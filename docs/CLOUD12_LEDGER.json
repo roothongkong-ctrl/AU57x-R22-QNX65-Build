@@ -1,7 +1,7 @@
 {
   "project": "2017 Audi A6L C7 MHI2_CN_AU57x_K1006_2 MU1005",
   "schema_version": 1,
-  "branch_baseline": "R25",
+  "branch_baseline": "R41",
   "installable": false,
   "vehicle_verified": false,
   "evidence_scope": "Public source / archived static audit / QNX isolated CI; no real OEM Bluetooth/iAP2/MFi/iPhone execution",
@@ -42,7 +42,13 @@
       "id": 4,
       "title": "蓝牙 RFCOMM/iAP2/MFi",
       "status": "PARTIAL",
-      "blocker": "实际 BlueSDK callback 和合法 MFi 认证链未验证"
+      "blocker": "R41已实现基于原厂libairplay.so MFi证书/签名导出的真实API调用适配和AA00-AA05 iAP2 CONTROL认证消息状态机，仍缺真实BlueSDK到原厂iAP2资源管理器端点及可信iPhone认证成功回调，不能宣告完整认证。",
+      "evidence": [
+        "project/source/src/cp_step04_stock_mfi.c",
+        "project/source/src/cp_step04_iap2_auth.c",
+        "tests/test_step04_stock_mfi.c",
+        "docs/R41_STOCK_MFI_INTEGRATION_CN.md"
+      ]
     },
     {
       "id": 5,

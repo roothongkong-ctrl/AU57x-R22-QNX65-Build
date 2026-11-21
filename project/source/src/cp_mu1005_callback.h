@@ -21,10 +21,8 @@ struct cp_mu_callback {
 };
 struct cp_mu_reader {
  void *opaque;
- /* Strict independent owner and paired identity attestations are mandatory. */
  int (*owner_thread)(void *);
  int (*paired_identity)(void *,uint32_t association,uint8_t mac[6]);
- /* Read only from verified live vendor memory; never use direct casts. */
  int (*read_live)(void *,uint32_t address,uint8_t *out,size_t n);
 };
 int cp_mu_decode_snapshot(const uint8_t *snapshot,size_t n,

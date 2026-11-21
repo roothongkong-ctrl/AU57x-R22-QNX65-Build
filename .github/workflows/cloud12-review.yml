@@ -33,6 +33,8 @@ jobs:
         run: bash ci/host_mu1005_callback.sh
       - name: MU1005 callback snapshot to normalized RFCOMM queue (host)
         run: bash ci/host_mu1005_bridge.sh
+      - name: Original MU1005 stock MFi + iAP2 CONTROL mock protocol validation
+        run: bash ci/host_step04_stock_mfi.sh
       - name: Assemble source-only review ZIP and SHA256
         if: always()
         run: bash ci/build_cloud_review_bundle.sh

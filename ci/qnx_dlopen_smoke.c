@@ -135,6 +135,14 @@ int main(void) {
         puts("AU57X_R39_BRIDGE_SYMBOL_MISSING");dlclose(h);return 19;
     }
     puts("AU57X_R39_BRIDGE_LOADED_OK");
+    /* Stock MFi is deliberately NOT invoked inside QEMU. */
+    if (!dlsym(h,"cp_stock_mfi_bind") || !dlsym(h,"cp_stock_mfi_sign") ||
+        !dlsym(h,"cp_auth_receive") || !dlsym(h,"cp_auth_tx_confirm") ||
+        !dlsym(h,"cp_step04_dispatch")) {
+       puts("AU57X_R41_STOCK_MFI_AUTH_SYMBOL_MISSING");
+       dlclose(h);return 19;
+    }
+    puts("AU57X_R41_STOCK_MFI_AUTH_SYMBOL_LOADED_OK");
     {int test=r24_contract(h);if(test){printf("AU57X_R24_CONTRACT_FAIL=%d\n",test);dlclose(h);return 20+test;}}
     if (dlclose(h) != 0) {
         puts("AU57X_DLCLOSE_FAILED");
