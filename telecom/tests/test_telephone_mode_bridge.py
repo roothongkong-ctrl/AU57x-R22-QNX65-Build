@@ -44,7 +44,7 @@ class TelephoneBridgeTests(unittest.TestCase):
         r = check_telephone(self.synthetic())
         self.assertFalse(r["sim_specific_mode_value_identified"])
         self.assertFalse(r["gh_cloud_executed_on_original_elf"])
-        self.assertIn("not_proven", r["what_is_not_proven"]) if False else None
+        self.assertIn("caller supplied 1", r["what_is_not_proven"])
 
 
 if __name__ == "__main__":
