@@ -36,7 +36,7 @@ static void fail_invalid(int manual, int mode, const char *plmn,
 }
 
 int main(void) {
-    static const char *ct[] = {"46003", "46005", "46011", "46012"};
+    static const char *ct[] = {"46003", "46005", "46011"};
     static const char *cm[] = {"46000", "46002", "46007", "46008"};
     static const char *cu[] = {"46001", "46006"};
     size_t i;
@@ -64,6 +64,7 @@ int main(void) {
     expect(0, 1, "46003", 1, "AT+COPS=0,2,,0");
     expect(0, 0, "46003", 1, "AT+COPS=0,2");
     expect(0, 2, "46000", 1, "AT+COPS=0,2");
+    expect(1, 1, "46012", 1, "AT+COPS=1,2,46012,0");
     expect(1, 1, "46099", 1, "AT+COPS=1,2,46099,0");
     fail_invalid(1, -1, "46003", 1);
     fail_invalid(5, 1, "46003", 1);
