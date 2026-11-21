@@ -42,6 +42,18 @@ class EvidenceGateTest(unittest.TestCase):
         with patch("cloud12_gate.subprocess.run",side_effect=subprocess.CalledProcessError(1,"git")):
             errs,_=audit(self.root)
         self.assertTrue(any("Cannot inspect tracked files" in e for e in errs),errs)
+    def test_proprietary_binary_in_git_index_rejected(self):
+        (self.root/".git").mkdir()
+        indexed=subprocess.CompletedProcess(["git","ls-files"],0,stdout=b"src/bridge.c\\x00private/oem_btstack.so\\x00",stderr=b"")
+        with patch("cloud12_gate.subprocess.run",return_value=indexed):
+            errs,_=audit(self.root)
+        self.assertTrue(any("Binary/key files tracked" in e and "oem_btstack.so" in e for e in errs),errs)
+    def test_clean_git_index_passes(self):
+        (self.root/".git").mkdir()
+        indexed=subprocess.CompletedProcess(["git","ls-files"],0,stdout=b"src/bridge.c\\x00tests/test_cloud12_gate.py\\x00",stderr=b"")
+        with patch("cloud12_gate.subprocess.run",return_value=indexed):
+            errs,_=audit(self.root)
+        self.assertFalse(errs,errs)
     def test_json_only_fixture_skips_git_scan(self):
         with patch("cloud12_gate.subprocess.run",side_effect=OSError("git unavailable")):
             errs,_=audit(self.root)
