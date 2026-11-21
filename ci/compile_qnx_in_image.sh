@@ -26,7 +26,13 @@ for s in "${sources[@]}"; do
    "$CC" "${flags[@]}" -c "$s" -o "$OUT/objects/$b.o"
 done
 printf 'LINK QNX .so\n'
-"$CC" -shared -Wl,-Bsymbolic-functions -Wl,--hash-style=sysv   -o "$OUT/libau57x_r22_native_qnx_REVIEW_ONLY.so" "$OUT"/objects/*.o
+# Keep a direct NEEDED entry for QNX libc.so.3: the ordinary
+# -shared link permits unresolved externals and drops libc on this SDK.
+# --no-as-needed only applies to this one explicit QNX system library.
+"$CC" -shared -Wl,-Bsymbolic-functions -Wl,--hash-style=sysv \
+  -o "$OUT/libau57x_r22_native_qnx_REVIEW_ONLY.so" \
+  "$OUT"/objects/*.o -Wl,--no-as-needed -lc -Wl,--as-needed
+"$RE" -d "$OUT/libau57x_r22_native_qnx_REVIEW_ONLY.so" | tee "$OUT/logs/dynamic_deps.txt"
 "$RE" -h -A -d "$OUT/libau57x_r22_native_qnx_REVIEW_ONLY.so" > "$OUT/logs/readelf.txt"
 file "$OUT/libau57x_r22_native_qnx_REVIEW_ONLY.so" | tee "$OUT/logs/file.txt"
 echo 'LINKED: QNX native file generated. NO_GO for installation; not runtime validated.'
