@@ -13,8 +13,8 @@ EXPECTED_SHA = "67755ff17740728290ce758e80d57904cb6b105bbf4f780d803e97ab5f60f1d2
 EXPECTED_SIZE = 19296
 MARKERS = {
     "huawei_me909au_821_literal": (0x3AB0, b"ME909Au-821\x00"),
-    "huawei_ati1_query_literal": (0x3A08, b"ATI1\x00"),
-    "huawei_ati51_query_literal": (0x3D68, b"ATI51\x00"),
+    "huawei_ati1_query_literal": (0x3A08, b"ATI1\r"),
+    "huawei_ati51_query_literal": (0x3D68, b"ATI51\r"),
     "huawei_software_switch_marker": (0x37B4, b"/ramdisk/huawei_me909au_821\x00"),
     "cinterion_als6a_model_literal": (0x3FF8, b"ALS6A\x00"),
     "cinterion_ah6a_model_literal": (0x429C, b"AH6A\x00"),
