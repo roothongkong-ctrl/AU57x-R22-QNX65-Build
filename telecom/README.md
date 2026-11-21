@@ -35,3 +35,20 @@ python3 telecom/tools/audit.py --nad /private/path/nad --telephone /private/path
 ```
 
 **验证范围声明：** GitHub Actions 的绿勾只证明这些无硬件测试通过，**不证明中国电信 LTE 已注册或车机可联网**。
+
+## 2026-11-22 最新云端研发进度（独立分支，无实车写入）
+
+- R03：原厂 nad ARM 取值点（请求+0x10）与 3 个调用点，telephone NADServicesProxy 第三个参数不改动 mode。详见 `docs/R03_OEM_MODE_PATH_CN.md`。
+- R04：已实现 `qnx/ct_network_policy_sim.c`，这是**仅对电信 PLMN 的纯字符串假设模拟器**；中国移动/联通和自动选网模板保持原样。已通过 Ubuntu GCC C 主机测试 33 例，QNX ARM 交叉编译结果由 GitHub Actions run 44933653525 记录。该 .so 绝对不可上车安装。
+- R05：读取原厂 NADUtil（只读）确认华为 ME909Au-821、Cinterion ALS6A/AH6A 多设备家族分支。尚未证明实际安装哪个型号。切勿在车机运行 NADUtil 冒充只读工具；它会触碰串口。
+- R03/R04 研究 CI run 44933415402，64 个 Python 离线/负向测试通过，生成非安装性 ZIP。
+- `INSTALL_GATE=BLOCKED`：尚无证据证明电信 SIM 实际 `mode=1`、无修复点/真实 LTE 注册/移动卡回归。
+- 原厂 ELF 不上传至公开仓库。继续研发必须解决上游模式分配与当前原车网络注册状态证据，**GitHub 云端模拟通过不能充当运营商联网证明**。
+
+## 工程入口
+
+- `tools/telephone_mode_bridge.py`：真实 SHA 限定的转发函数字节校验（仅在本地有授权 ELF 时可用）。
+- `tools/nadutil_families.py`：原厂管理程序模块族的原字节偏移校验（仅在本地）。
+- `tools/registration_triage.py`：已有脱敏文本日志的只读分析；不操作设备。
+- `tools/release_gate.py`、`tools/transaction_sim.py`、`tools/package_review.py`：安装拒绝、模拟恢复和研究包。
+- `ci/build_qnx_policy_sim.sh`：QNX6.5 ARM 源码交叉编译（明确 NO_INSTALL）。
