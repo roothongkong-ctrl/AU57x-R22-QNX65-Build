@@ -1,0 +1,29 @@
+name: AU57x cloud-only 12-step evidence and lifecycle gates (NO INSTALL)
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  evidence-and-lifecycle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Independent 12-step evidence ledger and fail-closed audit
+        run: |
+          python3 tools/cloud12_gate.py --report cloud12_result/summary.json
+      - name: Mutation-negative evidence regressions
+        run: python3 -m unittest discover -s tests -p test_cloud12_gate.py -v
+      - name: Handoff/wired-priority state machine ASan UBSan
+        run: bash ci/host_handoff.sh
+      - name: Publish cloud-only evidence report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AU57x-cloud12-evidence-NO-INSTALL
+          path: cloud12_result/
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,93 @@
+{
+  "project": "2017 Audi A6L C7 MHI2_CN_AU57x_K1006_2 MU1005",
+  "schema_version": 1,
+  "branch_baseline": "R25",
+  "installable": false,
+  "vehicle_verified": false,
+  "evidence_scope": "Public source / archived static audit / QNX isolated CI; no real OEM Bluetooth/iAP2/MFi/iPhone execution",
+  "steps": [
+    {
+      "id": 1,
+      "title": "固件基线与交接",
+      "status": "DONE",
+      "evidence": [
+        "README.md",
+        "docs/R25_GITHUB_REUSE_MU1005_CN.md"
+      ]
+    },
+    {
+      "id": 2,
+      "title": "原厂接口及关键文件静态对照",
+      "status": "PARTIAL",
+      "evidence": [
+        "docs/STEP04_STATIC_EVIDENCE.json",
+        "docs/STEP05_MU1005_USB_PLUGIN_ABI_AUDIT.json",
+        "docs/R25_GITHUB_REUSE_MATRIX.json"
+      ],
+      "blocker": "缺原厂蓝牙 iAP2 端点 owner、动态回调及 mm-ipod 跨进程链"
+    },
+    {
+      "id": 3,
+      "title": "QNX 6.5 原生编译与隔离加载",
+      "status": "DONE",
+      "evidence": [
+        ".github/workflows/qnx65-compile.yml"
+      ],
+      "scope": "19模块研究库 ELF/QEMU；非原厂进程装车"
+    },
+    {
+      "id": 4,
+      "title": "蓝牙 RFCOMM/iAP2/MFi",
+      "status": "PARTIAL",
+      "blocker": "实际 BlueSDK callback 和合法 MFi 认证链未验证"
+    },
+    {
+      "id": 5,
+      "title": "Wi-Fi 2.4/5GHz",
+      "status": "PARTIAL",
+      "blocker": "射频频段/热点切换的车机能力与关联未验证"
+    },
+    {
+      "id": 6,
+      "title": "AirPlay 发现及会话",
+      "status": "PARTIAL",
+      "blocker": "Bonjour/mDNS、身份和合法原厂 DIO 监听未验证"
+    },
+    {
+      "id": 7,
+      "title": "无线会话接入原厂CarPlay",
+      "status": "PARTIAL",
+      "blocker": "SI/DIO 动态 owner 与 DIO 子进程交接未实现"
+    },
+    {
+      "id": 8,
+      "title": "视频音频旋钮方向盘",
+      "status": "BLOCKED",
+      "blocker": "媒体与控制 OEM runtime 端点尚未连通"
+    },
+    {
+      "id": 9,
+      "title": "自动连接重连及频段回退",
+      "status": "PARTIAL",
+      "blocker": "只有状态机；缺真实无线/有线回调和射频验证"
+    },
+    {
+      "id": 10,
+      "title": "GitHub 云端集成与自动验收",
+      "status": "PARTIAL",
+      "blocker": "离线及QEMU门禁可在云端跑完；原厂跨进程集成无法模拟确认"
+    },
+    {
+      "id": 11,
+      "title": "SD安装备份恢复",
+      "status": "PARTIAL",
+      "blocker": "无已验证写入清单及同版车机恢复路径；不生产可刷写载荷"
+    },
+    {
+      "id": 12,
+      "title": "最终实车安装/验收",
+      "status": "NOT_STARTED",
+      "blocker": "需要真车与iPhone"
+    }
+  ]
+}
