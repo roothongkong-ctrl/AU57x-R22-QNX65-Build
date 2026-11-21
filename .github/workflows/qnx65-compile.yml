@@ -1,4 +1,4 @@
-name: AU57x R23 QNX6.5 ARMv7 (REVIEW ONLY)
+name: AU57x R24 QNX6.5 ARMv7 (REVIEW ONLY)
 on:
   push:
     branches: [main]
@@ -24,7 +24,7 @@ jobs:
           if git ls-files | grep -Ei '\.(so|dll|elf|img|bin|7z|spk|key|pem|p12|pfx|o|a|zip)$'; then
             echo 'ERROR: this public repository must not contain proprietary binaries or keys'; exit 3
           fi
-          test "$(find project/source -name '*.c' | wc -l)" -eq 16
+          test "$(find project/source -name '*.c' | wc -l)" -eq 18
       - name: Create artifact log folder
         run: mkdir -p qnx_build_result/logs
       - name: Clone public toolchain source
@@ -49,7 +49,7 @@ jobs:
         run: |
           set -o pipefail
           python3 project/tools/qnx_elf_gate.py \
-            --candidate qnx_build_result/libau57x_r23_native_qnx_REVIEW_ONLY.so \
+            --candidate qnx_build_result/libau57x_r24_native_qnx_REVIEW_ONLY.so \
             --output qnx_build_result/logs/qnx_elf_gate.json \
             2>&1 | tee qnx_build_result/logs/elf_gate_stdout.log
       - name: QNX6.5 QEMU runtime dlopen smoke (no OEM calls)
@@ -71,7 +71,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: AU57x-R23-QNX65-review-only
+          name: AU57x-R24-QNX65-review-only
           path: qnx_build_result/
           if-no-files-found: warn
           retention-days: 7

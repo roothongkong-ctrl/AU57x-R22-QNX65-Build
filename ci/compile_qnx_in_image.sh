@@ -16,10 +16,10 @@ printf 'Toolchain: '; command -v "$CC"
 printf 'SDK: QNX_HOST=%s QNX_TARGET=%s\n' "${QNX_HOST:-missing}" "${QNX_TARGET:-missing}"
 test -e "${QNX_TARGET:-/nonexistent}/armle-v7/lib/libc.so.3" || { echo 'ERROR: QNX libc.so.3 missing'; exit 42; }
 "$CC" -dM -E -x c /dev/null | grep -E '(__QNXNTO__|__QNX__|__NTO__)' | head -10
-mapfile -t sources < <(find "$P/source/src" "$P/source/legacy_mu1005/airplay" -maxdepth 1 -name '*.c' | sort)
-[ "${#sources[@]}" = 16 ] || { echo "ERROR: expected 16 C files got ${#sources[@]}"; exit 44; }
+mapfile -t sources < <(find "$P/source/src" "$P/source/legacy_mu1005/airplay" "$P/source/legacy_mu1005/bluetooth" -maxdepth 1 -name '*.c' | sort)
+[ "${#sources[@]}" = 18 ] || { echo "ERROR: expected 18 C files got ${#sources[@]}"; exit 44; }
 flags=(-std=c99 -O2 -Wall -Wextra -Werror -fPIC -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp -mno-unaligned-access
-       -I"$P/source/src" -I"$P/source/legacy_mu1005/airplay")
+       -I"$P/source/src" -I"$P/source/legacy_mu1005/airplay" -I"$P/source/legacy_mu1005/bluetooth")
 for s in "${sources[@]}"; do
    b=$(basename "$s" .c)
    printf 'COMPILE %s\n' "$b"
@@ -30,12 +30,12 @@ printf 'LINK QNX .so\n'
 # -shared link permits unresolved externals and drops libc on this SDK.
 # --no-as-needed only applies to this one explicit QNX system library.
 "$CC" -shared -Wl,-Bsymbolic-functions -Wl,--hash-style=sysv \
-  -o "$OUT/libau57x_r23_native_qnx_REVIEW_ONLY.so" \
+  -o "$OUT/libau57x_r24_native_qnx_REVIEW_ONLY.so" \
   "$OUT"/objects/*.o -Wl,--no-as-needed -lc -lsocket -Wl,--as-needed
-$RE -d "$OUT/libau57x_r23_native_qnx_REVIEW_ONLY.so" | tee "$OUT/logs/dynamic_deps.txt"
-"$RE" -h -A -d "$OUT/libau57x_r23_native_qnx_REVIEW_ONLY.so" > "$OUT/logs/readelf.txt"
-if ! "$RE" -d "$OUT/libau57x_r23_native_qnx_REVIEW_ONLY.so" | grep -q "Shared library: \[libsocket.so.3\]"; then
+$RE -d "$OUT/libau57x_r24_native_qnx_REVIEW_ONLY.so" | tee "$OUT/logs/dynamic_deps.txt"
+"$RE" -h -A -d "$OUT/libau57x_r24_native_qnx_REVIEW_ONLY.so" > "$OUT/logs/readelf.txt"
+if ! "$RE" -d "$OUT/libau57x_r24_native_qnx_REVIEW_ONLY.so" | grep -q "Shared library: \[libsocket.so.3\]"; then
   echo "ERROR: native socket library dependency missing"; exit 45
 fi
-file "$OUT/libau57x_r23_native_qnx_REVIEW_ONLY.so" | tee "$OUT/logs/file.txt"
+file "$OUT/libau57x_r24_native_qnx_REVIEW_ONLY.so" | tee "$OUT/logs/file.txt"
 echo 'LINKED: QNX native file generated. NO_GO for installation; not runtime validated.'
