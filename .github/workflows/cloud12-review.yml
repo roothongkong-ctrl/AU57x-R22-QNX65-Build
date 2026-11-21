@@ -29,6 +29,8 @@ jobs:
         run: bash ci/host_radio_policy.sh
       - name: SD transaction isolated rollback and fail-closed simulations
         run: python3 -m unittest discover -s tests -p test_cloud_sd_transaction_sim.py -v
+      - name: Pinned MU1005 callback snapshots and negative memory tests
+        run: bash ci/host_mu1005_callback.sh
       - name: Assemble source-only review ZIP and SHA256
         if: always()
         run: bash ci/build_cloud_review_bundle.sh

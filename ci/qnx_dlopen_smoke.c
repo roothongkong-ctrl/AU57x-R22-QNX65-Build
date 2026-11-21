@@ -127,6 +127,10 @@ int main(void) {
         puts("AU57X_R36_RADIO_MODEL_SYMBOL_MISSING");dlclose(h);return 19;
     }
     puts("AU57X_R36_RADIO_MODEL_LOADED_OK");
+    if (!dlsym(h,"cp_mu_decode_snapshot")) {
+        puts("AU57X_R38_CALLBACK_PARSER_MISSING");dlclose(h);return 19;
+    }
+    puts("AU57X_R38_CALLBACK_PARSER_LOADED_OK");
     {int test=r24_contract(h);if(test){printf("AU57X_R24_CONTRACT_FAIL=%d\n",test);dlclose(h);return 20+test;}}
     if (dlclose(h) != 0) {
         puts("AU57X_DLCLOSE_FAILED");
