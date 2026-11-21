@@ -3,6 +3,8 @@
 import json
 import shutil
 import tempfile
+import subprocess
+from unittest.mock import patch
 import unittest
 from pathlib import Path
 from sys import path as syspath
@@ -35,6 +37,15 @@ class EvidenceGateTest(unittest.TestCase):
         self.assertFalse(errs,errs)
         self.assertEqual(report["completed_steps"],[1,2,3,10])
         self.assertFalse(report["installable"])
+    def test_tracked_file_scan_failure_fails_closed(self):
+        (self.root/".git").mkdir()
+        with patch("cloud12_gate.subprocess.run",side_effect=subprocess.CalledProcessError(1,"git")):
+            errs,_=audit(self.root)
+        self.assertTrue(any("Cannot inspect tracked files" in e for e in errs),errs)
+    def test_json_only_fixture_skips_git_scan(self):
+        with patch("cloud12_gate.subprocess.run",side_effect=OSError("git unavailable")):
+            errs,_=audit(self.root)
+        self.assertFalse(errs,errs)
     def test_lies_about_installation_rejected(self):
         self.change(PATHS[0],lambda x:x.update(installable=True))
         self.assertTrue(audit(self.root)[0])
