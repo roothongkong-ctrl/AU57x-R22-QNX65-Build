@@ -49,5 +49,7 @@ int cp_lk_queue_control(struct cp_step04_link *,const uint8_t *,size_t,
 int cp_lk_tick(struct cp_step04_link *,uint64_t now_ms);
 int cp_lk_drain_rf(struct cp_step04_link *,AuRfIngress *);
 int cp_lk_peek(const struct cp_step04_link *,const uint8_t **,size_t *);
+/* Consume fully committed TCP output, never discard a partially sent frame. */
+int cp_lk_consume(struct cp_step04_link *,const uint8_t *,size_t);
 void cp_lk_revoke(struct cp_step04_link *);
 #endif

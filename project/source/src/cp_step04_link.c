@@ -201,6 +201,14 @@ int cp_lk_peek(const struct cp_step04_link *l,const uint8_t **p,size_t *n){
  if(!l||!p||!n||!l->count)return 0;
  *p=l->output[l->head].data;*n=l->output[l->head].size;return 1;
 }
+int cp_lk_consume(struct cp_step04_link *l,const uint8_t *data,size_t n){
+ if(!l||!data||!l->count)return CP_LK_BAD;
+ if(!live(l))return CP_LK_OWNER;
+ const struct cp_lk_wire *w=&l->output[l->head];
+ if(!n||w->size!=n||memcmp(w->data,data,n)!=0)return CP_LK_BAD;
+ l->head=(l->head+1u)%CP_LK_OUTPUT_SLOTS;--l->count;
+ return CP_LK_OK;
+}
 int cp_lk_drain_rf(struct cp_step04_link *l,AuRfIngress *rf){
  if(!l||!rf)return CP_LK_BAD;
  if(!live(l))return CP_LK_OWNER;
@@ -215,6 +223,5 @@ int cp_lk_drain_rf(struct cp_step04_link *l,AuRfIngress *rf){
  for(int i=0;i<4;i++)normalized[4+i]=(uint8_t)(rf->generation>>(8*i));
  memcpy(normalized+8,w->data,n);
  if(au_rf_daemon_data(rf,normalized,n+8)!=0){cp_lk_revoke(l);return CP_LK_DEAD_LINK;}
- l->head=(l->head+1u)%CP_LK_OUTPUT_SLOTS;--l->count;
- return CP_LK_OK;
+ return cp_lk_consume(l,w->data,n);
 }
