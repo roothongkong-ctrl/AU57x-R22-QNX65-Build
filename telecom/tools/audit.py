@@ -171,7 +171,7 @@ def audit(nad=None, telephone=None):
         "report_status": "EVIDENCE_ONLY",
         "firmware": "MHI2_CN_AU57x_K1006_2/MU1005",
         "apn_original_records": APN_RECORDS,
-        "apn_telecom_entries_missing_in_original": ["46003", "46005", "46011", "46012"],
+        "apn_telecom_entries_missing_in_original": ["46003", "46005", "46011"],
         "baseline_observations": {
             "chn_ct_seen_in_scan": True,
             "lte_registration_proven": False,
