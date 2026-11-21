@@ -39,6 +39,8 @@ jobs:
         run: bash ci/host_step04_link.sh
       - name: RFCOMM to iAP2 link to original MFi auth end-to-end mock (ASan UBSan)
         run: bash ci/host_step04_session.sh
+      - name: OEM R14 native registration and callback replay (host fixtures only)
+        run: bash ci/host_r14_native.sh
       - name: Assemble source-only review ZIP and SHA256
         if: always()
         run: bash ci/build_cloud_review_bundle.sh

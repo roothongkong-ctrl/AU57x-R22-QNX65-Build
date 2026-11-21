@@ -1,7 +1,7 @@
 {
   "project": "2017 Audi A6L C7 MHI2_CN_AU57x_K1006_2 MU1005",
   "schema_version": 1,
-  "branch_baseline": "R44",
+  "branch_baseline": "R45",
   "installable": false,
   "vehicle_verified": false,
   "evidence_scope": "Public source / archived static audit / QNX isolated CI; no real OEM Bluetooth/iAP2/MFi/iPhone execution",
@@ -42,7 +42,7 @@
       "id": 4,
       "title": "蓝牙 RFCOMM/iAP2/MFi",
       "status": "PARTIAL",
-      "blocker": "R44已将开源iAP2链路子集和AU57x归一化RFCOMM数据队列串联到原厂MFi AA00-AA05接口，主机端到端测试通过；仍未找到/调用实车原厂BlueSDK owner、真实OEM iAP2会话端点与真机iPhone认证成功事件，不能标DONE。",
+      "blocker": "R14同版原厂BlueSDK注册/SDP/事件QNX C代码已整合，40/40原厂指令静态吻合；仍缺真车进程的SDK生命周期/owner回调/已配对身份/运行时MFi证据。",
       "evidence": [
         "project/source/src/cp_step04_stock_mfi.c",
         "project/source/src/cp_step04_iap2_auth.c",
@@ -51,7 +51,10 @@
         "project/source/src/cp_step04_link.c",
         "project/source/src/cp_step04_session.c",
         "tests/test_step04_session.c",
-        "docs/R44_FULL_LINK_TO_STOCK_MFI_CN.md"
+        "docs/R44_FULL_LINK_TO_STOCK_MFI_CN.md",
+        "docs/R45_NATIVE_BLUESDK_MU1005_CN.md",
+        "docs/R45_MU1005_BTSTACK_STATIC_RECHECK.json",
+        "project/source/legacy_mu1005/bluetooth/native_binding.c"
       ]
     },
     {

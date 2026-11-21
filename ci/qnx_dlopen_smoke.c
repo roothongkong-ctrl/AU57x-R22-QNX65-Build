@@ -135,6 +135,13 @@ int main(void) {
         puts("AU57X_R39_BRIDGE_SYMBOL_MISSING");dlclose(h);return 19;
     }
     puts("AU57X_R39_BRIDGE_LOADED_OK");
+    /* Original R14 native binder is QNX-only and must remain uninvoked in QEMU. */
+    if (!dlsym(h,"mu_bt_native_attach") || !dlsym(h,"mu_bt_native_tick") ||
+        !dlsym(h,"mu_bt_native_withdraw")) {
+      puts("AU57X_R45_NATIVE_BLUE_SDK_BINDER_MISSING");
+      dlclose(h);return 20;
+    }
+    puts("AU57X_R45_NATIVE_BLUE_SDK_BINDER_LOADED_NO_CALL");
     /* Stock MFi is deliberately NOT invoked inside QEMU. */
     if (!dlsym(h,"cp_stock_mfi_bind") || !dlsym(h,"cp_stock_mfi_sign") ||
         !dlsym(h,"cp_auth_receive") || !dlsym(h,"cp_auth_tx_confirm") ||

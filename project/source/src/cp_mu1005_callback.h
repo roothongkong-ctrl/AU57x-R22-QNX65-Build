@@ -4,8 +4,9 @@
  */
 #ifndef CP_MU1005_CALLBACK_H
 #define CP_MU1005_CALLBACK_H
-#include <stdint.h>
+#include <sys/types.h>
 #include <stddef.h>
+#include <stdint.h>
 #define CP_MU_MAX_PAYLOAD 5035u
 enum cp_mu_result {
  CP_MU_OK=0, CP_MU_BAD=-1, CP_MU_STALE=-2,

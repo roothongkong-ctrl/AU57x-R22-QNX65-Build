@@ -1,0 +1,215 @@
+{
+  "target": "MHI2_CN_AU57x_K1006_2 / MU1005 R29 70-app.img reference",
+  "sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
+  "reference_sha_matches": true,
+  "word_count": 40,
+  "matching": 40,
+  "static_pass": true,
+  "runtime_owner_proven": false,
+  "real_iap2_endpoint_proven": false,
+  "carplay_working_proven": false,
+  "installable": false,
+  "rows": [
+    {
+      "address": "0x277a18",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277a1c",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277a20",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277a24",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x2779b4",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x2779b8",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x2779bc",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x2779c0",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x207244",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x207248",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x20724c",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x207250",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x2071c4",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x2071c8",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x2071cc",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x2071d0",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x27733c",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277340",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277344",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277348",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277074",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277078",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x27707c",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277080",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x2771f8",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x2771fc",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277200",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277204",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x2773f8",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x2773fc",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277400",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277404",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x27715c",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277160",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277164",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x277168",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x276f74",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x276f78",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x276f7c",
+      "matches": true,
+      "executable": true
+    },
+    {
+      "address": "0x276f80",
+      "matches": true,
+      "executable": true
+    }
+  ],
+  "r14_native_registration_source_recovered": true
+}

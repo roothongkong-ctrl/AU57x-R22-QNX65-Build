@@ -10,3 +10,5 @@
 公开的研究成果不包含 Apple 密钥、配对机密、专有的 QNX SDK、奥迪 OEM ELF 或已经可刷写的安装包。第三方授权不能以“研究测试通过”代替原厂实车验证。
 
 - R43: `project/source/src/cp_step04_link.[ch]` is a bounded C99 adaptation of Luka iAP2 link sans-I/O code at https://github.com/luka-dev/mib2q-carplay-rgi/blob/main/wireless/daemon/vendor/iap2-link/src/lib.rs (GPL-3.0). Changes: C99 fixed-size buffers, AU57x generation/owner guards, single outstanding CONTROL message, normalized RFCOMM queue; not a complete port.
+
+- R45：`project/source/legacy_mu1005/bluetooth/{native_binding,native_event,inbound,inbound_r5}.[ch]` 直接来自用户此前提供的 `R14_FINAL.zip` 历史AU57x工程，保留R14原始实现及安全门禁；蓝牙OEM不在公开仓库，固件地址仅限静态哈希绑定样本。

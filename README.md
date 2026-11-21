@@ -10,3 +10,6 @@ Read [云端研发审查说明](docs/CLOUD_README_CN.md), [12-step evidence ledg
 
 ### R41 Step 04 (research only)
 Stock MU1005 `libairplay.so` certificate/signature functions are now used through an owner-attested `dlsym` API, and iAP2 CSM messages AA00–AA05 have an ordered, fail-closed handoff to the wireless control gate. **No live OEM BlueSDK to iAP2 session or actual iPhone/MFi success is proven.** See `docs/R41_STOCK_MFI_INTEGRATION_CN.md`.
+
+### R45 pinned native MU1005 BlueSDK interface (NO INSTALL)
+Four original R14 ARM/QNX source modules are restored and compiled in the research build: owner-gated RFCOMM registration + SDP records + event RX/TX and teardown. Private OEM `btstack` SHA-256 and 40/40 executable words were independently rechecked. Neither true OEM process ownership nor iPhone authentication is proven. See `docs/R45_NATIVE_BLUESDK_MU1005_CN.md`.
