@@ -75,6 +75,20 @@ def audit(root):
                 "Static high-level DSI symbols must never be promoted to live iAP2",errors)
     except (OSError,ValueError) as e:
         errors.append("Missing high-level DSI evidence: "+str(e))
+    try:
+        ipod=read_json(root,"docs/R31_MM_IPOD_AUDIT.json")
+        require(ipod.get("sha256")==usb.get("oem_sha256",{}).get("mm-ipod"),
+                "mm-ipod pinned digest mismatch",errors)
+        require(ipod.get("static_7_of_7") is True and
+                ipod.get("verdict")=="PASS_STATIC_LOADER_SAMPLE_ONLY",
+                "mm-ipod loader static findings missing",errors)
+        require(all(ipod.get(k) is False for k in
+                    ("runtime_selected_transport_proven",
+                     "bluetooth_transport_plugin_found",
+                     "bluetooth_to_mm_ipod_link_proven","vehicle_installable")),
+                "mm-ipod static loader was incorrectly promoted to working Bluetooth",errors)
+    except (OSError,ValueError) as e:
+        errors.append("Missing mm-ipod loader audit: "+str(e))
     # Reject proprietary firmware, Apple keys and prebuilt binary uploads in public git.
     try:
         cp=subprocess.run(["git","-C",str(root),"ls-files","-z"],check=True,

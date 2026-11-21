@@ -23,9 +23,10 @@
         "docs/STEP04_STATIC_EVIDENCE.json",
         "docs/STEP05_MU1005_USB_PLUGIN_ABI_AUDIT.json",
         "docs/R25_GITHUB_REUSE_MATRIX.json",
-        "docs/R29_BT_DSI_OWNER_AUDIT.json"
+        "docs/R29_BT_DSI_OWNER_AUDIT.json",
+        "docs/R31_MM_IPOD_AUDIT.json"
       ],
-      "blocker": "已找到 high-level bluetooth ASI service symbols；仍缺运行时注册、蓝牙 iAP2 实际端点 owner 和跨进程链"
+      "blocker": "原厂 SI/DIO、Bluetooth ASI server、mm-ipod动态加载器静态定位；仍缺 RFCOMM→iAP2 真实端点 owner、事件序列与安全生命周期"
     },
     {
       "id": 3,

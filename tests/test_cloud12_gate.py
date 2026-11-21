@@ -13,7 +13,8 @@ from cloud12_gate import audit
 
 PATHS=["docs/CLOUD12_LEDGER.json","docs/STEP04_STATIC_EVIDENCE.json",
        "docs/STEP05_MU1005_USB_PLUGIN_ABI_AUDIT.json",
-       "docs/R25_GITHUB_REUSE_MATRIX.json","docs/R29_BT_DSI_OWNER_AUDIT.json"]
+       "docs/R25_GITHUB_REUSE_MATRIX.json","docs/R29_BT_DSI_OWNER_AUDIT.json",
+       "docs/R31_MM_IPOD_AUDIT.json"]
 
 class EvidenceGateTest(unittest.TestCase):
     def setUp(self):
@@ -48,6 +49,9 @@ class EvidenceGateTest(unittest.TestCase):
         self.assertTrue(audit(self.root)[0])
     def test_fake_high_level_dynamic_owner_rejected(self):
         self.change(PATHS[4],lambda x:x.update(rfcomm_to_iap2_owner_proven=True))
+        self.assertTrue(audit(self.root)[0])
+    def test_false_ipod_bluetooth_link_rejected(self):
+        self.change(PATHS[5],lambda x:x.update(bluetooth_to_mm_ipod_link_proven=True))
         self.assertTrue(audit(self.root)[0])
     def test_truncated_ledger_rejected(self):
         self.change(PATHS[0],lambda x:x["steps"].pop())
