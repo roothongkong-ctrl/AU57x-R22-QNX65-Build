@@ -29,7 +29,7 @@ static int valid_plmn(const char *plmn) {
 }
 static int is_ct_plmn(const char *plmn) {
     return !strcmp(plmn, "46003") || !strcmp(plmn, "46005") ||
-           !strcmp(plmn, "46011") || !strcmp(plmn, "46012");
+           !strcmp(plmn, "46011");
 }
 
 /*
