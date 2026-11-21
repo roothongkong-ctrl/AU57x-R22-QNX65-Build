@@ -50,7 +50,8 @@ def inspect_zip(path):
                 errors.append("invalid entry")
                 continue
             name=entry.get("path")
-            if (not safe_path(name) or not name.startswith("payload/") or\n                not name.endswith((".txt",".md",".json"))):
+            if (not safe_path(name) or not name.startswith("payload/") or
+                not name.endswith((".txt",".md",".json"))):
                 errors.append("unsafe or executable payload path")
                 continue
             referenced.append(name)
