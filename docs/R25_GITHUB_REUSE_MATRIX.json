@@ -1,0 +1,79 @@
+{
+  "firmware": "MHI2_CN_AU57x_K1006_2/MU1005",
+  "step05_status": "INCOMPLETE_OEM_LIVE_BOUNDARY_NOT_PROVEN",
+  "exact_oem_btstack_sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
+  "R14_exact_ARM_instruction_verification": "40/40 bytes matched at pinned 40 addresses",
+  "reusable_layout": {
+    "rf_channel_size": 176,
+    "tx_descriptor_size": 100,
+    "sdp_record_size": 36,
+    "max_payload": 5035,
+    "callback_offset": 8,
+    "mtu_offset": 12,
+    "owner_context_offset": 20,
+    "callback_events": [
+      1,
+      2,
+      4,
+      5,
+      6
+    ]
+  },
+  "candidates": [
+    {
+      "repo": "luka-dev/mib2q-carplay-rgi",
+      "license": "GPL-3.0",
+      "use": "BT graft model and iAP2 session tests; port on exact firmware",
+      "direct_binary_compatible": false
+    },
+    {
+      "repo": "congobg/MHI2Q_WiFi_CarPlay",
+      "license": "unspecified",
+      "use": "working MHI2Q wireless architecture documentation; not code in public tree",
+      "direct_binary_compatible": false
+    },
+    {
+      "repo": "omonob/VW-MHI2-Wireless-Carplay-Maps",
+      "license": "GPL-3.0",
+      "use": "SD card backup, rollback, exact firmware gate, step12",
+      "direct_binary_compatible": false
+    },
+    {
+      "repo": "joeyQuery/MHI2-wirelessCarPlay",
+      "license": "unspecified",
+      "use": "MHI2 MU0678 endpoint comparison; not AU57x route proof",
+      "direct_binary_compatible": false
+    },
+    {
+      "repo": "lvalen91/CPC200-CCPA_resources",
+      "license": "MIT",
+      "use": "iAP2 message sequences and real adapter capture test references",
+      "direct_binary_compatible": false
+    },
+    {
+      "repo": "lvalen91/carplayd",
+      "license": "Unlicense (top level)",
+      "use": "Rust iAP2 protocol validation reference; Linux daemon not directly ported",
+      "direct_binary_compatible": false
+    },
+    {
+      "repo": "oguzkarcan/EntryNav2-CarPlay",
+      "license": "GPL-3.0",
+      "use": "portable protocol and BT interface design; BMW/BlueZ backend not QNX",
+      "direct_binary_compatible": false
+    },
+    {
+      "repo": "edzenis/mib2high-carplay-altscreen-rgi",
+      "license": "NOASSERTION",
+      "use": "MHI2 HUD/route guidance later step09, not RFCOMM",
+      "direct_binary_compatible": false
+    },
+    {
+      "repo": "yuedizhibo/MHI2Q-CarPlay-AltScreen",
+      "license": "multi-component",
+      "use": "MHI2Q cluster only; plain MHI2 unsupported",
+      "direct_binary_compatible": false
+    }
+  ],
+  "notes": "All reuse recommendations require license review and actual MU1005 owner/callback proof; not installable."
+}
