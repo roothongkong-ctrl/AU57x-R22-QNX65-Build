@@ -59,6 +59,9 @@ int main(void){
  assert(cp_stock_mfi_sign(&stock,(const uint8_t*)"short",5,buf,sizeof buf,&n)==CP_STOCK_INVALID);
  assert(sign_calls==0);
  assert(cp_auth_init(&auth,&stock,&a,7,3)==CP_AUTH_OK);
+ msg(x,0x1D00); /* identification interleaved before MFi certificate */
+ assert(cp_auth_receive(&auth,x,6)==CP_AUTH_UNRELATED);
+ assert(auth.stage==CP_AUTH_AWAIT_CERT);
  msg(x,0xAA05);
  assert(cp_auth_receive(&auth,x,6)==CP_AUTH_OWNER);
  assert(auth.stage==CP_AUTH_FAILED&&!cp_auth_live(&auth));
@@ -70,6 +73,9 @@ int main(void){
  assert(cp_auth_tx_confirm(&auth,cert_token+1)==CP_AUTH_ORDER);
  assert(!cp_auth_live(&auth));
  tx_ok=1;assert(cp_auth_tx_confirm(&auth,cert_token)==CP_AUTH_OK);
+ msg(x,0x1D03); /* identification acceptance may arrive mid-auth */
+ assert(cp_auth_receive(&auth,x,6)==CP_AUTH_UNRELATED);
+ assert(auth.stage==CP_AUTH_AWAIT_CHALLENGE);
  msg(x,0xAA02);x[3]=30;x[7]=24;
  for(int i=0;i<20;i++)x[10+i]=(uint8_t)i;
  assert(cp_auth_receive(&auth,x,29)==CP_AUTH_BAD&&auth.stage==CP_AUTH_FAILED);
@@ -84,6 +90,9 @@ int main(void){
  for(int i=0;i<20;i++)assert(sent[10+i]==(uint8_t)(i^0x5a));
  assert(cp_auth_tx_confirm(&auth,sent_token)==CP_AUTH_OK);
  assert(auth.stage==CP_AUTH_AWAIT_PEER&&!cp_auth_live(&auth));
+ msg(x,0x4E02);
+ assert(cp_auth_receive(&auth,x,6)==CP_AUTH_UNRELATED);
+ assert(auth.stage==CP_AUTH_AWAIT_PEER);
  peer_ok=1;msg(x,0xAA05);
  assert(cp_auth_receive(&auth,x,6)==CP_AUTH_OK&&cp_auth_live(&auth));
  struct cp_wireless wl;struct cp_session sess={0};

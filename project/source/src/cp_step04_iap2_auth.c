@@ -62,6 +62,10 @@ int cp_auth_receive(struct cp_step04_auth *a,const uint8_t *frame,size_t len){
  if(!authentic(a))return fail(a,CP_AUTH_OWNER);
  if(be16(frame)!=0x4040||be16(frame+2)!=len)return fail(a,CP_AUTH_BAD);
  id=be16(frame+4);
+ /* iAP2 identification/power messages can interleave with authentication.
+  * This handler owns AA00..AA05 ONLY. A complete non-auth frame is left
+  * untouched for the separate, authorized iAP2 control dispatcher. */
+ if(id<AA00||id>AA05)return CP_AUTH_UNRELATED;
  if(id==AA04)return fail(a,CP_AUTH_OEM);
  if(id==AA00){
   if(a->stage!=CP_AUTH_AWAIT_CERT||len!=6)return fail(a,CP_AUTH_ORDER);
