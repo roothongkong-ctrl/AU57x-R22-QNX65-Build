@@ -1,0 +1,101 @@
+name: AU57x China Telecom R03 - review bundle (NO INSTALL)
+
+on:
+  push:
+    branches:
+      - telecom-mode-trace-r01
+    paths:
+      - "telecom/**"
+      - ".github/workflows/telecom-r03-review-bundle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  research-review:
+    name: R03/R04 offline gate and recoverability simulation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated research branch
+        uses: actions/checkout@v4
+
+      - name: Deny proprietary binaries or keys in public repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -Ei '\.(so|dll|elf|img|bin|7z|spk|key|pem|p12|pfx|o|a|zip)$'; then
+            echo "BLOCKED: original OEM code/images/keys cannot enter public GitHub repository"
+            exit 3
+          fi
+
+      - name: Python source syntax and POSIX shell parse
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m compileall -q telecom
+          sh -n telecom/sd/READ_ONLY_PROBE.sh
+          sh -n telecom/sd/INSTALL_DISABLED.sh
+
+      - name: Source tests with strict R03 evidence gates
+        run: python3 -m unittest discover -s telecom/tests -v
+
+      - name: Produce offline model analysis only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 telecom/tools/audit.py --out telecom_result
+          python3 telecom/tools/release_gate.py \
+            --evidence telecom/evidence/release_evidence.default.json \
+            --out telecom_result/release_gate.json
+
+      - name: Confirm installer gate is BLOCKED
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path("telecom_result/release_gate.json").read_text())
+          s=json.loads(Path("telecom_result/status.json").read_text())
+          assert r["safe_to_build_vehicle_installer"] is False
+          assert r["safe_to_claim_telecom_lte_works"] is False
+          assert s["report_status"] == "EVIDENCE_ONLY"
+          assert s["live_modem_test"] is False
+          assert s["installer_produced"] is False
+          print("GATE_BLOCKED_AS_EXPECTED: research only, no OEM binary, no LTE claim")
+          PY
+
+      - name: Package SD read-only review materials
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 telecom/tools/package_review.py \
+            --base telecom --result-dir telecom_result \
+            --out telecom_result/AU57x_CT_R03_REVIEW_ONLY.zip
+          sha256sum telecom_result/*.json telecom_result/*.md \
+            telecom_result/*.zip > telecom_result/SHA256SUMS.txt
+
+      - name: Independent review ZIP integrity gate
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          p=Path("telecom_result/AU57x_CT_R03_REVIEW_ONLY.zip")
+          with ZipFile(p) as z:
+              names=z.namelist()
+              assert len(names)==8
+              assert not any(n.lower().endswith((".elf",".img",".bin",".so",".key",".7z")) for n in names)
+              assert b"exit 78" in z.read(next(n for n in names if n.endswith("INSTALL_DISABLED.sh")))
+          print("REVIEW_BUNDLE_ONLY: verified, no vehicle installer")
+          PY
+
+      - name: Upload R03 research and rollback-simulation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AU57x-CT-R03-OFFLINE-REVIEW-ONLY
+          path: telecom_result/
+          if-no-files-found: warn
+          retention-days: 14
