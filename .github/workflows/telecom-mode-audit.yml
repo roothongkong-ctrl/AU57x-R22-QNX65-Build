@@ -1,0 +1,65 @@
+name: AU57x China Telecom R01 - offline evidence (NO INSTALL)
+
+on:
+  push:
+    branches:
+      - telecom-mode-trace-r01
+    paths:
+      - "telecom/**"
+      - ".github/workflows/telecom-mode-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Mode provenance preflight and evidence gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated research branch
+        uses: actions/checkout@v4
+      - name: Refuse OEM binaries in this public repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -Ei '\.(so|dll|elf|img|bin|7z|spk|key|pem|p12|pfx|o|a|zip)$'; then
+            echo "BLOCKED: proprietary firmware/binaries must not be committed here"
+            exit 3
+          fi
+      - name: Prepare optional read-only ELF analysis dependencies
+        shell: bash
+        run: python3 -m pip install --disable-pip-version-check --quiet 'capstone>=5,<6' 'pyelftools>=0.31,<1'
+      - name: Python syntax validation
+        run: python3 -m compileall -q telecom
+      - name: Mode template and evidence boundary tests
+        run: python3 -m unittest discover -s telecom/tests -v
+      - name: Produce Chinese audit and machine readable status
+        run: python3 telecom/tools/audit.py --out telecom_result
+      - name: Verify report never claims LTE or firmware installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          x = json.loads(Path("telecom_result/status.json").read_text())
+          assert x["report_status"] == "EVIDENCE_ONLY"
+          assert x["mode_source_confirmed"] is False
+          assert x["live_modem_test"] is False
+          assert x["installer_produced"] is False
+          assert x["files"] == []
+          print("PASS: no OEM binary was used, no LTE registration claimed.")
+          PY
+      - name: Create checksums for audit deliverables
+        shell: bash
+        run: sha256sum telecom_result/status.json telecom_result/RESULTS_CN.md > telecom_result/SHA256SUMS.txt
+      - name: Upload cloud audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AU57x-Telecom-R01-EVIDENCE-ONLY
+          path: telecom_result/
+          if-no-files-found: warn
+          retention-days: 14
