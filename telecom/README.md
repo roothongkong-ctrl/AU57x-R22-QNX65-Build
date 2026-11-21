@@ -9,7 +9,7 @@
 - 原厂 `nad` 中 `NadStandardNetworkManager` 有 mode 值比较：`mode=1` 时手动选网构造 `AT+COPS=1,2,%s,0`（GSM）；其他模式 `AT+COPS=1,2,%s`。
 - 对自动选网，同一分支对应 `AT+COPS=0,2,,0` 与 `AT+COPS=0,2`；自动情况下模块最终行为仍须验证。
 - 实车手动搜到 `CHN-CT 可用`，选网显示无应答；这**不是**LTE 成功注册的证据。
-- 原厂 APN XML 共 874 条，缺失电信 460/03、05、11、12；仅补 `ctnet` 在实车无效。
+- 原厂 APN XML 共 874 条，缺失电信 460/03、05、11；仅补 `ctnet` 在实车无效。
 - 尚未知道电信卡实际 mode 值、mode 的上游赋值路径、模块准确型号/频段、实时 CEREG/REJINFO。
 
 ## 云端 R01 内容
