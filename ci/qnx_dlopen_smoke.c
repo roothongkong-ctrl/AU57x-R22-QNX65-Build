@@ -121,6 +121,12 @@ int main(void) {
         dlclose(h); return 18;
     }
     puts("AU57X_R24_SOCKET_ADAPTER_LOADED_OK");
+    /* New R36 radio policy is a pure model. No Wi-Fi hardware is accessed. */
+    if (!dlsym(h,"cp_radio_begin") || !dlsym(h,"cp_radio_select") ||
+        !dlsym(h,"cp_radio_association_result")) {
+        puts("AU57X_R36_RADIO_MODEL_SYMBOL_MISSING");dlclose(h);return 19;
+    }
+    puts("AU57X_R36_RADIO_MODEL_LOADED_OK");
     {int test=r24_contract(h);if(test){printf("AU57X_R24_CONTRACT_FAIL=%d\n",test);dlclose(h);return 20+test;}}
     if (dlclose(h) != 0) {
         puts("AU57X_DLCLOSE_FAILED");

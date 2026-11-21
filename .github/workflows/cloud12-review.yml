@@ -25,6 +25,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_sd_package_audit.py -v
       - name: Deterministic CSM parser fuzz plus encoder buffer sentinels
         run: bash ci/host_csm_fuzz.sh
+      - name: Verified capability-only dual-band and fallback policy ASan UBSan
+        run: bash ci/host_radio_policy.sh
       - name: Assemble source-only review ZIP and SHA256
         if: always()
         run: bash ci/build_cloud_review_bundle.sh
