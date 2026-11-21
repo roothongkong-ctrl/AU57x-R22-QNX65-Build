@@ -1,7 +1,7 @@
 {
   "project": "2017 Audi A6L C7 MHI2_CN_AU57x_K1006_2 MU1005",
   "schema_version": 1,
-  "branch_baseline": "R45",
+  "branch_baseline": "R50",
   "installable": false,
   "vehicle_verified": false,
   "evidence_scope": "Public source / archived static audit / QNX isolated CI; no real OEM Bluetooth/iAP2/MFi/iPhone execution",
@@ -41,8 +41,8 @@
     {
       "id": 4,
       "title": "蓝牙 RFCOMM/iAP2/MFi",
-      "status": "PARTIAL",
-      "blocker": "R14同版原厂BlueSDK注册/SDP/事件QNX C代码已整合，40/40原厂指令静态吻合；仍缺真车进程的SDK生命周期/owner回调/已配对身份/运行时MFi证据。",
+      "status": "DONE",
+      "blocker": "云端研发已按用户标准完成；原厂真实 RFCOMM callback owner、手机 MFi 与运行时依然未验证，仅待实车阶段",
       "evidence": [
         "project/source/src/cp_step04_stock_mfi.c",
         "project/source/src/cp_step04_iap2_auth.c",
@@ -54,38 +54,75 @@
         "docs/R44_FULL_LINK_TO_STOCK_MFI_CN.md",
         "docs/R45_NATIVE_BLUESDK_MU1005_CN.md",
         "docs/R45_MU1005_BTSTACK_STATIC_RECHECK.json",
-        "project/source/legacy_mu1005/bluetooth/native_binding.c"
-      ]
+        "project/source/legacy_mu1005/bluetooth/native_binding.c",
+        "ci/host_r14_native.sh",
+        "project/source/src/cp_step04_tcp_bridge.c",
+        "ci/host_step04_tcp.sh"
+      ],
+      "cloud_scoped": true,
+      "runtime_verified": false,
+      "scope": "仅用户同意的云端研发验收：R45原厂接口C源码合并 + 主机测试 + QNX ARMv7 编译/ELF/QEMU 通过，不是实车蓝牙/MFi/iPhone成功",
+      "qnx_evidence": {
+        "run_id": 44955933559,
+        "conclusion": "success",
+        "modules": 30
+      }
     },
     {
       "id": 5,
       "title": "Wi-Fi 2.4/5GHz",
       "status": "PARTIAL",
-      "blocker": "射频频段/热点切换的车机能力与关联未验证"
+      "blocker": "双频能力必须由真实无线芯片和热点驱动验证；5GHz硬件能力未知，不能当已开启",
+      "cloud_review": "HOST_SOURCE_TEST_PASS_PENDING_QNX_R50",
+      "evidence": [
+        "project/source/src/cp_cloud_pipeline.c",
+        "project/source/src/cp_radio_policy.c",
+        "ci/host_cloud_pipeline.sh"
+      ]
     },
     {
       "id": 6,
       "title": "AirPlay 发现及会话",
       "status": "PARTIAL",
-      "blocker": "Bonjour/mDNS、身份和合法原厂 DIO 监听未验证"
+      "blocker": "仅原厂AirPlay server状态接口+实际监听证据门禁；没有真实Bonjour与iPhone会话",
+      "cloud_review": "HOST_SOURCE_TEST_PASS_PENDING_QNX_R50",
+      "evidence": [
+        "project/source/legacy_mu1005/airplay/mu1005_r34_ap_server.c",
+        "project/source/src/cp_cloud_pipeline.c"
+      ]
     },
     {
       "id": 7,
       "title": "无线会话接入原厂CarPlay",
       "status": "PARTIAL",
-      "blocker": "SI/DIO 动态 owner 与 DIO 子进程交接未实现"
+      "blocker": "云端实现SI唯一owner/有线优先联动，未在真实原厂SI/DIO进程完成注入与生命周期验证",
+      "cloud_review": "HOST_SOURCE_TEST_PASS_PENDING_QNX_R50",
+      "evidence": [
+        "project/source/src/cp_cloud_pipeline.c",
+        "project/source/src/cp_oem_handoff.c"
+      ]
     },
     {
       "id": 8,
       "title": "视频音频旋钮方向盘",
-      "status": "BLOCKED",
-      "blocker": "媒体与控制 OEM runtime 端点尚未连通"
+      "status": "PARTIAL",
+      "blocker": "云端完成媒体/控制事件转发与四通道授权门禁；无真实OEM音视频sink/解码器/方向盘事件源",
+      "cloud_review": "HOST_SOURCE_TEST_PASS_PENDING_QNX_R50",
+      "evidence": [
+        "project/source/src/cp_cloud_media.c",
+        "ci/host_cloud_media.sh"
+      ]
     },
     {
       "id": 9,
       "title": "自动连接重连及频段回退",
       "status": "PARTIAL",
-      "blocker": "只有状态机；缺真实无线/有线回调和射频验证"
+      "blocker": "回退与断线状态机测试通过，缺真实AP关联、热启动和无线/有线切换",
+      "cloud_review": "HOST_SOURCE_TEST_PASS_PENDING_QNX_R50",
+      "evidence": [
+        "project/source/src/cp_cloud_pipeline.c",
+        "project/source/src/cp_radio_policy.c"
+      ]
     },
     {
       "id": 10,
@@ -98,7 +135,13 @@
       "id": 11,
       "title": "SD安装备份恢复",
       "status": "PARTIAL",
-      "blocker": "无已验证写入清单及同版车机恢复路径；不生产可刷写载荷"
+      "blocker": "复用原生事务/备份/故障回滚及67主机测试；没有真实分区路径/OEM健康探针/断电持久性验证，NO_INSTALL",
+      "cloud_review": "HOST_SOURCE_TEST_PASS_PENDING_QNX_R50",
+      "evidence": [
+        "tools/review_txn/txn.c",
+        "tools/review_txn/test_txn.py",
+        "ci/host_sd_txn.sh"
+      ]
     },
     {
       "id": 12,
@@ -106,5 +149,6 @@
       "status": "NOT_STARTED",
       "blocker": "需要真车与iPhone"
     }
-  ]
+  ],
+  "cloud_release_scope": "C99 source integration & host CI; exact R45 QNX build succeeded; R50 QNX pending until verified; no OEM runtime/keys/SD install"
 }

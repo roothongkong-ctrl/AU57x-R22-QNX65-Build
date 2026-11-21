@@ -1,0 +1,203 @@
+/* SPDX-License-Identifier: GPL-3.0-only
+ * State-machine integration only; does not assert the availability of
+ * Wi-Fi 5GHz, the CarPlay Bonjour service, native DIO or an OEM MFi owner.
+ */
+#include "cp_cloud_pipeline.h"
+#include <string.h>
+static int eligible(struct cp_cloud_pipeline *s,int require_bt){
+ if(!s||!s->started||s->stopped||!s->epoch)return 0;
+ if(!s->owner.wired_idle||s->owner.wired_idle(s->owner.ctx)!=1)return 0;
+ if(require_bt&&(!s->owner.bt_alive||
+     s->owner.bt_alive(s->owner.ctx,s->epoch,s->bt_generation)!=1))return 0;
+ return 1;
+}
+static int stop(struct cp_cloud_pipeline *s){
+ if(!s)return CP_CLOUD_BAD;
+ if(s->started&&!s->stopped){
+  s->stopped=1;
+  if(s->radio.epoch)(void)cp_radio_revoke(&s->radio,s->epoch,0);
+  if(s->bootstrap)cp_s4_revoke(s->bootstrap);
+  (void)cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_FAILURE,1);
+ }
+ return CP_CLOUD_PROOF;
+}
+void cp_cloud_init(struct cp_cloud_pipeline *s){
+ if(!s)return;
+ memset(s,0,sizeof *s);cp_radio_init(&s->radio);cp_ho_init(&s->handoff);
+}
+int cp_cloud_begin(struct cp_cloud_pipeline *s,struct cp_step04_session *b,
+                  const struct cp_cloud_owner *ops,uint32_t epoch,uint32_t gen){
+ if(!s||!b||!ops||!epoch||!gen)return CP_CLOUD_BAD;
+ if(s->started||s->stopped)return CP_CLOUD_ORDER;
+ if(b->epoch!=epoch||b->link.generation!=gen)return CP_CLOUD_STALE;
+ if(!ops->bt_alive||!ops->wired_idle||!ops->radio_capability||
+    !ops->ap_prepare||!ops->ap_association||!ops->ap_disconnected||
+    !ops->carplay_request_sent||!ops->si_single_owner||
+    !ops->bonjour_identity_verified||!ops->airplay_listener_verified||
+    !ops->inner_iap2_mfi_verified||!ops->media_verified||
+    !ops->teardown_confirmed)return CP_CLOUD_BAD;
+ if(ops->wired_idle(ops->ctx)!=1||ops->bt_alive(ops->ctx,epoch,gen)!=1)
+  return CP_CLOUD_PROOF;
+ s->owner=*ops;s->bootstrap=b;s->epoch=epoch;s->bt_generation=gen;
+ if(cp_ho_begin(&s->handoff,epoch)!=CP_HO_OK)return CP_CLOUD_ORDER;
+ if(cp_ho_signal(&s->handoff,epoch,CP_HO_EV_BT_CONNECTED,1)!=CP_HO_OK)
+  return CP_CLOUD_ORDER;
+ s->started=1;
+ return CP_CLOUD_OK;
+}
+int cp_cloud_bind_airplay(struct cp_cloud_pipeline *s,Mu34ApServer *ap){
+ if(!s||!s->started||s->stopped||!ap)return CP_CLOUD_BAD;
+ if(s->airplay||ap->generation!=s->epoch||ap->state==MU34_AP_FAILED)
+  return CP_CLOUD_PROOF;
+ s->airplay=ap;return CP_CLOUD_OK;
+}
+int cp_cloud_confirm_bootstrap_auth(struct cp_cloud_pipeline *s){
+ int cap24,cap5;
+ if(!eligible(s,1))return stop(s);
+ if(s->handoff.phase!=CP_HO_BT_LINK)return CP_CLOUD_ORDER;
+ if(!s->bootstrap||s->bootstrap->epoch!=s->epoch||
+    s->bootstrap->link.generation!=s->bt_generation||
+    !cp_s4_authenticated(s->bootstrap))return CP_CLOUD_PROOF;
+ cap24=s->owner.radio_capability(s->owner.ctx,CP_RADIO_24)==1;
+ cap5=s->owner.radio_capability(s->owner.ctx,CP_RADIO_5)==1;
+ if(cp_radio_begin(&s->radio,s->epoch,cap24,cap5,1,1)!=CP_RADIO_OK)
+  return CP_CLOUD_PROOF;
+ if(cp_ho_signal(&s->handoff,s->epoch,
+    CP_HO_EV_BOOTSTRAP_MFI_AUTHENTICATED,1)!=CP_HO_OK)return stop(s);
+ return CP_CLOUD_OK;
+}
+int cp_cloud_radio_start(struct cp_cloud_pipeline *s){
+ enum cp_radio_band band=CP_RADIO_NONE;
+ if(!eligible(s,1))return stop(s);
+ if(s->handoff.phase!=CP_HO_BOOTSTRAP_AUTH)return CP_CLOUD_ORDER;
+ if(cp_radio_select(&s->radio,s->epoch,1,&band)!=CP_RADIO_OK)
+  return CP_CLOUD_ORDER;
+ if(s->owner.ap_prepare(s->owner.ctx,s->epoch,band)!=1)return stop(s);
+ if(cp_radio_connect_requested(&s->radio,s->epoch,1)!=CP_RADIO_OK)return stop(s);
+ s->band=band;
+ return CP_CLOUD_OK;
+}
+int cp_cloud_radio_result(struct cp_cloud_pipeline *s,int success,int disconnected){
+ int r;
+ if(!eligible(s,1))return stop(s);
+ if(s->handoff.phase!=CP_HO_BOOTSTRAP_AUTH||
+    s->radio.phase!=CP_RADIO_CONNECTING)return CP_CLOUD_ORDER;
+ if(success!=0&&success!=1)return CP_CLOUD_BAD;
+ if(success){
+  if(disconnected!=0||s->owner.ap_association(s->owner.ctx,s->epoch,s->band)!=1)
+    return CP_CLOUD_PROOF;
+  r=cp_radio_association_result(&s->radio,s->epoch,1,1,s->band,0);
+  if(r!=CP_RADIO_OK)return stop(s);
+  if(cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_WIFI_AP_AND_PHONE_CONFIRMED,1)!=CP_HO_OK)
+   return stop(s);
+  return CP_CLOUD_OK;
+ }
+ if(!disconnected||s->owner.ap_disconnected(s->owner.ctx,s->epoch,s->band)!=1)
+  return CP_CLOUD_RETRY; /* do not retry until actual disconnect */
+ r=cp_radio_association_result(&s->radio,s->epoch,1,0,s->band,1);
+ if(r==CP_RADIO_PENDING)return CP_CLOUD_RETRY;
+ return stop(s);
+}
+int cp_cloud_carplay_request(struct cp_cloud_pipeline *s){
+ if(!eligible(s,1))return stop(s);
+ if(s->handoff.phase!=CP_HO_WIFI_ASSOCIATED)return CP_CLOUD_ORDER;
+ if(s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1||
+    s->owner.carplay_request_sent(s->owner.ctx,s->epoch)!=1)return CP_CLOUD_PROOF;
+ return cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_CARPLAY_START_SENT,1)==CP_HO_OK?
+   CP_CLOUD_OK:CP_CLOUD_ORDER;
+}
+static int iface_ok(const char *p){
+ size_t i;
+ if(!p)return 0;
+ for(i=0;i<=CP_CLOUD_IFACE_MAX&&p[i];i++){
+  unsigned char c=(unsigned char)p[i];
+  if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||
+       (c>='0'&&c<='9')||c=='_'||c=='-'||c=='.'))return 0;
+ }
+ return i>0&&i<=CP_CLOUD_IFACE_MAX;
+}
+int cp_cloud_airplay_ready(struct cp_cloud_pipeline *s,const char *iface){
+ if(!eligible(s,1))return stop(s);
+ if(s->handoff.phase!=CP_HO_START_REQUESTED)return CP_CLOUD_ORDER;
+ if(!iface_ok(iface))return CP_CLOUD_BAD;
+ if(!s->airplay||s->airplay->generation!=s->epoch||
+    s->airplay->expected_port!=CP_CLOUD_PORT||
+    strcmp(mu34_ap_server_interface(s->airplay),iface)!=0||
+    mu34_ap_server_poll(s->airplay,s->epoch)!=MU34_AP_R_LISTENING_VERIFIED)
+  return CP_CLOUD_PROOF;
+ if(s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1||
+    s->owner.bonjour_identity_verified(s->owner.ctx,s->epoch,iface)!=1||
+    s->owner.airplay_listener_verified(s->owner.ctx,s->epoch,iface,CP_CLOUD_PORT)!=1)
+  return CP_CLOUD_PROOF;
+ if(cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_AIRPLAY_SESSION_CREATED,1)!=CP_HO_OK)
+  return stop(s);
+ memcpy(s->iface,iface,strlen(iface)+1);return CP_CLOUD_OK;
+}
+int cp_cloud_inner_auth(struct cp_cloud_pipeline *s){
+ if(!eligible(s,1))return stop(s);
+ if(s->handoff.phase!=CP_HO_AIRPLAY_SESSION)return CP_CLOUD_ORDER;
+ if(s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1||
+    s->owner.inner_iap2_mfi_verified(s->owner.ctx,s->epoch)!=1)return CP_CLOUD_PROOF;
+ return cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_IN_SESSION_IAP2_AUTHENTICATED,1)==CP_HO_OK?
+  CP_CLOUD_OK:CP_CLOUD_ORDER;
+}
+int cp_cloud_media_ready(struct cp_cloud_pipeline *s){
+ if(!eligible(s,0))return stop(s);
+ if(s->handoff.phase!=CP_HO_INNER_IAP_AUTH)return CP_CLOUD_ORDER;
+ if(s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1)return CP_CLOUD_PROOF;
+ for(int channel=CP_CLOUD_VIDEO;channel<=CP_CLOUD_STEERING;channel++){
+  if(s->owner.media_verified(s->owner.ctx,s->epoch,(enum cp_cloud_media)channel)!=1)
+   return CP_CLOUD_PROOF;
+ }
+ return cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_MEDIA_CONFIRMED,1)==CP_HO_OK?
+   CP_CLOUD_OK:CP_CLOUD_ORDER;
+}
+int cp_cloud_bt_closed(struct cp_cloud_pipeline *s,uint32_t gen){
+ if(!s||!s->started||s->stopped)return CP_CLOUD_STOPPED;
+ if(gen!=s->bt_generation)return CP_CLOUD_STALE;
+ if(s->handoff.phase<CP_HO_INNER_IAP_AUTH)return stop(s);
+ if(cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_BT_DISCONNECTED,1)!=CP_HO_OK)
+  return CP_CLOUD_ORDER;
+ return CP_CLOUD_OK;
+}
+int cp_cloud_wired_preempt(struct cp_cloud_pipeline *s){
+ if(!s)return CP_CLOUD_BAD;
+ if(s->started&&!s->stopped){
+  s->stopped=1;
+  if(s->radio.epoch)(void)cp_radio_revoke(&s->radio,s->epoch,1);
+  if(s->bootstrap)cp_s4_revoke(s->bootstrap);
+ }
+ return cp_ho_wired_takeover(&s->handoff,1)==CP_HO_OK?CP_CLOUD_OK:CP_CLOUD_ORDER;
+}
+int cp_cloud_end(struct cp_cloud_pipeline *s){
+ if(!s||!s->started||!s->epoch)return CP_CLOUD_BAD;
+ if(s->owner.teardown_confirmed(s->owner.ctx,s->epoch)!=1)return CP_CLOUD_PROOF;
+ if(s->handoff.phase!=CP_HO_TEARDOWN&&s->handoff.phase!=CP_HO_WIRED)
+  (void)cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_FAILURE,1);
+ if(cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_TEARDOWN_CONFIRMED,1)!=CP_HO_OK)
+  return CP_CLOUD_ORDER;
+ if(s->radio.epoch){
+  if(s->radio.phase!=CP_RADIO_CLOSED)(void)cp_radio_revoke(&s->radio,s->epoch,0);
+  if(cp_radio_new_epoch_ready(&s->radio,s->epoch,1)!=CP_RADIO_OK)
+   return CP_CLOUD_ORDER;
+ }
+ s->stopped=1;
+ if(s->bootstrap)cp_s4_revoke(s->bootstrap);
+ return CP_CLOUD_OK;
+}
+int cp_cloud_is_active(const struct cp_cloud_pipeline *s){
+ if(!s||!s->started||s->stopped||
+    s->handoff.phase!=CP_HO_MEDIA_ACTIVE||!cp_ho_media_ready(&s->handoff))return 0;
+ if(!s->owner.wired_idle||s->owner.wired_idle(s->owner.ctx)!=1||
+    !s->owner.si_single_owner||s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1||
+    !s->airplay||s->airplay->generation!=s->epoch||
+    mu34_ap_server_state(s->airplay)!=MU34_AP_LISTENING_VERIFIED||
+    !s->owner.airplay_listener_verified||
+    s->owner.airplay_listener_verified(s->owner.ctx,s->epoch,s->iface,CP_CLOUD_PORT)!=1||
+    !s->owner.bonjour_identity_verified||
+    s->owner.bonjour_identity_verified(s->owner.ctx,s->epoch,s->iface)!=1)
+  return 0;
+ for(int channel=CP_CLOUD_VIDEO;channel<=CP_CLOUD_STEERING;channel++)
+  if(s->owner.media_verified(s->owner.ctx,s->epoch,(enum cp_cloud_media)channel)!=1)return 0;
+ return 1;
+}

@@ -158,6 +158,13 @@ int main(void) {
         puts("AU57X_R44_BYTE_STREAM_AUTH_SYMBOL_MISSING");dlclose(h);return 19;
     }
     puts("AU57X_R44_BYTE_STREAM_AUTH_SYMBOL_LOADED_OK");
+    /* New cloud end-to-end adapters: symbol probes, not OEM invocations. */
+    if (!dlsym(h,"cp_s4_tcp_init") || !dlsym(h,"cp_s4_tcp_feed") ||
+        !dlsym(h,"cp_cloud_begin") || !dlsym(h,"cp_cloud_radio_start") ||
+        !dlsym(h,"cp_cloud_airplay_ready") || !dlsym(h,"cp_cloud_media_forward")) {
+        puts("AU57X_R50_CLOUD_PIPELINE_SYMBOL_MISSING");dlclose(h);return 41;
+    }
+    puts("AU57X_R50_CLOUD_PIPELINE_SYMBOLS_LOADED_ONLY");
     {int test=r24_contract(h);if(test){printf("AU57X_R24_CONTRACT_FAIL=%d\n",test);dlclose(h);return 20+test;}}
     if (dlclose(h) != 0) {
         puts("AU57X_DLCLOSE_FAILED");

@@ -13,3 +13,12 @@ Stock MU1005 `libairplay.so` certificate/signature functions are now used throug
 
 ### R45 pinned native MU1005 BlueSDK interface (NO INSTALL)
 Four original R14 ARM/QNX source modules are restored and compiled in the research build: owner-gated RFCOMM registration + SDP records + event RX/TX and teardown. Private OEM `btstack` SHA-256 and 40/40 executable words were independently rechecked. Neither true OEM process ownership nor iPhone authentication is proven. See `docs/R45_NATIVE_BLUESDK_MU1005_CN.md`.
+
+### R50 cloud integration 04–11
+
+- Scoped Step 04 **cloud-only DONE**: R45 30-module QNX ARMv7/QEMU success run 44955933559, zero physical MFi claims.
+- New `cp_step04_tcp_bridge` joins R14 57342 normalized RFCOMM socket byte frames to R44 iAP2/MFi (host test).
+- `cp_cloud_pipeline` composes verified Wi-Fi bands, OEM AirPlay server listener, Bonjour identity, SI owner, inner iAP2, 4-channel media proof and wired takeover; **callbacks must be from real OEM owner in production**.
+- `cp_cloud_media` routes bounded video/audio/MMI/steering messages to a caller-provided real native sink; no decoder or hardware access is provided.
+- `tools/review_txn` restores the original user-supplied native transaction/recovery source and its 67 host tests. No production installer, OEM file paths or SD flash image.
+- See `docs/R50_CLOUD_04_TO_11_CN.md`. All artifacts remain **review-only, NO_INSTALL**.
