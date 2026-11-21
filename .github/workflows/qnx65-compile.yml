@@ -1,0 +1,70 @@
+name: AU57x R22 QNX6.5 ARMv7 (REVIEW ONLY)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: au57x-qnx65-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  qnx-native-link:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 160
+    steps:
+      - name: Checkout public review-only C source
+        uses: actions/checkout@v4
+      - name: Preflight - source only, no OEM binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'Filenames included in repository:'
+          git ls-files
+          if git ls-files | grep -Ei '\.(so|dll|elf|img|bin|7z|spk|key|pem|p12|pfx|o|a|zip)$'; then
+            echo 'ERROR: this public repository must not contain proprietary binaries or keys'; exit 3
+          fi
+          test "$(find project/source -name '*.c' | wc -l)" -eq 13
+      - name: Create artifact log folder
+        run: mkdir -p qnx_build_result/logs
+      - name: Clone public toolchain source
+        run: git clone --depth=1 https://github.com/luka-dev/qnx65-armv7-toolchain.git /tmp/qnx65-toolchain
+      - name: Build QNX 6.5 ARMv7 GCC container
+        shell: bash
+        run: |
+          set -o pipefail
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 \
+            -t au57x-qnx65-cc:8.5 /tmp/qnx65-toolchain \
+            2>&1 | tee qnx_build_result/logs/toolchain_docker_build.log
+      - name: QNX compiler sanity + native compile and shared link
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "$GITHUB_WORKSPACE":/src -w /src \
+            au57x-qnx65-cc:8.5 \
+            bash /src/ci/compile_qnx_in_image.sh
+      - name: Strict QNX ELF gate
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 project/tools/qnx_elf_gate.py \
+            --candidate qnx_build_result/libau57x_r22_native_qnx_REVIEW_ONLY.so \
+            --output qnx_build_result/logs/qnx_elf_gate.json \
+            2>&1 | tee qnx_build_result/logs/elf_gate_stdout.log
+      - name: Hash output artifacts
+        if: always()
+        shell: bash
+        run: |
+          if test -d qnx_build_result; then
+            find qnx_build_result -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 -r sha256sum \
+              > qnx_build_result/SHA256SUMS.txt
+          fi
+      - name: Upload build result and logs even when failed
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AU57x-R22-QNX65-review-only
+          path: qnx_build_result/
+          if-no-files-found: warn
+          retention-days: 7

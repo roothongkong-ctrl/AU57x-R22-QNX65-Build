@@ -1,0 +1,5 @@
+qnx_build_result/
+*.o
+*.so
+.DS_Store
+__pycache__/
