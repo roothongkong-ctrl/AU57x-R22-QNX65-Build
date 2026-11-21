@@ -66,7 +66,7 @@ def audit(root):
                 "原厂" in steps[i]["scope"]
                 for i in (1,9)),
             "Cloud-only static and CI scopes must be explicit",errors)
-    require(not any(steps[i-1].get("status")=="DONE"
+    require(len(steps)==12 and not any(steps[i-1].get("status")=="DONE"
                     for i in (4,5,6,7,8,9,11,12)),
             "Cloud mocks cannot mark real OEM / install steps DONE",errors)
     try:
