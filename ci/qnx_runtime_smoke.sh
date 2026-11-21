@@ -6,7 +6,7 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$ROOT/qnx_build_result"
 UP=/tmp/qnx65-toolchain
-LIB="$OUT/libau57x_r22_native_qnx_REVIEW_ONLY.so"
+LIB="$OUT/libau57x_r23_native_qnx_REVIEW_ONLY.so"
 BIN="$OUT/au57x_qnx_dlopen_smoke"
 mkdir -p "$OUT/logs"
 test -s "$LIB"
@@ -40,5 +40,6 @@ QNX_TEST_EXTRA_SO="$LIB" QEMU_RUN_SECS=20 QEMU_TIMEOUT=80 \
  QEMU_KEEP_LOG="$OUT/logs/qnx_boot_console.log" \
  "$UP/tests/qemu-run-au57x.sh" "$BIN" 8.5 \
   2>&1 | tee "$OUT/logs/qnx_runtime_smoke.log"
+$([ "$(grep -Fc AU57X_R23_MODULES_LOADED_OK "$OUT/logs/qnx_runtime_smoke.log")" -ge 1 ])
 grep -Fq AU57X_RUNTIME_DLOPEN_OK "$OUT/logs/qnx_runtime_smoke.log"
 echo 'QNX 6.5 QEMU dynamic loader smoke PASS (no OEM calls)'
