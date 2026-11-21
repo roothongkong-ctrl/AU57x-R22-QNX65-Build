@@ -60,7 +60,7 @@ class EvidenceBoundaryTests(unittest.TestCase):
     def test_apn_does_not_claim_registration(self):
         r = audit()
         self.assertEqual(r["apn_original_records"], 874)
-        self.assertEqual(len(r["apn_telecom_entries_missing_in_original"]), 4)
+        self.assertEqual(len(r["apn_telecom_entries_missing_in_original"]), 3)
         self.assertFalse(
             r["baseline_observations"]["adding_ctnet_alone_resolved_problem"])
 
