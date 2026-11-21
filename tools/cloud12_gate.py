@@ -96,6 +96,26 @@ def audit(root):
                 "mm-ipod static loader was incorrectly promoted to working Bluetooth",errors)
     except (OSError,ValueError) as e:
         errors.append("Missing mm-ipod loader audit: "+str(e))
+    # R45's exact firmware match is a static sample check, never a live owner proof.
+    try:
+        native=read_json(root,"docs/R45_MU1005_BTSTACK_STATIC_RECHECK.json")
+        require(native.get("sha256")==reuse.get("exact_oem_btstack_sha256")
+                and native.get("reference_sha_matches") is True,
+                "R45 btstack digest differs from pinned R14/R25 sample",errors)
+        rows=native.get("rows",[])
+        require(native.get("word_count")==40 and native.get("matching")==40
+                and native.get("static_pass") is True
+                and len(rows)==40
+                and len({row.get("address") for row in rows})==40
+                and all(row.get("matches") is True
+                        and row.get("executable") is True for row in rows),
+                "R45 40/40 ARM executable instruction sample is incomplete",errors)
+        require(all(native.get(k) is False for k in
+                    ("runtime_owner_proven","real_iap2_endpoint_proven",
+                     "carplay_working_proven","installable")),
+                "R45 static sample cannot assert runtime ownership or installability",errors)
+    except (OSError,ValueError,TypeError,AttributeError) as e:
+        errors.append("Missing or invalid R45 native evidence: "+str(e))
     # Reject proprietary firmware, Apple keys and prebuilt binary uploads in public git.
     try:
         cp=subprocess.run(["git","-C",str(root),"ls-files","-z"],check=True,
