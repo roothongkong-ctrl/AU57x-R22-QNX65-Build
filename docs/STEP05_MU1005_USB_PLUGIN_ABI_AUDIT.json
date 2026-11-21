@@ -1,0 +1,41 @@
+{
+  "firmware": "MHI2_CN_AU57x_K1006_2 / MU1005",
+  "oem_sha256": {
+    "bluetooth": "7d5ae31396f016f811e18a7255bf1311e0bfa471b2a3252a6f2eb4bd3ad04272",
+    "mm-ipod": "4b87cd2d41ddcee2f38800feafe8b4b340e4f23e1d86c7e97af303522aa15d09",
+    "ipod-transport-usbdevice.so": "e1743821b166fcd93992b45fc7064ad14763ee8a4445478e9aa36e696f2f6e95"
+  },
+  "checks": {
+    "passed": 22,
+    "total": 22
+  },
+  "loader": {
+    "dynamic_template": "ipod-transport-%s.so",
+    "functions": [
+      "dlopen",
+      "dlsym"
+    ],
+    "exported": "device_transport_init",
+    "export_va": "0x103510"
+  },
+  "usb_plugin": {
+    "ipod_module_va": "0x3ec0",
+    "module_abi": "0x200",
+    "transport_table_va": "0x40b8",
+    "callbacks": {
+      "init": "0x1934",
+      "link_params_get": "0x1874",
+      "type_get": "0x18bc",
+      "caps_get": "0x18cc",
+      "audiopath_get": "0x1910",
+      "data_send": "0x1560",
+      "data_recv": "0x1228"
+    }
+  },
+  "bluetooth_dsi_iap2_service_type": "0x40000000; NOT RFCOMM channel",
+  "proven_wireless_plugin": false,
+  "rfcomm_actual_owner_verified": false,
+  "actual_mfi_verified": false,
+  "wireless_carplay_ready": false,
+  "vehicle_installable": false
+}
