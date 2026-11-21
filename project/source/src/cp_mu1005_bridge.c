@@ -29,11 +29,16 @@ int cp_mu_bridge_feed(struct cp_mu_bridge *b,const uint8_t snapshot[16],
  int rc;
  if(!b||!b->rf||!snapshot||!owner)return CP_MB_BAD;
  if(epoch!=b->epoch)return CP_MB_STALE;
- if(b->closed)return CP_MB_BLOCKED;
+ /* An OEM async TX completion may arrive AFTER native disconnect.
+  * Preserve the borrowed descriptor until its real completion callback.
+  * All other callbacks are rejected after closure. */
+ if(b->closed && (snapshot[0]!=6 || !b->rf->tx_busy))
+  return CP_MB_BLOCKED;
  rc=cp_mu_decode_snapshot(snapshot,16,b->epoch,epoch,
                            &owner->snapshot,&e,owned_rx,cap);
  if(rc==CP_MU_STALE)return CP_MB_STALE;
  if(rc!=CP_MU_OK)return fail(b);
+ if(b->closed && e.code!=6)return CP_MB_BLOCKED;
  switch(e.code){
  case 1:
   if(b->pending||b->connected)return fail(b);
@@ -50,7 +55,7 @@ int cp_mu_bridge_feed(struct cp_mu_bridge *b,const uint8_t snapshot[16],
      au_rf_received(b->rf,owned_rx,e.length)!=0)return fail(b);
   return CP_MB_OK;
  case 6:
-  if(!b->connected||!b->rf->tx_busy||!owner->tx_token_matches||
+  if((!b->connected&&!b->closed)||!b->rf->tx_busy||!owner->tx_token_matches||
      owner->tx_token_matches(owner->snapshot.opaque,e.token,b->wire_generation)!=1||
      au_rf_send_complete(b->rf,e.status==0)!=0)return fail(b);
   return CP_MB_OK;

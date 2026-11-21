@@ -48,9 +48,15 @@ int main(void){
  accept_tx=1;
  assert(cp_mu_bridge_feed(&bridge,evt,2,&ops,rx,sizeof rx)==CP_MB_OK);
  assert(!rf.tx_busy);
+ /* A second send is still owned asynchronously during native link loss. */
+ assert(au_rf_daemon_data(&rf,packet,sizeof packet)==0&&rf.tx_busy);
  evt[0]=4;put32(evt+12,0);
  assert(cp_mu_bridge_feed(&bridge,evt,2,&ops,rx,sizeof rx)==CP_MB_OK);
- assert(bridge.closed&&!rf.connected);
+ assert(bridge.closed&&!rf.connected&&rf.tx_busy&&rf.tx_cancelled);
+ assert(cp_mu_bridge_feed(&bridge,evt,2,&ops,rx,sizeof rx)==CP_MB_BLOCKED);
+ evt[0]=6;put32(evt+12,0x70000);
+ assert(cp_mu_bridge_feed(&bridge,evt,2,&ops,rx,sizeof rx)==CP_MB_OK);
+ assert(!rf.tx_busy);
  assert(cp_mu_bridge_feed(&bridge,evt,2,&ops,rx,sizeof rx)==CP_MB_BLOCKED);
  puts("AU57X_R39_CALLBACK_TO_RF_QUEUED_BRIDGE_PASS");
  return 0;
