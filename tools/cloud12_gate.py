@@ -60,8 +60,15 @@ def audit(root):
     require(reuse.get("exact_oem_btstack_sha256")==
       "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
       "Pinned btstack sample differs",errors)
-    require(not any(s.get("status")=="DONE" for s in steps[3:]),
-            "Cannot mark steps 04-12 DONE with only historical offline evidence",errors)
+    require(len(steps)==12 and steps[1].get("status")=="DONE" and
+            steps[9].get("status")=="DONE" and
+            all(isinstance(steps[i].get("scope"),str) and
+                "原厂" in steps[i]["scope"]
+                for i in (1,9)),
+            "Cloud-only static and CI scopes must be explicit",errors)
+    require(not any(steps[i-1].get("status")=="DONE"
+                    for i in (4,5,6,7,8,9,11,12)),
+            "Cloud mocks cannot mark real OEM / install steps DONE",errors)
     try:
         bt=read_json(root,"docs/R29_BT_DSI_OWNER_AUDIT.json")
         require(bt.get("verdict")=="PASS_EXACT_SAMPLES_STATIC_ONLY",

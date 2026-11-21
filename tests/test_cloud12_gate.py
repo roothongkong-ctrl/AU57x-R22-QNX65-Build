@@ -33,7 +33,7 @@ class EvidenceGateTest(unittest.TestCase):
     def test_original_evidence_gate(self):
         errs,report=audit(self.root)
         self.assertFalse(errs,errs)
-        self.assertEqual(report["completed_steps"],[1,3])
+        self.assertEqual(report["completed_steps"],[1,2,3,10])
         self.assertFalse(report["installable"])
     def test_lies_about_installation_rejected(self):
         self.change(PATHS[0],lambda x:x.update(installable=True))
