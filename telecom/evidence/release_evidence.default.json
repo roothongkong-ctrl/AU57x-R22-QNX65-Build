@@ -1,0 +1,15 @@
+{
+  "real_oem_identity_verified": false,
+  "upstream_network_mode_source_identified": false,
+  "telecom_mode_failure_path_verified": false,
+  "targeted_carrier_fix_implemented": false,
+  "china_mobile_original_path_preserved": false,
+  "arm_qnx_abi_verified": false,
+  "restore_is_independently_verified": false,
+  "vehicle_original_backup_exists": false,
+  "failure_injection_rollback_verified": false,
+  "reviewed_release_integrity": false,
+  "live_telecom_lte_registration_observed": false,
+  "live_telecom_data_session_observed": false,
+  "live_china_mobile_regression_passed": false
+}
