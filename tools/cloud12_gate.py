@@ -62,6 +62,19 @@ def audit(root):
       "Pinned btstack sample differs",errors)
     require(not any(s.get("status")=="DONE" for s in steps[3:]),
             "Cannot mark steps 04-12 DONE with only historical offline evidence",errors)
+    try:
+        bt=read_json(root,"docs/R29_BT_DSI_OWNER_AUDIT.json")
+        require(bt.get("verdict")=="PASS_EXACT_SAMPLES_STATIC_ONLY",
+                "High-level DSI sample verdict not pinned",errors)
+        require(bt.get("samples",{}).get("bluetooth",{}).get("sha256")==
+                usb.get("oem_sha256",{}).get("bluetooth"),
+                "High-level Bluetooth hash disagrees with prior 22/22 audit",errors)
+        require(all(bt.get(k) is False for k in
+                   ("rfcomm_to_iap2_owner_proven","dynamic_dsi_service_registration_proven",
+                    "mfi_verified","wireless_carplay_verified","installable")),
+                "Static high-level DSI symbols must never be promoted to live iAP2",errors)
+    except (OSError,ValueError) as e:
+        errors.append("Missing high-level DSI evidence: "+str(e))
     # Reject proprietary firmware, Apple keys and prebuilt binary uploads in public git.
     try:
         cp=subprocess.run(["git","-C",str(root),"ls-files","-z"],check=True,

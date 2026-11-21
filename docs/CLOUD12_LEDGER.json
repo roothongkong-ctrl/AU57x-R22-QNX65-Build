@@ -22,9 +22,10 @@
       "evidence": [
         "docs/STEP04_STATIC_EVIDENCE.json",
         "docs/STEP05_MU1005_USB_PLUGIN_ABI_AUDIT.json",
-        "docs/R25_GITHUB_REUSE_MATRIX.json"
+        "docs/R25_GITHUB_REUSE_MATRIX.json",
+        "docs/R29_BT_DSI_OWNER_AUDIT.json"
       ],
-      "blocker": "缺原厂蓝牙 iAP2 端点 owner、动态回调及 mm-ipod 跨进程链"
+      "blocker": "已找到 high-level bluetooth ASI service symbols；仍缺运行时注册、蓝牙 iAP2 实际端点 owner 和跨进程链"
     },
     {
       "id": 3,
