@@ -125,8 +125,11 @@ def audit(root):
              re.search(r"\.(?:so(?:\.[0-9]+)?|elf|img|bin|7z|zip|key|pem|p12|pfx|o|a)$",
                        p,re.IGNORECASE))
         require(not forbidden,"Binary/key files tracked: "+", ".join(forbidden),errors)
-    except (OSError,subprocess.SubprocessError):
-        pass  # Temp-dir test fixtures do not contain git metadata.
+    except (OSError,subprocess.SubprocessError) as e:
+        # A real checkout must not silently skip the proprietary-file guard.
+        # Isolated JSON-only unit fixtures intentionally have no .git directory.
+        if (root/".git").exists():
+            errors.append("Cannot inspect tracked files in repository: "+str(e))
     summary={"pass":not errors,"completed_steps":[s["id"] for s in steps
               if s.get("status")=="DONE"],"remaining_steps":[s["id"] for s in steps
               if s.get("status")!="DONE"],"scope":"OFFLINE_REVIEW_ONLY",
