@@ -21,5 +21,5 @@ with zipfile.ZipFile(sys.argv[1]) as z:
     assert len(names)==len(set(names))
 print("AU57X_CLOUD_SOURCE_NO_INSTALL_ZIP_PASS")
 PY
-sha256sum "$ZIP" > "$OUT/AU57x_MU1005_CLOUD_SOURCE_REVIEW_ONLY.zip.sha256"
+( cd "$OUT" && sha256sum "$(basename "$ZIP")" > "AU57x_MU1005_CLOUD_SOURCE_REVIEW_ONLY.zip.sha256" )
 printf '%s\n' 'REVIEW ONLY - NO SD INSTALLATION, NO OEM BYTES, NO APPLE MFI, NO VEHICLE VERIFICATION' > "$OUT/NOT_INSTALLABLE.txt"
