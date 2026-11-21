@@ -52,6 +52,13 @@ jobs:
             --candidate qnx_build_result/libau57x_r22_native_qnx_REVIEW_ONLY.so \
             --output qnx_build_result/logs/qnx_elf_gate.json \
             2>&1 | tee qnx_build_result/logs/elf_gate_stdout.log
+      - name: QNX6.5 QEMU runtime dlopen smoke (no OEM calls)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+          bash ci/qnx_runtime_smoke.sh
       - name: Hash output artifacts
         if: always()
         shell: bash
