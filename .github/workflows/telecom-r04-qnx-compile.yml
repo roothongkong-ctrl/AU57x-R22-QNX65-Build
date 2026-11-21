@@ -1,0 +1,112 @@
+name: AU57x China Telecom R04 - QNX policy research (NOT INSTALLABLE)
+
+on:
+  push:
+    branches:
+      - telecom-mode-trace-r01
+    paths:
+      - "telecom/qnx/**"
+      - "telecom/ci/build_qnx_policy_sim.sh"
+      - "telecom/tests/test_qnx_policy_host.c"
+      - ".github/workflows/telecom-r04-qnx-compile.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run pure C host regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p telecom_host_result
+          gcc -std=c99 -O1 -g -Wall -Wextra -Werror \
+            -fsanitize=undefined -fno-sanitize-recover=all \
+            telecom/qnx/ct_network_policy_sim.c \
+            telecom/tests/test_qnx_policy_host.c \
+            -o telecom_host_result/r04_host_policy
+          ./telecom_host_result/r04_host_policy \
+            | tee telecom_host_result/RESULTS_HOST.txt
+          test "$(grep -c 'NO OEM or modem I/O' telecom_host_result/RESULTS_HOST.txt)" -eq 1
+      - name: Upload host regression only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AU57x-CT-R04-HOST-TEST-ONLY
+          path: telecom_host_result/RESULTS_HOST.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  qnx-native:
+    needs: host-policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 160
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure no original OEM binaries or keys are committed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -Ei '\.(so|dll|elf|img|bin|7z|spk|key|pem|p12|pfx|o|a|zip)$'; then
+            echo "OEM_OR_SECRET_FILE_REFUSED"
+            exit 3
+          fi
+      - name: Prepare output directories
+        run: mkdir -p telecom_qnx_result/logs
+      - name: Clone public QNX6.5 cross-compiler project
+        run: git clone --depth=1 https://github.com/luka-dev/qnx65-armv7-toolchain.git /tmp/qnx65-toolchain
+      - name: Compile real QNX 6.5 ARMv7 GCC Docker toolchain
+        shell: bash
+        run: |
+          set -o pipefail
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 \
+            -t au57x-ct-qnx65:8.5 /tmp/qnx65-toolchain \
+            2>&1 | tee telecom_qnx_result/logs/toolchain.log
+      - name: Native ARM compile and shared link - hypothesis only
+        shell: bash
+        run: |
+          set -o pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "$GITHUB_WORKSPACE":/src -w /src \
+            au57x-ct-qnx65:8.5 \
+            bash /src/telecom/ci/build_qnx_policy_sim.sh \
+            2>&1 | tee telecom_qnx_result/logs/native_build.log
+      - name: Strict research library ELF / ABI inspection
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 project/tools/qnx_elf_gate.py \
+            --candidate telecom_qnx_result/libau57x_ct_r04_HYPOTHESIS_REVIEW_ONLY.so \
+            --output telecom_qnx_result/qnx_elf_gate.json \
+            2>&1 | tee telecom_qnx_result/logs/abi_gate.log
+      - name: Refuse to label simulator as installable
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'OEM_HOOK_WIRED=NO' telecom_qnx_result/logs/native_build.log
+          grep -q 'INSTALLABLE=NO' telecom_qnx_result/logs/native_build.log
+          grep -q 'TELECOM_LTE_REGISTRATION_VERIFIED=NO' telecom_qnx_result/logs/native_build.log
+          echo 'R04_STATUS=QNX_COMPILED_RESEARCH_ONLY' > telecom_qnx_result/STATUS.txt
+          echo 'OEM_PATCH=NOT_CREATED' >> telecom_qnx_result/STATUS.txt
+          echo 'MOBILE_LIVE_REGRESSION=NOT_TESTED' >> telecom_qnx_result/STATUS.txt
+      - name: Hash artifacts
+        if: always()
+        shell: bash
+        run: |
+          if test -d telecom_qnx_result; then
+            find telecom_qnx_result -type f ! -name SHA256SUMS.txt -print0 |
+              sort -z | xargs -0 -r sha256sum > telecom_qnx_result/SHA256SUMS.txt
+          fi
+      - name: Upload QNX ARM build evidence (never install on car)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AU57x-CT-R04-QNX-ARM-REVIEW-ONLY
+          path: telecom_qnx_result/
+          if-no-files-found: warn
+          retention-days: 14
