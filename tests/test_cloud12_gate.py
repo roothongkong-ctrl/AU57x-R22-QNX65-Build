@@ -14,7 +14,7 @@ from cloud12_gate import audit
 PATHS=["docs/CLOUD12_LEDGER.json","docs/STEP04_STATIC_EVIDENCE.json",
        "docs/STEP05_MU1005_USB_PLUGIN_ABI_AUDIT.json",
        "docs/R25_GITHUB_REUSE_MATRIX.json","docs/R29_BT_DSI_OWNER_AUDIT.json",
-       "docs/R31_MM_IPOD_AUDIT.json"]
+       "docs/R31_MM_IPOD_AUDIT.json","docs/R45_MU1005_BTSTACK_STATIC_RECHECK.json"]
 
 class EvidenceGateTest(unittest.TestCase):
     def setUp(self):
@@ -52,6 +52,15 @@ class EvidenceGateTest(unittest.TestCase):
         self.assertTrue(audit(self.root)[0])
     def test_false_ipod_bluetooth_link_rejected(self):
         self.change(PATHS[5],lambda x:x.update(bluetooth_to_mm_ipod_link_proven=True))
+        self.assertTrue(audit(self.root)[0])
+    def test_r45_false_runtime_owner_rejected(self):
+        self.change(PATHS[6],lambda x:x.update(runtime_owner_proven=True))
+        self.assertTrue(audit(self.root)[0])
+    def test_r45_partial_instruction_sample_rejected(self):
+        self.change(PATHS[6],lambda x:x["rows"][0].update(matches=False))
+        self.assertTrue(audit(self.root)[0])
+    def test_r45_duplicate_address_rejected(self):
+        self.change(PATHS[6],lambda x:x["rows"][1].update(address=x["rows"][0]["address"]))
         self.assertTrue(audit(self.root)[0])
     def test_truncated_ledger_rejected(self):
         self.change(PATHS[0],lambda x:x["steps"].pop())
