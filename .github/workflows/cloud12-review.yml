@@ -23,6 +23,8 @@ jobs:
         run: bash ci/host_oem_guard.sh
       - name: SD review-only archive integrity and tamper regressions
         run: python3 -m unittest discover -s tests -p test_sd_package_audit.py -v
+      - name: Deterministic CSM parser fuzz plus encoder buffer sentinels
+        run: bash ci/host_csm_fuzz.sh
       - name: Publish cloud-only evidence report
         if: always()
         uses: actions/upload-artifact@v4
