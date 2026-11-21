@@ -113,6 +113,14 @@ int main(void) {
         return 17;
     }
     puts("AU57X_R23_MODULES_LOADED_OK");
+    typedef int (*socket_fn)(void *, int, int);
+    socket_fn socket_step=(socket_fn)dlsym(h,"au_socket_step");
+    void *socket_done=dlsym(h,"au_socket_tx_complete");
+    if (!socket_step || !socket_done || socket_step(NULL,-1,0)!=-2) {
+        puts("AU57X_R24_SOCKET_ADAPTER_MISSING");
+        dlclose(h); return 18;
+    }
+    puts("AU57X_R24_SOCKET_ADAPTER_LOADED_OK");
     {int test=r24_contract(h);if(test){printf("AU57X_R24_CONTRACT_FAIL=%d\n",test);dlclose(h);return 20+test;}}
     if (dlclose(h) != 0) {
         puts("AU57X_DLCLOSE_FAILED");
