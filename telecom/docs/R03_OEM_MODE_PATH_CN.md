@@ -44,3 +44,18 @@
 - 下一步需要可复验的上游赋值证据，或一次真正安全的只读运行时观测。
 
 本项目代码：`telecom/tools/mode_provenance.py`，云端使用合成 ARM 夹具检查，另对用户授权的原厂文件执行过一致性人工核对。
+
+## R03b｜向上追踪到 telephone 的 NADServicesProxy 转发
+
+再次使用用户已上传、SHA256 匹配的原厂 `telephone` ELF 对照 ARM 字节：
+
+- `0x1F5360`：相关转发函数入口（标准 ARM 调用约定）。
+- `0x1F536C`：`mov r8,r2`，保存运营商参数。
+- `0x1F5370`：`mov r10,r3`，保存 `mode`。
+- `0x1F538C`：`mov r7,r1`，保存手动选网标志。
+- `0x1F53F0` / `0x1F53F4` / `0x1F53F8`：恢复 `r1/r2/r3`，其中 `r3` 直接由 `r10` 恢复，没有在本段内改动 mode。
+- `0x1F5414`：`blx r12`，由代理虚函数接口转发请求。
+
+**结论：** 该 `telephone` 转发层不会把 mode 改成 1；若电信卡真的误选 GSM，需要继续追查该转发函数的上层调用者或 NAD 入站请求解析。这里未证明任一 SIM 真实传参，也未证明模块有 LTE 注册能力。
+
+审计代码：`telecom/tools/telephone_mode_bridge.py`，本地原始 ELF 八处全部匹配；GitHub 云端通过合成数据回归测试，不包含原件。
