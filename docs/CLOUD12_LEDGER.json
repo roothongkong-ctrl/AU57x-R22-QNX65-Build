@@ -1,7 +1,7 @@
 {
   "project": "2017 Audi A6L C7 MHI2_CN_AU57x_K1006_2 MU1005",
   "schema_version": 1,
-  "branch_baseline": "R50",
+  "branch_baseline": "R52",
   "installable": false,
   "vehicle_verified": false,
   "evidence_scope": "Public source / archived static audit / QNX isolated CI; no real OEM Bluetooth/iAP2/MFi/iPhone execution",
@@ -73,56 +73,96 @@
       "title": "Wi-Fi 2.4/5GHz",
       "status": "PARTIAL",
       "blocker": "双频能力必须由真实无线芯片和热点驱动验证；5GHz硬件能力未知，不能当已开启",
-      "cloud_review": "HOST_SOURCE_TEST_PASS_PENDING_QNX_R50",
+      "cloud_review": "HOST_AND_QNX_R52_PASS_REVIEW_ONLY",
       "evidence": [
         "project/source/src/cp_cloud_pipeline.c",
         "project/source/src/cp_radio_policy.c",
         "ci/host_cloud_pipeline.sh"
-      ]
+      ],
+      "qnx_evidence": {
+        "run_id": 44957948490,
+        "conclusion": "success",
+        "source_modules": 33,
+        "sd_review_objects": 2,
+        "elf_gate": "PASS",
+        "qemu_dlopen_no_oem_calls": "PASS"
+      }
     },
     {
       "id": 6,
       "title": "AirPlay 发现及会话",
       "status": "PARTIAL",
       "blocker": "仅原厂AirPlay server状态接口+实际监听证据门禁；没有真实Bonjour与iPhone会话",
-      "cloud_review": "HOST_SOURCE_TEST_PASS_PENDING_QNX_R50",
+      "cloud_review": "HOST_AND_QNX_R52_PASS_REVIEW_ONLY",
       "evidence": [
         "project/source/legacy_mu1005/airplay/mu1005_r34_ap_server.c",
         "project/source/src/cp_cloud_pipeline.c"
-      ]
+      ],
+      "qnx_evidence": {
+        "run_id": 44957948490,
+        "conclusion": "success",
+        "source_modules": 33,
+        "sd_review_objects": 2,
+        "elf_gate": "PASS",
+        "qemu_dlopen_no_oem_calls": "PASS"
+      }
     },
     {
       "id": 7,
       "title": "无线会话接入原厂CarPlay",
       "status": "PARTIAL",
       "blocker": "云端实现SI唯一owner/有线优先联动，未在真实原厂SI/DIO进程完成注入与生命周期验证",
-      "cloud_review": "HOST_SOURCE_TEST_PASS_PENDING_QNX_R50",
+      "cloud_review": "HOST_AND_QNX_R52_PASS_REVIEW_ONLY",
       "evidence": [
         "project/source/src/cp_cloud_pipeline.c",
         "project/source/src/cp_oem_handoff.c"
-      ]
+      ],
+      "qnx_evidence": {
+        "run_id": 44957948490,
+        "conclusion": "success",
+        "source_modules": 33,
+        "sd_review_objects": 2,
+        "elf_gate": "PASS",
+        "qemu_dlopen_no_oem_calls": "PASS"
+      }
     },
     {
       "id": 8,
       "title": "视频音频旋钮方向盘",
       "status": "PARTIAL",
       "blocker": "云端完成媒体/控制事件转发与四通道授权门禁；无真实OEM音视频sink/解码器/方向盘事件源",
-      "cloud_review": "HOST_SOURCE_TEST_PASS_PENDING_QNX_R50",
+      "cloud_review": "HOST_AND_QNX_R52_PASS_REVIEW_ONLY",
       "evidence": [
         "project/source/src/cp_cloud_media.c",
         "ci/host_cloud_media.sh"
-      ]
+      ],
+      "qnx_evidence": {
+        "run_id": 44957948490,
+        "conclusion": "success",
+        "source_modules": 33,
+        "sd_review_objects": 2,
+        "elf_gate": "PASS",
+        "qemu_dlopen_no_oem_calls": "PASS"
+      }
     },
     {
       "id": 9,
       "title": "自动连接重连及频段回退",
       "status": "PARTIAL",
       "blocker": "回退与断线状态机测试通过，缺真实AP关联、热启动和无线/有线切换",
-      "cloud_review": "HOST_SOURCE_TEST_PASS_PENDING_QNX_R50",
+      "cloud_review": "HOST_AND_QNX_R52_PASS_REVIEW_ONLY",
       "evidence": [
         "project/source/src/cp_cloud_pipeline.c",
         "project/source/src/cp_radio_policy.c"
-      ]
+      ],
+      "qnx_evidence": {
+        "run_id": 44957948490,
+        "conclusion": "success",
+        "source_modules": 33,
+        "sd_review_objects": 2,
+        "elf_gate": "PASS",
+        "qemu_dlopen_no_oem_calls": "PASS"
+      }
     },
     {
       "id": 10,
@@ -136,12 +176,20 @@
       "title": "SD安装备份恢复",
       "status": "PARTIAL",
       "blocker": "复用原生事务/备份/故障回滚及67主机测试；没有真实分区路径/OEM健康探针/断电持久性验证，NO_INSTALL",
-      "cloud_review": "HOST_SOURCE_TEST_PASS_PENDING_QNX_R50",
+      "cloud_review": "HOST_AND_QNX_R52_PASS_REVIEW_ONLY",
       "evidence": [
         "tools/review_txn/txn.c",
         "tools/review_txn/test_txn.py",
         "ci/host_sd_txn.sh"
-      ]
+      ],
+      "qnx_evidence": {
+        "run_id": 44957948490,
+        "conclusion": "success",
+        "source_modules": 33,
+        "sd_review_objects": 2,
+        "elf_gate": "PASS",
+        "qemu_dlopen_no_oem_calls": "PASS"
+      }
     },
     {
       "id": 12,
@@ -150,5 +198,5 @@
       "blocker": "需要真车与iPhone"
     }
   ],
-  "cloud_release_scope": "C99 source integration & host CI; exact R45 QNX build succeeded; R50 QNX pending until verified; no OEM runtime/keys/SD install"
+  "cloud_release_scope": "R52 source-only cloud review: host CI 44957948431 success; QNX ARMv7 33 modules + two isolated SD transaction objects, ELF gate and QEMU dlopen success run 44957948490. No OEM runtime/keys/SD installation or vehicle verification."
 }
