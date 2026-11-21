@@ -25,6 +25,14 @@ for s in "${sources[@]}"; do
    printf 'COMPILE %s\n' "$b"
    "$CC" "${flags[@]}" -c "$s" -o "$OUT/objects/$b.o"
 done
+# Source-only original SD recovery controller, compiled separately.  Never linked
+# into the CarPlay radio/receiver library or exposed as an install payload.
+mkdir -p "$OUT/review_txn"
+for s in "$ROOT/tools/review_txn/sha256.c" "$ROOT/tools/review_txn/txn.c"; do
+    b=$(basename "$s" .c)
+    printf 'COMPILE REVIEW_ONLY SD_TRANSACTION %s\n' "$b"
+    "$CC" "${flags[@]}" -c "$s" -o "$OUT/review_txn/$b.o"
+done
 printf 'LINK QNX .so\n'
 # Keep a direct NEEDED entry for QNX libc.so.3: the ordinary
 # -shared link permits unresolved externals and drops libc on this SDK.

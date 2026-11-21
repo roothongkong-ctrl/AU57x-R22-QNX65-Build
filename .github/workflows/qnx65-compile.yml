@@ -1,4 +1,4 @@
-name: AU57x R50 QNX6.5 ARMv7 (REVIEW ONLY)
+name: AU57x R52 QNX6.5 ARMv7 (REVIEW ONLY)
 on:
   push:
     branches: [main]
@@ -7,7 +7,7 @@ permissions:
   contents: read
 concurrency:
   group: au57x-qnx65-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   qnx-native-link:
     runs-on: ubuntu-24.04
