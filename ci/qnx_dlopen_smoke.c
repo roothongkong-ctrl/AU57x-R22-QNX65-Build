@@ -143,6 +143,14 @@ int main(void) {
        dlclose(h);return 19;
     }
     puts("AU57X_R41_STOCK_MFI_AUTH_SYMBOL_LOADED_OK");
+    if (!dlsym(h,"cp_lk_accept_rf") || !dlsym(h,"cp_lk_feed_bytes") || !dlsym(h,"cp_lk_queue_control") || !dlsym(h,"cp_lk_drain_rf")) {
+        puts("AU57X_R43_IAP2_LINK_SYMBOL_MISSING");dlclose(h);return 19;
+    }
+    puts("AU57X_R43_IAP2_LINK_SYMBOL_LOADED_OK");
+    if (!dlsym(h,"cp_s4_accept_rf") || !dlsym(h,"cp_s4_authenticated") || !dlsym(h,"cp_s4_init")) {
+        puts("AU57X_R44_BYTE_STREAM_AUTH_SYMBOL_MISSING");dlclose(h);return 19;
+    }
+    puts("AU57X_R44_BYTE_STREAM_AUTH_SYMBOL_LOADED_OK");
     {int test=r24_contract(h);if(test){printf("AU57X_R24_CONTRACT_FAIL=%d\n",test);dlclose(h);return 20+test;}}
     if (dlclose(h) != 0) {
         puts("AU57X_DLCLOSE_FAILED");
