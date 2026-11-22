@@ -188,6 +188,12 @@ int cp_cloud_end(struct cp_cloud_pipeline *s){
 int cp_cloud_is_active(const struct cp_cloud_pipeline *s){
  if(!s||!s->started||s->stopped||
     s->handoff.phase!=CP_HO_MEDIA_ACTIVE||!cp_ho_media_ready(&s->handoff))return 0;
+ if(s->radio.epoch!=s->epoch||s->radio.phase!=CP_RADIO_ASSOCIATED||
+    s->radio.selected!=s->band||
+    !s->owner.ap_association||
+    s->owner.ap_association(s->owner.ctx,s->epoch,s->band)!=1||
+    !s->owner.radio_capability||
+    s->owner.radio_capability(s->owner.ctx,s->band)!=1)return 0;
  if(!s->owner.wired_idle||s->owner.wired_idle(s->owner.ctx)!=1||
     !s->owner.si_single_owner||s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1||
     !s->airplay||s->airplay->generation!=s->epoch||
