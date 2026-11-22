@@ -29,6 +29,13 @@ int main(void){
  cp.handoff.phase=CP_HO_INNER_IAP_AUTH;
  assert(cp_cloud_media_bind(&r,&cp,&ops)==CP_FWD_OK);
  assert(cp_cloud_media_forward(&r,CP_CLOUD_VIDEO,sample,sizeof sample,1,7)==CP_FWD_STALE);
+ /* Test-only raw media routing must reject native OEM decoder ownership. */
+ MuDioNative native={0};
+ cp.native_dio=&native;
+ assert(cp_cloud_media_forward(&r,CP_CLOUD_VIDEO,sample,sizeof sample,1,8)==CP_FWD_OWNER);
+ assert(cp_cloud_media_bind(&r,&cp,&ops)==CP_FWD_OWNER);
+ cp.native_dio=NULL;
+ assert(cp_cloud_media_bind(&r,&cp,&ops)==CP_FWD_OK);
  assert(cp_cloud_media_forward(&r,CP_CLOUD_VIDEO,sample,sizeof sample,1,8)==CP_FWD_OK);
  assert(cp_cloud_media_forward(&r,CP_CLOUD_VIDEO,sample,sizeof sample,1,8)==CP_FWD_ORDER);
  sink_result=0;

@@ -126,6 +126,32 @@ static int native_valid(struct cp_cloud_pipeline *p){
     p->airplay!=&n->ap)return 0;
  return 1;
 }
+int cp_cloud_native_rx_live(const struct cp_cloud_pipeline *p,int need_media){
+ const MuCprxService *rx;
+ if(!p||!(rx=p->rx_service)||!p->native_dio||
+    rx->version!=3||rx->generation!=p->epoch||rx->epoch!=p->epoch||
+    rx->backend.opaque!=p->native_dio||
+    rx->backend.generation!=p->epoch||
+    rx->session==0||rx->listener<0||rx->terminal||rx->cleaning||
+    rx->backend_released||!rx->started||!rx->start_confirmed||
+    !rx->evidence.admitted||!rx->evidence.si_admitted||
+    rx->evidence.admitted(rx->evidence.opaque,rx->generation)!=1||
+    rx->evidence.si_admitted(rx->evidence.opaque,
+       rx->generation,rx->epoch,rx->session)!=1)
+  return 0;
+ if(!need_media)return 1;
+ return rx->evidence.media&&rx->evidence.media(rx->evidence.opaque)==7;
+}
+int cp_cloud_bind_rx_service(struct cp_cloud_pipeline *p,MuCprxService *rx){
+ if(!p||!rx||!p->started||p->stopped||p->rx_service||
+    !p->native_dio||!native_valid(p))return CP_CLOUD_PROOF;
+ p->rx_service=rx;
+ if(!cp_cloud_native_rx_live(p,0)){
+  p->rx_service=NULL;
+  return CP_CLOUD_PROOF;
+ }
+ return CP_CLOUD_OK;
+}
 int cp_cloud_bind_native_dio(struct cp_cloud_pipeline *p,MuDioNative *n){
  if(!p||!n||!p->started||p->stopped||p->airplay||p->native_dio||
     !n->initialized||n->ap.generation!=p->epoch||
@@ -152,6 +178,14 @@ int cp_cloud_drive_native(struct cp_cloud_pipeline *p,uint64_t now){
 static int native_restore(struct cp_cloud_pipeline *p){
  int r;
  if(!p||!p->native_dio)return CP_CLOUD_OK;
+ /* Release the SI receiver lease before touching the underlying AirPlay
+  * singleton. A pending native stop is NOT confirmed cleanup. */
+ if(p->rx_service){
+  r=mu_cprx_shutdown(p->rx_service);
+  if(r!=1||!p->rx_service->backend_released)
+   return CP_CLOUD_RETRY;
+  p->rx_service=NULL;
+ }
  if(!p->native_dio->initialized){
   p->native_dio=0;p->airplay=0;return CP_CLOUD_OK;
  }
@@ -322,6 +356,7 @@ int cp_cloud_airplay_ready(struct cp_cloud_pipeline *s,const char *iface){
 int cp_cloud_inner_auth(struct cp_cloud_pipeline *s){
  if(!eligible(s,1))return stop(s);
  if(s->handoff.phase!=CP_HO_AIRPLAY_SESSION)return CP_CLOUD_ORDER;
+ if(s->native_dio&&!cp_cloud_native_rx_live(s,0))return CP_CLOUD_PROOF;
  if(s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1||
     s->owner.inner_iap2_mfi_verified(s->owner.ctx,s->epoch)!=1)return CP_CLOUD_PROOF;
  return cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_IN_SESSION_IAP2_AUTHENTICATED,1)==CP_HO_OK?
@@ -330,6 +365,8 @@ int cp_cloud_inner_auth(struct cp_cloud_pipeline *s){
 int cp_cloud_media_ready(struct cp_cloud_pipeline *s){
  if(!eligible(s,0))return stop(s);
  if(s->handoff.phase!=CP_HO_INNER_IAP_AUTH)return CP_CLOUD_ORDER;
+ /* Media active requires the ORIGINAL receiver to report streaming. */
+ if(s->native_dio&&!cp_cloud_native_rx_live(s,1))return CP_CLOUD_PROOF;
  if(s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1||
     s->owner.inner_iap2_mfi_verified(s->owner.ctx,s->epoch)!=1)return CP_CLOUD_PROOF;
  for(int channel=CP_CLOUD_VIDEO;channel<=CP_CLOUD_STEERING;channel++){
@@ -383,6 +420,7 @@ int cp_cloud_end(struct cp_cloud_pipeline *s){
 int cp_cloud_is_active(const struct cp_cloud_pipeline *s){
  if(!s||!s->started||s->stopped||
     s->handoff.phase!=CP_HO_MEDIA_ACTIVE||!cp_ho_media_ready(&s->handoff))return 0;
+ if(s->native_dio&&!cp_cloud_native_rx_live(s,1))return 0;
  if(s->radio.epoch!=s->epoch||s->radio.phase!=CP_RADIO_ASSOCIATED||
     s->radio.selected!=s->band||
     !s->owner.ap_association||

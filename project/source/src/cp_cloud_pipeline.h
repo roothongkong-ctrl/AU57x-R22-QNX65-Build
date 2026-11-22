@@ -9,6 +9,7 @@
 #include "cp_session_handoff.h"
 #include "mu1005_r34_ap_server.h"
 #include "native_exports.h"
+#include "cprx_service.h"
 #include <stddef.h>
 #include <stdint.h>
 #define CP_CLOUD_IFACE_MAX 16u
@@ -51,6 +52,8 @@ struct cp_cloud_pipeline {
  Mu34ApServer *airplay;
  /* When present, genuine same-process DIO backend owns this receiver. */
  MuDioNative *native_dio;
+ /* SI-owned receiver service witnesses the same inner iAP2 and media session. */
+ MuCprxService *rx_service;
  struct cp_handoff handoff;
  struct cp_cloud_owner owner;
  uint32_t epoch,bt_generation;
@@ -68,6 +71,10 @@ int cp_cloud_bind_airplay(struct cp_cloud_pipeline *,Mu34ApServer *);
 int cp_cloud_bind_native_dio(struct cp_cloud_pipeline *,MuDioNative *);
 /* Advance R68 using binder-created native CFString, never guessed names. */
 int cp_cloud_drive_native(struct cp_cloud_pipeline *,uint64_t now_ms);
+/* Bind the same SI-owned native receiver only after its own START succeeded. */
+int cp_cloud_bind_rx_service(struct cp_cloud_pipeline *,MuCprxService *);
+/* Require real, current SI epoch/session and optionally native media=7. */
+int cp_cloud_native_rx_live(const struct cp_cloud_pipeline *,int require_media);
 /* Bind the *one* original-MFI iAP2 link, identity and current AP config while
  * the Bluetooth link is IDLE. The resulting proof callback reads real owner
  * and receiver state, not caller-provided synthetic readiness booleans. */

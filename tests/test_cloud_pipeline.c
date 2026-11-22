@@ -308,7 +308,7 @@ static void automatic_native_carplay_start(void){
 /* Symbols exported by test binary are the names resolved by the R69 native
  * binder, but implementations below are isolated host FIXTURES, not OEM. */
 struct fake_cf {uint32_t marker;char text[64];};
-static int native_owner_ok=1,native_listener=0,native_stop_pending=0;
+static int native_owner_ok=1,native_listener=0,native_stop_pending=0,native_media_flag=0;
 static int queue_object,native_stop_calls=0;
 static char current_native_iface[32]="eth0";
 void *gAirPlayReceiverServer=&airplay_object;
@@ -374,6 +374,67 @@ static int native_interface(void *ctx,void *server,const void *manager,const cha
  return native_owner(ctx,server,manager)&&
     !strcmp(iface,current_native_iface);
 }
+static int rx_admitted(void *ctx,uint32_t generation){
+ (void)ctx;return generation==8&&single&&wired;
+}
+static int rx_si(void *ctx,uint32_t generation,uint64_t epoch,uint32_t session){
+ (void)ctx;return generation==8&&epoch==8&&session==1234&&single&&wired;
+}
+static int rx_media(void *ctx){(void)ctx;return native_media_flag;}
+static int rx_identity(void *ctx,char *s,size_t n){
+ (void)ctx;if(n<4)return -1;memcpy(s,"abc",3);return 3;
+}
+static void native_rx_media_contract(void){
+ struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
+ MuDioNative native={0};MuCprxService rx={0};
+ const MuDioGuard guard={NULL,native_lib,native_owner,native_listening,
+                         native_stopped,native_interface};
+ const MuCprxEvidence evidence={.admitted=rx_admitted,.identity=rx_identity,
+   .media=rx_media,.si_admitted=rx_si};
+ void *h=dlopen(NULL,RTLD_NOW);assert(h);
+ reset_fixture();native_owner_ok=1;native_listener=0;native_stop_pending=0;
+ native_media_flag=0;strcpy(current_native_iface,"eth0");
+ mocked_oem(&b,&stock,1);cp_cloud_init(&p);
+ assert(cp_cloud_begin(&p,&b,&ops,8,4)==CP_CLOUD_OK);
+ assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_OK);
+ assert(mu_dio_bind_interface(&native,h,&airplay_object,&airplay_owner,
+                              8,&guard,"eth0","wlan0")==0);
+ assert(cp_cloud_bind_native_dio(&p,&native)==CP_CLOUD_OK);
+ assert(cp_cloud_native_rx_live(&p,0)==0);
+ /* Same-process control socket, but dummy handset and media samples. */
+ assert(mu_cprx_open_si(&rx,&native,&evidence,5000,8,1234)==0);
+ assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_PROOF);
+ assert(mu_dio_start(&native,5000)==MU34_AP_R_LISTENING_VERIFIED);
+ rx.started=1;rx.start_confirmed=1;
+ assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_OK);
+ assert(cp_cloud_native_rx_live(&p,0)==1);
+ assert(cp_cloud_native_rx_live(&p,1)==0);
+ p.handoff.phase=CP_HO_AIRPLAY_SESSION;
+ assert(cp_cloud_inner_auth(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_media_ready(&p)==CP_CLOUD_PROOF);
+ native_media_flag=4;
+ assert(cp_cloud_media_ready(&p)==CP_CLOUD_PROOF);
+ native_media_flag=5;
+ assert(cp_cloud_media_ready(&p)==CP_CLOUD_PROOF);
+ native_media_flag=7;
+ assert(cp_cloud_media_ready(&p)==CP_CLOUD_OK);
+ strcpy(p.iface,"wlan0");
+ assert(cp_cloud_is_active(&p));
+ native_media_flag=0;assert(!cp_cloud_is_active(&p));
+ native_media_flag=7;assert(cp_cloud_is_active(&p));
+ rx.session=1235;assert(!cp_cloud_is_active(&p));
+ rx.session=1234;assert(cp_cloud_is_active(&p));
+ wired=0;assert(!cp_cloud_native_rx_live(&p,0));
+ wired=1;
+ assert(cp_cloud_end(&p)==CP_CLOUD_RETRY);
+ assert(native.initialized&&rx.backend_released==0);
+ assert(cp_cloud_end(&p)==CP_CLOUD_OK);
+ assert(rx.backend_released&&rx.listener==-1);
+ assert(!native.initialized&&!strcmp(current_native_iface,"eth0"));
+ dlclose(h);
+}
 static void native_dio_bound_pipeline(void){
  struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
  MuDioNative native={0};
@@ -410,5 +471,5 @@ static void native_dio_bound_pipeline(void){
  assert(!strcmp(current_native_iface,"eth0"));
  dlclose(h);
 }
-int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();
+int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();
  puts("AU57X_R47_CLOUD_04_05_06_07_08_09_OWNER_GATES_PASS");return 0;}

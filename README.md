@@ -22,3 +22,13 @@ Four original R14 ARM/QNX source modules are restored and compiled in the resear
 - `cp_cloud_media` routes bounded video/audio/MMI/steering messages to a caller-provided real native sink; no decoder or hardware access is provided.
 - `tools/review_txn` restores the original user-supplied native transaction/recovery source and its 67 host tests. No production installer, OEM file paths or SD flash image.
 - See `docs/R50_CLOUD_04_TO_11_CN.md`. All artifacts remain **review-only, NO_INSTALL**.
+
+### R71 original SI receiver/media witness (review only)
+
+`cp_cloud_bind_rx_service` connects the existing SI-bound CPRX service to the
+same original DIO AirPlay owner and requires live receiver/session/media
+observations before reporting audio/video active. Native media flows through
+the OEM AirPlay decoder, not the generic test-byte router; the router rejects
+native mode. Owner teardown retains original resources until native restore
+completes. All observed media status is mocked in CI, not car-verified.
+See `docs/R71_NATIVE_SI_MEDIA_CN.md`.
