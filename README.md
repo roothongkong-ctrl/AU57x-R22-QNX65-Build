@@ -189,3 +189,15 @@ relocations prove 11 server callback slots and 10 session callback slots.
 Neither an OEM hook nor real vehicle pairing/audio/video is implemented.
 `NO_INSTALL` remains mandatory. See
 `docs/R86_ORIGINAL_OEM_DELEGATE_ABI_CN.md`.
+
+### R87 — MHI2Q WCP reference adapted to AU57x BT-first native pipeline (NO INSTALL)
+
+R87 reimplements the publicly documented **car-initiated Bluetooth iAP2**
+bootstrap as owner-attested C99 code, with delayed client open, SDP check,
+bounded retries, pending cancellation barrier, generation checks and wired/USB
+priority. A new handoff function joins that genuine BT evidence with existing
+R44 OEM iAP2/MFi CONTROL and the R85 cross-process SI/DIO wireless pipeline;
+no fake BT-only success can authorize CarPlay. The real AU57x SDK client-open
+and cancellation callbacks are **not yet located or implemented**, and the
+real car's AirPlay/media proof remains unbound. No executable vehicle test
+package, donor blobs or SD installer. See `docs/R87_CONGO_WCP_AU57X_INTEGRATION_CN.md`.

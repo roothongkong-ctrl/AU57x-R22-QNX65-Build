@@ -1,0 +1,7 @@
+AU57x R87: congobg WCP lifecycle adapted to original AU57x R86 research (SOURCE ONLY / NO INSTALL)
+Baseline R86 exact original DIO AirPlay delegates + R85 SI/DIO restoration
+NEW: cp_wcp_autoconnect.[ch] + cp_wcp_handoff.[ch]
+BT: original paired ACL owner, SDP proof, 4s car-init delay, 12s timeout, 3 tries, 5s retry, 30s no service
+SAFETY: USB wired priority, cancellation ACK, no unauthorized new generations, MFi not inferred from BT
+DONOR: audit only, no MHI2Q binary or scripts redistributed
+STATUS: vehicle_verified=false, installable=false, safe_to_flash=false, NO_INSTALL
