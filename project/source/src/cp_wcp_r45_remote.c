@@ -69,7 +69,18 @@ static int wired(void *p){
  struct cp_wcp_r45_remote *r=p;
  return r&&r->bound&&live(r,r->generation);
 }
-static int connected(void *p,uint32_t g){return live((struct cp_wcp_r45_remote*)p,g);}
+/* MU1005 BlueSDK event 2 only proves original RFCOMM transport, not an
+ * established iAP2 CONTROL link.  A real phone must exchange the marker,
+ * valid peer LSP/SYN and ACK completing R44's link state machine first.
+ * R44 separately runs the original AA00-AA05 MFi exchange; this function
+ * MUST NOT infer MFi from RFCOMM or from the iAP2 marker alone. */
+static int connected(void *p,uint32_t g){
+ const struct cp_wcp_r45_remote *r=p;
+ const struct cp_step04_link *l;
+ if(!live(r,g))return 0;
+ l=&r->bridge->session->link;
+ return l->phase==CP_LK_NORMAL && l->have_peer_syn==1;
+}
 static int sdp(void *p,uint32_t g){(void)p;(void)g;return -1;}
 static int open_client(void *p,uint32_t g){(void)p;(void)g;return -1;}
 static int cancel_client(void *p,uint32_t g){(void)p;(void)g;return 0;}
@@ -81,7 +92,7 @@ int cp_wcp_r45_remote_ops(struct cp_wcp_r45_remote *r,struct cp_wcp_bt_ops *out)
  out->paired_acl_verified=paired;
  out->wired_idle_verified=wired;
  out->stock_iap2_connected=connected;
- /* No client SDP/open/cancel on this server-first original RFCOMM path. */
+ /* No guessed client SDP/open/cancel ABI; original server path only. */
  out->phone_iap2_sdp=sdp;
  out->stock_open_iap2=open_client;
  out->stock_cancel_iap2=cancel_client;
