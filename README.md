@@ -178,3 +178,14 @@ still missing**, so no vehicle installation is safe. Full details in
 ### R85 — wired-priority cross-process original-DIO restore (NO INSTALL)
 
 Adds opt-in CPRX v3 op 12 for **independently attested physical wired takeover** on *both* SI and DIO original owners. Unlike normal media-aware STOP, op12 can ask the original DIO backend to restore while media is streaming, but its ACK cannot precede completed original STOP/interface restoration. On failure or missing witnesses, the remote pipeline stays in retryable pending state. A separate SI final teardown witness must complete before full success. Host-only regression uses actual AF_UNIX + OEM test callbacks; neither production callback has been located in original binaries. This code must not be installed. See `docs/R85_SI_DIO_WIRED_RESTORE_CN.md`.
+
+### R86 — verified exact MU1005 DIO/AirPlay two-level callback ABI (NO INSTALL)
+
+A read-only SHA-256-pinned ARM32 ELF auditor reconstructs the **single** stock
+`AirPlayReceiverServerSetDelegate` registration call and the nested
+`AirPlayReceiverSessionSetDelegate` call.  Original `libairplay.so` machine
+code copies **60** and **56** bytes, respectively.  Original DIO ARM PIC/GOT
+relocations prove 11 server callback slots and 10 session callback slots.
+Neither an OEM hook nor real vehicle pairing/audio/video is implemented.
+`NO_INSTALL` remains mandatory. See
+`docs/R86_ORIGINAL_OEM_DELEGATE_ABI_CN.md`.
