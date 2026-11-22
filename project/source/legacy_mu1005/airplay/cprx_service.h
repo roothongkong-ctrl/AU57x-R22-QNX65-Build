@@ -101,4 +101,26 @@ int mu_cprx_open_si_unix(MuCprxService *,MuDioNative *,const MuCprxEvidence *,
  * do not reopen a live/pending MuCprxService with another directory. */
 int mu_cprx_tick(MuCprxService *,uint64_t now);
 int mu_cprx_shutdown(MuCprxService *);
+/* R78: nonblocking, owner-thread CPRX v3 START client. The SI owner must
+ * explicitly authorize this operation; its client is NEVER a substitute for
+ * a genuine OEM AirPlay/inner-iAP2 session. No independent worker thread. */
+#define MU_CPRX_CLIENT_ERROR (-1)
+#define MU_CPRX_CLIENT_PENDING 1
+#define MU_CPRX_CLIENT_CONFIRMED 2
+typedef struct {
+ MuCprxService *service;
+ int fd, phase;
+ uint32_t generation, session;
+ uint64_t epoch, deadline;
+ unsigned sent, received;
+ unsigned char request[32], reply[8];
+} MuCprxClient;
+void mu_cprx_client_init(MuCprxClient *);
+/* Caller must be on the verified, current original SI owner thread.
+ * Starts only when an owner-owned AF_UNIX v3 receiver lease is active. */
+int mu_cprx_client_begin(MuCprxClient *,MuCprxService *,uint64_t now_ms);
+/* Advance without blocking; call the server's mu_cprx_tick between ticks.
+ * A non-zero failure is terminal: reinitialize only for a NEW SI session. */
+int mu_cprx_client_tick(MuCprxClient *,uint64_t now_ms);
+void mu_cprx_client_close(MuCprxClient *);
 #endif

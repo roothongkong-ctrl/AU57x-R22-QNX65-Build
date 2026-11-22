@@ -286,3 +286,134 @@ int mu_cprx_tick(MuCprxService *s,uint64_t now){
  if(w<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))return 0;
  int mutate=s->mutating;drop(s);return (mutate||s->cleaning||s->terminal)?mu_cprx_shutdown(s):0;
 }
+
+/* R78: the production SI control sender (previously absent). Same original
+ * owner thread calls client_begin/tick and services mu_cprx_tick; the AF_UNIX
+ * server still independently checks the kernel credentials and SI owner.
+ * No additional source module, QNX thread, fake iPhone or trust in wire IDs. */
+void mu_cprx_client_init(MuCprxClient *c){
+ if(!c)return;
+ memset(c,0,sizeof *c);c->fd=-1;
+}
+void mu_cprx_client_close(MuCprxClient *c){
+ if(!c)return;
+ if(c->phase&&c->fd>=0)close(c->fd);
+ mu_cprx_client_init(c);
+}
+static int client_fail(MuCprxClient *c){
+ if(!c)return MU_CPRX_CLIENT_ERROR;
+ if(c->fd>=0)close(c->fd);
+ c->fd=-1;c->phase=5;
+ return MU_CPRX_CLIENT_ERROR;
+}
+int mu_cprx_client_begin(MuCprxClient *c,MuCprxService *s,uint64_t now){
+ struct sockaddr_un addr;struct stat inode;
+ int fd,flags,rc;
+ uid_t uid;gid_t gid;
+ size_t len;
+ if(!c||c->phase||!s||s->version!=3||!s->unix_listener||
+    s->listener<0||s->backend_released||s->terminal||s->cleaning||
+    s->started||s->start_confirmed||
+    !s->generation||!s->epoch||!s->session||!s->port||s->port>65535||
+    !s->unix_path[0]||!s->evidence.si_admitted||
+    s->evidence.si_admitted(s->evidence.opaque,s->generation,
+                            s->epoch,s->session)!=1||
+    !s->evidence.admitted||
+    s->evidence.admitted(s->evidence.opaque,s->generation)!=1||
+    lstat(s->unix_path,&inode)!=0||!S_ISSOCK(inode.st_mode)||
+    inode.st_dev!=s->unix_dev||inode.st_ino!=s->unix_ino)return -1;
+ len=strlen(s->unix_path);
+ if(len>=sizeof addr.sun_path)return -1;
+ fd=socket(AF_UNIX,SOCK_STREAM,0);
+ if(fd<0)return -1;
+ flags=fcntl(fd,F_GETFD);
+ if(flags<0||fcntl(fd,F_SETFD,flags|FD_CLOEXEC)<0||
+    nonblock(fd)||safe_send(fd)){
+  /* QNX needs SO_NOSIGPIPE when MSG_NOSIGNAL is unavailable; do not risk
+   * a disconnected SI peer delivering SIGPIPE to the original process. */
+  close(fd);return -1;
+ }
+ memset(&addr,0,sizeof addr);addr.sun_family=AF_UNIX;
+ memcpy(addr.sun_path,s->unix_path,len+1);
+#ifdef __QNXNTO__
+ addr.sun_len=(unsigned char)SUN_LEN(&addr);
+ rc=connect(fd,(struct sockaddr*)&addr,(socklen_t)SUN_LEN(&addr));
+#else
+ rc=connect(fd,(struct sockaddr*)&addr,
+   (socklen_t)(offsetof(struct sockaddr_un,sun_path)+len+1));
+#endif
+ if(rc<0&&errno!=EINPROGRESS&&errno!=EAGAIN&&errno!=EWOULDBLOCK){
+  close(fd);return -1;
+ }
+ /* Validate the server's kernel identity as well; the owner callback is
+  * separately checked on the receiving side. Same UID is NOT a PID proof. */
+ if(rc==0&&(!kernel_peer(fd,&uid,&gid)||
+    uid!=s->peer_uid||gid!=s->peer_gid)){
+  close(fd);return -1;
+ }
+ mu_cprx_client_init(c);
+ c->service=s;c->fd=fd;c->phase=rc<0?1:2;
+ c->generation=s->generation;c->epoch=s->epoch;c->session=s->session;
+ c->deadline=now+6500;
+ memcpy(c->request,"CPRX",4);c->request[4]=3;c->request[5]=1;
+ put32(c->request+8,s->generation);
+ c->request[12]=(unsigned char)s->port;
+ c->request[13]=(unsigned char)(s->port>>8);
+ put32(c->request+16,(uint32_t)s->epoch);
+ put32(c->request+20,(uint32_t)(s->epoch>>32));
+ put32(c->request+24,s->session);
+ return 0;
+}
+int mu_cprx_client_tick(MuCprxClient *c,uint64_t now){
+ MuCprxService *s;
+ uid_t uid;gid_t gid;
+ if(!c||!c->phase)return MU_CPRX_CLIENT_ERROR;
+ if(c->phase==4)return MU_CPRX_CLIENT_CONFIRMED;
+ if(c->phase==5)return MU_CPRX_CLIENT_ERROR;
+ s=c->service;
+ if(!s||s->generation!=c->generation||s->epoch!=c->epoch||
+    s->session!=c->session||s->terminal||s->backend_released||
+    now>=c->deadline||!s->evidence.si_admitted||
+    s->evidence.si_admitted(s->evidence.opaque,s->generation,
+                           s->epoch,s->session)!=1)
+  return client_fail(c);
+ if(c->phase==1){
+  int error=0;socklen_t n=(socklen_t)sizeof error;
+  if(getsockopt(c->fd,SOL_SOCKET,SO_ERROR,&error,&n)<0)
+   return client_fail(c);
+  if(error==EINPROGRESS||error==EALREADY)return MU_CPRX_CLIENT_PENDING;
+  if(error)return client_fail(c);
+  if(!kernel_peer(c->fd,&uid,&gid)||
+     uid!=s->peer_uid||gid!=s->peer_gid)return client_fail(c);
+  c->phase=2;
+ }
+ if(c->phase==2){
+  ssize_t n=send(c->fd,c->request+c->sent,32-c->sent,MSG_NOSIGNAL);
+  if(n<0){
+   if(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR)
+    return MU_CPRX_CLIENT_PENDING;
+   return client_fail(c);
+  }
+  if(n==0)return client_fail(c);
+  c->sent+=(unsigned)n;
+  if(c->sent!=32)return MU_CPRX_CLIENT_PENDING;
+  c->phase=3;
+ }
+ if(c->phase==3){
+  ssize_t n=recv(c->fd,c->reply+c->received,8-c->received,0);
+  if(n<0){
+   if(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR)
+    return MU_CPRX_CLIENT_PENDING;
+   return client_fail(c);
+  }
+  if(n==0)return client_fail(c);
+  c->received+=(unsigned)n;
+  if(c->received!=8)return MU_CPRX_CLIENT_PENDING;
+  if(memcmp(c->reply,"CPRA",4)||c->reply[4]!=2||c->reply[5]!=0||
+     c->reply[6]||c->reply[7]||!s->start_confirmed)
+   return client_fail(c);
+  close(c->fd);c->fd=-1;c->phase=4;
+  return MU_CPRX_CLIENT_CONFIRMED;
+ }
+ return MU_CPRX_CLIENT_PENDING;
+}

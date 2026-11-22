@@ -431,6 +431,7 @@ static void native_rx_media_contract(void){
  assert(mu_dio_bind_interface(&native,h,&airplay_object,&airplay_owner,
                               8,&guard,"eth0","wlan0")==0);
  assert(cp_cloud_bind_native_dio(&p,&native)==CP_CLOUD_OK);
+ assert(cp_cloud_enable_native_client(&p)==CP_CLOUD_PROOF);
  assert(cp_cloud_native_rx_live(&p,0)==0);
  /* v3 TCP entrypoint must stay fail-closed. Only a preexisting 0700
   * owner-private directory may host a credential-checked AF_UNIX listener. */
@@ -529,22 +530,33 @@ static void native_rx_media_contract(void){
  assert(rx.client<0&&!rx.started&&native_start_calls==0);
  close(fd);
  si_peer_allowed=1;
- fd=socket(AF_UNIX,SOCK_STREAM,0);assert(fd>=0);
- assert(connect(fd,(struct sockaddr *)&addr,sizeof addr)==0);
- unsigned char req[32]={0};
- memcpy(req,"CPRX",4);req[4]=3;req[5]=1; /* v3 START */
- req[8]=8;req[12]=0x88;req[13]=0x13; /* gen 8, AirPlay port 5000 */
- req[16]=8;req[24]=0xd2;req[25]=4; /* SI epoch 8/session 1234 */
- assert(send(fd,req,sizeof req,0)==(ssize_t)sizeof req);
- for(unsigned i=0;i<12&&!rx.start_confirmed;i++){
-  int got=cp_cloud_drive_native(&p,101+i);
+ /* Fail closed before opening any client socket on stale SI generations,
+  * altered kernel credentials or a switched socket inode. */
+ MuCprxClient bad={0};mu_cprx_client_init(&bad);
+ rx.session=1235;
+ assert(mu_cprx_client_begin(&bad,&rx,103)==-1&&bad.phase==0);
+ rx.session=1234;
+ rx.peer_uid=(geteuid()==0?1:0);
+ assert(mu_cprx_client_begin(&bad,&rx,103)==-1&&bad.phase==0);
+ rx.peer_uid=geteuid();
+ rx.unix_ino++;
+ assert(mu_cprx_client_begin(&bad,&rx,103)==-1&&bad.phase==0);
+ rx.unix_ino--;
+ assert(!rx.started&&native_start_calls==0);
+ /* R78: original SI owner opts in; the pipeline MUST construct and send
+  * the actual CPRX v3 START, no manually composed success packet. */
+ assert(cp_cloud_enable_native_client(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_enable_native_client(&p)==CP_CLOUD_PROOF);
+ for(unsigned i=0;i<25&&!rx.start_confirmed;i++){
+  int got=cp_cloud_drive_native(&p,103+i);
   assert(got==CP_CLOUD_RETRY||got==CP_CLOUD_PROOF);
  }
  assert(rx.started&&rx.start_confirmed);
+ assert(p.rx_client_enabled&&p.rx_client.phase==4&&p.rx_client.fd==-1);
+ MuCprxClient duplicate={0};mu_cprx_client_init(&duplicate);
+ assert(mu_cprx_client_begin(&duplicate,&rx,114)==-1);
+ assert(duplicate.phase==0);
  assert(si_peer_checks>=2&&native_start_calls==1);
- unsigned char reply[8];
- assert(recv(fd,reply,sizeof reply,0)==(ssize_t)sizeof reply);
- assert(memcmp(reply,"CPRA",4)==0&&reply[5]==0);
  assert(cp_cloud_prepare_receiver(&p,native.iface)==CP_CLOUD_OK);
  assert(native_start_calls==1); /* no competing second START */
  assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_PROOF);
@@ -603,7 +615,6 @@ static void native_rx_media_contract(void){
  rx.session=1234;assert(cp_cloud_is_active(&p));
  wired=0;assert(!cp_cloud_native_rx_live(&p,0));
  wired=1;
- close(fd);
  assert(cp_cloud_end(&p)==CP_CLOUD_RETRY);
  assert(native.initialized&&rx.backend_released==0);
  assert(rx.listener==-1&&rx.unix_listener);
@@ -616,6 +627,7 @@ static void native_rx_media_contract(void){
                              elsewhere,geteuid(),getegid())==-1);
  assert(cp_cloud_end(&p)==CP_CLOUD_OK);
  assert(rx.backend_released&&rx.listener==-1);
+ assert(!p.rx_client_enabled&&!p.rx_client.phase&&p.rx_client.fd==-1);
  assert(!native.initialized&&!strcmp(current_native_iface,"eth0"));
  assert(lstat(bound_path,&sockstat)==-1&&errno==ENOENT);
  assert(rmdir(sockdir)==0);

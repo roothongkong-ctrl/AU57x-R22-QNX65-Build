@@ -54,6 +54,10 @@ struct cp_cloud_pipeline {
  MuDioNative *native_dio;
  /* SI-owned receiver service witnesses the same inner iAP2 and media session. */
  MuCprxService *rx_service;
+ /* Explicit opt-in: the original SI owner may drive a real nonblocking
+  * AF_UNIX START client. Never auto-start an unverified receiver. */
+ MuCprxClient rx_client;
+ int rx_client_enabled;
  struct cp_handoff handoff;
  struct cp_cloud_owner owner;
  uint32_t epoch,bt_generation;
@@ -76,6 +80,9 @@ int cp_cloud_drive_native(struct cp_cloud_pipeline *,uint64_t now_ms);
  * native AirPlay start operations. The local SI CPRX socket is ticked through
  * cp_cloud_drive_native on the original owner thread. */
 int cp_cloud_bind_rx_service(struct cp_cloud_pipeline *,MuCprxService *);
+/* Owner-only opt-in after binding the authentic CPRX receiver. Once enabled,
+ * drive_native sends the real v3 START and waits for an actual socket ACK. */
+int cp_cloud_enable_native_client(struct cp_cloud_pipeline *);
 /* Require the real current SI lease (generation+epoch+session), with
  * independently observed native owner proof; optionally native media=7.
  * R74 binds inner iAP2/MFi and four channels to this exact SI session. */

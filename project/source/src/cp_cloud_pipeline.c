@@ -59,7 +59,8 @@ static int stop(struct cp_cloud_pipeline *s){
 }
 void cp_cloud_init(struct cp_cloud_pipeline *s){
  if(!s)return;
- memset(s,0,sizeof *s);cp_radio_init(&s->radio);cp_ho_init(&s->handoff);
+ memset(s,0,sizeof *s);mu_cprx_client_init(&s->rx_client);
+ cp_radio_init(&s->radio);cp_ho_init(&s->handoff);
 }
 int cp_cloud_begin(struct cp_cloud_pipeline *s,struct cp_step04_session *b,
                   const struct cp_cloud_owner *ops,uint32_t epoch,uint32_t gen){
@@ -181,6 +182,15 @@ int cp_cloud_bind_rx_service(struct cp_cloud_pipeline *p,MuCprxService *rx){
  p->rx_service=rx;
  return CP_CLOUD_OK;
 }
+int cp_cloud_enable_native_client(struct cp_cloud_pipeline *p){
+ if(!p||!p->started||p->stopped||p->rx_client_enabled||
+    p->handoff.phase!=CP_HO_WIFI_ASSOCIATED||!p->rx_service||
+    !native_valid(p)||!native_rx_lease(p,p->rx_service)||
+    p->rx_service->started||p->rx_service->start_confirmed||
+    !eligible(p,1))return CP_CLOUD_PROOF;
+ p->rx_client_enabled=1;
+ return CP_CLOUD_OK;
+}
 int cp_cloud_bind_native_dio(struct cp_cloud_pipeline *p,MuDioNative *n){
  if(!p||!n||!p->started||p->stopped||p->airplay||p->native_dio||
     !n->initialized||n->ap.generation!=p->epoch||
@@ -207,8 +217,28 @@ int cp_cloud_drive_native(struct cp_cloud_pipeline *p,uint64_t now){
   * mu_dio_start(), and its ACK proves the same receiver was committed. */
  if(!p->rx_service)return CP_CLOUD_PROOF;
  if(!native_rx_lease(p,p->rx_service))return stop(p);
+ /* R78: the genuine SI owner explicitly opts in. Without an opt-in,
+  * retain R77's externally driven protocol. With opt-in, establish one
+  * nonblocking START client and require its real AF_UNIX ACK; do not set
+  * start_confirmed or simulate inner MFi/media readiness. */
+ if(p->rx_client_enabled){
+  if(!p->rx_client.phase){
+   if(!eligible(p,1)||!p->bootstrap||
+      !cp_s4_authenticated(p->bootstrap)||
+      p->radio.phase!=CP_RADIO_ASSOCIATED)return CP_CLOUD_RETRY;
+   if(mu_cprx_client_begin(&p->rx_client,p->rx_service,now)!=0)
+    return stop(p);
+  }
+  if(mu_cprx_client_tick(&p->rx_client,now)==MU_CPRX_CLIENT_ERROR)
+   return stop(p);
+ }
  r=mu_cprx_tick(p->rx_service,now);
  if(r!=0||!native_valid(p))return stop(p);
+ if(p->rx_client_enabled){
+  r=mu_cprx_client_tick(&p->rx_client,now);
+  if(r==MU_CPRX_CLIENT_ERROR)return stop(p);
+  if(r!=MU_CPRX_CLIENT_CONFIRMED)return CP_CLOUD_RETRY;
+ }
  if(!cp_cloud_native_rx_live(p,0))return CP_CLOUD_RETRY;
  r=cp_cloud_drive_start(p,p->native_dio->iface,now);
  if(r!=CP_CLOUD_OK)return r;
@@ -235,6 +265,12 @@ int cp_cloud_drive_native(struct cp_cloud_pipeline *p,uint64_t now){
 static int native_restore(struct cp_cloud_pipeline *p){
  int r;
  if(!p||!p->native_dio)return CP_CLOUD_OK;
+ /* Revoke the sender before releasing the SI receiver lease; the
+  * original backend must still acknowledge native restore separately. */
+ if(p->rx_client_enabled){
+  mu_cprx_client_close(&p->rx_client);
+  p->rx_client_enabled=0;
+ }
  /* Release the SI receiver lease before touching the underlying AirPlay
   * singleton. A pending native stop is NOT confirmed cleanup. */
  if(p->rx_service){

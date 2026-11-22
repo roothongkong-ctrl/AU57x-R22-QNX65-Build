@@ -92,3 +92,15 @@ preventing a second SI instance from stealing that endpoint. Reopening the
 same in-use service object in a different private directory is also refused.
 See `docs/R77_SI_SOCKET_RESTORE_BARRIER_CN.md`. Only host fixtures and CI
 have been run; **this is not a car installation or wireless CarPlay proof**.
+
+### R78 — nonblocking SI CPRX START client (NO INSTALL)
+
+Adds a genuine AF_UNIX nonblocking CPRX v3 client in the existing native
+service and an **explicit** original SI owner opt-in to the CarPlay pipeline.
+The owner's periodic tick sends real 32-byte START, receives actual CPRA
+acknowledgement, and never marks inner MFi or media ready from that ACK alone.
+Legacy hand-crafted host START requests are no longer needed for the normal
+test. UID/session/socket inode and restoration barriers remain enforced.
+This is source-only: native `smartphone_integrator` runtime binding and real
+phone video/audio are unverified. Details in
+`docs/R78_SI_AUTO_START_CLIENT_CN.md`.
