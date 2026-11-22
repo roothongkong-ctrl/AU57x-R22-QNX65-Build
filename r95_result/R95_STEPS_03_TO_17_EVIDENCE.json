@@ -1,0 +1,279 @@
+{
+  "version": "R95",
+  "baseline": "MHI2_CN_AU57x_K1006_2 / MU1005",
+  "generated_utc": "2026-11-22T16:00:00.932694+00:00",
+  "vehicle_verified": false,
+  "installable": false,
+  "safe_to_flash": false,
+  "scope": "OFFLINE_STEPS_03_TO_17_CONTINUOUS_NO_INSTALL",
+  "tests": {
+    "launcher": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 1.77,
+      "log_file": "launcher.log"
+    },
+    "loader": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 0.31,
+      "log_file": "loader.log"
+    },
+    "rf_register": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 0.1,
+      "log_file": "rf_register.log"
+    },
+    "rf_io": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 0.19,
+      "log_file": "rf_io.log"
+    },
+    "bt_epoch": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 0.17,
+      "log_file": "bt_epoch.log"
+    },
+    "iap2": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 0.77,
+      "log_file": "iap2.log"
+    },
+    "mfi": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 0.81,
+      "log_file": "mfi.log"
+    },
+    "handoff": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 1.39,
+      "log_file": "handoff.log"
+    },
+    "radio": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 0.2,
+      "log_file": "radio.log"
+    },
+    "ap": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 4.15,
+      "log_file": "ap.log"
+    },
+    "media": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 0.28,
+      "log_file": "media.log"
+    },
+    "wired": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 0.16,
+      "log_file": "wired.log"
+    },
+    "sd": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 3.07,
+      "log_file": "sd.log"
+    },
+    "r95_sd": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 1.49,
+      "log_file": "r95_sd.log"
+    },
+    "r95_retry": {
+      "result": "PASS",
+      "detail": "exit=0",
+      "elapsed_s": 0.89,
+      "log_file": "r95_retry.log"
+    }
+  },
+  "steps": [
+    {
+      "step": 3,
+      "title": "OEM supervisor startup hook",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "launcher",
+        "loader"
+      ],
+      "requires": "exact OEM config schema and supervisor runtime environment unverified"
+    },
+    {
+      "step": 4,
+      "title": "Original BlueSDK callback thread",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "loader"
+      ],
+      "requires": "actual btstack callback-thread owner is not bound"
+    },
+    {
+      "step": 5,
+      "title": "RFCOMM registration",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "rf_register"
+      ],
+      "requires": "iAP2 profile argument is experimental, live registration unverified"
+    },
+    {
+      "step": 6,
+      "title": "RFCOMM byte transport",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "rf_io",
+        "iap2"
+      ],
+      "requires": "physical BlueSDK RF events are unverified"
+    },
+    {
+      "step": 7,
+      "title": "Phone/session generation",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "bt_epoch",
+        "iap2"
+      ],
+      "requires": "paired iPhone MAC authority unverified"
+    },
+    {
+      "step": 8,
+      "title": "iAP2 transport handshake",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "iap2"
+      ],
+      "requires": "real handset iAP2 handshake is unverified"
+    },
+    {
+      "step": 9,
+      "title": "OEM Apple MFi",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "mfi"
+      ],
+      "requires": "only fixture MFi certificate/signature tested; real OEM MFi unverified"
+    },
+    {
+      "step": 10,
+      "title": "BT-to-Wi-Fi handoff",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "handoff",
+        "ap"
+      ],
+      "requires": "real phone-car handoff unverified"
+    },
+    {
+      "step": 11,
+      "title": "2.4 GHz AP/network",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "radio",
+        "ap"
+      ],
+      "requires": "2.4 GHz stock hotspot and association unverified"
+    },
+    {
+      "step": 12,
+      "title": "Bonjour discovery",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "ap"
+      ],
+      "requires": "real original Bonjour service advertisement unverified"
+    },
+    {
+      "step": 13,
+      "title": "AirPlay receiver session",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "ap"
+      ],
+      "requires": "real original AirPlay DIO owner/session unverified"
+    },
+    {
+      "step": 14,
+      "title": "Video/audio streams",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "media"
+      ],
+      "requires": "live iPhone media channels unverified"
+    },
+    {
+      "step": 15,
+      "title": "SI/DIO/HMI wired precedence",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "wired",
+        "ap"
+      ],
+      "requires": "real MMI control event dispatch unverified"
+    },
+    {
+      "step": 16,
+      "title": "Full wireless integration",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "iap2",
+        "mfi",
+        "ap",
+        "media"
+      ],
+      "requires": "mock end-to-end only; no real device-to-vehicle connection"
+    },
+    {
+      "step": 17,
+      "title": "SD backup and rollback",
+      "offline_test": "PASS",
+      "vehicle_complete": false,
+      "assessment": "OFFLINE_CONTRACT_ONLY",
+      "test_keys": [
+        "sd",
+        "r95_sd"
+      ],
+      "requires": "host/QNX transaction model verified, but stock image mount, actual config and boot health callback unverified"
+    }
+  ],
+  "message": "Automated host contracts cannot prove OEM callback binding or genuine iPhone / Wi-Fi / AirPlay / MFi."
+}
