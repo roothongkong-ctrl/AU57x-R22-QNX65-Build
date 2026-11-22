@@ -36,7 +36,9 @@ int cp_wcp_r45_remote_bind(struct cp_wcp_r45_remote *,
  struct cp_s4_socket_io *,struct cp_s4_tcp_bridge *,
  const struct cp_wcp_r45_remote_owner *);
 /* Returns R87's existing transport callback surface for a proven already-
- * connected, server-first original RFCOMM link. No invented client-open ABI. */
+ * connected, server-first original RFCOMM link. A transport CONNECT alone
+ * is never iAP2 READY: wait for the validated R44 SYN/LSP/ACK exchange.
+ * Still no invented client-open ABI or MFi bypass. */
 int cp_wcp_r45_remote_ops(struct cp_wcp_r45_remote *,struct cp_wcp_bt_ops *);
 /* Not safe to reuse an old session generation after disconnect/USB takeover. */
 void cp_wcp_r45_remote_unbind(struct cp_wcp_r45_remote *);

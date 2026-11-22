@@ -1,3 +1,13 @@
+## R90 / Original MU1005 Bluetooth iAP2 handshake readiness (2026-11-22) — SOURCE ONLY
+
+R90 fixes a genuine R89 integration bug: **RFCOMM CONNECT was being reported as iAP2 `LINK_READY` before an iAP2 handshake even began**. The R45 socket-to-R44 `cp_wcp_r45_remote` path now requires a live authenticated original transport **and** the completed R44 peer iAP2 `SYN/LSP/ACK` (`CP_LK_NORMAL` + `have_peer_syn`). R44 original MFi `AA00..AA05` is still a distinct *mandatory* authentication step before wireless CarPlay begins.
+
+`ci/host_wcp_r45_remote.sh` now uses real split TCP frames to verify all link phases and USB/owner refusal. `ci/host_wcp_r45_remote_mfi.sh` additionally runs the full R44 AA00/AA02/AA05 state machine with clearly synthetic OEM cert/signature fixtures and a real localhost TCP stream, including irreversible revocation. These are **not** Apple or in-car successes.
+
+The original MU1005 `btstack` native owner hook, proprietary iAP2 RFCOMM registration mode and actual iPhone/MFi outcome remain **unverified**. The unchanged native callback adapter requires independently proven `iap2_profile_proven`; there is no SD installer or OEM code in this repository. See `docs/R90_MU1005_R45_IAP2_NORMAL_MFI_GATES_CN.md`. `installable=false`, `vehicle_verified=false`, `safe_to_flash=false`.
+
+---
+
 ## R89 / MU1005 original btstack cross-process RF bridge (2026-11-22) — SOURCE ONLY
 
 R89 fixes the R88 cross-process pointer assumption by connecting the actual **R45 RFCOMM normalized TCP frames (127.0.0.1:57342)** through the existing R44 socket/iAP2/MFi state machine to a new `cp_wcp_r45_remote.[ch]` adapter. The transport proof checks an accepted local socket, original owner, independent paired MAC, server publication, same generation, and wired priority continuously. Existing R44 MFi proofs are still necessary; a test owner or socket frame never authenticates the phone.

@@ -1,7 +1,7 @@
 name: AU57x R52 QNX6.5 ARMv7 (REVIEW ONLY)
 on:
   push:
-    branches: [main, r89-stock-btstack-rfcomm-owner-bridge]
+    branches: [main, r90-r45-iap2-handshake-original-mfi]
   workflow_dispatch:
 permissions:
   contents: read

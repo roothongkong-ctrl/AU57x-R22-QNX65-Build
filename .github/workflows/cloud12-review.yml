@@ -1,7 +1,7 @@
 name: AU57x cloud-only 12-step evidence and lifecycle gates (NO INSTALL)
 on:
   push:
-    branches: [main, r89-stock-btstack-rfcomm-owner-bridge]
+    branches: [main, r90-r45-iap2-handshake-original-mfi]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -35,6 +35,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_wcp_donor_reference_audit.py -v
       - name: R89 cross-process original R45 socket to R44/R87 transport contract
         run: bash ci/host_wcp_r45_remote.sh
+      - name: R90 real TCP original R45/R44 iAP2 handshake and synthetic AA00-AA05 fail-closed test
+        run: bash ci/host_wcp_r45_remote_mfi.sh
       - name: R89 exact original MU1005 RFCOMM profile callers (synthetic source tests)
         run: python3 -m unittest discover -s tests -p test_mu1005_rf_register_sites.py -v
       - name: R88 original R45 server-first RFCOMM into R87 (no phone/no OEM)

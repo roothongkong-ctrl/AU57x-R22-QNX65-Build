@@ -42,6 +42,34 @@ static int control(void *p,const uint8_t *buf,size_t n){
  (void)p;(void)buf;(void)n;return 0;
 }
 static int ack(void *p,uint32_t tok){(void)p;(void)tok;return 0;}
+static uint8_t r90_sum(const uint8_t *v,size_t n){
+ uint8_t s=0;
+ for(size_t i=0;i<n;i++)s=(uint8_t)(s+v[i]);
+ return (uint8_t)(0u-s);
+}
+static size_t r90_packet(uint8_t *out,uint8_t control,uint8_t psn,
+                         uint8_t ack,const uint8_t *payload,size_t n){
+ size_t total=n?n+10u:9u;
+ out[0]=0xff;out[1]=0x5a;
+ out[2]=(uint8_t)(total>>8);out[3]=(uint8_t)total;
+ out[4]=control;out[5]=psn;out[6]=ack;out[7]=0;
+ out[8]=r90_sum(out,8);
+ if(n){memcpy(out+9,payload,n);out[9+n]=r90_sum(payload,n);}
+ return total;
+}
+static void r90_send_data(int fd,struct cp_s4_socket_io *w,
+                          const uint8_t *p,size_t n,uint64_t now){
+ uint8_t frame[8+256]={2,0,0,0,7,0,0,0};
+ assert(n<=256);
+ frame[2]=(uint8_t)n;frame[3]=(uint8_t)(n>>8);
+ memcpy(frame+8,p,n);
+ /* Break header and payload at independent boundaries to exercise the
+  * production stream parser over a real AF_INET TCP connection. */
+ assert(send(fd,frame,3,0)==3);
+ assert(cp_s4_socket_poll(w,now)==CP_LK_OK);
+ assert(send(fd,frame+3,n+5,0)==(ssize_t)(n+5));
+ assert(cp_s4_socket_poll(w,now+1)==CP_LK_OK);
+}
 static void make_pair(int *listener,int *client,int *accepted){
  struct sockaddr_in a;
  *listener=socket(AF_INET,SOCK_STREAM,0);assert(*listener>=0);
@@ -68,6 +96,8 @@ int main(void){
  const uint8_t mac[6]={2,4,6,8,10,12};
  const uint8_t connect_frame[14]={1,0,6,0,7,0,0,0,2,4,6,8,10,12};
  const uint8_t syn_marker[6]={0xff,0x55,2,0,0xee,0x10};
+ const uint8_t lsp[]={1,4,0x05,0x80,0x0f,0xa0,0x01,0xf4,4,3,10,0,1};
+ uint8_t iap_frame[128];size_t iap_len;
  o.epoch=8;o.gen=7;o.alive=o.published=o.paired=o.usb_idle=o.transport=1;
  memcpy(o.mac,mac,6);
  s.epoch=o.epoch;
@@ -89,8 +119,33 @@ int main(void){
  assert(out.phone_iap2_sdp(out.ctx,7)<0);
  assert(cp_wcp_bt_init(&ac,&out)==CP_WCP_OK);
  assert(cp_wcp_bt_acl_up(&ac,7,102)==CP_WCP_OK);
- assert(cp_wcp_bt_tick(&ac,7,103)==CP_WCP_LINK_READY);
+ /* Original R89 bug: a plain R45 CONNECT previously reported LINK_READY
+  * even though ZERO iAP2 bytes had arrived. Must remain WAIT. */
+ assert(out.stock_iap2_connected(out.ctx,7)==0);
+ assert(cp_wcp_bt_tick(&ac,7,103)==CP_WCP_WAIT);
+ assert(ac.state==CP_WCP_DELAY);
+ assert(cp_s4_authenticated(&s)==0);
+ /* Marker only: R44 has NOT verified a peer SYN or control session. */
+ r90_send_data(client,&w,syn_marker,sizeof syn_marker,104);
+ assert(s.link.phase==CP_LK_NEGOTIATE);
+ assert(!s.link.have_peer_syn);
+ assert(out.stock_iap2_connected(out.ctx,7)==0);
+ assert(cp_wcp_bt_tick(&ac,7,106)==CP_WCP_WAIT);
+ /* Valid LSP/SYN still needs an ACK of our original SYN sequence 99. */
+ iap_len=r90_packet(iap_frame,0x80,42,99,lsp,sizeof lsp);
+ r90_send_data(client,&w,iap_frame,iap_len,107);
+ assert(s.link.have_peer_syn&&s.link.phase==CP_LK_NEGOTIATE);
+ assert(out.stock_iap2_connected(out.ctx,7)==0);
+ assert(cp_wcp_bt_tick(&ac,7,109)==CP_WCP_WAIT);
+ /* Only a valid peer ACK transitions the R44 iAP2 link to NORMAL. */
+ iap_len=r90_packet(iap_frame,0x40,42,99,NULL,0);
+ r90_send_data(client,&w,iap_frame,iap_len,110);
+ assert(s.link.phase==CP_LK_NORMAL);
+ assert(out.stock_iap2_connected(out.ctx,7)==1);
+ assert(cp_wcp_bt_tick(&ac,7,112)==CP_WCP_LINK_READY);
  assert(ac.state==CP_WCP_READY);
+ /* Finished iAP2 LINK does not equal original Apple MFi success. */
+ assert(cp_s4_authenticated(&s)==0);
  assert(out.stock_iap2_connected(out.ctx,6)==0);
  o.paired=0;assert(out.stock_iap2_connected(out.ctx,7)==0);
  o.paired=1;o.usb_idle=0;assert(out.stock_iap2_connected(out.ctx,7)==0);
@@ -99,26 +154,13 @@ int main(void){
  o.published=1;assert(out.stock_iap2_connected(out.ctx,7)==1);
  assert(cp_wcp_bt_abort(&ac,7,1)==CP_WCP_OK);
  assert(ac.state==CP_WCP_BLOCKED); /* physical USB never starts wireless */
- assert(out.stock_iap2_connected(out.ctx,7)==1); /* still RF, NOT CarPlay */
- /* Fragments of the original iAP marker must traverse the *R44* parser. */
- unsigned char frame[14]={2,0,6,0,7,0,0,0};
- memcpy(frame+8,syn_marker,6);
- assert(send(client,frame,7,0)==7);
- assert(cp_s4_socket_poll(&w,104)==CP_LK_OK);
- assert(send(client,frame+7,7,0)==7);
- assert(cp_s4_socket_poll(&w,105)==CP_LK_OK);
- for(unsigned attempt=0;attempt<20 && s.link.phase==CP_LK_DETECT;attempt++){
-  struct pollfd pfd={w.fd,POLLIN,0};
-  assert(poll(&pfd,1,100)>=0);
-  assert(cp_s4_socket_poll(&w,106+attempt)==CP_LK_OK);
- }
- assert(s.link.phase==CP_LK_NEGOTIATE);
+ assert(out.stock_iap2_connected(out.ctx,7)==1); /* iAP2, NOT MFi */
  /* Genuine socket loss: even intact heap data may not authorize session. */
  cp_s4_socket_abort(&w);
  assert(out.stock_iap2_connected(out.ctx,7)==0);
  assert(cp_wcp_r45_remote_ops(&r,&out)==-1);
  cp_wcp_r45_remote_unbind(&r);
  close(client);close(listener);
- puts("R89 original btstack->loopback->R44->R87 fail-closed: PASS");
+ puts("R90 original btstack->real TCP->iAP2 SYN/LSP/ACK->R87 fail-closed: PASS");
  return 0;
 }

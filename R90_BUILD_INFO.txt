@@ -1,0 +1,10 @@
+AU57x Wireless CarPlay R90 — R45/R44/R87 server-first iAP2 handshake and stock MFi gating
+Baseline: 2017 Audi A6L C7 / MHI2_CN_AU57x_K1006_2 / MU1005
+Date: 2026-11-22
+Native C source units: 38 (same as R89; this change corrects the existing original RFCOMM bridge readiness, not an unverified new hook)
+Change: R89 prematurely marked CP_WCP_READY when BlueSDK CONNECT alone arrived; R90 requires actual peer SYN/LSP/ACK and CP_LK_NORMAL.
+Additional host test: real TCP AA00-AA05 synthetic OEM MFi transcript; only fixture evidence, NO Apple or iPhone authorization.
+Original MU1005 btstack SHA256: 51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566
+OEM btstack live owner/profile: still unverified. Original HFP=7/SIM=4 NOT iAP2; never guess iAP2 profile.
+Cloud QNX ARMv7 build requires new run verification; host results do not establish car readiness.
+installable=false; safe_to_flash=false; vehicle_verified=false; SOURCE_ONLY; NO_INSTALL
