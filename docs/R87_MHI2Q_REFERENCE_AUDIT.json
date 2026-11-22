@@ -1,0 +1,66 @@
+{
+  "reference": "congobg/MHI2Q_WiFi_CarPlay",
+  "reference_platform": "MHI2Q 3638 MU0917 (not AU57x)",
+  "target_platform": "MHI2_CN_AU57x_K1006_2 MU1005",
+  "safe_to_flash": false,
+  "donor_binaries_may_be_installed": false,
+  "vendor_code_embedded": false,
+  "components": {
+    "WCP.jar": {
+      "source_path": "mnt/app/eso/hmi/lsd/jars/WCP.jar",
+      "size_bytes": 127088,
+      "sha256": "dbc24425acd5a0f438474288328c4bd46a9cec9714b3398915e9ce65b7fc5855",
+      "elf32_arm": false,
+      "classification": "donor_reference_ONLY"
+    },
+    "start-ap.sh": {
+      "source_path": "mnt/app/eso/telephone/start-ap.sh",
+      "size_bytes": 10279,
+      "sha256": "95b569c1d0f0a67293bbd46d69bf98aa6ec375447b1d0a6ae589fc17bffa76cc",
+      "elf32_arm": false,
+      "classification": "donor_reference_ONLY"
+    },
+    "libwcpstart.so": {
+      "source_path": "mnt/ota/wcp/libwcpstart.so",
+      "size_bytes": 433913,
+      "sha256": "f3615330bfe433f46248381a9b73ab4358eddeba918cbe8a4dec23b40e9979f6",
+      "elf32_arm": true,
+      "classification": "donor_reference_ONLY"
+    },
+    "libbthook.so": {
+      "source_path": "mnt/ota/wcp/libbthook.so",
+      "size_bytes": 58937,
+      "sha256": "c862fe0d8bfbabdd804e39858616436481b19ce6620a2e915428620853280ad8",
+      "elf32_arm": true,
+      "classification": "donor_reference_ONLY"
+    },
+    "wcpd": {
+      "source_path": "mnt/ota/wcp/wcpd",
+      "size_bytes": 253254,
+      "sha256": "c02192fa89ec193bae4d5b6c5075d6918abf3d7c5a15afc7f43bd5ce5011ac98",
+      "elf32_arm": true,
+      "classification": "donor_reference_ONLY"
+    },
+    "wcppaird": {
+      "source_path": "mnt/ota/wcp/wcppaird",
+      "size_bytes": 18787,
+      "sha256": "9fba9efeac89dee3357c400a540cb77df7b3c05187691ab02590688cb48ed406",
+      "elf32_arm": true,
+      "classification": "donor_reference_ONLY"
+    },
+    "wcp-boot.sh": {
+      "source_path": "mnt/ota/wcp/wcp-boot.sh",
+      "size_bytes": 5846,
+      "sha256": "67b85ae5383d0b23dc1395dd01c2af38fa46b9e4dc3d268c98b01892b60e2a48",
+      "elf32_arm": false,
+      "classification": "donor_reference_ONLY"
+    },
+    "dio-up.sh": {
+      "source_path": "mnt/ota/wcp/dio-up.sh",
+      "size_bytes": 3247,
+      "sha256": "4f0aa0a39f79851a3507e69fc22a6771a58d245f588e88115c30ad38261671f7",
+      "elf32_arm": false,
+      "classification": "donor_reference_ONLY"
+    }
+  }
+}

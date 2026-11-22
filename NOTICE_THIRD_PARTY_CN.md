@@ -14,3 +14,5 @@
 - R45：`project/source/legacy_mu1005/bluetooth/{native_binding,native_event,inbound,inbound_r5}.[ch]` 直接来自用户此前提供的 `R14_FINAL.zip` 历史AU57x工程，保留R14原始实现及安全门禁；蓝牙OEM不在公开仓库，固件地址仅限静态哈希绑定样本。
 
 - R50 `tools/review_txn/` 来源：用户先前提供的 AU57x_Wireless_Consolidated.zip 中 `source/install_native/`，本次恢复并纳入云端测试，无厂商固件、安装文件清单或真实OEM执行参数。
+
+- R87：研究参考 [congobg/MHI2Q_WiFi_CarPlay](https://github.com/congobg/MHI2Q_WiFi_CarPlay)，其发布内容采用 PolyForm Noncommercial 1.0.0。`cp_wcp_autoconnect.[ch]` 和 `cp_wcp_handoff.[ch]` 是对公开行为描述的独立 C99 实现，**不包含**对方编译好的 `.so`、`wcpd`、`WCP.jar` 或其脚本代码，也不把 MHI2Q 二进制安装到 AU57x。

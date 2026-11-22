@@ -1,5 +1,6 @@
 /* AU57x owner-bound R04-09 cloud integration fixture: no OEM keys or RF. */
 #include "cp_cloud_pipeline.h"
+#include "cp_wcp_handoff.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1441,5 +1442,43 @@ static void native_dio_bound_pipeline(void){
  assert(p.handoff.phase==CP_HO_WIRED);
  dlclose(h);
 }
-int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();native_si_owner_loss_recovery();native_abandoned_mutation_rollback();native_remote_process_boundary();native_r83_corrupt_session_snapshot();native_remote_owner_cloud_pipeline();native_r85_wired_remote_rollback();
+/* R87: a real ACL connection alone cannot authorize wireless. The
+ * original R44 MFi owner is the only path into the R85 pipeline. */
+static int wcp_live=0,wcp_opened=0;
+static int wcp_owner(void *ctx,uint32_t gen){(void)ctx;return bt&&gen==4;}
+static int wcp_paired(void *ctx,uint32_t gen){(void)ctx;return gen==4;}
+static int wcp_wired(void *ctx){(void)ctx;return wired;}
+static int wcp_link(void *ctx,uint32_t gen){(void)ctx;return gen==4&&wcp_live;}
+static int wcp_sdp(void *ctx,uint32_t gen){(void)ctx;return gen==4;}
+static int wcp_open(void *ctx,uint32_t gen){(void)ctx;wcp_opened++;return gen==4;}
+static int wcp_cancel(void *ctx,uint32_t gen){(void)ctx;return gen==4;}
+static void r87_cloud_bootstrap(void){
+ struct cp_wcp_autoconnect a;struct cp_cloud_pipeline p;
+ struct cp_step04_session b;struct cp_stock_mfi m;
+ const struct cp_wcp_bt_ops w={NULL,wcp_owner,wcp_paired,wcp_wired,wcp_link,
+                               wcp_sdp,wcp_open,wcp_cancel};
+ reset_fixture();wcp_live=0;wcp_opened=0;
+ mocked_oem(&b,&m,0);cp_cloud_init(&p);
+ assert(cp_wcp_bt_init(&a,&w)==CP_WCP_OK);
+ assert(cp_wcp_bt_acl_up(&a,4,0)==CP_WCP_OK);
+ assert(cp_wcp_begin_cloud(&a,&b,&p,&ops)==CP_WCP_DENIED);
+ assert(cp_wcp_bt_tick(&a,4,4000)==CP_WCP_WAIT);
+ assert(wcp_opened==1);
+ wcp_live=1;
+ assert(cp_wcp_bt_tick(&a,4,4001)==CP_WCP_LINK_READY);
+ assert(cp_wcp_begin_cloud(&a,&b,&p,&ops)==CP_WCP_WAIT);
+ assert(!p.started); /* BT only != Apple MFi */
+ mocked_oem(&b,&m,1);
+ wired=0;assert(cp_wcp_begin_cloud(&a,&b,&p,&ops)==CP_WCP_DENIED);
+ wired=1;
+ assert(cp_wcp_begin_cloud(&a,&b,&p,&ops)==CP_WCP_OK);
+ assert(p.started&&p.epoch==8&&p.bt_generation==4);
+ assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
+ assert(cp_wcp_begin_cloud(&a,&b,&p,&ops)==CP_WCP_DENIED);
+ assert(cp_wcp_bt_abort(&a,4,1)==CP_WCP_OK);
+ assert(cp_wcp_begin_cloud(&a,&b,&p,&ops)==CP_WCP_DENIED);
+ reset_fixture();
+}
+
+int main(void){r87_cloud_bootstrap();successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();native_si_owner_loss_recovery();native_abandoned_mutation_rollback();native_remote_process_boundary();native_r83_corrupt_session_snapshot();native_remote_owner_cloud_pipeline();native_r85_wired_remote_rollback();
  puts("AU57X_R47_CLOUD_04_05_06_07_08_09_OWNER_GATES_PASS");return 0;}

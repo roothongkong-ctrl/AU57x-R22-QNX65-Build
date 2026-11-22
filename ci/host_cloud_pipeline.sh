@@ -8,6 +8,8 @@ gcc -std=c99 -O1 -g -Wall -Wextra -Werror -D_DEFAULT_SOURCE -rdynamic \
  -I"$ROOT/project/source/legacy_mu1005/airplay" \
  "$ROOT/tests/test_cloud_pipeline.c" \
  "$ROOT/project/source/src/cp_cloud_pipeline.c" \
+ "$ROOT/project/source/src/cp_wcp_autoconnect.c" \
+ "$ROOT/project/source/src/cp_wcp_handoff.c" \
  "$ROOT/project/source/legacy_mu1005/airplay/mu1005_r34_ap_server.c" \
  "$ROOT/project/source/legacy_mu1005/airplay/native_exports.c" \
  "$ROOT/project/source/legacy_mu1005/airplay/cprx_service.c" \
