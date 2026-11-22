@@ -898,6 +898,8 @@ static void native_remote_process_boundary(void){
  char dir[]="/tmp/au57x-r81-separate-XXXXXX";
  MuCprxRemoteEndpoint endpoint={0};
  reset_fixture();si_peer_allowed=1;
+ /* DIO reports state 4: associated/pending, not video/audio ready. */
+ native_media_flag=4;
  assert(mkdtemp(dir));
  assert(mu_cprx_open_backend_si_unix(&rx,&backend,&evidence,5000,8,1234,
                           dir,geteuid(),getegid())==0);
@@ -930,8 +932,17 @@ static void native_remote_process_boundary(void){
   r81_client_si_allowed=0;
   assert(mu_cprx_client_tick(&client,100)==MU_CPRX_CLIENT_ERROR);
   mu_cprx_client_close(&client);r81_client_si_allowed=1;
-  assert(mu_cprx_client_begin_remote(&client,&endpoint,1,100)==0);
+  /* Before START, a read-only status query cannot claim a DIO listener. */
+  assert(mu_cprx_client_begin_remote(&client,&endpoint,MU_CPRX_OP_STATUS,100)==0);
   int rc=MU_CPRX_CLIENT_PENDING;
+  for(unsigned i=0;i<500&&rc==MU_CPRX_CLIENT_PENDING;i++){
+   rc=mu_cprx_client_tick(&client,100+i);
+   if(rc==MU_CPRX_CLIENT_PENDING)usleep(1000);
+  }
+  assert(rc==MU_CPRX_CLIENT_BUSY&&client.observed_media==-1);
+  mu_cprx_client_close(&client);
+  assert(mu_cprx_client_begin_remote(&client,&endpoint,1,100)==0);
+  rc=MU_CPRX_CLIENT_PENDING;
   for(unsigned i=0;i<500&&rc==MU_CPRX_CLIENT_PENDING;i++){
    rc=mu_cprx_client_tick(&client,100+i);
    if(rc==MU_CPRX_CLIENT_PENDING)usleep(1000);
@@ -939,6 +950,23 @@ static void native_remote_process_boundary(void){
   assert(rc==MU_CPRX_CLIENT_CONFIRMED&&client.remote_mode);
   assert(client.service==NULL&&client.fd==-1);
   mu_cprx_client_close(&client);
+  /* Read an actual 12-byte DIO response in the OTHER PROCESS. The fact
+   * that the receiver started is not equivalent to AirPlay media=7. */
+  assert(mu_cprx_client_begin_remote(&client,&endpoint,MU_CPRX_OP_STATUS,620)==0);
+  assert(client.observed_media==-1&&client.reply_need==8);
+  /* Status success extends 8-byte CPRA header to exactly 12 bytes. */
+  rc=MU_CPRX_CLIENT_PENDING;
+  for(unsigned i=0;i<500&&rc==MU_CPRX_CLIENT_PENDING;i++){
+   rc=mu_cprx_client_tick(&client,620+i);
+   if(rc==MU_CPRX_CLIENT_PENDING)usleep(1000);
+  }
+  assert(rc==MU_CPRX_CLIENT_CONFIRMED&&client.observed_media==4&&client.reply_need==12);
+  assert(client.reply[8]==4&&client.reply[9]==0&&client.reply[10]==0&&
+         client.reply[11]==0);
+  /* A completed status sample isn't permanent authorization. */
+  r81_client_si_allowed=0;
+  assert(mu_cprx_client_tick(&client,630)==MU_CPRX_CLIENT_ERROR);
+  mu_cprx_client_close(&client);r81_client_si_allowed=1;
   assert(mu_cprx_client_begin_remote(&client,&endpoint,2,650)==0);
   rc=MU_CPRX_CLIENT_PENDING;
   for(unsigned i=0;i<500&&rc==MU_CPRX_CLIENT_PENDING;i++){
@@ -957,6 +985,7 @@ static void native_remote_process_boundary(void){
   if(!server_end)usleep(500);
  }
  assert(server_end&&b.starts==1&&b.stops==1);
+ assert(native_media_flag==4); /* read-only DIO media query must not mutate */
  int childstatus=0;assert(waitpid(pid,&childstatus,0)==pid);
  assert(WIFEXITED(childstatus)&&WEXITSTATUS(childstatus)==0);
  struct stat st;assert(lstat(endpoint.socket_path,&st)==-1&&errno==ENOENT);

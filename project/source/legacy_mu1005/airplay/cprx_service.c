@@ -299,7 +299,7 @@ int mu_cprx_tick(MuCprxService *s,uint64_t now){
  * No additional source module, QNX thread, fake iPhone or trust in wire IDs. */
 void mu_cprx_client_init(MuCprxClient *c){
  if(!c)return;
- memset(c,0,sizeof *c);c->fd=-1;
+ memset(c,0,sizeof *c);c->fd=-1;c->observed_media=-1;
 }
 void mu_cprx_client_close(MuCprxClient *c){
  if(!c)return;
@@ -362,6 +362,7 @@ static int client_begin_op(MuCprxClient *c,MuCprxService *s,uint64_t now,
  }
  mu_cprx_client_init(c);
  c->service=s;c->fd=fd;c->phase=rc<0?1:2;c->operation=operation;
+ c->reply_need=8;
  c->generation=s->generation;c->epoch=s->epoch;c->session=s->session;
  c->deadline=now+6500;
  memcpy(c->request,"CPRX",4);c->request[4]=3;
@@ -393,7 +394,7 @@ int mu_cprx_client_begin_remote(MuCprxClient *c,
  size_t n,dir_len;
  int fd,flags,rc;
  uid_t uid;gid_t gid;
- if(!c||c->phase||!endpoint||(op!=1&&op!=2)||
+ if(!c||c->phase||!endpoint||(op!=1&&op!=2&&op!=MU_CPRX_OP_STATUS)||
     !endpoint->generation||!endpoint->epoch||!endpoint->session||
     !endpoint->airplay_port||endpoint->airplay_port>65535||
     !endpoint->si_owner_verified||!endpoint->dio_server_verified||
@@ -440,6 +441,7 @@ int mu_cprx_client_begin_remote(MuCprxClient *c,
  mu_cprx_client_init(c);
  c->remote_mode=1;c->remote=*endpoint;
  c->fd=fd;c->phase=rc<0?1:2;c->operation=op;
+ c->reply_need=8u; /* status may return an 8-byte BUSY response */
  c->generation=endpoint->generation;
  c->epoch=endpoint->epoch;c->session=endpoint->session;
  c->deadline=now+6500;
@@ -522,7 +524,10 @@ int mu_cprx_client_tick(MuCprxClient *c,uint64_t now){
   c->phase=3;
  }
  if(c->phase==3){
-  ssize_t n=recv(c->fd,c->reply+c->received,8-c->received,0);
+  unsigned need=c->reply_need;
+  /* Avoid parsing an ACK while its media-state payload is still in flight. */
+  if(need!=8&&need!=12)return client_fail(c);
+  ssize_t n=recv(c->fd,c->reply+c->received,need-c->received,0);
   if(n<0){
    if(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR)
     return MU_CPRX_CLIENT_PENDING;
@@ -530,17 +535,39 @@ int mu_cprx_client_tick(MuCprxClient *c,uint64_t now){
   }
   if(n==0)return client_fail(c);
   c->received+=(unsigned)n;
-  if(c->received!=8)return MU_CPRX_CLIENT_PENDING;
+  if(c->received!=need)return MU_CPRX_CLIENT_PENDING;
   if(memcmp(c->reply,"CPRA",4)||c->reply[4]!=2||
      c->reply[6]||c->reply[7])return client_fail(c);
-  if(c->operation==2&&c->reply[5]==3){
-   close(c->fd);c->fd=-1;c->phase=6;
-   return MU_CPRX_CLIENT_BUSY;
+  /* DIO status has a VARIABLE response size: 8-byte RETRY/error, but
+   * exactly 12 bytes only for a success that carries stock media state.
+   * Never wait for four bytes the server will not send on RETRY. */
+  if(c->operation==MU_CPRX_OP_STATUS&&need==8&&c->reply[5]==0){
+   c->reply_need=12;
+   return MU_CPRX_CLIENT_PENDING;
   }
-  if(c->reply[5]!=0||
-     (!c->remote_mode&&c->operation==1&&(!s->start_confirmed||!s->started))||
-     (!c->remote_mode&&c->operation==2&&!s->backend_released))
-   return client_fail(c);
+  /* A DIO receiver can be booting: an op 6 request returns RETRY/1,
+   * never invent media=7 or report a completed status query. */
+  if(c->operation==MU_CPRX_OP_STATUS){
+   if(c->reply[5]==1){
+    close(c->fd);c->fd=-1;c->phase=6;
+    return MU_CPRX_CLIENT_BUSY;
+   }
+   if(!c->remote_mode||c->reply[5]!=0||
+      (c->reply[8]!=0&&c->reply[8]!=4&&
+       c->reply[8]!=5&&c->reply[8]!=7)||
+      c->reply[9]||c->reply[10]||c->reply[11])
+    return client_fail(c);
+   c->observed_media=(int)c->reply[8];
+  }else{
+   if(c->operation==2&&c->reply[5]==3){
+    close(c->fd);c->fd=-1;c->phase=6;
+    return MU_CPRX_CLIENT_BUSY;
+   }
+   if(c->reply[5]!=0||
+      (!c->remote_mode&&c->operation==1&&(!s->start_confirmed||!s->started))||
+      (!c->remote_mode&&c->operation==2&&!s->backend_released))
+    return client_fail(c);
+  }
   close(c->fd);c->fd=-1;c->phase=4;
   return MU_CPRX_CLIENT_CONFIRMED;
  }

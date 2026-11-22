@@ -140,3 +140,13 @@ socket protocol boundaries. QNX production SI/DIO identity callbacks and
 actual CarPlay media events are still missing. See
 `docs/R81_SI_DIO_SEPARATE_PROCESS_IPC_CN.md`. No OEM binaries are packaged;
 **SOURCE ONLY / NO INSTALL**.
+
+### R82 — SI-to-DIO read-only media observation across processes (NO INSTALL)
+
+The separate SI process can now issue an authenticated CPRX v3 op 6 status
+query and receive its **full 12-byte reply** from the original DIO-side
+receiver, instead of mistaking an 8-byte START ACK for streaming media.
+Status values 0/4/5/7 are one-time DIO observations; they are never accepted
+as an iPhone MFi/video/audio/control proof. Linux fork() regression checks
+pre-START BUSY, observed state 4, and unchanged native START/STOP counts.
+See `docs/R82_SI_DIO_READONLY_MEDIA_STATUS_CN.md`. NO INSTALL.

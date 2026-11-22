@@ -108,6 +108,9 @@ int mu_cprx_shutdown(MuCprxService *);
 #define MU_CPRX_CLIENT_PENDING 1
 #define MU_CPRX_CLIENT_CONFIRMED 2
 #define MU_CPRX_CLIENT_BUSY 3 /* STOP refused: native media still active */
+/* R82: authenticated read-only DIO status query, CPRX v3 op 6. Status code
+ * 0/4/5/7 is a *single observed sample*, NOT a live CarPlay media grant. */
+#define MU_CPRX_OP_STATUS 6u
 /* R81: process-separated SI client endpoint. This is a snapshot of an
  * existing DIO process's socket identity, NOT a pointer to DIO's address
  * space. The two independently observed owner callbacks are mandatory. */
@@ -130,8 +133,9 @@ typedef struct {
  unsigned operation; /* 1=START, 2=graceful STOP */
  uint32_t generation, session;
  uint64_t epoch, deadline;
- unsigned sent, received;
- unsigned char request[32], reply[8];
+ unsigned sent, received, reply_need;
+ int observed_media; /* -1 until a validated remote op 6 response */
+ unsigned char request[32], reply[12];
 } MuCprxClient;
 void mu_cprx_client_init(MuCprxClient *);
 /* Caller must be on the verified, current original SI owner thread.
@@ -147,6 +151,11 @@ int mu_cprx_client_begin_stop(MuCprxClient *,MuCprxService *,uint64_t now_ms);
  * This API does not dereference MuCprxService in another process. */
 int mu_cprx_client_begin_remote(MuCprxClient *,
  const MuCprxRemoteEndpoint *,unsigned operation,uint64_t now_ms);
+/* R82: use mu_cprx_client_begin_remote(c, endpoint, MU_CPRX_OP_STATUS,
+ * now) for an authenticated, READ-ONLY media observation from original DIO.
+ * 12-byte reply includes stock media flag 0,4,5,7; a pending native listener
+ * returns BUSY. For a new observation, close/init and issue a NEW transaction;
+ * never infer live video/audio or same-phone MFi from a cached flag 7. */
 /* Advance without blocking; call the server's mu_cprx_tick between ticks.
  * After BUSY, caller may close and reinitialize when media is independently
  * known idle. Any ERROR is terminal and requires a new verified SI session. */
