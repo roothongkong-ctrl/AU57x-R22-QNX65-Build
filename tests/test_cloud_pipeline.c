@@ -122,9 +122,16 @@ static void successful_dual_fallback(void){
  single=1;assert(cp_cloud_is_active(&s));
  listener=0;assert(!cp_cloud_is_active(&s));
  listener=1;assert(cp_cloud_is_active(&s));
+ /* Cached media authorization is invalid after the live AP drops. */
+ associated=0;assert(!cp_cloud_is_active(&s));
+ associated=1;assert(cp_cloud_is_active(&s));
+ cap24=0;assert(!cp_cloud_is_active(&s));
+ cap24=1;assert(cp_cloud_is_active(&s));
  assert(cp_cloud_bt_closed(&s,1)==CP_CLOUD_STALE);
  assert(cp_cloud_bt_closed(&s,4)==CP_CLOUD_OK);
  assert(cp_cloud_is_active(&s)); /* stock AirPlay/inner iAP2 owns media */
+ assert(cp_radio_revoke(&s.radio,8,0)==CP_RADIO_OK);
+ assert(!cp_cloud_is_active(&s)); /* no live radio, no authorized media */
  assert(cp_cloud_wired_preempt(&s)==CP_CLOUD_OK&&!cp_cloud_is_active(&s));
  assert(cp_cloud_end(&s)==CP_CLOUD_OK);
  assert(cp_cloud_begin(&s,&b,&ops,8,4)==CP_CLOUD_ORDER);
