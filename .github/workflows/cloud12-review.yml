@@ -43,6 +43,8 @@ jobs:
         run: bash ci/host_r14_native.sh
       - name: R14 TCP 57342 normalized stream to R44 real iAP2/MFi state model
         run: bash ci/host_step04_tcp.sh
+      - name: R59 local TCP loopback R14 to R44 I/O (no OEM authority)
+        run: bash ci/host_step04_socket.sh
       - name: R04-09 owner-bound radio, SI, AirPlay and wired-preemption host test
         run: bash ci/host_cloud_pipeline.sh
       - name: R08 media audio/video/HMI/steering native sink contract test
