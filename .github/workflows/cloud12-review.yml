@@ -1,7 +1,7 @@
 name: AU57x cloud-only 12-step evidence and lifecycle gates (NO INSTALL)
 on:
   push:
-    branches: [main]
+    branches: [main, r87-wcp-congo-au57x-integration]
   pull_request:
   workflow_dispatch:
 permissions:
