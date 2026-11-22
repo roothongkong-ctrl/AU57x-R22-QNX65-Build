@@ -24,6 +24,9 @@ static int ap_ok(void*ctx,uint32_t e,enum cp_radio_band b){
 static int ap_closed(void*ctx,uint32_t e,enum cp_radio_band b){
  (void)ctx;return e==8&&(b==CP_RADIO_5||b==CP_RADIO_24);
 }
+static int running_ap(void*ctx,uint32_t e,enum cp_radio_band b){
+ (void)ctx;return ap&&e==8&&(b==CP_RADIO_24||b==CP_RADIO_5);
+}
 static int cp_start(void*ctx,uint32_t e){(void)ctx;return request&&e==8;}
 static int si(void*ctx,uint32_t e){(void)ctx;return single&&e==8;}
 static int bonjour_ok(void*ctx,uint32_t e,const char*name){
@@ -63,7 +66,7 @@ static void native_airplay(Mu34ApServer *ap){
  assert(mu34_ap_server_init(ap,&bind)==0);
 }
 static const struct cp_cloud_owner ops={0,owner,wd,caps,ap_start,ap_ok,
- ap_closed,cp_start,si,bonjour_ok,airplay_ok,inner_ok,media_ok,torn};
+ ap_closed,cp_start,si,bonjour_ok,airplay_ok,inner_ok,media_ok,torn,running_ap};
 static void mocked_oem(struct cp_step04_session *s,struct cp_stock_mfi *stock,int authenticated){
  static int handle;
  memset(s,0,sizeof *s);memset(stock,0,sizeof *stock);
@@ -175,5 +178,54 @@ static void no_cert_no_radio(void){
  assert(cp_cloud_wired_preempt(&s)==CP_CLOUD_OK);
  assert(cp_cloud_end(&s)==CP_CLOUD_OK);
 }
-int main(void){successful_dual_fallback();only_24();no_cert_no_radio();
+static void radio_to_airplay_proof(void){
+ struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
+ struct cp_oem_assertions proof={0};Mu34ApServer real_ap;
+ static const uint8_t mac[6]={1,2,3,4,5,6};
+ static const uint16_t sent[]={0xaa01,0xaa03,0x5703,0x4301};
+ static const uint16_t recv[]={0xaa00,0xaa02,0xaa05,0x5702,0x4300};
+ static const char *const ip[]={"10.0.0.1"};
+ static const struct cp_session config={
+  .wifi={.ssid="AUDI_REVIEW",.passphrase="review-only",.security=2,.channel=6},
+  .ip_addresses=ip,.ip_address_count=1,.airplay_port=5000,
+  .public_key="review-only",.source_version="review-only"
+ };
+ static const struct cp_identification identity={
+  .name="Review",.model="MU1005",.manufacturer="Audi",
+  .serial="not-real",.firmware="MU1005",.hardware="lab",
+  .bluetooth_name="review-bt",.wireless_ssid="AUDI_REVIEW",
+  .bluetooth_mac6=mac,.accessory_messages=sent,.phone_messages=recv,
+  .accessory_message_count=4,.phone_message_count=5
+ };
+ reset_fixture();mocked_oem(&b,&stock,1);cp_cloud_init(&p);
+ b.link.phase=CP_LK_IDLE;
+ assert(cp_cloud_bind_bootstrap(&p,&b,&config,&identity)==CP_CLOUD_OK);
+ assert(cp_cloud_bind_bootstrap(&p,&b,&config,&identity)==CP_CLOUD_BAD);
+ b.link.phase=CP_LK_NORMAL;
+ assert(cp_cloud_begin(&p,&b,&ops,8,4)==CP_CLOUD_OK);
+ assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
+ assert(!proof.live_hotspot&&!proof.network_airplay_ready);
+ assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK);
+ assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
+ assert(proof.verified_mfi&&proof.live_hotspot&&!proof.network_airplay_ready);
+ ap=0;
+ assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1&&!proof.live_hotspot);
+ ap=1;
+ assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_OK);
+ native_airplay(&real_ap);
+ assert(cp_cloud_bind_airplay(&p,&real_ap)==CP_CLOUD_OK);
+ assert(cp_cloud_prepare_receiver(&p,"wlan0")==CP_CLOUD_OK);
+ assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
+ assert(proof.live_hotspot&&proof.network_airplay_ready);
+ bonjour=0;
+ assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1&&!proof.network_airplay_ready);
+ bonjour=1;wired=0;
+ assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==0);
+ wired=1;
+ assert(cp_cloud_wired_preempt(&p)==CP_CLOUD_OK);
+ assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==0);
+ assert(cp_cloud_end(&p)==CP_CLOUD_OK);
+}
+int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();
  puts("AU57X_R47_CLOUD_04_05_06_07_08_09_OWNER_GATES_PASS");return 0;}

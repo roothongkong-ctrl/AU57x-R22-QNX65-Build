@@ -37,6 +37,9 @@ struct cp_cloud_owner {
  int (*inner_iap2_mfi_verified)(void *,uint32_t epoch);
  int (*media_verified)(void *,uint32_t epoch,enum cp_cloud_media item);
  int (*teardown_confirmed)(void *,uint32_t epoch);
+ /* Actual running AP beacon/channel, before the iPhone associates.
+  * Merely accepting ap_prepare() is not sufficient evidence. */
+ int (*ap_hotspot_verified)(void *,uint32_t epoch,enum cp_radio_band);
 };
 struct cp_cloud_pipeline {
  struct cp_step04_session *bootstrap;
@@ -54,6 +57,12 @@ int cp_cloud_begin(struct cp_cloud_pipeline *,struct cp_step04_session *,
                    const struct cp_cloud_owner *,uint32_t epoch,uint32_t bt_generation);
 /* Requires exact known OEM AirPlay backend; never a different-firmware donor. */
 int cp_cloud_bind_airplay(struct cp_cloud_pipeline *,Mu34ApServer *);
+/* Bind the *one* original-MFI iAP2 link, identity and current AP config while
+ * the Bluetooth link is IDLE. The resulting proof callback reads real owner
+ * and receiver state, not caller-provided synthetic readiness booleans. */
+int cp_cloud_bind_bootstrap(struct cp_cloud_pipeline *,
+  struct cp_step04_session *,const struct cp_session *,
+  const struct cp_identification *);
 int cp_cloud_confirm_bootstrap_auth(struct cp_cloud_pipeline *);
 int cp_cloud_radio_start(struct cp_cloud_pipeline *);
 int cp_cloud_radio_result(struct cp_cloud_pipeline *,int association_succeeded,

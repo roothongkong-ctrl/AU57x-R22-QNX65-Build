@@ -4,6 +4,42 @@
  */
 #include "cp_cloud_pipeline.h"
 #include <string.h>
+static int actual_wireless_proof(void *opaque,uint32_t epoch,uint32_t generation,
+                                 struct cp_oem_assertions *out){
+ struct cp_cloud_pipeline *p=opaque;
+ const char *iface;
+ if(!out)return 0;
+ memset(out,0,sizeof *out);
+ if(!p||!p->started||p->stopped||!p->bootstrap||
+    epoch!=p->epoch||generation!=p->bt_generation||
+    p->bootstrap->epoch!=epoch||
+    p->bootstrap->link.generation!=generation||
+    !p->owner.wired_idle||p->owner.wired_idle(p->owner.ctx)!=1||
+    !p->owner.bt_alive||
+    p->owner.bt_alive(p->owner.ctx,epoch,generation)!=1)return 0;
+ out->verified_mfi=cp_s4_authenticated(p->bootstrap);
+ out->verified_control_session=out->verified_mfi;
+ out->sole_dio_owner=p->owner.si_single_owner(p->owner.ctx,epoch)==1;
+ out->wired_active=0;
+ out->live_hotspot=(p->radio.epoch==epoch&&p->band!=CP_RADIO_NONE&&
+     p->radio.selected==p->band&&
+     (p->radio.phase==CP_RADIO_CONNECTING||
+      p->radio.phase==CP_RADIO_ASSOCIATED)&&
+     p->owner.radio_capability(p->owner.ctx,p->band)==1&&
+     p->owner.ap_hotspot_verified(p->owner.ctx,epoch,p->band)==1);
+ if(!out->live_hotspot||p->radio.phase!=CP_RADIO_ASSOCIATED||
+    p->owner.ap_association(p->owner.ctx,epoch,p->band)!=1||
+    !out->sole_dio_owner||!p->airplay||
+    p->airplay->generation!=epoch||
+    mu34_ap_server_poll(p->airplay,epoch)!=MU34_AP_R_LISTENING_VERIFIED)
+  return 1;
+ iface=mu34_ap_server_interface(p->airplay);
+ out->network_airplay_ready=iface[0]&&
+  p->airplay->expected_port==CP_CLOUD_PORT&&
+  p->owner.bonjour_identity_verified(p->owner.ctx,epoch,iface)==1&&
+  p->owner.airplay_listener_verified(p->owner.ctx,epoch,iface,CP_CLOUD_PORT)==1;
+ return 1;
+}
 static int eligible(struct cp_cloud_pipeline *s,int require_bt){
  if(!s||!s->started||s->stopped||!s->epoch)return 0;
  if(!s->owner.wired_idle||s->owner.wired_idle(s->owner.ctx)!=1)return 0;
@@ -29,13 +65,14 @@ int cp_cloud_begin(struct cp_cloud_pipeline *s,struct cp_step04_session *b,
                   const struct cp_cloud_owner *ops,uint32_t epoch,uint32_t gen){
  if(!s||!b||!ops||!epoch||!gen)return CP_CLOUD_BAD;
  if(s->started||s->stopped)return CP_CLOUD_ORDER;
+ if(s->bootstrap&&s->bootstrap!=b)return CP_CLOUD_STALE;
  if(b->epoch!=epoch||b->link.generation!=gen)return CP_CLOUD_STALE;
  if(!ops->bt_alive||!ops->wired_idle||!ops->radio_capability||
     !ops->ap_prepare||!ops->ap_association||!ops->ap_disconnected||
     !ops->carplay_request_sent||!ops->si_single_owner||
     !ops->bonjour_identity_verified||!ops->airplay_listener_verified||
     !ops->inner_iap2_mfi_verified||!ops->media_verified||
-    !ops->teardown_confirmed)return CP_CLOUD_BAD;
+    !ops->teardown_confirmed||!ops->ap_hotspot_verified)return CP_CLOUD_BAD;
  if(ops->wired_idle(ops->ctx)!=1||ops->bt_alive(ops->ctx,epoch,gen)!=1)
   return CP_CLOUD_PROOF;
  s->owner=*ops;s->bootstrap=b;s->epoch=epoch;s->bt_generation=gen;
@@ -43,6 +80,25 @@ int cp_cloud_begin(struct cp_cloud_pipeline *s,struct cp_step04_session *b,
  if(cp_ho_signal(&s->handoff,epoch,CP_HO_EV_BT_CONNECTED,1)!=CP_HO_OK)
   return CP_CLOUD_ORDER;
  s->started=1;
+ return CP_CLOUD_OK;
+}
+int cp_cloud_bind_bootstrap(struct cp_cloud_pipeline *p,
+ struct cp_step04_session *b,const struct cp_session *config,
+ const struct cp_identification *identity){
+ uint8_t bytes[CP_LK_FRAME_MAX-10u];size_t n=0;
+ if(!p||!b||!config||!identity||p->started||p->stopped||
+    p->bootstrap||b->link.phase!=CP_LK_IDLE||!b->epoch||
+    !config->wifi.ssid||!identity->wireless_ssid||
+    strcmp(config->wifi.ssid,identity->wireless_ssid)!=0||
+    config->airplay_port!=CP_CLOUD_PORT||
+    cp_encode_identification_1d01(identity,bytes,sizeof bytes,&n)!=CP_OK||
+    cp_encode_wifi_5703(&config->wifi,bytes,sizeof bytes,&n)!=CP_OK||
+    cp_encode_start_4301(config,bytes,sizeof bytes,&n)!=CP_OK)
+  return CP_CLOUD_BAD;
+ if(cp_s4_bind_identity(b,identity)!=CP_LK_OK||
+    cp_s4_bind_wireless(b,config,actual_wireless_proof,p)!=CP_LK_OK)
+  return CP_CLOUD_BAD;
+ p->bootstrap=b;
  return CP_CLOUD_OK;
 }
 int cp_cloud_bind_airplay(struct cp_cloud_pipeline *s,Mu34ApServer *ap){
