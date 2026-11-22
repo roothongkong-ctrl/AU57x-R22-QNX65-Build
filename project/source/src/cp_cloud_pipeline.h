@@ -60,6 +60,8 @@ struct cp_cloud_pipeline {
  int rx_client_enabled;
  /* R79: same sender drives media-aware STOP and awaits OEM restore ACK. */
  int graceful_stop_started;
+ /* A failed native lease owns a mandatory, retryable OEM restore barrier. */
+ int native_cleanup_pending;
  struct cp_handoff handoff;
  struct cp_cloud_owner owner;
  uint32_t epoch,bt_generation;

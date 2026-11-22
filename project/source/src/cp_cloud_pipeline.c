@@ -47,6 +47,9 @@ static int eligible(struct cp_cloud_pipeline *s,int require_bt){
      s->owner.bt_alive(s->owner.ctx,s->epoch,s->bt_generation)!=1))return 0;
  return 1;
 }
+/* Declared here so failure paths on the owner tick can retry OEM teardown,
+ * rather than setting stopped forever and orphaning a native SI receiver. */
+static int native_failure(struct cp_cloud_pipeline *s);
 static int stop(struct cp_cloud_pipeline *s){
  if(!s)return CP_CLOUD_BAD;
  if(s->started&&!s->stopped){
@@ -209,15 +212,31 @@ int cp_cloud_bind_native_dio(struct cp_cloud_pipeline *p,MuDioNative *n){
 }
 int cp_cloud_drive_native(struct cp_cloud_pipeline *p,uint64_t now){
  int r;
- if(!p||!p->native_dio)return CP_CLOUD_BAD;
- if(!p->started||p->stopped)return CP_CLOUD_STOPPED;
+ if(!p||!p->started)return CP_CLOUD_BAD;
+ /* An interrupted OEM teardown must continue on later owner ticks, even
+  * though wireless has already been marked stopped. Wired priority wins. */
+ if(p->stopped){
+  if(p->native_dio&&(p->handoff.wired_active||
+     !p->owner.wired_idle||p->owner.wired_idle(p->owner.ctx)!=1))
+   return cp_cloud_wired_preempt(p);
+  if(p->native_cleanup_pending){
+   r=cp_cloud_end(p);
+   return r==CP_CLOUD_OK?CP_CLOUD_STOPPED:CP_CLOUD_RETRY;
+  }
+  return CP_CLOUD_STOPPED;
+ }
+ if(!p->native_dio)return CP_CLOUD_BAD;
+ /* A wired connection arriving during a half-sent START or a normal STOP
+  * must preempt before any further wireless socket/DIO mutations. */
+ if(!p->owner.wired_idle||p->owner.wired_idle(p->owner.ctx)!=1)
+  return cp_cloud_wired_preempt(p);
  if(p->graceful_stop_started)return CP_CLOUD_RETRY;
- if(!native_valid(p))return stop(p);
+ if(!native_valid(p))return native_failure(p);
  /* The SI CPRX control service is the ONLY native start/stop authority.
   * Tick it on the original owner thread: a real v3 CPRX START first calls
   * mu_dio_start(), and its ACK proves the same receiver was committed. */
  if(!p->rx_service)return CP_CLOUD_PROOF;
- if(!native_rx_lease(p,p->rx_service))return stop(p);
+ if(!native_rx_lease(p,p->rx_service))return native_failure(p);
  /* R78: the genuine SI owner explicitly opts in. Without an opt-in,
   * retain R77's externally driven protocol. With opt-in, establish one
   * nonblocking START client and require its real AF_UNIX ACK; do not set
@@ -228,33 +247,33 @@ int cp_cloud_drive_native(struct cp_cloud_pipeline *p,uint64_t now){
       !cp_s4_authenticated(p->bootstrap)||
       p->radio.phase!=CP_RADIO_ASSOCIATED)return CP_CLOUD_RETRY;
    if(mu_cprx_client_begin(&p->rx_client,p->rx_service,now)!=0)
-    return stop(p);
+    return native_failure(p);
   }
   if(mu_cprx_client_tick(&p->rx_client,now)==MU_CPRX_CLIENT_ERROR)
-   return stop(p);
+   return native_failure(p);
  }
  r=mu_cprx_tick(p->rx_service,now);
- if(r!=0||!native_valid(p))return stop(p);
+ if(r!=0||!native_valid(p))return native_failure(p);
  if(p->rx_client_enabled){
   r=mu_cprx_client_tick(&p->rx_client,now);
-  if(r==MU_CPRX_CLIENT_ERROR)return stop(p);
+  if(r==MU_CPRX_CLIENT_ERROR)return native_failure(p);
   if(r!=MU_CPRX_CLIENT_CONFIRMED)return CP_CLOUD_RETRY;
  }
  if(!cp_cloud_native_rx_live(p,0))return CP_CLOUD_RETRY;
  r=cp_cloud_drive_start(p,p->native_dio->iface,now);
- if(r!=CP_CLOUD_OK)return r;
+ if(r!=CP_CLOUD_OK)return p->stopped?native_failure(p):r;
  /* A listener and 4301 ACK are not media. Advance the SAME session only
   * after independently observed inner iAP2/MFi authentication, and then
   * after native media==7 and all four OEM delivery/control witnesses. */
  if(p->handoff.phase==CP_HO_AIRPLAY_SESSION){
   r=cp_cloud_inner_auth(p);
   if(r==CP_CLOUD_PROOF)return CP_CLOUD_RETRY;
-  if(r!=CP_CLOUD_OK)return r;
+  if(r!=CP_CLOUD_OK)return p->stopped?native_failure(p):r;
  }
  if(p->handoff.phase==CP_HO_INNER_IAP_AUTH){
   r=cp_cloud_media_ready(p);
   if(r==CP_CLOUD_PROOF)return CP_CLOUD_RETRY;
-  if(r!=CP_CLOUD_OK)return r;
+  if(r!=CP_CLOUD_OK)return p->stopped?native_failure(p):r;
  }
  /* Do not report success on a cached MEDIA_ACTIVE phase after a native
   * stream or SI owner dropped. The next owner tick can trigger cleanup. */
@@ -289,6 +308,17 @@ static int native_restore(struct cp_cloud_pipeline *p){
  if(r!=0)return CP_CLOUD_PROOF;
  p->native_dio=0;p->airplay=0;
  return CP_CLOUD_OK;
+}
+/* Once a genuine SI lease is compromised, never leave native DIO running
+ * only because the caller has not explicitly invoked cp_cloud_end(). The
+ * rollback lease remains pending until the OEM stop/restore barrier succeeds. */
+static int native_failure(struct cp_cloud_pipeline *s){
+ int r;
+ if(!s)return CP_CLOUD_BAD;
+ (void)stop(s);
+ s->native_cleanup_pending=1;
+ r=cp_cloud_end(s);
+ return r==CP_CLOUD_OK?CP_CLOUD_PROOF:CP_CLOUD_RETRY;
 }
 int cp_cloud_confirm_bootstrap_auth(struct cp_cloud_pipeline *s){
  int cap24,cap5;
@@ -480,7 +510,8 @@ int cp_cloud_media_ready(struct cp_cloud_pipeline *s){
 int cp_cloud_bt_closed(struct cp_cloud_pipeline *s,uint32_t gen){
  if(!s||!s->started||s->stopped)return CP_CLOUD_STOPPED;
  if(gen!=s->bt_generation)return CP_CLOUD_STALE;
- if(s->handoff.phase<CP_HO_INNER_IAP_AUTH)return stop(s);
+ if(s->handoff.phase<CP_HO_INNER_IAP_AUTH)
+  return s->native_dio?native_failure(s):stop(s);
  if(cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_BT_DISCONNECTED,1)!=CP_HO_OK)
   return CP_CLOUD_ORDER;
  return CP_CLOUD_OK;
@@ -489,11 +520,16 @@ int cp_cloud_graceful_native_end(struct cp_cloud_pipeline *s,uint64_t now){
  int r,t;
  if(!s||!s->started||!s->native_dio||!s->rx_service)
   return CP_CLOUD_BAD;
- if(s->stopped)return CP_CLOUD_STOPPED;
+ if(s->stopped)return s->native_cleanup_pending?CP_CLOUD_RETRY:CP_CLOUD_STOPPED;
+ /* Wired takeover must interrupt an in-flight voluntary STOP, not wait for
+  * media idle or an ACK from a wireless session that is being displaced. */
+ if(!s->owner.wired_idle||s->owner.wired_idle(s->owner.ctx)!=1)
+  return cp_cloud_wired_preempt(s);
  if(!s->graceful_stop_started){
   /* Normal disconnect is voluntary: do not cut off actively streaming
    * native media. For immediate wired priority, call wired_preempt instead. */
-  if(!native_valid(s)||!native_rx_lease(s,s->rx_service))return stop(s);
+  if(!native_valid(s)||!native_rx_lease(s,s->rx_service))
+   return native_failure(s);
   if(!s->rx_service->started||!s->rx_service->start_confirmed||
      s->rx_service->evidence.media(s->rx_service->evidence.opaque)==7)
    return CP_CLOUD_RETRY;
@@ -506,17 +542,17 @@ int cp_cloud_graceful_native_end(struct cp_cloud_pipeline *s,uint64_t now){
   s->graceful_stop_started=1;
  }
  r=mu_cprx_client_tick(&s->rx_client,now);
- if(r==MU_CPRX_CLIENT_ERROR)return stop(s);
+ if(r==MU_CPRX_CLIENT_ERROR)return native_failure(s);
  if(r==MU_CPRX_CLIENT_BUSY){
   mu_cprx_client_close(&s->rx_client);
   s->graceful_stop_started=0;
   return CP_CLOUD_RETRY;
  }
  t=mu_cprx_tick(s->rx_service,now);
- if(t<0)return stop(s);
+ if(t<0)return native_failure(s);
  if(r!=MU_CPRX_CLIENT_CONFIRMED)
   r=mu_cprx_client_tick(&s->rx_client,now);
- if(r==MU_CPRX_CLIENT_ERROR)return stop(s);
+ if(r==MU_CPRX_CLIENT_ERROR)return native_failure(s);
  if(r==MU_CPRX_CLIENT_BUSY){
   mu_cprx_client_close(&s->rx_client);
   s->graceful_stop_started=0;
@@ -525,7 +561,7 @@ int cp_cloud_graceful_native_end(struct cp_cloud_pipeline *s,uint64_t now){
  if(r!=MU_CPRX_CLIENT_CONFIRMED)return CP_CLOUD_RETRY;
  /* Service may have been terminated after emitting the last authenticated
   * ACK; that is expected only if it already finished OEM restoration. */
- if(!s->rx_service->backend_released)return stop(s);
+ if(!s->rx_service->backend_released)return native_failure(s);
  mu_cprx_client_close(&s->rx_client);
  s->graceful_stop_started=0;
  return cp_cloud_end(s);
@@ -544,6 +580,7 @@ int cp_cloud_wired_preempt(struct cp_cloud_pipeline *s){
  }
  if(cp_ho_wired_takeover(&s->handoff,1)!=CP_HO_OK)return CP_CLOUD_ORDER;
  restored=native_restore(s);
+ if(restored==CP_CLOUD_OK)s->native_cleanup_pending=0;
  return restored;
 }
 int cp_cloud_end(struct cp_cloud_pipeline *s){
@@ -562,6 +599,7 @@ int cp_cloud_end(struct cp_cloud_pipeline *s){
    return CP_CLOUD_ORDER;
  }
  s->stopped=1;
+ s->native_cleanup_pending=0;
  if(s->bootstrap)cp_s4_revoke(s->bootstrap);
  return CP_CLOUD_OK;
 }

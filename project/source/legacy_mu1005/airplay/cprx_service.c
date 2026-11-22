@@ -64,6 +64,14 @@ static int private_dir(const char *dir){
         st.st_uid==geteuid()&&(st.st_mode&0777)==0700;
 }
 static void drop(MuCprxService *s){if(s->client>=0)close(s->client);s->client=-1;s->used=s->size=s->sent=0;s->required=16;s->mutating=0;s->length_used=s->payload_used=s->payload_need=0;}
+/* A client can disappear while OEM START or STOP is returning pending.
+ * Dropping it without checking mutating would orphan the original receiver.
+ * Shutdown preserves the R77 Unix-path lease until OEM restore succeeds. */
+static int abandoned(MuCprxService *s){
+ int mutation=s->mutating||s->cleaning;
+ drop(s);
+ return mutation?mu_cprx_shutdown(s):0;
+}
 static void reply(MuCprxService *s,unsigned code){memcpy(s->reply,"CPRA\2\0\0\0",8);s->reply[5]=(unsigned char)code;s->size=8;s->sent=0;}
 static uint32_t gen(const unsigned char *p){return (uint32_t)p[0]|(uint32_t)p[1]<<8|(uint32_t)p[2]<<16|(uint32_t)p[3]<<24;}
 static uint64_t epoch64(const unsigned char *p){return (uint64_t)gen(p)|((uint64_t)gen(p+4)<<32);}
@@ -263,28 +271,26 @@ int mu_cprx_tick(MuCprxService *s,uint64_t now){
  if(!peer_verified(s,s->client)){
   /* The local SI process may have exited/relinquished this lease.
    * If it was in a native mutation, preserve rollback semantics. */
-  int mutate=s->mutating;
-  drop(s);
-  return mutate?mu_cprx_shutdown(s):0;
+  return abandoned(s);
  }
- if(now>=s->deadline){int mutate=s->mutating;drop(s);return mutate?mu_cprx_shutdown(s):0;}
- if(s->used<s->required){ssize_t r=recv(s->client,s->req+s->used,s->required-s->used,0);if(r<=0){if(r<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))return 0;drop(s);return 0;}s->used+=(unsigned)r;if(s->used<s->required)return 0;
+ if(now>=s->deadline)return abandoned(s);
+ if(s->used<s->required){ssize_t r=recv(s->client,s->req+s->used,s->required-s->used,0);if(r<=0){if(r<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))return 0;return abandoned(s);}s->used+=(unsigned)r;if(s->used<s->required)return 0;
   if(s->required==16 && s->req[4]==3 && s->version==3){s->required=32;return 0;}}
  /* v3 semantic messages carry a 2-byte length or a fixed 4-byte ACK. */
  unsigned op=s->req[5];
  if(!s->size&&(!header_valid(s) || op>10 || (op>=8&&s->version!=3) || (op==8&&!s->evidence.metadata) || (op==9&&!s->evidence.semantic_in) || (op==10&&!s->evidence.semantic_next)))reply(s,2);
  if(!s->size&&op>=8&&op<=10){
   if(op==10)s->payload_need=4;
-  else if(s->length_used<2){ssize_t r=recv(s->client,s->length_bytes+s->length_used,2-s->length_used,0);if(r<=0){if(r<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))return 0;drop(s);return 0;}s->length_used+=(unsigned)r;if(s->length_used<2)return 0;s->payload_need=(unsigned)s->length_bytes[0]|(unsigned)s->length_bytes[1]<<8;if(s->payload_need<6||s->payload_need>(op==8?4096u:8192u))reply(s,2);}
-  if(!s->size&&s->payload_used<s->payload_need){ssize_t r=recv(s->client,s->payload+s->payload_used,s->payload_need-s->payload_used,0);if(r<=0){if(r<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))return 0;drop(s);return 0;}s->payload_used+=(unsigned)r;if(s->payload_used<s->payload_need)return 0;}
+  else if(s->length_used<2){ssize_t r=recv(s->client,s->length_bytes+s->length_used,2-s->length_used,0);if(r<=0){if(r<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))return 0;return abandoned(s);}s->length_used+=(unsigned)r;if(s->length_used<2)return 0;s->payload_need=(unsigned)s->length_bytes[0]|(unsigned)s->length_bytes[1]<<8;if(s->payload_need<6||s->payload_need>(op==8?4096u:8192u))reply(s,2);}
+  if(!s->size&&s->payload_used<s->payload_need){ssize_t r=recv(s->client,s->payload+s->payload_used,s->payload_need-s->payload_used,0);if(r<=0){if(r<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))return 0;return abandoned(s);}s->payload_used+=(unsigned)r;if(s->payload_used<s->payload_need)return 0;}
  }
  if(!s->size){/* Detect abandoned pending request before touching OEM again. */
-  unsigned char extra;ssize_t r=recv(s->client,&extra,1,MSG_PEEK);if(r>=0){int mutate=s->mutating;drop(s);return mutate?mu_cprx_shutdown(s):0;}
-  if(errno!=EAGAIN&&errno!=EWOULDBLOCK&&errno!=EINTR){int mutate=s->mutating;drop(s);return mutate?mu_cprx_shutdown(s):0;}
+  unsigned char extra;ssize_t r=recv(s->client,&extra,1,MSG_PEEK);if(r>=0)return abandoned(s);
+  if(errno!=EAGAIN&&errno!=EWOULDBLOCK&&errno!=EINTR)return abandoned(s);
   handle(s);if(!s->size)return 0;}
  ssize_t w=send(s->client,s->reply+s->sent,s->size-s->sent,MSG_NOSIGNAL);if(w>0){s->sent+=(unsigned)w;if(s->sent==s->size){if(op==1&&s->reply[5]==0&&s->started)s->start_confirmed=1;drop(s);if(s->terminal||s->cleaning)return mu_cprx_shutdown(s);}return 0;}
  if(w<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))return 0;
- int mutate=s->mutating;drop(s);return (mutate||s->cleaning||s->terminal)?mu_cprx_shutdown(s):0;
+ return s->terminal?mu_cprx_shutdown(s):abandoned(s);
 }
 
 /* R78: the production SI control sender (previously absent). Same original

@@ -117,3 +117,14 @@ success. Wired CarPlay preemption remains a separate immediate-priority
 recovery path. An old START acknowledgement also ceases to be valid if its SI
 session has ended. Host-only fixtures do not establish vehicle compatibility.
 See `docs/R79_NATIVE_GRACEFUL_STOP_CN.md`.
+
+### R80 — original SI owner-loss recovery, wired priority, interrupted operations (NO INSTALL)
+
+The native owner loop now detects wired takeover *before* processing any
+wireless START/STOP and retries pending OEM restoration on later ticks. A
+lost original SI lease or fatal authenticated link now enters mandatory,
+retryable native cleanup instead of leaving DIO alive behind a stopped flag.
+An abandoned in-flight CPRX START/STOP keeps its private AF_UNIX lease until
+the OEM restore barrier succeeds. Added actual local-socket negative tests.
+These are source/host/OEM-stub checks, not a functional iPhone or QNX car test.
+See `docs/R80_NATIVE_SESSION_WIRED_ROLLBACK_CN.md`.

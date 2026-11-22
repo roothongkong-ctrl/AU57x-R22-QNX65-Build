@@ -617,10 +617,13 @@ static void native_rx_media_contract(void){
  assert(mu_cprx_client_tick(&stale,130)==MU_CPRX_CLIENT_ERROR);
  rx.session=1234;assert(cp_cloud_is_active(&p));
  wired=0;assert(!cp_cloud_native_rx_live(&p,0));
- wired=1;
- assert(cp_cloud_end(&p)==CP_CLOUD_RETRY);
+ /* R80: an actual wired takeover must be seen by the existing owner tick,
+  * not depend on an unrelated UI event manually calling wired_preempt(). */
+ assert(cp_cloud_drive_native(&p,130)==CP_CLOUD_RETRY);
+ assert(p.stopped&&p.handoff.wired_active);
  assert(native.initialized&&rx.backend_released==0);
  assert(rx.listener==-1&&rx.unix_listener);
+ wired=1;
  /* STOP is pending: keep the *same* AF_UNIX path reserved so a new
   * controller cannot race the original AirPlay singleton restoration. */
  assert(lstat(bound_path,&sockstat)==0&&S_ISSOCK(sockstat.st_mode));
@@ -628,7 +631,8 @@ static void native_rx_media_contract(void){
                              sockdir,geteuid(),getegid())==-1);
  assert(mu_cprx_open_si_unix(&rx,&native,&evidence,5000,8,1234,
                              elsewhere,geteuid(),getegid())==-1);
- assert(cp_cloud_end(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_drive_native(&p,131)==CP_CLOUD_RETRY);
+ assert(cp_cloud_drive_native(&p,132)==CP_CLOUD_OK);
  assert(rx.backend_released&&rx.listener==-1);
  assert(!p.rx_client_enabled&&!p.rx_client.phase&&p.rx_client.fd==-1);
  assert(!native.initialized&&!strcmp(current_native_iface,"eth0"));
@@ -764,6 +768,107 @@ static void native_graceful_pipeline_end(void){
  assert(rmdir(dir)==0);
  dlclose(h);
 }
+/* R80: independent SI session loss after a real START must force an
+ * automatic native rollback across owner ticks. The first recovery attempt
+ * cannot restore while OEM owner proof is absent; the pathname stays leased
+ * and must only be freed after restoring original DIO and interface. */
+static void native_si_owner_loss_recovery(void){
+ struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
+ MuDioNative native={0};MuCprxService rx={0};
+ const MuDioGuard guard={NULL,native_lib,native_owner,native_listening,
+                         native_stopped,native_interface};
+ const MuCprxEvidence evidence={.admitted=rx_admitted,.identity=rx_identity,
+   .media=rx_media,.si_admitted=rx_si,.si_client_verified=rx_peer,
+   .si_inner_iap2_mfi=rx_inner,.si_media_channel=rx_channel};
+ char dir[]="/tmp/au57x-r80-loss-XXXXXX";
+ void *h=dlopen(NULL,RTLD_NOW);assert(h);
+ reset_fixture();native_owner_ok=1;native_listener=0;native_stop_calls=0;
+ native_stop_pending=0;native_media_flag=0;si_peer_allowed=1;
+ strcpy(current_native_iface,"eth0");
+ mocked_oem(&b,&stock,1);cp_cloud_init(&p);
+ assert(cp_cloud_begin(&p,&b,&ops,8,4)==CP_CLOUD_OK);
+ assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_OK);
+ assert(mu_dio_bind_interface(&native,h,&airplay_object,&airplay_owner,
+                              8,&guard,"eth0","wlan0")==0);
+ assert(cp_cloud_bind_native_dio(&p,&native)==CP_CLOUD_OK);
+ assert(mkdtemp(dir));
+ assert(mu_cprx_open_si_unix(&rx,&native,&evidence,5000,8,1234,
+                              dir,geteuid(),getegid())==0);
+ char path[MU_CPRX_UNIX_PATH_MAX];strcpy(path,rx.unix_path);
+ assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_OK);
+ assert(cp_cloud_enable_native_client(&p)==CP_CLOUD_OK);
+ for(unsigned i=0;i<24&&!rx.start_confirmed;i++){
+  int r=cp_cloud_drive_native(&p,200+i);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
+ }
+ assert(rx.start_confirmed&&native_start_calls==1);
+ /* Simulate real SI owner's disappearance, not merely a transient video
+  * pause: old socket ACK is no longer a valid session credential. */
+ single=0;
+ assert(cp_cloud_drive_native(&p,300)==CP_CLOUD_RETRY);
+ assert(p.stopped&&p.native_cleanup_pending);
+ assert(rx.listener==-1&&!rx.backend_released);
+ struct stat st;assert(lstat(path,&st)==0&&S_ISSOCK(st.st_mode));
+ single=1;
+ assert(cp_cloud_drive_native(&p,301)==CP_CLOUD_RETRY);
+ assert(lstat(path,&st)==0&&S_ISSOCK(st.st_mode));
+ assert(cp_cloud_drive_native(&p,302)==CP_CLOUD_STOPPED);
+ assert(!p.native_cleanup_pending&&!p.native_dio&&!p.rx_service);
+ assert(rx.backend_released&&native_stop_calls==1);
+ assert(!native.initialized&&!strcmp(current_native_iface,"eth0"));
+ assert(lstat(path,&st)==-1&&errno==ENOENT);
+ assert(rmdir(dir)==0);
+ dlclose(h);
+}
+/* R80: a disconnected CPRX client must not abandon an in-flight OEM START.
+ * The socket is a real AF_UNIX connection, but OEM operations are stubs. */
+struct r80_pending_backend {int starts,restores;};
+static int r80_start(void *opaque,unsigned port){
+ struct r80_pending_backend *p=opaque;
+ assert(port==5000);p->starts++;return 1; /* asynchronous pending */
+}
+static int r80_poll(void *opaque){(void)opaque;return 1;}
+static int r80_restore(void *opaque){
+ struct r80_pending_backend *p=opaque;
+ return ++p->restores==1?1:0; /* pending, then complete */
+}
+static void native_abandoned_mutation_rollback(void){
+ MuCprxService rx={0};struct r80_pending_backend status={0};
+ MuReceiverBackend b={&status,8,r80_start,r80_poll,r80_restore};
+ const MuCprxEvidence evidence={.admitted=rx_admitted,.identity=rx_identity,
+   .media=rx_media,.si_admitted=rx_si,.si_client_verified=rx_peer};
+ char dir[]="/tmp/au57x-r80-abort-XXXXXX";
+ reset_fixture();si_peer_allowed=1;assert(mkdtemp(dir));
+ assert(mu_cprx_open_backend_si_unix(&rx,&b,&evidence,5000,8,1234,
+                                      dir,geteuid(),getegid())==0);
+ char path[MU_CPRX_UNIX_PATH_MAX];strcpy(path,rx.unix_path);
+ int fd=socket(AF_UNIX,SOCK_STREAM,0);assert(fd>=0);
+ struct sockaddr_un addr={0};addr.sun_family=AF_UNIX;
+ strcpy(addr.sun_path,path);
+ assert(connect(fd,(struct sockaddr*)&addr,sizeof addr)==0);
+ unsigned char req[32]={0};
+ memcpy(req,"CPRX",4);req[4]=3;req[5]=1;
+ req[8]=8;req[12]=0x88;req[13]=0x13;
+ req[16]=8;req[24]=0xd2;req[25]=4;
+ assert(send(fd,req,sizeof req,0)==(ssize_t)sizeof req);
+ for(int i=0;i<6&&status.starts==0;i++)
+  assert(mu_cprx_tick(&rx,100+i)==0);
+ assert(status.starts==1&&rx.mutating&&rx.started&&!rx.start_confirmed);
+ close(fd); /* pending original AirPlay operation becomes orphaned */
+ assert(mu_cprx_tick(&rx,110)==-1);
+ assert(rx.terminal&&rx.listener==-1&&!rx.backend_released);
+ assert(status.restores==1);
+ struct stat st;assert(lstat(path,&st)==0&&S_ISSOCK(st.st_mode));
+ MuCprxService duplicate={0};
+ assert(mu_cprx_open_backend_si_unix(&duplicate,&b,&evidence,5000,8,1234,
+                                      dir,geteuid(),getegid())==-1);
+ assert(mu_cprx_shutdown(&rx)==1&&rx.backend_released);
+ assert(status.restores==2);
+ assert(lstat(path,&st)==-1&&errno==ENOENT);
+ assert(rmdir(dir)==0);
+}
 static void native_dio_bound_pipeline(void){
  struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
  MuDioNative native={0};
@@ -808,5 +913,5 @@ static void native_dio_bound_pipeline(void){
  assert(p.handoff.phase==CP_HO_WIRED);
  dlclose(h);
 }
-int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();
+int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();native_si_owner_loss_recovery();native_abandoned_mutation_rollback();
  puts("AU57X_R47_CLOUD_04_05_06_07_08_09_OWNER_GATES_PASS");return 0;}
