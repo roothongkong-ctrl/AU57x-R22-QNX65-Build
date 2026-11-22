@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <dlfcn.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 #include <string.h>
 static int wired=1,bt=1,cap5=1,cap24=1,ap=1,associated=1;
 static int single=1,bonjour=1,listener=1,inner=1,request=1,phone_session=1;
@@ -405,10 +408,42 @@ static void native_rx_media_contract(void){
  assert(cp_cloud_native_rx_live(&p,0)==0);
  /* Same-process control socket, but dummy handset and media samples. */
  assert(mu_cprx_open_si(&rx,&native,&evidence,5000,8,1234)==0);
+ rx.session=1235; /* reject stale/foreign SI session at bind time */
  assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_PROOF);
- assert(mu_dio_start(&native,5000)==MU34_AP_R_LISTENING_VERIFIED);
- rx.started=1;rx.start_confirmed=1;
+ rx.session=1234;
+ rx.epoch=9; /* reject wrong epoch even with an authorized generation */
+ assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_PROOF);
+ rx.epoch=8;
+ /* START must arrive over the real local SI service v3 socket, NOT
+  * via an independent call to the original receiver or a forged flag. */
  assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_OK);
+ assert(cp_cloud_native_rx_live(&p,0)==0);
+ assert(cp_cloud_prepare_receiver(&p,native.iface)==CP_CLOUD_RETRY);
+ assert(native_start_calls==0);
+ assert(cp_cloud_drive_native(&p,100)==CP_CLOUD_RETRY);
+ int fd=socket(AF_INET,SOCK_STREAM,0);assert(fd>=0);
+ struct sockaddr_in addr={0};
+ addr.sin_family=AF_INET;
+ addr.sin_port=htons(MU_CPRX_PORT);
+ addr.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+ assert(connect(fd,(struct sockaddr *)&addr,sizeof addr)==0);
+ unsigned char req[32]={0};
+ memcpy(req,"CPRX",4);req[4]=3;req[5]=1; /* v3 START */
+ req[8]=8;req[12]=0x88;req[13]=0x13; /* gen 8, AirPlay port 5000 */
+ req[16]=8;req[24]=0xd2;req[25]=4; /* SI epoch 8/session 1234 */
+ assert(send(fd,req,sizeof req,0)==(ssize_t)sizeof req);
+ for(unsigned i=0;i<12&&!rx.start_confirmed;i++){
+  int got=cp_cloud_drive_native(&p,101+i);
+  assert(got==CP_CLOUD_RETRY||got==CP_CLOUD_PROOF);
+ }
+ assert(rx.started&&rx.start_confirmed);
+ assert(native_start_calls==1);
+ unsigned char reply[8];
+ assert(recv(fd,reply,sizeof reply,0)==(ssize_t)sizeof reply);
+ assert(memcmp(reply,"CPRA",4)==0&&reply[5]==0);
+ assert(cp_cloud_prepare_receiver(&p,native.iface)==CP_CLOUD_OK);
+ assert(native_start_calls==1); /* no competing second START */
+ assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_PROOF);
  assert(cp_cloud_native_rx_live(&p,0)==1);
  assert(cp_cloud_native_rx_live(&p,1)==0);
  p.handoff.phase=CP_HO_AIRPLAY_SESSION;
@@ -428,6 +463,7 @@ static void native_rx_media_contract(void){
  rx.session=1234;assert(cp_cloud_is_active(&p));
  wired=0;assert(!cp_cloud_native_rx_live(&p,0));
  wired=1;
+ close(fd);
  assert(cp_cloud_end(&p)==CP_CLOUD_RETRY);
  assert(native.initialized&&rx.backend_released==0);
  assert(cp_cloud_end(&p)==CP_CLOUD_OK);
@@ -459,10 +495,13 @@ static void native_dio_bound_pipeline(void){
  assert(cp_cloud_bind_native_dio(&p,&native)==CP_CLOUD_OK);
  assert(cp_cloud_bind_native_dio(&p,&native)==CP_CLOUD_PROOF);
  assert(cp_cloud_drive_native(&p,10)==CP_CLOUD_PROOF); /* no wireless */
- assert(cp_cloud_prepare_receiver(&p,native.iface)==CP_CLOUD_OK);
+ /* A bare MuDioNative binding cannot START the receiver without SI CPRX. */
+ assert(cp_cloud_prepare_receiver(&p,native.iface)==CP_CLOUD_RETRY);
+ assert(native_start_calls==0);
+ /* Native low-level binder itself retains the original start/restore ABI;
+  * this isolated fixture exercises it without pretending to be the pipeline. */
+ assert(mu_dio_start(&native,5000)==MU34_AP_R_LISTENING_VERIFIED);
  assert(native_start_calls==1&&!strcmp(current_native_iface,"wlan0"));
- assert(cp_cloud_prepare_receiver(&p,native.iface)==CP_CLOUD_OK);
- assert(native_start_calls==1);
  /* First shutdown returns pending: never free the OEM singleton early. */
  assert(cp_cloud_end(&p)==CP_CLOUD_RETRY);
  assert(native.initialized&&native_stop_calls==1);

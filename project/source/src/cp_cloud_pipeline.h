@@ -71,7 +71,9 @@ int cp_cloud_bind_airplay(struct cp_cloud_pipeline *,Mu34ApServer *);
 int cp_cloud_bind_native_dio(struct cp_cloud_pipeline *,MuDioNative *);
 /* Advance R68 using binder-created native CFString, never guessed names. */
 int cp_cloud_drive_native(struct cp_cloud_pipeline *,uint64_t now_ms);
-/* Bind the same SI-owned native receiver only after its own START succeeded. */
+/* Bind an SI-owned v3 CPRX lease BEFORE its first START, avoiding competing
+ * native AirPlay start operations. The local SI CPRX socket is ticked through
+ * cp_cloud_drive_native on the original owner thread. */
 int cp_cloud_bind_rx_service(struct cp_cloud_pipeline *,MuCprxService *);
 /* Require real, current SI epoch/session and optionally native media=7. */
 int cp_cloud_native_rx_live(const struct cp_cloud_pipeline *,int require_media);

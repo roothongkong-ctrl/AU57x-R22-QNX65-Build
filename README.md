@@ -32,3 +32,13 @@ the OEM AirPlay decoder, not the generic test-byte router; the router rejects
 native mode. Owner teardown retains original resources until native restore
 completes. All observed media status is mocked in CI, not car-verified.
 See `docs/R71_NATIVE_SI_MEDIA_CN.md`.
+
+### R72 — one SI owner controls the native receiver (NO INSTALL)
+
+R72 eliminates competing native AirPlay starts. SI CPRX v3 must be leased
+**before** its first START; the original-owner periodic tick now services its
+real loopback START request and waits for a confirmed reply before the CarPlay
+pipeline may consider the receiver ready. Invalid epoch/session are rejected,
+while the OEM restoration barrier remains mandatory. See
+`docs/R72_SINGLE_SI_RECEIVER_OWNER_CN.md`. Host socket tests are not vehicle
+proof; real SI/DIO callbacks are still required.

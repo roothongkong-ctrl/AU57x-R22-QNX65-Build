@@ -126,30 +126,38 @@ static int native_valid(struct cp_cloud_pipeline *p){
     p->airplay!=&n->ap)return 0;
  return 1;
 }
-int cp_cloud_native_rx_live(const struct cp_cloud_pipeline *p,int need_media){
- const MuCprxService *rx;
- if(!p||!(rx=p->rx_service)||!p->native_dio||
-    rx->version!=3||rx->generation!=p->epoch||rx->epoch!=p->epoch||
+/* SI must own this single local v3 receiver session from OPEN onward.
+ * Do not accept a controller that someone else has already STARTed: doing so
+ * would let this pipeline and the SI socket client both mutate DIO. */
+static int native_rx_lease(const struct cp_cloud_pipeline *p,
+                           const MuCprxService *rx){
+ if(!p||!p->native_dio||!rx||rx->version!=3||
+    rx->generation!=p->epoch||rx->epoch!=p->epoch||
+    rx->port!=CP_CLOUD_PORT||!rx->session||
     rx->backend.opaque!=p->native_dio||
     rx->backend.generation!=p->epoch||
-    rx->session==0||rx->listener<0||rx->terminal||rx->cleaning||
-    rx->backend_released||!rx->started||!rx->start_confirmed||
+    !rx->backend.start||!rx->backend.poll||!rx->backend.restore||
+    rx->listener<0||rx->terminal||rx->cleaning||rx->backend_released||
     !rx->evidence.admitted||!rx->evidence.si_admitted||
+    !rx->evidence.identity||!rx->evidence.media||
     rx->evidence.admitted(rx->evidence.opaque,rx->generation)!=1||
-    rx->evidence.si_admitted(rx->evidence.opaque,
-       rx->generation,rx->epoch,rx->session)!=1)
+    rx->evidence.si_admitted(rx->evidence.opaque,rx->generation,
+                              rx->epoch,rx->session)!=1)return 0;
+ return 1;
+}
+int cp_cloud_native_rx_live(const struct cp_cloud_pipeline *p,int need_media){
+ const MuCprxService *rx=p?p->rx_service:NULL;
+ if(!native_rx_lease(p,rx)||!rx->started||!rx->start_confirmed)
   return 0;
  if(!need_media)return 1;
- return rx->evidence.media&&rx->evidence.media(rx->evidence.opaque)==7;
+ return rx->evidence.media(rx->evidence.opaque)==7;
 }
 int cp_cloud_bind_rx_service(struct cp_cloud_pipeline *p,MuCprxService *rx){
  if(!p||!rx||!p->started||p->stopped||p->rx_service||
-    !p->native_dio||!native_valid(p))return CP_CLOUD_PROOF;
- p->rx_service=rx;
- if(!cp_cloud_native_rx_live(p,0)){
-  p->rx_service=NULL;
+    !p->native_dio||!native_valid(p)||
+    !native_rx_lease(p,rx)||rx->started||rx->start_confirmed)
   return CP_CLOUD_PROOF;
- }
+ p->rx_service=rx;
  return CP_CLOUD_OK;
 }
 int cp_cloud_bind_native_dio(struct cp_cloud_pipeline *p,MuDioNative *n){
@@ -169,8 +177,17 @@ int cp_cloud_bind_native_dio(struct cp_cloud_pipeline *p,MuDioNative *n){
  return CP_CLOUD_OK;
 }
 int cp_cloud_drive_native(struct cp_cloud_pipeline *p,uint64_t now){
+ int r;
  if(!p||!p->native_dio)return CP_CLOUD_BAD;
  if(!native_valid(p))return stop(p);
+ /* The SI CPRX control service is the ONLY native start/stop authority.
+  * Tick it on the original owner thread: a real v3 CPRX START first calls
+  * mu_dio_start(), and its ACK proves the same receiver was committed. */
+ if(!p->rx_service)return CP_CLOUD_PROOF;
+ if(!native_rx_lease(p,p->rx_service))return stop(p);
+ r=mu_cprx_tick(p->rx_service,now);
+ if(r!=0||!native_valid(p))return stop(p);
+ if(!cp_cloud_native_rx_live(p,0))return CP_CLOUD_RETRY;
  return cp_cloud_drive_start(p,p->native_dio->iface,now);
 }
 /* Accept native stop only after the OEM confirms cleanup and original
@@ -248,6 +265,9 @@ int cp_cloud_prepare_receiver(struct cp_cloud_pipeline *s,const void *iface_cf){
  const char *iface;
  if(!eligible(s,1))return stop(s);
  if(s->handoff.phase!=CP_HO_WIFI_ASSOCIATED)return CP_CLOUD_ORDER;
+ /* Native mode must never launch a second server: only the SI's v3
+  * CPRX START can call mu_dio_start() for this generation. */
+ if(s->native_dio&&!cp_cloud_native_rx_live(s,0))return CP_CLOUD_RETRY;
  if(!s->airplay||s->airplay->generation!=s->epoch||
     s->radio.epoch!=s->epoch||s->radio.phase!=CP_RADIO_ASSOCIATED||
     !s->owner.ap_association||
