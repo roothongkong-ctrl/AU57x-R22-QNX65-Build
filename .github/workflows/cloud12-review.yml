@@ -29,6 +29,10 @@ jobs:
         run: bash ci/host_radio_policy.sh
       - name: SD transaction isolated rollback and fail-closed simulations
         run: python3 -m unittest discover -s tests -p test_cloud_sd_transaction_sim.py -v
+      - name: R87 Congo-inspired car-initiated original iAP2 bootstrap and wired-priority regressions
+        run: bash ci/host_wcp_autoconnect.sh
+      - name: R87 donor reference manifest negative tests (no donor blobs)
+        run: python3 -m unittest discover -s tests -p test_wcp_donor_reference_audit.py -v
       - name: R86 pinned exact MU1005 OEM delegate ABI parser negative tests (no OEM files)
         run: python3 -m unittest discover -s tests -p test_oem_delegate_audit.py -v
       - name: Pinned MU1005 callback snapshots and negative memory tests
