@@ -1,0 +1,167 @@
+{
+  "AirPlay_session_delegate": {
+    "DIO_callsite": "0x159448",
+    "callbacks": [
+      {
+        "callback_va": "0x159a58",
+        "got_va": "0x1a72d8",
+        "offset_bytes": 12,
+        "symbol": "s_sessionFinalizedCallback"
+      },
+      {
+        "callback_va": "0x1594ec",
+        "got_va": "0x1a7a3c",
+        "offset_bytes": 16,
+        "symbol": "s_handleSessionControl"
+      },
+      {
+        "callback_va": "0x1592b0",
+        "got_va": "0x1a7798",
+        "offset_bytes": 20,
+        "symbol": "s_sessionCopyProperty"
+      },
+      {
+        "callback_va": "0x159094",
+        "got_va": "0x1a77d8",
+        "offset_bytes": 28,
+        "symbol": "s_sessionNotifyProperty"
+      },
+      {
+        "callback_va": "0x15989c",
+        "got_va": "0x1a7b20",
+        "offset_bytes": 32,
+        "symbol": "s_sessionModesChangedCallback"
+      },
+      {
+        "callback_va": "0x1599f8",
+        "got_va": "0x1a7288",
+        "offset_bytes": 36,
+        "symbol": "s_sessionRequestUICallback"
+      },
+      {
+        "callback_va": "0x159dd8",
+        "got_va": "0x1a7344",
+        "offset_bytes": 40,
+        "symbol": "s_duckAudioCallback"
+      },
+      {
+        "callback_va": "0x159c28",
+        "got_va": "0x1a7a68",
+        "offset_bytes": 44,
+        "symbol": "s_unduckAudioCallback"
+      },
+      {
+        "callback_va": "0x1562c8",
+        "got_va": "0x1a7244",
+        "offset_bytes": 48,
+        "symbol": "s_audioTornDownCallback"
+      },
+      {
+        "callback_va": "0x155c44",
+        "got_va": "0x1a72b0",
+        "offset_bytes": 52,
+        "symbol": "s_airplayErrorCallback"
+      }
+    ],
+    "copied_bytes": 56,
+    "delegate_context": "DIO sessionCreatedCallback r2 stored at +0",
+    "dst_offset": 20,
+    "session_ref": "DIO sessionCreatedCallback r1, passed in r0",
+    "setter_va": "0x1fb44"
+  },
+  "DIO_delegate": {
+    "airplay_copy_dst_offset": 16,
+    "airplay_server_setter": "0x1ceec",
+    "callbacks": [
+      {
+        "callback_va": "0x15a000",
+        "got_va": "0x1a72ac",
+        "offset_bytes": 12,
+        "symbol": "s_serverCopyPropertyCallback"
+      },
+      {
+        "callback_va": "0x159374",
+        "got_va": "0x1a7ad0",
+        "offset_bytes": 20,
+        "symbol": "s_sessionCreatedCallback"
+      },
+      {
+        "callback_va": "0x155efc",
+        "got_va": "0x1a7858",
+        "offset_bytes": 24,
+        "symbol": "s_sessionCreationFailedCallback"
+      },
+      {
+        "callback_va": "0x1561f8",
+        "got_va": "0x1a7460",
+        "offset_bytes": 28,
+        "symbol": "s_sessionScreenCreatedCallback"
+      },
+      {
+        "callback_va": "0x156364",
+        "got_va": "0x1a7a70",
+        "offset_bytes": 32,
+        "symbol": "s_audioTypeCallback"
+      },
+      {
+        "callback_va": "0x158da8",
+        "got_va": "0x1a7280",
+        "offset_bytes": 36,
+        "symbol": "s_waitAudioAvailableAckEvent"
+      },
+      {
+        "callback_va": "0x1564a8",
+        "got_va": "0x1a7898",
+        "offset_bytes": 40,
+        "symbol": "s_txAudioDumpingCallback"
+      },
+      {
+        "callback_va": "0x15645c",
+        "got_va": "0x1a7598",
+        "offset_bytes": 44,
+        "symbol": "s_rxAudioDumpingCallback"
+      },
+      {
+        "callback_va": "0x1563fc",
+        "got_va": "0x1a74e0",
+        "offset_bytes": 48,
+        "symbol": "s_txAudioFlushCallback"
+      },
+      {
+        "callback_va": "0x1563cc",
+        "got_va": "0x1a7610",
+        "offset_bytes": 52,
+        "symbol": "s_rxAudioFlushCallback"
+      },
+      {
+        "callback_va": "0x156540",
+        "got_va": "0x1a7a40",
+        "offset_bytes": 56,
+        "symbol": "s_initAudioDumpingCallback"
+      }
+    ],
+    "callsite_va": "0x15df68",
+    "context": "[DIO local r5 + 8] stored at +0",
+    "delegate_size": 60,
+    "import_name": "AirPlayReceiverServerSetDelegate",
+    "registration_server": "[DIO local r5 + 12]",
+    "stack_delegate": "sp + 76"
+  },
+  "not_proven": [
+    "production interposition/owner attachment",
+    "real MFi/Apple pairing",
+    "live DIO/SI and physical cable callbacks",
+    "real audio/video/control",
+    "safe SD installation"
+  ],
+  "oem_sha256": {
+    "dio_manager": "e40b5bf9df3f96221ac01bc0484e06493e6c58e60cca32d2547939ff1d56f63c",
+    "libairplay.so": "193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b5",
+    "smartphone_integrator": "2c61e7a17d5c77df2f97023284b948b66dc4052010acad74be9bfa63b339de0b"
+  },
+  "research_only": true,
+  "safe_to_flash": false,
+  "source": "exact MU1005 OEM ELF32",
+  "valid": true,
+  "vehicle_verified": false
+}
