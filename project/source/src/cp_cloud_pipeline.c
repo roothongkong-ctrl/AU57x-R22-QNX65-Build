@@ -815,6 +815,13 @@ int cp_cloud_wired_preempt(struct cp_cloud_pipeline *s){
    * No DIO wired proof -> permanent RETRY and no fake wired success. */
   return CP_CLOUD_RETRY;
  }
+ if(s->remote_phase==4){
+  /* DIO restored, but SI's final session teardown can still be pending.
+   * Never treat the absence of a local DIO pointer as completed takeover. */
+  if(s->remote_teardown_confirmed)return CP_CLOUD_OK;
+  restored=cp_cloud_end(s);
+  return restored==CP_CLOUD_OK?CP_CLOUD_OK:CP_CLOUD_RETRY;
+ }
  restored=native_restore(s);
  if(restored==CP_CLOUD_OK)s->native_cleanup_pending=0;
  return restored;

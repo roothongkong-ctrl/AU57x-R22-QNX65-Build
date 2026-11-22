@@ -1387,10 +1387,12 @@ static void native_r85_wired_remote_rollback(void){
  /* DIO restored, but SI's final teardown witness is still pending. Do not
   * restart the original receiver or report complete until SI confirms. */
  assert(cp_cloud_drive_remote_dio(&p,440)==CP_CLOUD_RETRY);
+ assert(cp_cloud_wired_preempt(&p)==CP_CLOUD_RETRY); /* no false OK */
  assert(native_stop_calls==1&&!p.remote_teardown_confirmed);
  r85_teardown_ok=1;
  assert(cp_cloud_drive_remote_dio(&p,441)==CP_CLOUD_OK);
  assert(p.remote_teardown_confirmed&&p.handoff.phase==CP_HO_WIRED);
+ assert(cp_cloud_wired_preempt(&p)==CP_CLOUD_OK);
  assert(cp_cloud_drive_remote_dio(&p,442)==CP_CLOUD_STOPPED);
  assert(rmdir(dir)==0);dlclose(h);
  r85_si_cable=r85_dio_cable=r85_teardown_ok=0;
