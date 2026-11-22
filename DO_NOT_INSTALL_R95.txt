@@ -1,0 +1,5 @@
+R95 is a source-only offline engineering package for steps 03 to 17.
+It is NOT a vehicle firmware, NOT a drop-in SD update, NOT an iPhone-ready wireless CarPlay package.
+The generated C transaction plan is limited to marked au57x-r95-* HOST fixtures and is not a car installer.
+OEM BlueSDK owner, authentic MFi, exact factory connectivity.json, hardware 2.4 GHz, DIO AirPlay receiver and recovery boot hook are not verified.
+DO NOT FLASH OR INSTALL this ZIP in an Audi head unit.

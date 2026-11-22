@@ -1,0 +1,5 @@
+AU57x R95 | 2026-11-22 | MHI2_CN_AU57x_K1006_2 / MU1005
+Milestone: advance offline work continuously across steps 03-17.
+New: SHA-pinned generated C SD transaction fixture and rollback, 15-test fail-continue matrix, checksum-preserving QNX GCC download retry.
+Not new: production BlueSDK callbacks, authenticated iPhone, physical QNX loader in stock vehicle, Wi-Fi radio, AirPlay stream, installable SD payload.
+NO INSTALL. Original OEM proprietary binaries and Apple keys excluded.

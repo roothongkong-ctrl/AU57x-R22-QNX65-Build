@@ -1,3 +1,17 @@
+# R95：直接连续推进第 3～17 步（离线工程；禁止装车）
+
+本版将第 3～17 步合成**一次不中断的离线回归**，`tools/r95_stage_review.py` 实际运行 **15/15 组主机测试通过**，每个步骤独立记录真车欠缺项。`bash ci/host_r95_to_step17.sh` 可重新生成 `r95_result/R95_STEPS_03_TO_17_EVIDENCE.json`。**这里的 15/15 是离线测试通过，不是 15 个真实装车步骤全部完成。**
+
+实质新增：`tools/r95_sd_plan_codegen.py` 将旧/新文件 SHA256、权限、所有者固定生成真实 C `txn_spec` 源码，和现有 `tools/review_txn/txn.c` 共同编译运行，执行 `trial`/`recover`、备份检查、失败前拒绝并测试 11 种正反场景；生成器**仅**支持明确标记 `au57x-r95-*` 的主机试验目录，不能装车。还修复 GCC 下载 `curl exit 18` 的一次性网络问题，保留工具链源码 SHA256 验证，已在 CI 分支增加有限重试。
+
+**绝对不要求现在上车。** 既不导入私有原厂二进制，也不宣称 `btstack`、iPhone、Wi-Fi 或 MFi 已在真实车机接通。原厂准确 `connectivity.json` 与回调 owner 等生产证据仍需最后一次车机验证，参见 `docs/R95_TO_STEP17_MULTI_TASK_CN.md`。
+
+- **主机验证**：`bash ci/host_r95_to_step17.sh && bash ci/host_r95_source_compile.sh`
+- **研究范围**：步骤 3～17 离线集成；步骤 18～20 尚待装车候选/最终验收
+- **发布类型**：源码 + 测试，不是可装车 SD 更新包，`installable=false`。
+
+---
+
 # R93：原厂 btstack 动态调用核验 + SD 卡一键取证（研究与诊断版）
 
 **已完成：** 用户原始 MU1005 `btstack` 的 QNX 动态调用（4/4 ARM BL → PLT、`R_ARM_JUMP_SLOT pthread_create`）静态验收；预加载器加入真实进程名检查；实际动态预加载的主机测试通过。

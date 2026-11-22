@@ -1,7 +1,7 @@
 name: AU57x cloud-only 12-step evidence and lifecycle gates (NO INSTALL)
 on:
   push:
-    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline]
+    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline, r95-offline-steps-03-to-17]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -77,6 +77,14 @@ jobs:
         run: bash ci/host_cloud_media.sh
       - name: R11 recovered 67 native C transaction and independent rollback tests
         run: bash ci/host_sd_txn.sh
+      - name: R95 host strict compile of 40 native C modules
+        run: bash ci/host_r95_source_compile.sh
+      - name: R95 continuous offline steps 03-17 evidence matrix (records failures, no car)
+        run: bash ci/host_r95_to_step17.sh
+      - name: R95 checksum-preserving toolchain download retry negative tests
+        run: python3 -m unittest discover -s tests -p test_r95_toolchain_retry.py -v
+      - name: R95 generated immutable C SD backup/rollback transaction and fault tests
+        run: python3 -m unittest discover -s tests -p test_r95_sd_plan_codegen.py -v
       - name: Assemble source-only review ZIP and SHA256
         if: always()
         run: bash ci/build_cloud_review_bundle.sh
@@ -85,6 +93,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AU57x-cloud12-evidence-NO-INSTALL
-          path: cloud12_result/
+          path: |
+            cloud12_result/
+            r95_result/
           if-no-files-found: warn
           retention-days: 14

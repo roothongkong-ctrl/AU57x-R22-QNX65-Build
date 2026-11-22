@@ -1,7 +1,7 @@
 name: AU57x R52 QNX6.5 ARMv7 (REVIEW ONLY)
 on:
   push:
-    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline]
+    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline, r95-offline-steps-03-to-17]
   workflow_dispatch:
 permissions:
   contents: read
@@ -32,6 +32,11 @@ jobs:
         run: mkdir -p qnx_build_result/logs
       - name: Clone public toolchain source
         run: git clone --depth=1 https://github.com/luka-dev/qnx65-armv7-toolchain.git /tmp/qnx65-toolchain
+      - name: Retry transient checksum-verified GNU GCC/binutils fetch errors
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/r95_toolchain_retry.py /tmp/qnx65-toolchain/Dockerfile
       - name: Build QNX 6.5 ARMv7 GCC container
         shell: bash
         run: |
