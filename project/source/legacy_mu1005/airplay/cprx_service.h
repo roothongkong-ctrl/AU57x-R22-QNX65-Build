@@ -96,7 +96,9 @@ int mu_cprx_open_si(MuCprxService *,MuDioNative *,const MuCprxEvidence *,unsigne
 int mu_cprx_open_si_unix(MuCprxService *,MuDioNative *,const MuCprxEvidence *,
  unsigned,uint64_t,uint32_t,const char *dir,uid_t expected_uid,gid_t expected_gid);
 /* Call on genuine owner periodically, with monotonic milliseconds. 0 active,
- * 1 ended, -1 cleanup pending/error (retain object and retry shutdown). */
+ * 1 ended, -1 cleanup pending/error (retain object and retry shutdown).
+ * R77: the AF_UNIX pathname stays reserved until OEM restore succeeds;
+ * do not reopen a live/pending MuCprxService with another directory. */
 int mu_cprx_tick(MuCprxService *,uint64_t now);
 int mu_cprx_shutdown(MuCprxService *);
 #endif

@@ -1,9 +1,9 @@
-# AU57x / MU1005 wireless CarPlay — R76 source research (NO INSTALL)
+# AU57x / MU1005 wireless CarPlay — R77 source research (NO INSTALL)
 
 **Research-only: Not a CarPlay wireless implementation validated on the vehicle.**
 2017 Audi A6L C7, MHI2_CN_AU57x_K1006_2 / MU1005, QNX 6.5 ARMv7.
 
-Four cloud-deliverable scoped tasks (01, 02 static-only, 03 research-build-only, 10 offline-CI-only) are complete; eight total project steps remain. R24 compiled 19 C modules with strict native ELF gate and QNX QEMU dlopen. R26–R32 added explicit 12-step evidence ledger, model/authorization tests, read-only SD ZIP safety gate, deterministic CSM fuzz, and sample-pinned original Bluetooth/mm-ipod static research. These do NOT prove BlueSDK owner, genuine MFi, Wi-Fi radio, Apple identity, DIO/AirPlay media or safe installation.
+Five cloud-scoped ledger tasks (01, 02, 03, 04, 10) are DONE; seven other ledger tasks are incomplete, and eight items still require functional/vehicle acceptance (including step 04). R24 compiled 19 C modules with strict native ELF gate and QNX QEMU dlopen. R26–R32 added explicit 12-step evidence ledger, model/authorization tests, read-only SD ZIP safety gate, deterministic CSM fuzz, and sample-pinned original Bluetooth/mm-ipod static research. These do NOT prove BlueSDK owner, genuine MFi, Wi-Fi radio, Apple identity, DIO/AirPlay media or safe installation.
 
 Read [云端研发审查说明](docs/CLOUD_README_CN.md), [12-step evidence ledger](docs/CLOUD12_LEDGER.json), and GitHub Actions [cloud review gates](.github/workflows/cloud12-review.yml). Every passing run can publish a source-only ZIP and SHA256; no vehicle installer.
 
@@ -81,3 +81,14 @@ getpeereid(); Linux host CI uses SO_PEERCRED. Kernel effective UID/GID **do
 not identify a unique OEM process**; original SI owner/session verification
 remains mandatory. No path or OEM process hooks are invented. See
 `docs/R76_SI_UNIX_PEER_QNX65_CN.md`. SOURCE ONLY / NO INSTALL.
+
+
+### R77 — retain SI socket reservation until OEM rollback confirms (NO INSTALL)
+
+R77 fixes a native receiver lifecycle race: a failed/pending OEM STOP must not
+unlink the SI AF_UNIX control pathname before the original AirPlay singleton
+has actually restored. The old pathname remains reserved through retries,
+preventing a second SI instance from stealing that endpoint. Reopening the
+same in-use service object in a different private directory is also refused.
+See `docs/R77_SI_SOCKET_RESTORE_BARRIER_CN.md`. Only host fixtures and CI
+have been run; **this is not a car installation or wireless CarPlay proof**.

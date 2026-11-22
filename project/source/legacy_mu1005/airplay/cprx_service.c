@@ -85,7 +85,12 @@ static int authorized(MuCprxService *s){
 static int open_service(MuCprxService *s,const MuReceiverBackend *b,
  const MuCprxEvidence *e,unsigned port,unsigned version,uint64_t epoch,
  uint32_t session,const char *dir,uid_t expected_uid,gid_t expected_gid){
- if(!s||!b||!b->opaque||!b->generation||!b->start||!b->poll||!b->restore||!e||!e->admitted||!e->identity||!e->media||!port||port>65535||e->admitted(e->opaque,b->generation)!=1)return -1;
+ /* A running or not-yet-restored receiver must never be overwritten by a
+  * second open in a different private directory. Otherwise the first
+  * listener and OEM restoration lease would be lost. Caller zero-initializes
+  * MuCprxService; reuse is permitted only after completed release. */
+ if(!s||(s->backend.restore&&!s->backend_released))return -1;
+ if(!b||!b->opaque||!b->generation||!b->start||!b->poll||!b->restore||!e||!e->admitted||!e->identity||!e->media||!port||port>65535||e->admitted(e->opaque,b->generation)!=1)return -1;
  if(version==3&&(!epoch||!session||!e->si_admitted||
    !e->si_client_verified||
    e->si_admitted(e->opaque,b->generation,epoch,session)!=1))return -1;
@@ -183,9 +188,14 @@ static int restore_backend(MuCprxService *s){
 int mu_cprx_shutdown(MuCprxService *s){
  if(!s||!s->backend.restore)return -1;
  drop(s);if(s->listener>=0){close(s->listener);s->listener=-1;}
- release_unix_path(s);
  s->terminal=1;
+ /* Keep the original socket pathname reserved while OEM stop/restore is
+  * pending, including after closing the listening FD. Otherwise another SI
+  * controller could bind the same name and start the singleton prematurely.
+  * Retry through this existing service until the native owner confirms its
+  * teardown barrier; only THEN remove the socket inode. */
  if(restore_backend(s)!=0)return -1;
+ release_unix_path(s);
  s->started=s->start_confirmed=s->cleaning=0;return 1;
 }
 static int header_valid(const MuCprxService *s){

@@ -458,6 +458,14 @@ static void native_rx_media_contract(void){
  MuCprxService other={0};
  assert(mu_cprx_open_si_unix(&other,&native,&evidence,5000,8,1234,
                              sockdir,geteuid(),getegid())==-1);
+ /* A second open with a DIFFERENT path must not overwrite the live service.
+  * A pathname-only collision check would miss this ownership bug. */
+ char elsewhere[]="/tmp/au57x-r77-other-XXXXXX";
+ assert(mkdtemp(elsewhere));
+ assert(mu_cprx_open_si_unix(&rx,&native,&evidence,5000,8,1234,
+                             elsewhere,geteuid(),getegid())==-1);
+ assert(strcmp(rx.unix_path,bound_path)==0&&rx.listener>=0);
+ assert(rmdir(elsewhere)==0);
  rx.session=1235; /* reject stale/foreign SI session at bind time */
  assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_PROOF);
  rx.session=1234;
@@ -598,6 +606,14 @@ static void native_rx_media_contract(void){
  close(fd);
  assert(cp_cloud_end(&p)==CP_CLOUD_RETRY);
  assert(native.initialized&&rx.backend_released==0);
+ assert(rx.listener==-1&&rx.unix_listener);
+ /* STOP is pending: keep the *same* AF_UNIX path reserved so a new
+  * controller cannot race the original AirPlay singleton restoration. */
+ assert(lstat(bound_path,&sockstat)==0&&S_ISSOCK(sockstat.st_mode));
+ assert(mu_cprx_open_si_unix(&other,&native,&evidence,5000,8,1234,
+                             sockdir,geteuid(),getegid())==-1);
+ assert(mu_cprx_open_si_unix(&rx,&native,&evidence,5000,8,1234,
+                             elsewhere,geteuid(),getegid())==-1);
  assert(cp_cloud_end(&p)==CP_CLOUD_OK);
  assert(rx.backend_released&&rx.listener==-1);
  assert(!native.initialized&&!strcmp(current_native_iface,"eth0"));
