@@ -50,3 +50,12 @@ and native media states (0/4/5 wait, 7 plus four media/HMI witnesses active),
 re-checks streaming each tick, and retries incomplete OEM restoration on
 repeated wired takeover calls. Host/OEM fixtures are **not** iPhone or car proof.
 See `docs/R73_SI_OWNER_TICK_WIRED_RESTORE_CN.md`.
+
+### R74 — bind inner MFi and four media/control witnesses to one SI session (NO INSTALL)
+
+Native CPRX v3 session authorization now requires **session-scoped** original
+SI callbacks for inner iAP2/MFi and video, audio, MMI and steering. A previous
+phone's epoch-only success flags cannot authorize a new SI session. Runtime
+checks repeat on each owner tick; dropping any callback makes MEDIA_ACTIVE
+false immediately. CI uses independent host fixtures, not car callbacks.
+See `docs/R74_SI_SESSION_SCOPED_PROOFS_CN.md`.

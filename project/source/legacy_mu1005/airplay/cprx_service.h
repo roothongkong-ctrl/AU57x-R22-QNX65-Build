@@ -20,6 +20,12 @@ typedef struct {
  int (*metadata)(void *,const unsigned char *,size_t); /* 1 accepted, 0 retry, -1 rejected */
  int (*semantic_in)(void *,unsigned,const unsigned char *,size_t);
  int (*semantic_next)(void *,unsigned char *,size_t); /* size, 0 empty, negative failure */
+ /* R74: same ORIGINAL SI session as si_admitted. The caller, not the CPRX
+  * wire, must establish both proofs independently on the OEM owner thread.
+  * Epoch-only assertions from another AirPlay/iAP2 session are insufficient. */
+ int (*si_inner_iap2_mfi)(void *,uint32_t generation,uint64_t epoch,uint32_t session);
+ int (*si_media_channel)(void *,uint32_t generation,uint64_t epoch,uint32_t session,
+                         unsigned channel); /* 1 video, 2 audio, 3 MMI, 4 steering */
 } MuCprxEvidence;
 /* One backend owns the entire receiver lifecycle for this generation.
  * Caller supplies real verified owner callbacks, never synthetic readiness.

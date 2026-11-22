@@ -76,7 +76,9 @@ int cp_cloud_drive_native(struct cp_cloud_pipeline *,uint64_t now_ms);
  * native AirPlay start operations. The local SI CPRX socket is ticked through
  * cp_cloud_drive_native on the original owner thread. */
 int cp_cloud_bind_rx_service(struct cp_cloud_pipeline *,MuCprxService *);
-/* Require real, current SI epoch/session and optionally native media=7. */
+/* Require the real current SI lease (generation+epoch+session), with
+ * independently observed native owner proof; optionally native media=7.
+ * R74 binds inner iAP2/MFi and four channels to this exact SI session. */
 int cp_cloud_native_rx_live(const struct cp_cloud_pipeline *,int require_media);
 /* Bind the *one* original-MFI iAP2 link, identity and current AP config while
  * the Bluetooth link is IDLE. The resulting proof callback reads real owner

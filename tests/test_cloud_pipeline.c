@@ -312,6 +312,7 @@ static void automatic_native_carplay_start(void){
  * binder, but implementations below are isolated host FIXTURES, not OEM. */
 struct fake_cf {uint32_t marker;char text[64];};
 static int native_owner_ok=1,native_listener=0,native_stop_pending=0,native_media_flag=0;
+static int native_inner=1,native_channel[5]={0,1,1,1,1};
 static int queue_object,native_stop_calls=0;
 static char current_native_iface[32]="eth0";
 void *gAirPlayReceiverServer=&airplay_object;
@@ -383,6 +384,14 @@ static int rx_admitted(void *ctx,uint32_t generation){
 static int rx_si(void *ctx,uint32_t generation,uint64_t epoch,uint32_t session){
  (void)ctx;return generation==8&&epoch==8&&session==1234&&single&&wired;
 }
+static int rx_inner(void *ctx,uint32_t gen,uint64_t epoch,uint32_t session){
+ (void)ctx;return gen==8&&epoch==8&&session==1234&&native_inner;
+}
+static int rx_channel(void *ctx,uint32_t gen,uint64_t epoch,uint32_t session,
+                      unsigned channel){
+ (void)ctx;return gen==8&&epoch==8&&session==1234&&
+   channel>=CP_CLOUD_VIDEO&&channel<=CP_CLOUD_STEERING&&native_channel[channel];
+}
 static int rx_media(void *ctx){(void)ctx;return native_media_flag;}
 static int rx_identity(void *ctx,char *s,size_t n){
  (void)ctx;if(n<4)return -1;memcpy(s,"abc",3);return 3;
@@ -393,10 +402,13 @@ static void native_rx_media_contract(void){
  const MuDioGuard guard={NULL,native_lib,native_owner,native_listening,
                          native_stopped,native_interface};
  const MuCprxEvidence evidence={.admitted=rx_admitted,.identity=rx_identity,
-   .media=rx_media,.si_admitted=rx_si};
+   .media=rx_media,.si_admitted=rx_si,
+   .si_inner_iap2_mfi=rx_inner,.si_media_channel=rx_channel};
  void *h=dlopen(NULL,RTLD_NOW);assert(h);
  reset_fixture();native_owner_ok=1;native_listener=0;native_stop_pending=0;
- native_media_flag=0;strcpy(current_native_iface,"eth0");
+ native_media_flag=0;native_inner=1;
+ for(int i=1;i<5;i++)native_channel[i]=1;
+ strcpy(current_native_iface,"eth0");
  mocked_oem(&b,&stock,1);cp_cloud_init(&p);
  assert(cp_cloud_begin(&p,&b,&ops,8,4)==CP_CLOUD_OK);
  assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
@@ -414,6 +426,12 @@ static void native_rx_media_contract(void){
  rx.epoch=9; /* reject wrong epoch even with an authorized generation */
  assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_PROOF);
  rx.epoch=8;
+ rx.evidence.si_inner_iap2_mfi=NULL;
+ assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_PROOF);
+ rx.evidence.si_inner_iap2_mfi=rx_inner;
+ rx.evidence.si_media_channel=NULL;
+ assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_PROOF);
+ rx.evidence.si_media_channel=rx_channel;
  /* START must arrive over the real local SI service v3 socket, NOT
   * via an independent call to the original receiver or a forged flag. */
  assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_OK);
@@ -454,6 +472,11 @@ static void native_rx_media_contract(void){
  assert(cp_cloud_drive_native(&p,120)==CP_CLOUD_RETRY);
  assert(p.handoff.phase==CP_HO_AIRPLAY_SESSION);
  inner=1;
+ /* Old phone/other inner iAP2 session cannot authorize the current SI. */
+ native_inner=0;
+ assert(cp_cloud_drive_native(&p,121)==CP_CLOUD_RETRY);
+ assert(p.handoff.phase==CP_HO_AIRPLAY_SESSION);
+ native_inner=1;
  assert(cp_cloud_drive_native(&p,121)==CP_CLOUD_RETRY);
  assert(p.handoff.phase==CP_HO_INNER_IAP_AUTH);
  native_media_flag=4;
@@ -462,6 +485,14 @@ static void native_rx_media_contract(void){
  native_media_flag=5;
  assert(cp_cloud_drive_native(&p,123)==CP_CLOUD_RETRY);
  native_media_flag=7;
+ /* Legacy epoch-only witnesses remain green while the SI session says
+  * steering or audio never joined this phone's receiver session. */
+ native_channel[CP_CLOUD_STEERING]=0;
+ assert(cp_cloud_drive_native(&p,124)==CP_CLOUD_RETRY);
+ native_channel[CP_CLOUD_STEERING]=1;
+ native_channel[CP_CLOUD_AUDIO]=0;
+ assert(cp_cloud_drive_native(&p,124)==CP_CLOUD_RETRY);
+ native_channel[CP_CLOUD_AUDIO]=1;
  media[CP_CLOUD_STEERING]=0;
  assert(cp_cloud_drive_native(&p,124)==CP_CLOUD_RETRY);
  media[CP_CLOUD_STEERING]=1;
@@ -472,6 +503,15 @@ static void native_rx_media_contract(void){
  assert(!cp_cloud_is_active(&p));
  native_media_flag=7;
  assert(cp_cloud_drive_native(&p,127)==CP_CLOUD_OK);
+ assert(cp_cloud_is_active(&p));
+ native_inner=0;
+ assert(!cp_cloud_is_active(&p));
+ assert(cp_cloud_drive_native(&p,128)==CP_CLOUD_RETRY);
+ native_inner=1;
+ native_channel[CP_CLOUD_VIDEO]=0;
+ assert(!cp_cloud_is_active(&p));
+ native_channel[CP_CLOUD_VIDEO]=1;
+ assert(cp_cloud_drive_native(&p,129)==CP_CLOUD_OK);
  assert(cp_cloud_is_active(&p));
  rx.session=1235;assert(!cp_cloud_is_active(&p));
  rx.session=1234;assert(cp_cloud_is_active(&p));
