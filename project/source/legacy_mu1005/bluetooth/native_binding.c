@@ -1,4 +1,5 @@
 #include "native_binding.h"
+#include "rf_arg_experiment.h"
 #include <stdint.h>
 #include <string.h>
 #if defined(__QNXNTO__) && defined(__arm__) && UINTPTR_MAX == UINT32_MAX
@@ -26,8 +27,8 @@ static int auth(void*p,uint32_t a,const uint8_t mac[6]){Resident*r=p;return cert
 static int register_verified(void *channel,uint8_t *slot,uint16_t ignored){
  Resident *r=&res;uint8_t profile=0;
  (void)ignored;
- if(!cert(r)||!r->owner.iap2_profile_proven||
-    r->owner.iap2_profile_proven(r->owner.opaque,&profile)!=1)return -1;
+ if(!cert(r)||mu_rf_arg_choose(r->owner.iap2_profile_proven,
+    r->owner.opaque,&profile)==MU_RF_ARG_DENY)return -1;
  return ((int (*)(void*,uint8_t*,uint16_t))(uintptr_t)0x277a18u)(channel,slot,profile);
 }
 static void callback(void *ch,const void *event){
@@ -45,7 +46,7 @@ static int words_ok(void){
 }
 #define RFN(type,a) ((type)(uintptr_t)(a))
 int mu_bt_native_attach(const MuBtOwner *o,int fd){
- if(!o||!o->owner_ready||!o->transport_ready||!o->read_live||!o->paired_authorized||!o->iap2_profile_proven||res.attempted||fd<0||o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
+ if(!o||!o->owner_ready||!o->transport_ready||!o->read_live||!o->paired_authorized||res.attempted||fd<0||o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
  if(!words_ok())return -1;
  res.attempted=1;res.owner=*o;res.peer=(Mu38PeerOps){&res,assoc,rd,auth};
  InboundOps n={0};n.reg=register_verified;n.unreg=RFN(int (*)(void*,uint8_t*),0x2779b4u);
