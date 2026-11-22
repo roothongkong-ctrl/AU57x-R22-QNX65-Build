@@ -111,6 +111,11 @@ int mu_cprx_shutdown(MuCprxService *);
 /* R82: authenticated read-only DIO status query, CPRX v3 op 6. Status code
  * 0/4/5/7 is a *single observed sample*, NOT a live CarPlay media grant. */
 #define MU_CPRX_OP_STATUS 6u
+/* R83: read-only DIO proof snapshot for one exact SI owner session.
+ * 28-byte success reply: CPRA[8], media[1], inner_mfi[1], channel_mask[1],
+ * reserved[1], generation[4], epoch[8], session[4].
+ * Proof is a SNAPSHOT, not a renewable authorization or OEM validation. */
+#define MU_CPRX_OP_SESSION_STATUS 11u
 /* R81: process-separated SI client endpoint. This is a snapshot of an
  * existing DIO process's socket identity, NOT a pointer to DIO's address
  * space. The two independently observed owner callbacks are mandatory. */
@@ -134,8 +139,10 @@ typedef struct {
  uint32_t generation, session;
  uint64_t epoch, deadline;
  unsigned sent, received, reply_need;
- int observed_media; /* -1 until a validated remote op 6 response */
- unsigned char request[32], reply[12];
+ int observed_media; /* -1 until a validated remote media sample */
+ int observed_inner; /* -1 until op11; then 0/1 same-SI iAP2/MFi witness */
+ unsigned observed_channels; /* bits 0..3 video/audio/HMI/steering */
+ unsigned char request[32], reply[28];
 } MuCprxClient;
 void mu_cprx_client_init(MuCprxClient *);
 /* Caller must be on the verified, current original SI owner thread.
@@ -155,7 +162,10 @@ int mu_cprx_client_begin_remote(MuCprxClient *,
  * now) for an authenticated, READ-ONLY media observation from original DIO.
  * 12-byte reply includes stock media flag 0,4,5,7; a pending native listener
  * returns BUSY. For a new observation, close/init and issue a NEW transaction;
- * never infer live video/audio or same-phone MFi from a cached flag 7. */
+ * never infer live video/audio or same-phone MFi from a cached flag 7.
+ * R83 op11 additionally samples separately supplied, independently verified
+ * same-session inner-iAP2/MFi and four channels from the DIO-side OEM owner.
+ * Missing callbacks are rejected, not converted into ready flags. */
 /* Advance without blocking; call the server's mu_cprx_tick between ticks.
  * After BUSY, caller may close and reinitialize when media is independently
  * known idle. Any ERROR is terminal and requires a new verified SI session. */

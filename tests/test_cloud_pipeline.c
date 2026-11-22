@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <sys/un.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <sys/wait.h>
 #include <errno.h>
 #include <unistd.h>
@@ -890,14 +891,23 @@ static int r81_dio_server(void *ctx,int fd,uint32_t gen,uint64_t epoch,uint32_t 
  return r81_client_dio_allowed&&r81_si_owner(ctx,gen,epoch,sess)&&fd>=0&&
   getpeername(fd,(struct sockaddr*)&sa,&len)==0&&sa.sun_family==AF_UNIX;
 }
+/* Test-only synchronization of parent DIO observations and child SI calls.
+ * The two processes do not share C objects or synthetic status globals. */
+static void r83_set_native(int to_server,int from_server,char value){
+ char reply=0;
+ assert(write(to_server,&value,1)==1);
+ assert(read(from_server,&reply,1)==1&&reply==value);
+}
 static void native_remote_process_boundary(void){
  struct r81_backend b={0};MuCprxService rx={0};
  MuReceiverBackend backend={&b,8,r81_start,r81_poll,r81_restore};
  const MuCprxEvidence evidence={.admitted=rx_admitted,.identity=rx_identity,
-   .media=rx_media,.si_admitted=rx_si,.si_client_verified=rx_peer};
+   .media=rx_media,.si_admitted=rx_si,.si_client_verified=rx_peer,
+   .si_inner_iap2_mfi=rx_inner,.si_media_channel=rx_channel};
  char dir[]="/tmp/au57x-r81-separate-XXXXXX";
  MuCprxRemoteEndpoint endpoint={0};
- reset_fixture();si_peer_allowed=1;
+ reset_fixture();si_peer_allowed=1;native_inner=1;
+ for(int i=1;i<=4;i++)native_channel[i]=1;
  /* DIO reports state 4: associated/pending, not video/audio ready. */
  native_media_flag=4;
  assert(mkdtemp(dir));
@@ -909,8 +919,11 @@ static void native_remote_process_boundary(void){
  endpoint.server_gid=getegid();
  endpoint.si_owner_verified=r81_si_owner;
  endpoint.dio_server_verified=r81_dio_server;
+ int changes[2],acks[2];
+ assert(pipe(changes)==0&&pipe(acks)==0);
  pid_t pid=fork();assert(pid>=0);
  if(pid==0){
+  close(changes[0]);close(acks[1]);
   /* Separate address space: this child NEVER accesses rx or backend. */
   MuCprxClient client;mu_cprx_client_init(&client);
   MuCprxRemoteEndpoint wrong=endpoint;
@@ -963,6 +976,60 @@ static void native_remote_process_boundary(void){
   assert(rc==MU_CPRX_CLIENT_CONFIRMED&&client.observed_media==4&&client.reply_need==12);
   assert(client.reply[8]==4&&client.reply[9]==0&&client.reply[10]==0&&
          client.reply[11]==0);
+  /* R83: a missing DIO same-session verifier must FAIL CLOSED.
+   * A valid global media flag and valid wire IDs are insufficient. */
+  mu_cprx_client_close(&client);
+  r83_set_native(changes[1],acks[0],'n');
+  assert(mu_cprx_client_begin_remote(&client,&endpoint,
+            MU_CPRX_OP_SESSION_STATUS,625)==0);
+  rc=MU_CPRX_CLIENT_PENDING;
+  for(unsigned i=0;i<500&&rc==MU_CPRX_CLIENT_PENDING;i++){
+   rc=mu_cprx_client_tick(&client,625+i);
+   if(rc==MU_CPRX_CLIENT_PENDING)usleep(1000);
+  }
+  assert(rc==MU_CPRX_CLIENT_ERROR&&client.observed_media==-1&&
+         client.observed_inner==-1&&client.observed_channels==0);
+  mu_cprx_client_close(&client);
+  /* Native DIO media=7 alone is not complete channel delivery: revoke the
+   * real steering callback and observe mask 0b0111 for the SAME SI session. */
+  r83_set_native(changes[1],acks[0],'7');
+  assert(mu_cprx_client_begin_remote(&client,&endpoint,
+            MU_CPRX_OP_SESSION_STATUS,630)==0);
+  rc=MU_CPRX_CLIENT_PENDING;
+  for(unsigned i=0;i<500&&rc==MU_CPRX_CLIENT_PENDING;i++){
+   rc=mu_cprx_client_tick(&client,630+i);
+   if(rc==MU_CPRX_CLIENT_PENDING)usleep(1000);
+  }
+  assert(rc==MU_CPRX_CLIENT_CONFIRMED&&client.reply_need==28&&
+         client.observed_media==7&&client.observed_inner==1&&
+         client.observed_channels==7&&client.reply[11]==0);
+  mu_cprx_client_close(&client);
+  r83_set_native(changes[1],acks[0],'a');
+  assert(mu_cprx_client_begin_remote(&client,&endpoint,
+            MU_CPRX_OP_SESSION_STATUS,640)==0);
+  rc=MU_CPRX_CLIENT_PENDING;
+  for(unsigned i=0;i<500&&rc==MU_CPRX_CLIENT_PENDING;i++){
+   rc=mu_cprx_client_tick(&client,640+i);
+   if(rc==MU_CPRX_CLIENT_PENDING)usleep(1000);
+  }
+  assert(rc==MU_CPRX_CLIENT_CONFIRMED&&client.observed_media==7&&
+         client.observed_inner==1&&client.observed_channels==15);
+  /* Explicit SI owner revocation invalidates the previously read snapshot. */
+  r81_client_si_allowed=0;
+  assert(mu_cprx_client_tick(&client,645)==MU_CPRX_CLIENT_ERROR);
+  assert(client.observed_media==-1&&client.observed_inner==-1&&
+         client.observed_channels==0);
+  mu_cprx_client_close(&client);r81_client_si_allowed=1;
+  r83_set_native(changes[1],acks[0],'0');
+  assert(mu_cprx_client_begin_remote(&client,&endpoint,
+            MU_CPRX_OP_SESSION_STATUS,646)==0);
+  rc=MU_CPRX_CLIENT_PENDING;
+  for(unsigned i=0;i<500&&rc==MU_CPRX_CLIENT_PENDING;i++){
+   rc=mu_cprx_client_tick(&client,646+i);
+   if(rc==MU_CPRX_CLIENT_PENDING)usleep(1000);
+  }
+  assert(rc==MU_CPRX_CLIENT_CONFIRMED&&client.observed_media==4&&
+         client.observed_inner==1&&client.observed_channels==0);
   /* A completed status sample isn't permanent authorization. */
   r81_client_si_allowed=0;
   assert(mu_cprx_client_tick(&client,630)==MU_CPRX_CLIENT_ERROR);
@@ -975,10 +1042,25 @@ static void native_remote_process_boundary(void){
   }
   assert(rc==MU_CPRX_CLIENT_CONFIRMED);
   mu_cprx_client_close(&client);
+  close(changes[1]);close(acks[0]);
   _exit(0);
  }
+ close(changes[1]);close(acks[0]);
+ int fl=fcntl(changes[0],F_GETFL);
+ assert(fl>=0&&fcntl(changes[0],F_SETFL,fl|O_NONBLOCK)==0);
  int server_end=0;
- for(unsigned i=0;i<1000&&!server_end;i++){
+ for(unsigned i=0;i<1500&&!server_end;i++){
+  char command;
+  while(read(changes[0],&command,1)==1){
+   if(command=='n')rx.evidence.si_inner_iap2_mfi=NULL;
+   if(command=='7'){
+    rx.evidence.si_inner_iap2_mfi=rx_inner;
+    native_media_flag=7;native_channel[4]=0;
+   }
+   if(command=='a')native_channel[4]=1;
+   if(command=='0')native_media_flag=4;
+   assert(write(acks[1],&command,1)==1);
+  }
   int rc=mu_cprx_tick(&rx,100+i);
   assert(rc==0||rc==1);
   server_end=rx.backend_released;
@@ -986,10 +1068,56 @@ static void native_remote_process_boundary(void){
  }
  assert(server_end&&b.starts==1&&b.stops==1);
  assert(native_media_flag==4); /* read-only DIO media query must not mutate */
+ close(changes[0]);close(acks[1]);
  int childstatus=0;assert(waitpid(pid,&childstatus,0)==pid);
  assert(WIFEXITED(childstatus)&&WEXITSTATUS(childstatus)==0);
  struct stat st;assert(lstat(endpoint.socket_path,&st)==-1&&errno==ENOENT);
  assert(rmdir(dir)==0);
+}
+/* R83: hostile/corrupt remote replies cannot impersonate the current SI
+ * session or claim four synchronized channels from a global media flag.
+ * The parser must reject invalid generation/epoch/session, partial proofs,
+ * reserved bits, and unsupported media without leaving cached grants. */
+static void native_r83_corrupt_session_snapshot(void){
+ MuCprxRemoteEndpoint e={0};
+ e.generation=8;e.epoch=8;e.session=1234;
+ e.si_owner_verified=r81_si_owner;
+ e.dio_server_verified=r81_dio_server;
+ r81_client_si_allowed=r81_client_dio_allowed=1;
+ for(int variant=0;variant<9;variant++){
+  int fd[2];assert(socketpair(AF_UNIX,SOCK_STREAM,0,fd)==0);
+  MuCprxClient c;mu_cprx_client_init(&c);
+  c.remote=e;c.remote_mode=1;c.operation=MU_CPRX_OP_SESSION_STATUS;
+  c.generation=8;c.epoch=8;c.session=1234;
+  c.fd=fd[0];c.phase=3;c.reply_need=8;c.deadline=1000;
+  unsigned char reply[28]={0};
+  memcpy(reply,"CPRA",4);reply[4]=2;
+  reply[8]=7;reply[9]=1;reply[10]=15;
+  reply[12]=8;reply[16]=8;reply[24]=0xd2;reply[25]=4;
+  switch(variant){
+   case 0:reply[12]=9;break; /* wrong generation */
+   case 1:reply[16]=9;break; /* stale epoch */
+   case 2:reply[24]=0xd3;break; /* different SI session */
+   case 3:reply[8]=4;break; /* incomplete native media */
+   case 4:reply[9]=0;break; /* missing inner MFi */
+   case 5:reply[10]=0x1f;break; /* forbidden channel bits */
+   case 6:reply[11]=1;break; /* malformed reserved */
+   case 7:reply[8]=8;break; /* undocumented native state */
+   default:break; /* exact same-session, full snapshot parses */
+  }
+  assert(send(fd[1],reply,sizeof reply,0)==(ssize_t)sizeof reply);
+  int r=mu_cprx_client_tick(&c,100);
+  assert(r==MU_CPRX_CLIENT_PENDING&&c.reply_need==28);
+  r=mu_cprx_client_tick(&c,101);
+  if(variant!=8){
+   assert(r==MU_CPRX_CLIENT_ERROR&&c.observed_media==-1&&
+          c.observed_inner==-1&&c.observed_channels==0);
+  }else{
+   assert(r==MU_CPRX_CLIENT_CONFIRMED&&c.observed_media==7&&
+          c.observed_inner==1&&c.observed_channels==15);
+  }
+  mu_cprx_client_close(&c);close(fd[1]);
+ }
 }
 static void native_dio_bound_pipeline(void){
  struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
@@ -1035,5 +1163,5 @@ static void native_dio_bound_pipeline(void){
  assert(p.handoff.phase==CP_HO_WIRED);
  dlclose(h);
 }
-int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();native_si_owner_loss_recovery();native_abandoned_mutation_rollback();native_remote_process_boundary();
+int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();native_si_owner_loss_recovery();native_abandoned_mutation_rollback();native_remote_process_boundary();native_r83_corrupt_session_snapshot();
  puts("AU57X_R47_CLOUD_04_05_06_07_08_09_OWNER_GATES_PASS");return 0;}

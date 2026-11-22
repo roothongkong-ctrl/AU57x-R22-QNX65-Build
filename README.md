@@ -150,3 +150,14 @@ Status values 0/4/5/7 are one-time DIO observations; they are never accepted
 as an iPhone MFi/video/audio/control proof. Linux fork() regression checks
 pre-START BUSY, observed state 4, and unchanged native START/STOP counts.
 See `docs/R82_SI_DIO_READONLY_MEDIA_STATUS_CN.md`. NO INSTALL.
+
+### R83 — same-session SI/DIO media evidence snapshot (NO INSTALL)
+
+R83 adds read-only CPRX v3 operation 11 over the real two-process AF_UNIX
+channel. Its 28-byte reply returns native DIO media status, same-original-SI
+inner iAP2/MFi observation, individually attested video/audio/MMI/steering
+channel bits, and exact generation/epoch/session echoes. Missing native
+witness callbacks fail closed; inconsistent responses and expired SI owner
+clear all cached observations. Linux fork() and hostile-response tests pass;
+OEM source callbacks are still HOST FIXTURES ONLY, not real vehicle bindings.
+See `docs/R83_SI_DIO_SESSION_PROOF_CN.md`. SOURCE ONLY / NO INSTALL.

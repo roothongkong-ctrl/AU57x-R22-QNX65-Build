@@ -76,6 +76,7 @@ static void reply(MuCprxService *s,unsigned code){memcpy(s->reply,"CPRA\2\0\0\0"
 static uint32_t gen(const unsigned char *p){return (uint32_t)p[0]|(uint32_t)p[1]<<8|(uint32_t)p[2]<<16|(uint32_t)p[3]<<24;}
 static uint64_t epoch64(const unsigned char *p){return (uint64_t)gen(p)|((uint64_t)gen(p+4)<<32);}
 static void put32(unsigned char*p,uint32_t v){for(unsigned i=0;i<4;i++)p[i]=(unsigned char)(v>>(i*8));}
+static void put64(unsigned char*p,uint64_t v){put32(p,(uint32_t)v);put32(p+4,(uint32_t)(v>>32));}
 static int peer_verified(const MuCprxService *s,int fd){
  uid_t uid;gid_t gid;
  if(!s||fd<0)return 0;
@@ -251,6 +252,38 @@ static int handle(MuCprxService *s){
  if(op==5){
   reply(s,0);s->reply[8]=(unsigned char)s->identity_len;s->reply[9]=0;memcpy(s->reply+10,s->identity_value,s->identity_len);s->size=s->identity_len+10;return 0;}
  if(op==6||op==7){int m=s->evidence.media(s->evidence.opaque);if(m!=0&&m!=4&&m!=5&&m!=7){reply(s,1);return 0;}reply(s,0);s->reply[8]=(unsigned char)m;memset(s->reply+9,0,3);s->size=12;return 0;}
+ /* R83: same-session DIO-side proof snapshot; callbacks MUST originate
+  * from verified original owner/session events, not current media alone.
+  * Report absent/unknown evidence as RETRY, never as streaming ready. */
+ if(op==MU_CPRX_OP_SESSION_STATUS&&s->version==3){
+  int m,auth;unsigned mask=0;
+  if(!s->evidence.si_inner_iap2_mfi||!s->evidence.si_media_channel){
+   reply(s,2);return 0;
+  }
+  m=s->evidence.media(s->evidence.opaque);
+  if(m!=0&&m!=4&&m!=5&&m!=7){reply(s,1);return 0;}
+  auth=s->evidence.si_inner_iap2_mfi(s->evidence.opaque,
+           s->generation,s->epoch,s->session);
+  if(auth!=0&&auth!=1){reply(s,1);return 0;}
+  if(auth==1&&m==7){
+   for(unsigned channel=1;channel<=4;channel++){
+    int live=s->evidence.si_media_channel(s->evidence.opaque,
+        s->generation,s->epoch,s->session,channel);
+    if(live!=0&&live!=1){reply(s,1);return 0;}
+    if(live==1)mask|=1u<<(channel-1);
+   }
+  }
+  reply(s,0);
+  s->reply[8]=(unsigned char)m;
+  s->reply[9]=(unsigned char)auth;
+  s->reply[10]=(unsigned char)mask;
+  s->reply[11]=0;
+  put32(s->reply+12,s->generation);
+  put64(s->reply+16,s->epoch);
+  put32(s->reply+24,s->session);
+  s->size=28;
+  return 0;
+ }
  if(op>=8&&op<=10&&s->version==3){int r=-1;
   if(op==8&&s->evidence.metadata&&mu_sem_csm(s->payload,s->payload_need))r=s->evidence.metadata(s->evidence.opaque,s->payload,s->payload_need);
   if(op==9&&s->evidence.semantic_in)r=mu_sem_input(&s->semantic,s->payload,s->payload_need,s->evidence.opaque,s->evidence.semantic_in);
@@ -278,7 +311,7 @@ int mu_cprx_tick(MuCprxService *s,uint64_t now){
   if(s->required==16 && s->req[4]==3 && s->version==3){s->required=32;return 0;}}
  /* v3 semantic messages carry a 2-byte length or a fixed 4-byte ACK. */
  unsigned op=s->req[5];
- if(!s->size&&(!header_valid(s) || op>10 || (op>=8&&s->version!=3) || (op==8&&!s->evidence.metadata) || (op==9&&!s->evidence.semantic_in) || (op==10&&!s->evidence.semantic_next)))reply(s,2);
+ if(!s->size&&(!header_valid(s) || op>MU_CPRX_OP_SESSION_STATUS || (op>=8&&s->version!=3) || (op==8&&!s->evidence.metadata) || (op==9&&!s->evidence.semantic_in) || (op==10&&!s->evidence.semantic_next)))reply(s,2);
  if(!s->size&&op>=8&&op<=10){
   if(op==10)s->payload_need=4;
   else if(s->length_used<2){ssize_t r=recv(s->client,s->length_bytes+s->length_used,2-s->length_used,0);if(r<=0){if(r<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))return 0;return abandoned(s);}s->length_used+=(unsigned)r;if(s->length_used<2)return 0;s->payload_need=(unsigned)s->length_bytes[0]|(unsigned)s->length_bytes[1]<<8;if(s->payload_need<6||s->payload_need>(op==8?4096u:8192u))reply(s,2);}
@@ -299,7 +332,7 @@ int mu_cprx_tick(MuCprxService *s,uint64_t now){
  * No additional source module, QNX thread, fake iPhone or trust in wire IDs. */
 void mu_cprx_client_init(MuCprxClient *c){
  if(!c)return;
- memset(c,0,sizeof *c);c->fd=-1;c->observed_media=-1;
+ memset(c,0,sizeof *c);c->fd=-1;c->observed_media=-1;c->observed_inner=-1;
 }
 void mu_cprx_client_close(MuCprxClient *c){
  if(!c)return;
@@ -310,6 +343,7 @@ static int client_fail(MuCprxClient *c){
  if(!c)return MU_CPRX_CLIENT_ERROR;
  if(c->fd>=0)close(c->fd);
  c->fd=-1;c->phase=5;
+ c->observed_media=-1;c->observed_inner=-1;c->observed_channels=0;
  return MU_CPRX_CLIENT_ERROR;
 }
 static int client_begin_op(MuCprxClient *c,MuCprxService *s,uint64_t now,
@@ -394,7 +428,7 @@ int mu_cprx_client_begin_remote(MuCprxClient *c,
  size_t n,dir_len;
  int fd,flags,rc;
  uid_t uid;gid_t gid;
- if(!c||c->phase||!endpoint||(op!=1&&op!=2&&op!=MU_CPRX_OP_STATUS)||
+ if(!c||c->phase||!endpoint||(op!=1&&op!=2&&op!=MU_CPRX_OP_STATUS&&op!=MU_CPRX_OP_SESSION_STATUS)||
     !endpoint->generation||!endpoint->epoch||!endpoint->session||
     !endpoint->airplay_port||endpoint->airplay_port>65535||
     !endpoint->si_owner_verified||!endpoint->dio_server_verified||
@@ -526,7 +560,7 @@ int mu_cprx_client_tick(MuCprxClient *c,uint64_t now){
  if(c->phase==3){
   unsigned need=c->reply_need;
   /* Avoid parsing an ACK while its media-state payload is still in flight. */
-  if(need!=8&&need!=12)return client_fail(c);
+  if(need!=8&&need!=12&&need!=28)return client_fail(c);
   ssize_t n=recv(c->fd,c->reply+c->received,need-c->received,0);
   if(n<0){
    if(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR)
@@ -541,22 +575,39 @@ int mu_cprx_client_tick(MuCprxClient *c,uint64_t now){
   /* DIO status has a VARIABLE response size: 8-byte RETRY/error, but
    * exactly 12 bytes only for a success that carries stock media state.
    * Never wait for four bytes the server will not send on RETRY. */
-  if(c->operation==MU_CPRX_OP_STATUS&&need==8&&c->reply[5]==0){
-   c->reply_need=12;
-   return MU_CPRX_CLIENT_PENDING;
+  if(need==8&&c->reply[5]==0){
+   if(c->operation==MU_CPRX_OP_STATUS){
+    c->reply_need=12;
+    return MU_CPRX_CLIENT_PENDING;
+   }
+   if(c->operation==MU_CPRX_OP_SESSION_STATUS){
+    c->reply_need=28;
+    return MU_CPRX_CLIENT_PENDING;
+   }
   }
   /* A DIO receiver can be booting: an op 6 request returns RETRY/1,
    * never invent media=7 or report a completed status query. */
-  if(c->operation==MU_CPRX_OP_STATUS){
+  if(c->operation==MU_CPRX_OP_STATUS||c->operation==MU_CPRX_OP_SESSION_STATUS){
    if(c->reply[5]==1){
     close(c->fd);c->fd=-1;c->phase=6;
     return MU_CPRX_CLIENT_BUSY;
    }
    if(!c->remote_mode||c->reply[5]!=0||
       (c->reply[8]!=0&&c->reply[8]!=4&&
-       c->reply[8]!=5&&c->reply[8]!=7)||
-      c->reply[9]||c->reply[10]||c->reply[11])
+       c->reply[8]!=5&&c->reply[8]!=7))
     return client_fail(c);
+   if(c->operation==MU_CPRX_OP_STATUS){
+    if(need!=12||c->reply[9]||c->reply[10]||c->reply[11])
+     return client_fail(c);
+   }else{
+    if(need!=28||c->reply[9]>1||(c->reply[10]&0xf0)||
+       c->reply[11]||gen(c->reply+12)!=c->generation||
+       epoch64(c->reply+16)!=c->epoch||gen(c->reply+24)!=c->session||
+       (c->reply[8]!=7&&c->reply[10])||
+       (!c->reply[9]&&c->reply[10]))return client_fail(c);
+    c->observed_inner=(int)c->reply[9];
+    c->observed_channels=(unsigned)c->reply[10];
+   }
    c->observed_media=(int)c->reply[8];
   }else{
    if(c->operation==2&&c->reply[5]==3){
