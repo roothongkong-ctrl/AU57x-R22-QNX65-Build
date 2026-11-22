@@ -108,8 +108,24 @@ int mu_cprx_shutdown(MuCprxService *);
 #define MU_CPRX_CLIENT_PENDING 1
 #define MU_CPRX_CLIENT_CONFIRMED 2
 #define MU_CPRX_CLIENT_BUSY 3 /* STOP refused: native media still active */
+/* R81: process-separated SI client endpoint. This is a snapshot of an
+ * existing DIO process's socket identity, NOT a pointer to DIO's address
+ * space. The two independently observed owner callbacks are mandatory. */
+typedef struct {
+ char socket_path[MU_CPRX_UNIX_PATH_MAX];
+ uint32_t generation, session;
+ uint64_t epoch;
+ unsigned airplay_port;
+ uid_t server_uid;
+ gid_t server_gid;
+ void *owner_ctx;
+ int (*si_owner_verified)(void *,uint32_t,uint64_t,uint32_t);
+ int (*dio_server_verified)(void *,int,uint32_t,uint64_t,uint32_t);
+} MuCprxRemoteEndpoint;
 typedef struct {
  MuCprxService *service;
+ MuCprxRemoteEndpoint remote;
+ int remote_mode;
  int fd, phase;
  unsigned operation; /* 1=START, 2=graceful STOP */
  uint32_t generation, session;
@@ -125,6 +141,12 @@ int mu_cprx_client_begin(MuCprxClient *,MuCprxService *,uint64_t now_ms);
  * Native media=7 receives BUSY, never an implied teardown; confirmed STOP
  * is emitted only after the original backend restore barrier succeeds. */
 int mu_cprx_client_begin_stop(MuCprxClient *,MuCprxService *,uint64_t now_ms);
+/* Actual cross-process AF_UNIX client. Both START and STOP require the
+ * original SI owner and a separately verified DIO server. A local socket
+ * pathname, UID/GID or valid wire token alone never proves OEM ownership.
+ * This API does not dereference MuCprxService in another process. */
+int mu_cprx_client_begin_remote(MuCprxClient *,
+ const MuCprxRemoteEndpoint *,unsigned operation,uint64_t now_ms);
 /* Advance without blocking; call the server's mu_cprx_tick between ticks.
  * After BUSY, caller may close and reinitialize when media is independently
  * known idle. Any ERROR is terminal and requires a new verified SI session. */

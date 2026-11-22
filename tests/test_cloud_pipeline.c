@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <sys/un.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
@@ -869,6 +870,98 @@ static void native_abandoned_mutation_rollback(void){
  assert(lstat(path,&st)==-1&&errno==ENOENT);
  assert(rmdir(dir)==0);
 }
+/* R81 architecture test: real SI client and DIO receiver live in different
+ * Unix processes. No shared MuCprxService address or OEM global objects. */
+struct r81_backend { unsigned starts,stops; };
+static int r81_start(void *ctx,unsigned port){
+ struct r81_backend *b=ctx;assert(port==5000);b->starts++;return 2;
+}
+static int r81_poll(void *ctx){(void)ctx;return 2;}
+static int r81_restore(void *ctx){
+ struct r81_backend *b=ctx;b->stops++;return 0;
+}
+static int r81_client_si_allowed=1,r81_client_dio_allowed=1;
+static int r81_si_owner(void *ctx,uint32_t gen,uint64_t epoch,uint32_t sess){
+ (void)ctx;return r81_client_si_allowed&&gen==8&&epoch==8&&sess==1234;
+}
+static int r81_dio_server(void *ctx,int fd,uint32_t gen,uint64_t epoch,uint32_t sess){
+ struct sockaddr_un sa={0};socklen_t len=sizeof sa;
+ (void)ctx;
+ return r81_client_dio_allowed&&r81_si_owner(ctx,gen,epoch,sess)&&fd>=0&&
+  getpeername(fd,(struct sockaddr*)&sa,&len)==0&&sa.sun_family==AF_UNIX;
+}
+static void native_remote_process_boundary(void){
+ struct r81_backend b={0};MuCprxService rx={0};
+ MuReceiverBackend backend={&b,8,r81_start,r81_poll,r81_restore};
+ const MuCprxEvidence evidence={.admitted=rx_admitted,.identity=rx_identity,
+   .media=rx_media,.si_admitted=rx_si,.si_client_verified=rx_peer};
+ char dir[]="/tmp/au57x-r81-separate-XXXXXX";
+ MuCprxRemoteEndpoint endpoint={0};
+ reset_fixture();si_peer_allowed=1;
+ assert(mkdtemp(dir));
+ assert(mu_cprx_open_backend_si_unix(&rx,&backend,&evidence,5000,8,1234,
+                          dir,geteuid(),getegid())==0);
+ strcpy(endpoint.socket_path,rx.unix_path);
+ endpoint.generation=8;endpoint.epoch=8;endpoint.session=1234;
+ endpoint.airplay_port=5000;endpoint.server_uid=geteuid();
+ endpoint.server_gid=getegid();
+ endpoint.si_owner_verified=r81_si_owner;
+ endpoint.dio_server_verified=r81_dio_server;
+ pid_t pid=fork();assert(pid>=0);
+ if(pid==0){
+  /* Separate address space: this child NEVER accesses rx or backend. */
+  MuCprxClient client;mu_cprx_client_init(&client);
+  MuCprxRemoteEndpoint wrong=endpoint;
+  wrong.si_owner_verified=NULL;
+  assert(mu_cprx_client_begin_remote(&client,&wrong,1,100)==-1);
+  wrong=endpoint;wrong.dio_server_verified=NULL;
+  assert(mu_cprx_client_begin_remote(&client,&wrong,1,100)==-1);
+  wrong=endpoint;wrong.session=1235;
+  assert(mu_cprx_client_begin_remote(&client,&wrong,1,100)==-1);
+  wrong=endpoint;wrong.server_uid=(geteuid()==0?1:0);
+  assert(mu_cprx_client_begin_remote(&client,&wrong,1,100)==-1);
+  /* The original SI owner and DIO identity may vanish after connect but
+   * BEFORE any START bytes are sent; deny even this transient window. */
+  assert(mu_cprx_client_begin_remote(&client,&endpoint,1,100)==0);
+  r81_client_dio_allowed=0;
+  assert(mu_cprx_client_tick(&client,100)==MU_CPRX_CLIENT_ERROR);
+  mu_cprx_client_close(&client);r81_client_dio_allowed=1;
+  assert(mu_cprx_client_begin_remote(&client,&endpoint,1,100)==0);
+  r81_client_si_allowed=0;
+  assert(mu_cprx_client_tick(&client,100)==MU_CPRX_CLIENT_ERROR);
+  mu_cprx_client_close(&client);r81_client_si_allowed=1;
+  assert(mu_cprx_client_begin_remote(&client,&endpoint,1,100)==0);
+  int rc=MU_CPRX_CLIENT_PENDING;
+  for(unsigned i=0;i<500&&rc==MU_CPRX_CLIENT_PENDING;i++){
+   rc=mu_cprx_client_tick(&client,100+i);
+   if(rc==MU_CPRX_CLIENT_PENDING)usleep(1000);
+  }
+  assert(rc==MU_CPRX_CLIENT_CONFIRMED&&client.remote_mode);
+  assert(client.service==NULL&&client.fd==-1);
+  mu_cprx_client_close(&client);
+  assert(mu_cprx_client_begin_remote(&client,&endpoint,2,650)==0);
+  rc=MU_CPRX_CLIENT_PENDING;
+  for(unsigned i=0;i<500&&rc==MU_CPRX_CLIENT_PENDING;i++){
+   rc=mu_cprx_client_tick(&client,650+i);
+   if(rc==MU_CPRX_CLIENT_PENDING)usleep(1000);
+  }
+  assert(rc==MU_CPRX_CLIENT_CONFIRMED);
+  mu_cprx_client_close(&client);
+  _exit(0);
+ }
+ int server_end=0;
+ for(unsigned i=0;i<1000&&!server_end;i++){
+  int rc=mu_cprx_tick(&rx,100+i);
+  assert(rc==0||rc==1);
+  server_end=rx.backend_released;
+  if(!server_end)usleep(500);
+ }
+ assert(server_end&&b.starts==1&&b.stops==1);
+ int childstatus=0;assert(waitpid(pid,&childstatus,0)==pid);
+ assert(WIFEXITED(childstatus)&&WEXITSTATUS(childstatus)==0);
+ struct stat st;assert(lstat(endpoint.socket_path,&st)==-1&&errno==ENOENT);
+ assert(rmdir(dir)==0);
+}
 static void native_dio_bound_pipeline(void){
  struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
  MuDioNative native={0};
@@ -913,5 +1006,5 @@ static void native_dio_bound_pipeline(void){
  assert(p.handoff.phase==CP_HO_WIRED);
  dlclose(h);
 }
-int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();native_si_owner_loss_recovery();native_abandoned_mutation_rollback();
+int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();native_si_owner_loss_recovery();native_abandoned_mutation_rollback();native_remote_process_boundary();
  puts("AU57X_R47_CLOUD_04_05_06_07_08_09_OWNER_GATES_PASS");return 0;}

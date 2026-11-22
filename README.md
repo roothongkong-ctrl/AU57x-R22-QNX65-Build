@@ -128,3 +128,15 @@ An abandoned in-flight CPRX START/STOP keeps its private AF_UNIX lease until
 the OEM restore barrier succeeds. Added actual local-socket negative tests.
 These are source/host/OEM-stub checks, not a functional iPhone or QNX car test.
 See `docs/R80_NATIVE_SESSION_WIRED_ROLLBACK_CN.md`.
+
+### R81 — distinct SI/DIO process boundary (NO INSTALL)
+
+Original MU1005 static ELF metadata separates `smartphone_integrator`
+(`libirc_mmx_adapter.so`, no direct `libairplay.so` DT_NEEDED) from
+`dio_manager` (`libairplay.so`, `libiap2client.so.1`). R81 adds a
+**process-separated** SI CPRX v3 client that does not hold or dereference a
+DIO `MuCprxService *`. A real Linux fork-based START/STOP roundtrip verifies
+socket protocol boundaries. QNX production SI/DIO identity callbacks and
+actual CarPlay media events are still missing. See
+`docs/R81_SI_DIO_SEPARATE_PROCESS_IPC_CN.md`. No OEM binaries are packaged;
+**SOURCE ONLY / NO INSTALL**.

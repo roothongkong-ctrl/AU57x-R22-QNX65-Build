@@ -380,6 +380,78 @@ int mu_cprx_client_begin(MuCprxClient *c,MuCprxService *s,uint64_t now){
 int mu_cprx_client_begin_stop(MuCprxClient *c,MuCprxService *s,uint64_t now){
  return client_begin_op(c,s,now,2);
 }
+/* R81: caller runs in original SI process; the DIO socket lives in an
+ * independent address space. Never copy or dereference a DIO service pointer.
+ * The endpoint MUST come from an independently authenticated OEM SI/DIO
+ * association, never from a message received on this socket. */
+int mu_cprx_client_begin_remote(MuCprxClient *c,
+ const MuCprxRemoteEndpoint *endpoint,unsigned op,uint64_t now){
+ struct sockaddr_un addr;
+ struct stat st,dir_st;
+ char dir[MU_CPRX_UNIX_PATH_MAX];
+ const char *slash;
+ size_t n,dir_len;
+ int fd,flags,rc;
+ uid_t uid;gid_t gid;
+ if(!c||c->phase||!endpoint||(op!=1&&op!=2)||
+    !endpoint->generation||!endpoint->epoch||!endpoint->session||
+    !endpoint->airplay_port||endpoint->airplay_port>65535||
+    !endpoint->si_owner_verified||!endpoint->dio_server_verified||
+    endpoint->si_owner_verified(endpoint->owner_ctx,endpoint->generation,
+          endpoint->epoch,endpoint->session)!=1)return -1;
+ for(n=0;n<sizeof endpoint->socket_path&&endpoint->socket_path[n];n++){}
+ /* Some QNX 6.5 libc builds lack strnlen(); this bound is exact. */
+ if(n<12||n>=sizeof addr.sun_path||endpoint->socket_path[0]!='/'||
+    strcmp(endpoint->socket_path+n-10,"/cprx.sock"))return -1;
+ slash=strrchr(endpoint->socket_path,'/');
+ if(!slash||slash==endpoint->socket_path)return -1;
+ dir_len=(size_t)(slash-endpoint->socket_path);
+ if(dir_len>=sizeof dir)return -1;
+ memcpy(dir,endpoint->socket_path,dir_len);dir[dir_len]=0;
+ /* Private path + pinned server effective owner. SI and DIO might use
+  * different OS accounts on the actual car: that remains unverified. */
+ if(lstat(dir,&dir_st)!=0||!S_ISDIR(dir_st.st_mode)||
+    (dir_st.st_mode&0777)!=0700||dir_st.st_uid!=endpoint->server_uid||
+    lstat(endpoint->socket_path,&st)!=0||!S_ISSOCK(st.st_mode)||
+    (st.st_mode&0777)!=0600||st.st_uid!=endpoint->server_uid)return -1;
+ fd=socket(AF_UNIX,SOCK_STREAM,0);
+ if(fd<0)return -1;
+ flags=fcntl(fd,F_GETFD);
+ if(flags<0||fcntl(fd,F_SETFD,flags|FD_CLOEXEC)<0||
+    nonblock(fd)||safe_send(fd)){close(fd);return -1;}
+ memset(&addr,0,sizeof addr);addr.sun_family=AF_UNIX;
+ memcpy(addr.sun_path,endpoint->socket_path,n+1);
+#ifdef __QNXNTO__
+ addr.sun_len=(unsigned char)SUN_LEN(&addr);
+ rc=connect(fd,(struct sockaddr*)&addr,(socklen_t)SUN_LEN(&addr));
+#else
+ rc=connect(fd,(struct sockaddr*)&addr,
+     (socklen_t)(offsetof(struct sockaddr_un,sun_path)+n+1));
+#endif
+ if(rc<0&&errno!=EINPROGRESS&&errno!=EAGAIN&&errno!=EWOULDBLOCK){
+  close(fd);return -1;
+ }
+ if(rc==0&&(!kernel_peer(fd,&uid,&gid)||
+     uid!=endpoint->server_uid||gid!=endpoint->server_gid||
+     endpoint->dio_server_verified(endpoint->owner_ctx,fd,
+       endpoint->generation,endpoint->epoch,endpoint->session)!=1)){
+  close(fd);return -1;
+ }
+ mu_cprx_client_init(c);
+ c->remote_mode=1;c->remote=*endpoint;
+ c->fd=fd;c->phase=rc<0?1:2;c->operation=op;
+ c->generation=endpoint->generation;
+ c->epoch=endpoint->epoch;c->session=endpoint->session;
+ c->deadline=now+6500;
+ memcpy(c->request,"CPRX",4);c->request[4]=3;c->request[5]=(unsigned char)op;
+ put32(c->request+8,endpoint->generation);
+ c->request[12]=(unsigned char)endpoint->airplay_port;
+ c->request[13]=(unsigned char)(endpoint->airplay_port>>8);
+ put32(c->request+16,(uint32_t)endpoint->epoch);
+ put32(c->request+20,(uint32_t)(endpoint->epoch>>32));
+ put32(c->request+24,endpoint->session);
+ return 0;
+}
 int mu_cprx_client_tick(MuCprxClient *c,uint64_t now){
  MuCprxService *s;
  uid_t uid;gid_t gid;
@@ -387,22 +459,41 @@ int mu_cprx_client_tick(MuCprxClient *c,uint64_t now){
  if(c->phase==5)return MU_CPRX_CLIENT_ERROR;
  if(c->phase==6)return MU_CPRX_CLIENT_BUSY;
  s=c->service;
- if(!s||s->generation!=c->generation||s->epoch!=c->epoch||
-    s->session!=c->session||!s->evidence.si_admitted||
-    s->evidence.si_admitted(s->evidence.opaque,s->generation,
-                           s->epoch,s->session)!=1)
-  return client_fail(c);
+ if(c->remote_mode){
+  const MuCprxRemoteEndpoint *e=&c->remote;
+  if(s||!e->si_owner_verified||!e->dio_server_verified||
+     e->generation!=c->generation||e->epoch!=c->epoch||
+     e->session!=c->session||
+     e->si_owner_verified(e->owner_ctx,e->generation,e->epoch,e->session)!=1)
+   return client_fail(c);
+ }else{
+  if(!s||s->generation!=c->generation||s->epoch!=c->epoch||
+     s->session!=c->session||!s->evidence.si_admitted||
+     s->evidence.si_admitted(s->evidence.opaque,s->generation,
+                            s->epoch,s->session)!=1)
+   return client_fail(c);
+ }
+ /* Remote DIO process ownership must remain independently verified; a
+  * successful connect and kernel UID alone are insufficient for a car. */
+ if(c->remote_mode&&c->phase>=2&&c->phase<=3&&
+    c->remote.dio_server_verified(c->remote.owner_ctx,c->fd,
+        c->generation,c->epoch,c->session)!=1)return client_fail(c);
  /* An old START ACK isn't permanent proof of a live SI session. A STOP
   * ACK must be backed by a completed native restoration, never only bytes. */
  if(c->phase==4){
-  if(c->operation==1&&(!s->started||!s->start_confirmed||
-                        s->terminal||s->backend_released))return client_fail(c);
-  if(c->operation==2&&!s->backend_released)return client_fail(c);
+  if(!c->remote_mode){
+   if(c->operation==1&&(!s->started||!s->start_confirmed||
+                         s->terminal||s->backend_released))return client_fail(c);
+   if(c->operation==2&&!s->backend_released)return client_fail(c);
+  }
+  /* For remote clients, an ACK reports what the authenticated DIO service
+   * confirmed at that instant, not continued streaming or a permanent lease. */
   return MU_CPRX_CLIENT_CONFIRMED;
  }
  if(now>=c->deadline||
-    (c->operation==1&&(s->terminal||s->backend_released))||
-    (c->operation==2&&s->backend_released&&c->phase!=3))
+    (!c->remote_mode&&
+      ((c->operation==1&&(s->terminal||s->backend_released))||
+       (c->operation==2&&s->backend_released&&c->phase!=3))))
   return client_fail(c);
  if(c->phase==1){
   int error=0;socklen_t n=(socklen_t)sizeof error;
@@ -411,7 +502,11 @@ int mu_cprx_client_tick(MuCprxClient *c,uint64_t now){
   if(error==EINPROGRESS||error==EALREADY)return MU_CPRX_CLIENT_PENDING;
   if(error)return client_fail(c);
   if(!kernel_peer(c->fd,&uid,&gid)||
-     uid!=s->peer_uid||gid!=s->peer_gid)return client_fail(c);
+     uid!=(c->remote_mode?c->remote.server_uid:s->peer_uid)||
+     gid!=(c->remote_mode?c->remote.server_gid:s->peer_gid)||
+     (c->remote_mode&&c->remote.dio_server_verified(
+         c->remote.owner_ctx,c->fd,c->generation,c->epoch,c->session)!=1))
+   return client_fail(c);
   c->phase=2;
  }
  if(c->phase==2){
@@ -443,8 +538,8 @@ int mu_cprx_client_tick(MuCprxClient *c,uint64_t now){
    return MU_CPRX_CLIENT_BUSY;
   }
   if(c->reply[5]!=0||
-     (c->operation==1&&(!s->start_confirmed||!s->started))||
-     (c->operation==2&&!s->backend_released))
+     (!c->remote_mode&&c->operation==1&&(!s->start_confirmed||!s->started))||
+     (!c->remote_mode&&c->operation==2&&!s->backend_released))
    return client_fail(c);
   close(c->fd);c->fd=-1;c->phase=4;
   return MU_CPRX_CLIENT_CONFIRMED;
