@@ -41,6 +41,9 @@ struct cp_cloud_owner {
  /* Actual running AP beacon/channel, before the iPhone associates.
   * Merely accepting ap_prepare() is not sufficient evidence. */
  int (*ap_hotspot_verified)(void *,uint32_t epoch,enum cp_radio_band);
+ /* Actual connected iPhone AirPlay/CarPlay session; not merely Bonjour
+  * advertisement or an open listening socket on port 5000. */
+ int (*airplay_session_connected)(void *,uint32_t epoch,const char *iface,unsigned port);
 };
 struct cp_cloud_pipeline {
  struct cp_step04_session *bootstrap;

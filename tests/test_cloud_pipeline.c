@@ -6,7 +6,7 @@
 #include <dlfcn.h>
 #include <string.h>
 static int wired=1,bt=1,cap5=1,cap24=1,ap=1,associated=1;
-static int single=1,bonjour=1,listener=1,inner=1,request=1;
+static int single=1,bonjour=1,listener=1,inner=1,request=1,phone_session=1;
 static int media[5]={0,1,1,1,1};
 static unsigned ap_calls=0,observed_port=0,native_start_calls=0;
 static int airplay_object,airplay_owner,airplay_start_key,airplay_stop_key,airplay_interface_key;
@@ -47,6 +47,9 @@ static int airplay_ok(void*ctx,uint32_t e,const char*name,unsigned port){
  (void)ctx;observed_port=port;
  return listener&&e==8&&!strcmp(name,"wlan0")&&port==5000;
 }
+static int session_connected(void*ctx,uint32_t e,const char *name,unsigned port){
+ (void)ctx;return phone_session&&e==8&&port==5000&&!strcmp(name,"wlan0");
+}
 static int inner_ok(void*ctx,uint32_t e){(void)ctx;return inner&&e==8;}
 static int media_ok(void*ctx,uint32_t e,enum cp_cloud_media id){
  (void)ctx;return e==8&&id>=CP_CLOUD_VIDEO&&id<=CP_CLOUD_STEERING&&media[id];
@@ -77,7 +80,8 @@ static void native_airplay(Mu34ApServer *ap){
  assert(mu34_ap_server_init(ap,&bind)==0);
 }
 static const struct cp_cloud_owner ops={0,owner,wd,caps,ap_start,ap_ok,
- ap_closed,cp_start,si,bonjour_ok,airplay_ok,inner_ok,media_ok,torn,running_ap};
+ ap_closed,cp_start,si,bonjour_ok,airplay_ok,inner_ok,media_ok,torn,running_ap,
+ session_connected};
 static void mocked_oem(struct cp_step04_session *s,struct cp_stock_mfi *stock,int authenticated){
  static int handle;
  memset(s,0,sizeof *s);memset(stock,0,sizeof *stock);
@@ -98,7 +102,7 @@ static void mocked_oem(struct cp_step04_session *s,struct cp_stock_mfi *stock,in
  s->auth.owner.peer_auth_succeeded=peer;
 }
 static void reset_fixture(void){
- wired=bt=cap5=cap24=ap=associated=single=bonjour=listener=inner=request=1;
+ wired=bt=cap5=cap24=ap=associated=single=bonjour=listener=inner=request=phone_session=1;
  for(int i=1;i<5;i++)media[i]=1;
  ap_calls=0;observed_port=0;native_start_calls=0;
 }
@@ -138,6 +142,9 @@ static void successful_dual_fallback(void){
  request=0;assert(cp_cloud_carplay_request(&s)==CP_CLOUD_PROOF);
  request=1;assert(cp_cloud_carplay_request(&s)==CP_CLOUD_OK);
  assert(cp_cloud_airplay_ready(&s,"../../etc")==CP_CLOUD_BAD);
+ phone_session=0;
+ assert(cp_cloud_airplay_ready(&s,"wlan0")==CP_CLOUD_PROOF);
+ phone_session=1;
  assert(cp_cloud_airplay_ready(&s,"wlan0")==CP_CLOUD_OK);
  inner=0;assert(cp_cloud_inner_auth(&s)==CP_CLOUD_PROOF);
  inner=1;assert(cp_cloud_inner_auth(&s)==CP_CLOUD_OK);
@@ -153,6 +160,8 @@ static void successful_dual_fallback(void){
  inner=1;assert(cp_cloud_is_active(&s));
  listener=0;assert(!cp_cloud_is_active(&s));
  listener=1;assert(cp_cloud_is_active(&s));
+ phone_session=0;assert(!cp_cloud_is_active(&s));
+ phone_session=1;assert(cp_cloud_is_active(&s));
  /* Cached media authorization is invalid after the live AP drops. */
  associated=0;assert(!cp_cloud_is_active(&s));
  associated=1;assert(cp_cloud_is_active(&s));
@@ -283,7 +292,12 @@ static void automatic_native_carplay_start(void){
  ack[8]=sum8(ack,8);
  assert(cp_lk_feed_bytes(&b.link,ack,sizeof ack,102)==CP_LK_OK);
  assert(!b.wireless_pending&&!b.link.outbound_pending);
- assert(cp_cloud_drive_start(&p,"wlan0",103)==CP_CLOUD_OK);
+ phone_session=0;
+ assert(cp_cloud_drive_start(&p,"wlan0",103)==CP_CLOUD_RETRY);
+ assert(p.handoff.phase==CP_HO_START_REQUESTED);
+ assert(cp_cloud_drive_start(&p,"wlan0",104)==CP_CLOUD_RETRY);
+ phone_session=1;
+ assert(cp_cloud_drive_start(&p,"wlan0",105)==CP_CLOUD_OK);
  assert(p.handoff.phase==CP_HO_AIRPLAY_SESSION);
  assert(cp_cloud_drive_start(&p,"wlan0",104)==CP_CLOUD_OK);
  assert(native_start_calls==1);

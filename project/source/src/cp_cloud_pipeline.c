@@ -72,7 +72,8 @@ int cp_cloud_begin(struct cp_cloud_pipeline *s,struct cp_step04_session *b,
     !ops->carplay_request_sent||!ops->si_single_owner||
     !ops->bonjour_identity_verified||!ops->airplay_listener_verified||
     !ops->inner_iap2_mfi_verified||!ops->media_verified||
-    !ops->teardown_confirmed||!ops->ap_hotspot_verified)return CP_CLOUD_BAD;
+    !ops->teardown_confirmed||!ops->ap_hotspot_verified||
+    !ops->airplay_session_connected)return CP_CLOUD_BAD;
  if(ops->wired_idle(ops->ctx)!=1||ops->bt_alive(ops->ctx,epoch,gen)!=1)
   return CP_CLOUD_PROOF;
  s->owner=*ops;s->bootstrap=b;s->epoch=epoch;s->bt_generation=gen;
@@ -264,6 +265,14 @@ int cp_cloud_drive_start(struct cp_cloud_pipeline *s,const void *iface_cf,
  if(!s||!s->started||s->stopped)return CP_CLOUD_BAD;
  if(s->handoff.phase>=CP_HO_AIRPLAY_SESSION&&
     s->handoff.phase<=CP_HO_MEDIA_ACTIVE)return CP_CLOUD_OK;
+ /* iPhone can ACK 4301 before connecting the IP AirPlay media channel.
+  * Subsequent owner ticks must WAIT for the confirmed client session. */
+ if(s->handoff.phase==CP_HO_START_REQUESTED){
+  if(!eligible(s,1))return stop(s);
+  if(!s->airplay||s->airplay->generation!=s->epoch)return CP_CLOUD_PROOF;
+  r=cp_cloud_airplay_ready(s,mu34_ap_server_interface(s->airplay));
+  return r==CP_CLOUD_PROOF?CP_CLOUD_RETRY:r;
+ }
  if(s->handoff.phase!=CP_HO_WIFI_ASSOCIATED)return CP_CLOUD_ORDER;
  if(!s->bootstrap||!s->bootstrap->wireless_bound||
     s->bootstrap->wireless_ctx!=s||
@@ -303,7 +312,8 @@ int cp_cloud_airplay_ready(struct cp_cloud_pipeline *s,const char *iface){
   return CP_CLOUD_PROOF;
  if(s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1||
     s->owner.bonjour_identity_verified(s->owner.ctx,s->epoch,iface)!=1||
-    s->owner.airplay_listener_verified(s->owner.ctx,s->epoch,iface,CP_CLOUD_PORT)!=1)
+    s->owner.airplay_listener_verified(s->owner.ctx,s->epoch,iface,CP_CLOUD_PORT)!=1||
+    s->owner.airplay_session_connected(s->owner.ctx,s->epoch,iface,CP_CLOUD_PORT)!=1)
   return CP_CLOUD_PROOF;
  if(cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_AIRPLAY_SESSION_CREATED,1)!=CP_HO_OK)
   return stop(s);
@@ -387,6 +397,8 @@ int cp_cloud_is_active(const struct cp_cloud_pipeline *s){
     mu34_ap_server_state(s->airplay)!=MU34_AP_LISTENING_VERIFIED||
     !s->owner.airplay_listener_verified||
     s->owner.airplay_listener_verified(s->owner.ctx,s->epoch,s->iface,CP_CLOUD_PORT)!=1||
+    !s->owner.airplay_session_connected||
+    s->owner.airplay_session_connected(s->owner.ctx,s->epoch,s->iface,CP_CLOUD_PORT)!=1||
     !s->owner.bonjour_identity_verified||
     s->owner.bonjour_identity_verified(s->owner.ctx,s->epoch,s->iface)!=1)
   return 0;
