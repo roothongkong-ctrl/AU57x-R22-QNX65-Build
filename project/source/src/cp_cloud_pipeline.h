@@ -74,6 +74,12 @@ int cp_cloud_prepare_receiver(struct cp_cloud_pipeline *,const void *cf_interfac
 /* Confirms the authenticated 0x4301 reached link ACK, not merely an
  * externally asserted 'request sent' flag. */
 int cp_cloud_carplay_request(struct cp_cloud_pipeline *);
+/* Call periodically on original OEM owner thread during WIFI_ASSOCIATED.
+ * Starts the genuine AirPlay receiver once, pumps the existing iAP2 link,
+ * waits for 4301 peer ACK, then advances to native AirPlay session state.
+ * Never creates a background thread or a synthetic transport. */
+int cp_cloud_drive_start(struct cp_cloud_pipeline *,const void *cf_interface,
+                         uint64_t now_ms);
 int cp_cloud_airplay_ready(struct cp_cloud_pipeline *,const char *observed_interface);
 int cp_cloud_inner_auth(struct cp_cloud_pipeline *);
 int cp_cloud_media_ready(struct cp_cloud_pipeline *);

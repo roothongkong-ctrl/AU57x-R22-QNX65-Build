@@ -9,6 +9,15 @@ static int media[5]={0,1,1,1,1};
 static unsigned ap_calls=0,observed_port=0,native_start_calls=0;
 static int airplay_object,airplay_owner,airplay_start_key,airplay_stop_key,airplay_interface_key;
 static int owner(void*ctx,uint32_t e,uint32_t g){(void)ctx;return bt&&e==8&&g==4;}
+static int ack_wireless(void*ctx,uint32_t token){
+ struct cp_step04_session *s=ctx;
+ if(!s||!s->wireless_pending||s->wireless_token!=token)return -1;
+ s->wireless_pending=0;s->wireless_token=0;return 0;
+}
+static uint8_t sum8(const uint8_t*p,size_t n){
+ uint8_t x=0;for(size_t i=0;i<n;i++)x=(uint8_t)(x+p[i]);
+ return (uint8_t)(0u-x);
+}
 static int stock_owner(void*ctx){(void)ctx;return 1;}
 static void release_oem(void*ctx,void*ptr){(void)ctx;(void)ptr;}
 static int wd(void*ctx){(void)ctx;return wired;}
@@ -227,5 +236,57 @@ static void radio_to_airplay_proof(void){
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==0);
  assert(cp_cloud_end(&p)==CP_CLOUD_OK);
 }
-int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();
+static void automatic_native_carplay_start(void){
+ struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
+ Mu34ApServer real_ap;
+ static const uint8_t mac[6]={1,2,3,4,5,6};
+ static const uint16_t sent[]={0xaa01,0xaa03,0x5703,0x4301};
+ static const uint16_t recv[]={0xaa00,0xaa02,0xaa05,0x5702,0x4300};
+ static const char *const ip[]={"10.0.0.1"};
+ static const struct cp_session config={
+  .wifi={.ssid="AUDI_AUTO",.passphrase="test-review",.security=2,.channel=6},
+  .ip_addresses=ip,.ip_address_count=1,.airplay_port=5000,
+  .public_key="test-review",.source_version="test-review"
+ };
+ static const struct cp_identification identity={
+  .name="Review",.model="MU1005",.manufacturer="Audi",
+  .serial="not-real",.firmware="MU1005",.hardware="lab",
+  .bluetooth_name="review-bt",.wireless_ssid="AUDI_AUTO",
+  .bluetooth_mac6=mac,.accessory_messages=sent,.phone_messages=recv,
+  .accessory_message_count=4,.phone_message_count=5
+ };
+ reset_fixture();mocked_oem(&b,&stock,1);cp_cloud_init(&p);
+ b.link.phase=CP_LK_IDLE;
+ assert(cp_cloud_bind_bootstrap(&p,&b,&config,&identity)==CP_CLOUD_OK);
+ b.link.phase=CP_LK_NORMAL;
+ b.link.epoch=8;b.link.tx_psn=99;b.link.owner.opaque=&b;b.link.owner.live=owner;
+ b.link.owner.acked=ack_wireless;
+ assert(cp_cloud_begin(&p,&b,&ops,8,4)==CP_CLOUD_OK);
+ assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_OK);
+ native_airplay(&real_ap);
+ assert(cp_cloud_bind_airplay(&p,&real_ap)==CP_CLOUD_OK);
+ b.identity_accepted=1; /* simulated phone 1D02, no OEM identity fabricated */
+ assert(cp_cloud_drive_start(&p,"wlan0",100)==CP_CLOUD_RETRY);
+ assert(native_start_calls==1&&b.wireless.start_sent==0);
+ /* 4300 arrived: queued authentic iAP2 4301 on the existing link. */
+ b.wireless.availability_seen=1;b.wireless.wireless_available=1;
+ assert(cp_cloud_drive_start(&p,"wlan0",101)==CP_CLOUD_RETRY);
+ assert(b.wireless.start_sent==1&&b.wireless_pending&&b.link.outbound_pending);
+ assert(b.link.outbound_seq==100);
+ assert(native_start_calls==1);
+ /* Simulate the peer's REAL iAP2 ACK wire envelope; not owner assertion. */
+ uint8_t ack[9]={0xff,0x5a,0,9,0x40,0,100,0,0};
+ ack[8]=sum8(ack,8);
+ assert(cp_lk_feed_bytes(&b.link,ack,sizeof ack,102)==CP_LK_OK);
+ assert(!b.wireless_pending&&!b.link.outbound_pending);
+ assert(cp_cloud_drive_start(&p,"wlan0",103)==CP_CLOUD_OK);
+ assert(p.handoff.phase==CP_HO_AIRPLAY_SESSION);
+ assert(cp_cloud_drive_start(&p,"wlan0",104)==CP_CLOUD_OK);
+ assert(native_start_calls==1);
+ assert(cp_cloud_wired_preempt(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_end(&p)==CP_CLOUD_OK);
+}
+int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();
  puts("AU57X_R47_CLOUD_04_05_06_07_08_09_OWNER_GATES_PASS");return 0;}

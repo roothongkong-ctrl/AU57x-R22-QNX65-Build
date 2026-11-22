@@ -205,6 +205,30 @@ int cp_cloud_carplay_request(struct cp_cloud_pipeline *s){
  return cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_CARPLAY_START_SENT,1)==CP_HO_OK?
    CP_CLOUD_OK:CP_CLOUD_ORDER;
 }
+int cp_cloud_drive_start(struct cp_cloud_pipeline *s,const void *iface_cf,
+                         uint64_t now){
+ int r,t;
+ if(!s||!s->started||s->stopped)return CP_CLOUD_BAD;
+ if(s->handoff.phase>=CP_HO_AIRPLAY_SESSION&&
+    s->handoff.phase<=CP_HO_MEDIA_ACTIVE)return CP_CLOUD_OK;
+ if(s->handoff.phase!=CP_HO_WIFI_ASSOCIATED)return CP_CLOUD_ORDER;
+ if(!s->bootstrap||!s->bootstrap->wireless_bound||
+    s->bootstrap->wireless_ctx!=s||
+    s->bootstrap->wireless_proof!=actual_wireless_proof)return CP_CLOUD_PROOF;
+ r=cp_cloud_prepare_receiver(s,iface_cf);
+ if(r!=CP_CLOUD_OK)return r;
+ t=cp_s4_tick(s->bootstrap,now);
+ if(t==CP_LK_BACKPRESSURE)return CP_CLOUD_RETRY;
+ if(t!=CP_LK_OK)return stop(s);
+ if(!s->bootstrap->wireless.start_sent||
+    s->bootstrap->wireless_pending||s->bootstrap->link.outbound_pending)
+  return CP_CLOUD_RETRY;
+ r=cp_cloud_carplay_request(s);
+ if(r==CP_CLOUD_PROOF)return CP_CLOUD_RETRY;
+ if(r!=CP_CLOUD_OK)return r;
+ r=cp_cloud_airplay_ready(s,mu34_ap_server_interface(s->airplay));
+ return r==CP_CLOUD_PROOF?CP_CLOUD_RETRY:r;
+}
 static int iface_ok(const char *p){
  size_t i;
  if(!p)return 0;
