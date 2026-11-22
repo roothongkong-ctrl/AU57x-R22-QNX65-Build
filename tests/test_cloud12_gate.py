@@ -44,7 +44,7 @@ class EvidenceGateTest(unittest.TestCase):
         self.assertTrue(any("Cannot inspect tracked files" in e for e in errs),errs)
     def test_git_index_rejects_oem_binary(self):
         (self.root/".git").mkdir()
-        indexed=subprocess.CompletedProcess(["git","ls-files"],0,stdout=b"src/bridge.c\\x00private/oem_btstack.so\\x00",stderr=b"")
+        indexed=subprocess.CompletedProcess(["git","ls-files"],0,stdout=b"src/bridge.c\x00private/oem_btstack.so\x00",stderr=b"")
         with patch("cloud12_gate.subprocess.run",return_value=indexed):
             errs,_=audit(self.root)
         self.assertTrue(any("Binary/key files tracked" in e for e in errs),errs)
