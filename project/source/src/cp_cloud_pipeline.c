@@ -107,6 +107,59 @@ int cp_cloud_bind_airplay(struct cp_cloud_pipeline *s,Mu34ApServer *ap){
   return CP_CLOUD_PROOF;
  s->airplay=ap;return CP_CLOUD_OK;
 }
+/* R69: use the original DIO singleton, typed native CF objects and owner
+ * dispatch queue. This code does not load an OEM image or invent an owner. */
+static int native_valid(struct cp_cloud_pipeline *p){
+ MuDioNative *n;
+ if(!p||!(n=p->native_dio)||!n->initialized||!n->server||
+    !n->manager||!n->handle||!n->iface||!n->get_queue||!n->queue||
+    !n->server_slot||*n->server_slot!=n->server||
+    n->get_queue(n->server)!=n->queue||!n->guard.verified_library||
+    n->guard.verified_library(n->guard.opaque,n->handle)!=1||
+    !n->guard.owner_exclusive||
+    n->guard.owner_exclusive(n->guard.opaque,n->server,n->manager)!=1||
+    !n->ap.binding.cf_string_ok||
+    n->ap.binding.cf_string_ok(n,n->iface)!=1||
+    n->ap.binding.opaque!=n||n->ap.binding.server!=n->server||
+    n->ap.binding.owner!=n->manager||n->ap.generation!=p->epoch||
+    p->airplay!=&n->ap)return 0;
+ return 1;
+}
+int cp_cloud_bind_native_dio(struct cp_cloud_pipeline *p,MuDioNative *n){
+ if(!p||!n||!p->started||p->stopped||p->airplay||p->native_dio||
+    !n->initialized||n->ap.generation!=p->epoch||
+    n->ap.state!=MU34_AP_BOUND||!n->queue||!n->get_queue||
+    !n->server_slot||!n->server||!n->manager||!n->iface||
+    !n->guard.verified_library||!n->guard.owner_exclusive||
+    !n->ap.binding.cf_string_ok||
+    n->guard.verified_library(n->guard.opaque,n->handle)!=1||
+    n->guard.owner_exclusive(n->guard.opaque,n->server,n->manager)!=1||
+    *n->server_slot!=n->server||n->get_queue(n->server)!=n->queue||
+    n->ap.binding.opaque!=n||n->ap.binding.server!=n->server||
+    n->ap.binding.owner!=n->manager||
+    n->ap.binding.cf_string_ok(n,n->iface)!=1)return CP_CLOUD_PROOF;
+ p->native_dio=n;p->airplay=&n->ap;
+ return CP_CLOUD_OK;
+}
+int cp_cloud_drive_native(struct cp_cloud_pipeline *p,uint64_t now){
+ if(!p||!p->native_dio)return CP_CLOUD_BAD;
+ if(!native_valid(p))return stop(p);
+ return cp_cloud_drive_start(p,p->native_dio->iface,now);
+}
+/* Accept native stop only after the OEM confirms cleanup and original
+ * interface restoration; preserve owner for retries otherwise. */
+static int native_restore(struct cp_cloud_pipeline *p){
+ int r;
+ if(!p||!p->native_dio)return CP_CLOUD_OK;
+ if(!p->native_dio->initialized){
+  p->native_dio=0;p->airplay=0;return CP_CLOUD_OK;
+ }
+ r=mu_dio_restore(p->native_dio);
+ if(r==1)return CP_CLOUD_RETRY;
+ if(r!=0)return CP_CLOUD_PROOF;
+ p->native_dio=0;p->airplay=0;
+ return CP_CLOUD_OK;
+}
 int cp_cloud_confirm_bootstrap_auth(struct cp_cloud_pipeline *s){
  int cap24,cap5;
  if(!eligible(s,1))return stop(s);
@@ -285,16 +338,24 @@ int cp_cloud_bt_closed(struct cp_cloud_pipeline *s,uint32_t gen){
  return CP_CLOUD_OK;
 }
 int cp_cloud_wired_preempt(struct cp_cloud_pipeline *s){
+ int restored=CP_CLOUD_OK;
  if(!s)return CP_CLOUD_BAD;
+ /* Attempt OEM restore BEFORE giving up the exclusive wireless owner.
+  * If it remains pending, revoke wireless now but report incomplete cleanup. */
  if(s->started&&!s->stopped){
+  restored=native_restore(s);
   s->stopped=1;
   if(s->radio.epoch)(void)cp_radio_revoke(&s->radio,s->epoch,1);
   if(s->bootstrap)cp_s4_revoke(s->bootstrap);
  }
- return cp_ho_wired_takeover(&s->handoff,1)==CP_HO_OK?CP_CLOUD_OK:CP_CLOUD_ORDER;
+ if(cp_ho_wired_takeover(&s->handoff,1)!=CP_HO_OK)return CP_CLOUD_ORDER;
+ return restored;
 }
 int cp_cloud_end(struct cp_cloud_pipeline *s){
+ int r;
  if(!s||!s->started||!s->epoch)return CP_CLOUD_BAD;
+ r=native_restore(s);
+ if(r!=CP_CLOUD_OK)return r;
  if(s->owner.teardown_confirmed(s->owner.ctx,s->epoch)!=1)return CP_CLOUD_PROOF;
  if(s->handoff.phase!=CP_HO_TEARDOWN&&s->handoff.phase!=CP_HO_WIRED)
   (void)cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_FAILURE,1);

@@ -8,6 +8,7 @@
 #include "cp_radio_policy.h"
 #include "cp_session_handoff.h"
 #include "mu1005_r34_ap_server.h"
+#include "native_exports.h"
 #include <stddef.h>
 #include <stdint.h>
 #define CP_CLOUD_IFACE_MAX 16u
@@ -45,6 +46,8 @@ struct cp_cloud_pipeline {
  struct cp_step04_session *bootstrap;
  struct cp_radio_policy radio;
  Mu34ApServer *airplay;
+ /* When present, genuine same-process DIO backend owns this receiver. */
+ MuDioNative *native_dio;
  struct cp_handoff handoff;
  struct cp_cloud_owner owner;
  uint32_t epoch,bt_generation;
@@ -57,6 +60,11 @@ int cp_cloud_begin(struct cp_cloud_pipeline *,struct cp_step04_session *,
                    const struct cp_cloud_owner *,uint32_t epoch,uint32_t bt_generation);
 /* Requires exact known OEM AirPlay backend; never a different-firmware donor. */
 int cp_cloud_bind_airplay(struct cp_cloud_pipeline *,Mu34ApServer *);
+/* Bind original MU1005 AirPlay singleton + SI owner, verified by
+ * mu_dio_bind_interface() INSIDE the original OEM process and thread. */
+int cp_cloud_bind_native_dio(struct cp_cloud_pipeline *,MuDioNative *);
+/* Advance R68 using binder-created native CFString, never guessed names. */
+int cp_cloud_drive_native(struct cp_cloud_pipeline *,uint64_t now_ms);
 /* Bind the *one* original-MFI iAP2 link, identity and current AP config while
  * the Bluetooth link is IDLE. The resulting proof callback reads real owner
  * and receiver state, not caller-provided synthetic readiness booleans. */

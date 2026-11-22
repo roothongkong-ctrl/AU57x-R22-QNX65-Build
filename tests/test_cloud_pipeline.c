@@ -2,6 +2,8 @@
 #include "cp_cloud_pipeline.h"
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <dlfcn.h>
 #include <string.h>
 static int wired=1,bt=1,cap5=1,cap24=1,ap=1,associated=1;
 static int single=1,bonjour=1,listener=1,inner=1,request=1;
@@ -288,5 +290,111 @@ static void automatic_native_carplay_start(void){
  assert(cp_cloud_wired_preempt(&p)==CP_CLOUD_OK);
  assert(cp_cloud_end(&p)==CP_CLOUD_OK);
 }
-int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();
+
+/* Symbols exported by test binary are the names resolved by the R69 native
+ * binder, but implementations below are isolated host FIXTURES, not OEM. */
+struct fake_cf {uint32_t marker;char text[64];};
+static int native_owner_ok=1,native_listener=0,native_stop_pending=0;
+static int queue_object,native_stop_calls=0;
+static char current_native_iface[32]="eth0";
+void *gAirPlayReceiverServer=&airplay_object;
+unsigned long CFStringGetTypeID(void){return 0x51ul;}
+unsigned long AirPlayReceiverServerGetTypeID(void){return 0x52ul;}
+unsigned long CFGetTypeID(const void *p){
+ if(p==&airplay_object)return 0x52ul;
+ return p&&((const struct fake_cf *)p)->marker==0x46543132u?0x51ul:0;
+}
+void *CFStringCreateWithCString(const void *allocator,const char *value,unsigned int encoding){
+ struct fake_cf *str;
+ (void)allocator;
+ if(!value||encoding!=0x08000100u||strlen(value)>=64)return NULL;
+ str=malloc(sizeof *str);if(!str)return NULL;
+ str->marker=0x46543132u;strcpy(str->text,value);return str;
+}
+unsigned char CFStringGetCString(const void *cf,char *out,long cap,unsigned int encoding){
+ const struct fake_cf *str=cf;
+ if(!str||CFGetTypeID(cf)!=CFStringGetTypeID()||!out||cap<1||
+    encoding!=0x08000100u||strlen(str->text)+1>(size_t)cap)return 0;
+ strcpy(out,str->text);return 1;
+}
+void CFRelease(const void *cf){assert(CFGetTypeID(cf)==CFStringGetTypeID());free((void *)cf);}
+void *AirPlayReceiverServerGetDispatchQueue(void *server){
+ return server==&airplay_object?&queue_object:NULL;
+}
+int AirPlayReceiverServerSetProperty(void *server,unsigned int flags,
+    const void *key,const void *qualifier,const void *value){
+ const struct fake_cf *k=key,*v=value;
+ if(server!=&airplay_object||flags||qualifier||
+    CFGetTypeID(key)!=CFStringGetTypeID()||
+    CFGetTypeID(value)!=CFStringGetTypeID()||
+    strcmp(k->text,"interfaceName"))return -1;
+ strcpy(current_native_iface,v->text);return 0;
+}
+int AirPlayReceiverServerControl(void *server,unsigned int flags,
+  const void *command,const void *qualifier,const void *value,void **response){
+ const struct fake_cf *cmd=command;
+ if(server!=&airplay_object||flags!=1||qualifier||value||response||
+    CFGetTypeID(command)!=CFStringGetTypeID())return -1;
+ if(!strcmp(cmd->text,"startServer")){
+  native_start_calls++;native_listener=1;return 0;
+ }
+ if(!strcmp(cmd->text,"stopServer")){
+  native_stop_calls++;native_listener=0;native_stop_pending=1;return 0;
+ }
+ return -1;
+}
+static int native_lib(void *ctx,void *h){return ctx==NULL&&h&&native_owner_ok;}
+static int native_owner(void *ctx,void *server,const void *manager){
+ return ctx==NULL&&server==&airplay_object&&manager==&airplay_owner&&
+        native_owner_ok&&wired&&single;
+}
+static int native_listening(void *ctx,void *server,const void *manager,unsigned port){
+ return native_owner(ctx,server,manager)&&native_listener&&port==5000;
+}
+static int native_stopped(void *ctx,void *server,const void *manager){
+ if(!native_owner(ctx,server,manager)||native_listener)return -1;
+ if(native_stop_pending){native_stop_pending=0;return 0;}
+ return 1;
+}
+static int native_interface(void *ctx,void *server,const void *manager,const char *iface){
+ return native_owner(ctx,server,manager)&&
+    !strcmp(iface,current_native_iface);
+}
+static void native_dio_bound_pipeline(void){
+ struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
+ MuDioNative native={0};
+ const MuDioGuard guard={NULL,native_lib,native_owner,native_listening,
+                         native_stopped,native_interface};
+ void *h=dlopen(NULL,RTLD_NOW);assert(h);
+ reset_fixture();native_owner_ok=1;native_listener=0;native_stop_pending=0;
+ native_stop_calls=0;strcpy(current_native_iface,"eth0");
+ mocked_oem(&b,&stock,1);cp_cloud_init(&p);
+ assert(cp_cloud_begin(&p,&b,&ops,8,4)==CP_CLOUD_OK);
+ assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_OK);
+ assert(cp_cloud_drive_native(&p,3)==CP_CLOUD_BAD);
+ native_owner_ok=0;
+ assert(mu_dio_bind_interface(&native,h,&airplay_object,&airplay_owner,
+                              8,&guard,"eth0","wlan0")==-1);
+ native_owner_ok=1;
+ assert(mu_dio_bind_interface(&native,h,&airplay_object,&airplay_owner,
+                              8,&guard,"eth0","wlan0")==0);
+ assert(native.initialized);
+ assert(cp_cloud_bind_native_dio(&p,&native)==CP_CLOUD_OK);
+ assert(cp_cloud_bind_native_dio(&p,&native)==CP_CLOUD_PROOF);
+ assert(cp_cloud_drive_native(&p,10)==CP_CLOUD_PROOF); /* no wireless */
+ assert(cp_cloud_prepare_receiver(&p,native.iface)==CP_CLOUD_OK);
+ assert(native_start_calls==1&&!strcmp(current_native_iface,"wlan0"));
+ assert(cp_cloud_prepare_receiver(&p,native.iface)==CP_CLOUD_OK);
+ assert(native_start_calls==1);
+ /* First shutdown returns pending: never free the OEM singleton early. */
+ assert(cp_cloud_end(&p)==CP_CLOUD_RETRY);
+ assert(native.initialized&&native_stop_calls==1);
+ assert(cp_cloud_end(&p)==CP_CLOUD_OK);
+ assert(!native.initialized&&native_stop_calls==1);
+ assert(!strcmp(current_native_iface,"eth0"));
+ dlclose(h);
+}
+int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();
  puts("AU57X_R47_CLOUD_04_05_06_07_08_09_OWNER_GATES_PASS");return 0;}
