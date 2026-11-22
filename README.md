@@ -1,3 +1,7 @@
+## R91 FAST-CONNECT EXPERIMENT (2026-11-22)
+
+User-priority change: attempt stock MU1005 Bluetooth iAP2 first connection as early as possible. See `docs/R91_FAST_CONNECT_CN.md`. R91 adds an **opt-in, unverified RFCOMM argument-0 trial** (`AU57X_FAST_CONNECT_EXPERIMENT=1`) only if the original owner does not provide a verified argument. Original MFi and iAP2 protocol gating remain intact. This is a compiled research source; **it does not contain a usable btstack loader, is not a working wireless CarPlay implementation, and is NOT INSTALLABLE**.
+
 ## R90 / Original MU1005 Bluetooth iAP2 handshake readiness (2026-11-22) — SOURCE ONLY
 
 R90 fixes a genuine R89 integration bug: **RFCOMM CONNECT was being reported as iAP2 `LINK_READY` before an iAP2 handshake even began**. The R45 socket-to-R44 `cp_wcp_r45_remote` path now requires a live authenticated original transport **and** the completed R44 peer iAP2 `SYN/LSP/ACK` (`CP_LK_NORMAL` + `have_peer_syn`). R44 original MFi `AA00..AA05` is still a distinct *mandatory* authentication step before wireless CarPlay begins.

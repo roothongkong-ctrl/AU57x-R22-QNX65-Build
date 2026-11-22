@@ -1,0 +1,8 @@
+AU57x R91 — FAST RFCOMM experiment (experimental branch)
+Baseline: MHI2_CN_AU57x_K1006_2/MU1005, QNX 6.5 ARMv7
+New native C units: 39 (R90 38 + rf_arg_experiment.c)
+Opt-in GCC: AU57X_FAST_CONNECT_EXPERIMENT=1 (QNX trial branch only)
+Fast mode: when original iAP2 RFCOMM argument is unknown, TRY zero as used in documented MHI2Q server-first donor. Exact MU1005 meaning not yet verified. Verified OEM callback takes precedence.
+Aims: remove one software stop condition for offline trial builds; no Apple MFi bypass.
+Still missing: actual original btstack loader/owner binding, real connected iPhone, actual MFi, AirPlay, media, SD install/rollback.
+Experimental compiled source REVIEW ONLY, NO_INSTALL, safe_to_flash=false, installable=false, vehicle_verified=false.

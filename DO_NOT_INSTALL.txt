@@ -1,0 +1,1 @@
+R91 is experimental SOURCE CODE only. Do NOT install in an Audi MMI or overwrite the original btstack. AU57X_FAST_CONNECT_EXPERIMENT=1 tries unknown original RFCOMM argument zero; real QNX owner/startup binding is not included. Original Apple MFi and iAP2 still required. USB CarPlay should be preserved. vehicle_verified=false, installable=false, safe_to_flash=false.
