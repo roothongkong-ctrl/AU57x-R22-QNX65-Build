@@ -127,8 +127,8 @@
     },
     {
       "path": "ci/host_bt_preload_probe.sh",
-      "sha256": "1b18182b060d45f0100735e91e28019ac9ce695d6ce824b9556ec3424326e36b",
-      "bytes": 2035
+      "sha256": "d7721503fa08145b602f4bcdb5a195ed5b330488868df3f31f4444e9521400b2",
+      "bytes": 2075
     },
     {
       "path": "ci/host_cloud_media.sh",
@@ -567,8 +567,8 @@
     },
     {
       "path": "project/source/legacy_mu1005/bluetooth/bt_preload_probe.c",
-      "sha256": "4b0dd90ff2fce70cd21510b48ff1b72358a56dae4efe135323bdd5b0d9f9d6c9",
-      "bytes": 4029
+      "sha256": "cbc982fb7fc9904c62fe964fcae4d2ccbc98f5438eaca048273d11d0dbe09306",
+      "bytes": 4053
     },
     {
       "path": "project/source/legacy_mu1005/bluetooth/bt_preload_probe.h",

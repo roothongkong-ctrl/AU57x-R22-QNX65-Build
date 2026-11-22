@@ -45,7 +45,7 @@ static void log_one(const char *event,uintptr_t callsite,uintptr_t start,int mat
  event,(long)getpid(),(unsigned long)callsite,(unsigned long)start,matched);
  if(n<=0||n>=(int)sizeof line)return;
  fd=open(BT_PROBE_LOG,O_WRONLY|O_CREAT|O_APPEND,0600);
- if(fd>=0){(void)write(fd,line,(size_t)n);(void)close(fd);}
+ if(fd>=0){ssize_t written=write(fd,line,(size_t)n);(void)written;(void)close(fd);}
 }
 static void log_failure(const char *event){
  /* No OEM API calls or log of sensitive MACs in a rejected process. */
