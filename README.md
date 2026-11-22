@@ -1,3 +1,13 @@
+## R89 / MU1005 original btstack cross-process RF bridge (2026-11-22) — SOURCE ONLY
+
+R89 fixes the R88 cross-process pointer assumption by connecting the actual **R45 RFCOMM normalized TCP frames (127.0.0.1:57342)** through the existing R44 socket/iAP2/MFi state machine to a new `cp_wcp_r45_remote.[ch]` adapter. The transport proof checks an accepted local socket, original owner, independent paired MAC, server publication, same generation, and wired priority continuously. Existing R44 MFi proofs are still necessary; a test owner or socket frame never authenticates the phone.
+
+Original user-owned MU1005 `btstack` ARM calls establish that the OEM RFCOMM register third argument differs across services (HFP=7, SIM=4). It is *not known* for iAP2. The former R45 literal zero is replaced by a mandatory original-owner `iap2_profile_proven()` callback that fails closed when absent, with no HFP/SIM guess. Private binaries are not redistributed. See `docs/R89_REAL_BTSTACK_TO_R44_R87_CN.md`, `docs/R89_MU1005_RFCOMM_REGISTER_CALLERS.json`.
+
+Run `bash ci/host_wcp_r45_remote.sh` and `python3 -m unittest discover -s tests -p test_mu1005_rf_register_sites.py -v`. **Still missing actual btstack process/SDK event owner binding, proven iAP2 registration mode and real iPhone/MFi exchange. `vehicle_verified=false`, `installable=false`, `safe_to_flash=false`.**
+
+---
+
 ## R88 / MU1005 original Bluetooth path (2026-11-22) — SOURCE ONLY
 
 R88 now compares the **user-owned, SHA256-pinned actual MU1005** `btstack` and `bluetooth` against the public MU0678 `IapDevice`/`IapServices` trace (https://github.com/joeyQuery/MHI2-wirelessCarPlay). The original MU1005 Bluetooth control binary has `bluetooth.enableIap` and `SERVICETYPE_IAP2`, while the original MU1005 `btstack` lacks **literal** `IapDevice`, `IapServices`, `/dev/iapDevice`, `CIapBTChannel` identifiers. The native stock RFCOMM/SDP and existing OBEX client paths **are** found. This does not prove that MU1005 lacks a dynamically formed iAP2 endpoint or that the native client-open ABI is known. Pinned ARM entry-word check: 40/40. OEM binaries stay private. See `docs/R88_MU1005_BT_IAP_PATH_CN.md` and the reproducible JSON.

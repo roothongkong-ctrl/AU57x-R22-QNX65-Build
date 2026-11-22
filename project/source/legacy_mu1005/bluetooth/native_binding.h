@@ -9,6 +9,10 @@ typedef struct {
  int (*transport_ready)(void *); /* authenticated local endpoint ready */
  int (*read_live)(void *,uint32_t,void *,size_t); /* callback-scoped checked read */
  int (*paired_authorized)(void *,uint32_t,const uint8_t[6]);
+ /* OEM owner must provide independently proven iAP2 RFCOMM registration
+  * profile/mode. HFP=7 and SIM=4 are NOT iAP2 values.
+  * 1=verified, 0=unverified/deny. Never default to zero. */
+ int (*iap2_profile_proven)(void *,uint8_t *profile);
 } MuBtOwner;
 /* On QNX ARM32, resolve fixed ABI only for the pinned reference executable.
  * On other hosts returns -1 without reading/calling any native address.
