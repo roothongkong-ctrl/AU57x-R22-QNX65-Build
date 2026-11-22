@@ -35,6 +35,11 @@ typedef struct {
  int (*si_inner_iap2_mfi)(void *,uint32_t generation,uint64_t epoch,uint32_t session);
  int (*si_media_channel)(void *,uint32_t generation,uint64_t epoch,uint32_t session,
                          unsigned channel); /* 1 video, 2 audio, 3 MMI, 4 steering */
+ /* R85: INDEPENDENT DIO original-owner wired transition, for the SAME
+  * receiver lease. Never derive from SI's wire data, SI USB events alone,
+  * a root UID or global media flag. Missing callback = DENY op 12. */
+ int (*dio_wired_takeover_verified)(void *,uint32_t generation,
+                                  uint64_t epoch,uint32_t session);
 } MuCprxEvidence;
 /* One backend owns the entire receiver lifecycle for this generation.
  * Caller supplies real verified owner callbacks, never synthetic readiness.
@@ -116,6 +121,9 @@ int mu_cprx_shutdown(MuCprxService *);
  * reserved[1], generation[4], epoch[8], session[4].
  * Proof is a SNAPSHOT, not a renewable authorization or OEM validation. */
 #define MU_CPRX_OP_SESSION_STATUS 11u
+/* R85: opt-in DIO forced restore after BOTH original SI/DIO independently
+ * verify physical wired takeover. No listener/media state can authorize it. */
+#define MU_CPRX_OP_WIRED_RESTORE 12u
 /* R81: process-separated SI client endpoint. This is a snapshot of an
  * existing DIO process's socket identity, NOT a pointer to DIO's address
  * space. The two independently observed owner callbacks are mandatory. */
@@ -129,13 +137,16 @@ typedef struct {
  void *owner_ctx;
  int (*si_owner_verified)(void *,uint32_t,uint64_t,uint32_t);
  int (*dio_server_verified)(void *,int,uint32_t,uint64_t,uint32_t);
+ /* R85: real SI-side physical wired takeover proof, separate from DIO's
+  * independently checked evidence. Required only for op 12. */
+ int (*si_wired_takeover_verified)(void *,uint32_t,uint64_t,uint32_t);
 } MuCprxRemoteEndpoint;
 typedef struct {
  MuCprxService *service;
  MuCprxRemoteEndpoint remote;
  int remote_mode;
  int fd, phase;
- unsigned operation; /* 1=START, 2=graceful STOP */
+ unsigned operation; /* 1 START, 2 idle STOP, 12 verified wired restore */
  uint32_t generation, session;
  uint64_t epoch, deadline;
  unsigned sent, received, reply_need;
@@ -158,6 +169,10 @@ int mu_cprx_client_begin_stop(MuCprxClient *,MuCprxService *,uint64_t now_ms);
  * This API does not dereference MuCprxService in another process. */
 int mu_cprx_client_begin_remote(MuCprxClient *,
  const MuCprxRemoteEndpoint *,unsigned operation,uint64_t now_ms);
+/* R85 op 12 may FORCE OEM restore while media==7 only when the DIO-side
+ * original owner verifies actual wired takeover, and the SI client confirms
+ * its OWN independent wired event. OEM restore must finish before ACK.
+ * No production proof adapter is supplied; missing proof fails closed. */
 /* R82: use mu_cprx_client_begin_remote(c, endpoint, MU_CPRX_OP_STATUS,
  * now) for an authenticated, READ-ONLY media observation from original DIO.
  * 12-byte reply includes stock media flag 0,4,5,7; a pending native listener

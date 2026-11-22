@@ -236,6 +236,23 @@ static int handle(MuCprxService *s){
   if(!s->start_confirmed)s->cleaning=1;
   reply(s,2);return 0;
  }
+ if(op==MU_CPRX_OP_WIRED_RESTORE){
+  /* NEVER use a wire assertion as a wired event. The genuine DIO owner
+   * must independently verify the physical wired transition of this exact
+   * session. This check repeats during a pending OEM restore. */
+  if(!s->evidence.dio_wired_takeover_verified||
+     s->evidence.dio_wired_takeover_verified(s->evidence.opaque,
+            s->generation,s->epoch,s->session)!=1){
+   if(s->mutating)s->cleaning=1; /* finish rollback if already started */
+   reply(s,2);return 0;
+  }
+  s->mutating=1;
+  int restored=restore_backend(s);
+  if(restored==1)return 0; /* original stop/interface restore pending */
+  if(restored<0){s->cleaning=1;reply(s,2);return 0;}
+  s->started=s->start_confirmed=0;s->terminal=1;
+  reply(s,0);return 0; /* only after OEM backend released */
+ }
  if(op==2){
   /* A lost bootstrap link must not tear down already streaming IP media.
    * The native SI owner retains the lease on BUSY/unknown. Only begin STOP
@@ -311,7 +328,7 @@ int mu_cprx_tick(MuCprxService *s,uint64_t now){
   if(s->required==16 && s->req[4]==3 && s->version==3){s->required=32;return 0;}}
  /* v3 semantic messages carry a 2-byte length or a fixed 4-byte ACK. */
  unsigned op=s->req[5];
- if(!s->size&&(!header_valid(s) || op>MU_CPRX_OP_SESSION_STATUS || (op>=8&&s->version!=3) || (op==8&&!s->evidence.metadata) || (op==9&&!s->evidence.semantic_in) || (op==10&&!s->evidence.semantic_next)))reply(s,2);
+ if(!s->size&&(!header_valid(s) || op>MU_CPRX_OP_WIRED_RESTORE || (op>=8&&s->version!=3) || (op==8&&!s->evidence.metadata) || (op==9&&!s->evidence.semantic_in) || (op==10&&!s->evidence.semantic_next)))reply(s,2);
  if(!s->size&&op>=8&&op<=10){
   if(op==10)s->payload_need=4;
   else if(s->length_used<2){ssize_t r=recv(s->client,s->length_bytes+s->length_used,2-s->length_used,0);if(r<=0){if(r<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))return 0;return abandoned(s);}s->length_used+=(unsigned)r;if(s->length_used<2)return 0;s->payload_need=(unsigned)s->length_bytes[0]|(unsigned)s->length_bytes[1]<<8;if(s->payload_need<6||s->payload_need>(op==8?4096u:8192u))reply(s,2);}
@@ -428,12 +445,16 @@ int mu_cprx_client_begin_remote(MuCprxClient *c,
  size_t n,dir_len;
  int fd,flags,rc;
  uid_t uid;gid_t gid;
- if(!c||c->phase||!endpoint||(op!=1&&op!=2&&op!=MU_CPRX_OP_STATUS&&op!=MU_CPRX_OP_SESSION_STATUS)||
+ if(!c||c->phase||!endpoint||(op!=1&&op!=2&&op!=MU_CPRX_OP_STATUS&&op!=MU_CPRX_OP_SESSION_STATUS&&op!=MU_CPRX_OP_WIRED_RESTORE)||
     !endpoint->generation||!endpoint->epoch||!endpoint->session||
     !endpoint->airplay_port||endpoint->airplay_port>65535||
     !endpoint->si_owner_verified||!endpoint->dio_server_verified||
     endpoint->si_owner_verified(endpoint->owner_ctx,endpoint->generation,
-          endpoint->epoch,endpoint->session)!=1)return -1;
+          endpoint->epoch,endpoint->session)!=1||
+    (op==MU_CPRX_OP_WIRED_RESTORE&&
+      (!endpoint->si_wired_takeover_verified||
+       endpoint->si_wired_takeover_verified(endpoint->owner_ctx,
+       endpoint->generation,endpoint->epoch,endpoint->session)!=1)))return -1;
  for(n=0;n<sizeof endpoint->socket_path&&endpoint->socket_path[n];n++){}
  /* Some QNX 6.5 libc builds lack strnlen(); this bound is exact. */
  if(n<12||n>=sizeof addr.sun_path||endpoint->socket_path[0]!='/'||
@@ -500,7 +521,11 @@ int mu_cprx_client_tick(MuCprxClient *c,uint64_t now){
   if(s||!e->si_owner_verified||!e->dio_server_verified||
      e->generation!=c->generation||e->epoch!=c->epoch||
      e->session!=c->session||
-     e->si_owner_verified(e->owner_ctx,e->generation,e->epoch,e->session)!=1)
+     e->si_owner_verified(e->owner_ctx,e->generation,e->epoch,e->session)!=1||
+     (c->operation==MU_CPRX_OP_WIRED_RESTORE&&
+       (!e->si_wired_takeover_verified||
+        e->si_wired_takeover_verified(e->owner_ctx,
+              e->generation,e->epoch,e->session)!=1)))
    return client_fail(c);
  }else{
   if(!s||s->generation!=c->generation||s->epoch!=c->epoch||

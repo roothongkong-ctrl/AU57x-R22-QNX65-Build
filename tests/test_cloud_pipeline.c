@@ -1273,6 +1273,128 @@ static void native_remote_owner_cloud_pipeline(void){
  assert(!strcmp(current_native_iface,"eth0"));
  assert(rmdir(dir)==0);dlclose(h);
 }
+/* R85: same OEM DIO singleton, but physically distinct SI vs DIO original
+ * wired event witnesses. The SI cannot declare the DIO callback true. */
+static int r85_si_cable=0,r85_dio_cable=0,r85_teardown_ok=0;
+static int r85_final_teardown(void *ctx,uint32_t e){
+ (void)ctx;return e==8&&r85_teardown_ok;
+}
+static int r85_si_wired_idle(void *opaque){(void)opaque;return !r85_si_cable;}
+static int r85_si_wired(void *opaque,uint32_t gen,uint64_t epoch,uint32_t sess){
+ (void)opaque;return r85_si_cable&&gen==8&&epoch==8&&sess==1234;
+}
+static int r85_dio_wired(void *opaque,uint32_t gen,uint64_t epoch,uint32_t sess){
+ (void)opaque;return r85_dio_cable&&gen==8&&epoch==8&&sess==1234;
+}
+static void native_r85_wired_remote_rollback(void){
+ struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
+ MuDioNative native={0};MuCprxService rx={0};
+ const MuDioGuard guard={NULL,native_lib,native_owner,native_listening,
+                        native_stopped,native_interface};
+ const MuCprxEvidence evidence={.admitted=rx_admitted,.identity=rx_identity,
+  .media=rx_media,.si_admitted=rx_si,.si_client_verified=rx_peer,
+  .si_inner_iap2_mfi=rx_inner,.si_media_channel=rx_channel,
+  .dio_wired_takeover_verified=r85_dio_wired};
+ struct cp_cloud_owner si_ops=ops;
+ si_ops.wired_idle=r85_si_wired_idle;
+ si_ops.teardown_confirmed=r85_final_teardown;
+ MuCprxRemoteEndpoint e={0};
+ char dir[]="/tmp/au57x-r85-wired-XXXXXX";
+ void *h=dlopen(NULL,RTLD_NOW);assert(h);
+ reset_fixture();native_owner_ok=1;native_listener=0;
+ native_stop_pending=0;native_stop_calls=0;
+ native_media_flag=7;native_inner=1;si_peer_allowed=1;
+ r85_si_cable=r85_dio_cable=r85_teardown_ok=0;
+ strcpy(current_native_iface,"eth0");
+ mocked_oem(&b,&stock,1);cp_cloud_init(&p);
+ assert(cp_cloud_begin(&p,&b,&si_ops,8,4)==CP_CLOUD_OK);
+ assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_OK);
+ assert(mkdtemp(dir));
+ assert(mu_dio_bind_interface(&native,h,&airplay_object,&airplay_owner,
+                              8,&guard,"eth0","wlan0")==0);
+ assert(mu_cprx_open_si_unix(&rx,&native,&evidence,5000,8,1234,
+                              dir,geteuid(),getegid())==0);
+ char path[MU_CPRX_UNIX_PATH_MAX];strcpy(path,rx.unix_path);
+ strcpy(e.socket_path,rx.unix_path);
+ e.generation=8;e.epoch=8;e.session=1234;e.airplay_port=5000;
+ e.server_uid=geteuid();e.server_gid=getegid();
+ e.si_owner_verified=r81_si_owner;e.dio_server_verified=r81_dio_server;
+ e.si_wired_takeover_verified=r85_si_wired;
+ assert(cp_cloud_bind_remote_dio(&p,&e,"wlan0")==CP_CLOUD_OK);
+ int started=0;
+ for(int i=0;i<35&&!started;i++){
+  int r=cp_cloud_drive_remote_dio(&p,100+i);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
+  assert(mu_cprx_tick(&rx,100+i)==0);
+  r=cp_cloud_drive_remote_dio(&p,100+i);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
+  started=p.remote_start_confirmed;
+ }
+ assert(started&&native_start_calls==1&&rx.started&&rx.start_confirmed);
+ assert(native_media_flag==7&&native_stop_calls==0);
+ /* Forged/disabled SI authorization is not enough to force DIO teardown. */
+ r85_si_cable=1;
+ assert(cp_cloud_wired_preempt(&p)==CP_CLOUD_RETRY);
+ assert(p.remote_wired_pending&&p.stopped&&p.handoff.wired_active);
+ assert(!cp_cloud_remote_live_at(&p,300));
+ assert(cp_cloud_wired_preempt(&p)==CP_CLOUD_RETRY);
+ p.remote_dio.si_wired_takeover_verified=NULL;
+ assert(cp_cloud_drive_remote_dio(&p,300)==CP_CLOUD_RETRY);
+ assert(p.remote_client.phase==0&&native_stop_calls==0);
+ assert(cp_cloud_end(&p)==CP_CLOUD_RETRY);
+ p.remote_dio.si_wired_takeover_verified=r85_si_wired;
+ /* SI wired=true but independent ORIGINAL DIO wired=false is a denial.
+  * An active iPhone media stream must continue until DIO independently
+  * sees the actual wired event, not a mere SI-originated socket request. */
+ int rejected=0;
+ for(int i=0;i<25&&!rejected;i++){
+  int r=cp_cloud_drive_remote_dio(&p,320+i);
+  assert(r==CP_CLOUD_RETRY);
+  assert(mu_cprx_tick(&rx,320+i)==0);
+  r=cp_cloud_drive_remote_dio(&p,320+i);
+  assert(r==CP_CLOUD_RETRY);
+  rejected=p.remote_client.phase==0;
+ }
+ assert(rejected&&native_stop_calls==0&&native.initialized);
+ struct stat st;assert(lstat(path,&st)==0&&S_ISSOCK(st.st_mode));
+ /* Once BOTH original sides verify physical wired takeover, op12 can
+  * restore despite media==7 (ordinary STOP still rejects). */
+ r85_dio_cable=1;
+ int restored=0,pending=0;
+ for(int i=0;i<60&&!restored;i++){
+  int r=cp_cloud_drive_remote_dio(&p,360+i);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_OK);
+  int sr=mu_cprx_tick(&rx,360+i);
+  assert(sr==0||sr==1);
+  if(native_stop_calls&&rx.listener>=0){
+   pending=1;
+   assert(!rx.backend_released&&lstat(path,&st)==0&&S_ISSOCK(st.st_mode));
+   assert(p.remote_phase!=4);
+  }
+  r=cp_cloud_drive_remote_dio(&p,360+i);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_OK);
+  restored=rx.backend_released;
+  assert(!restored||r==CP_CLOUD_RETRY); /* no SI teardown proof yet */
+ }
+ assert(restored&&pending&&rx.backend_released);
+ assert(native_stop_calls==1&&!native.initialized);
+ assert(p.remote_phase==4&&!p.remote_wired_pending&&p.stopped);
+ assert(!p.remote_teardown_confirmed);
+ assert(!strcmp(current_native_iface,"eth0"));
+ assert(lstat(path,&st)==-1&&errno==ENOENT);
+ /* DIO restored, but SI's final teardown witness is still pending. Do not
+  * restart the original receiver or report complete until SI confirms. */
+ assert(cp_cloud_drive_remote_dio(&p,440)==CP_CLOUD_RETRY);
+ assert(native_stop_calls==1&&!p.remote_teardown_confirmed);
+ r85_teardown_ok=1;
+ assert(cp_cloud_drive_remote_dio(&p,441)==CP_CLOUD_OK);
+ assert(p.remote_teardown_confirmed&&p.handoff.phase==CP_HO_WIRED);
+ assert(cp_cloud_drive_remote_dio(&p,442)==CP_CLOUD_STOPPED);
+ assert(rmdir(dir)==0);dlclose(h);
+ r85_si_cable=r85_dio_cable=r85_teardown_ok=0;
+}
 static void native_dio_bound_pipeline(void){
  struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
  MuDioNative native={0};
@@ -1317,5 +1439,5 @@ static void native_dio_bound_pipeline(void){
  assert(p.handoff.phase==CP_HO_WIRED);
  dlclose(h);
 }
-int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();native_si_owner_loss_recovery();native_abandoned_mutation_rollback();native_remote_process_boundary();native_r83_corrupt_session_snapshot();native_remote_owner_cloud_pipeline();
+int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();native_si_owner_loss_recovery();native_abandoned_mutation_rollback();native_remote_process_boundary();native_r83_corrupt_session_snapshot();native_remote_owner_cloud_pipeline();native_r85_wired_remote_rollback();
  puts("AU57X_R47_CLOUD_04_05_06_07_08_09_OWNER_GATES_PASS");return 0;}

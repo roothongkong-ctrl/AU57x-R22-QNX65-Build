@@ -558,8 +558,39 @@ int cp_cloud_remote_live_at(const struct cp_cloud_pipeline *s,uint64_t now){
 }
 int cp_cloud_drive_remote_dio(struct cp_cloud_pipeline *p,uint64_t now){
  int r;
- if(!p||!p->remote_phase||p->remote_phase==4)return CP_CLOUD_BAD;
+ if(!p||!p->remote_phase)return CP_CLOUD_BAD;
+ if(p->remote_phase==4){
+  if(p->remote_teardown_confirmed)return CP_CLOUD_STOPPED;
+  r=cp_cloud_end(p);
+  return r==CP_CLOUD_OK?CP_CLOUD_OK:CP_CLOUD_RETRY;
+ }
+ /* R85: once wired takeover is requested, only op12 may run. No normal
+  * START/STOP/status request can race this original-DIO restore barrier. */
+ if(p->remote_wired_pending){
+  if(!p->stopped||!p->handoff.wired_active||!p->owner.wired_idle||
+     p->owner.wired_idle(p->owner.ctx)!=0)return CP_CLOUD_RETRY;
+  if(!p->remote_client.phase){
+   if(mu_cprx_client_begin_remote(&p->remote_client,&p->remote_dio,
+        MU_CPRX_OP_WIRED_RESTORE,now)!=0)return CP_CLOUD_RETRY;
+  }
+  r=mu_cprx_client_tick(&p->remote_client,now);
+  if(r==MU_CPRX_CLIENT_PENDING)return CP_CLOUD_RETRY;
+  if(r!=MU_CPRX_CLIENT_CONFIRMED){
+   mu_cprx_client_close(&p->remote_client);
+   return CP_CLOUD_RETRY;
+  }
+  /* A successful op12 ACK is emitted by DIO only after its actual OEM
+   * backend.stop/restore + interface barrier. Before that: NEVER succeed. */
+  mu_cprx_client_close(&p->remote_client);
+  p->remote_phase=4;p->remote_wired_pending=0;
+  p->remote_start_confirmed=0;
+  remote_revoke_snapshot(p);
+  r=cp_cloud_end(p);
+  return r==CP_CLOUD_OK?CP_CLOUD_OK:CP_CLOUD_RETRY;
+ }
  if(p->remote_phase==3)return CP_CLOUD_RETRY; /* STOP in progress */
+ if(!p->owner.wired_idle||p->owner.wired_idle(p->owner.ctx)!=1)
+  return cp_cloud_wired_preempt(p);
  if(!remote_owner_valid(p)){
   remote_revoke_snapshot(p);
   /* DIO may still have an original receiver. Never report rollback until
@@ -624,7 +655,10 @@ int cp_cloud_drive_remote_dio(struct cp_cloud_pipeline *p,uint64_t now){
 int cp_cloud_remote_graceful_end(struct cp_cloud_pipeline *p,uint64_t now){
  int r;
  if(!p||!p->remote_phase)return CP_CLOUD_BAD;
- if(p->remote_phase==4)return cp_cloud_end(p);
+ if(p->remote_phase==4){
+  if(p->remote_teardown_confirmed)return CP_CLOUD_OK;
+  return cp_cloud_end(p);
+ }
  if(!p->remote_start_confirmed)return CP_CLOUD_BAD;
  if(p->remote_phase!=3){
   /* R79 native STOP must not forcibly kill a live iPhone session. A fresh
@@ -770,11 +804,15 @@ int cp_cloud_wired_preempt(struct cp_cloud_pipeline *s){
  }
  if(cp_ho_wired_takeover(&s->handoff,1)!=CP_HO_OK)return CP_CLOUD_ORDER;
  if(s->remote_phase&&s->remote_phase!=4){
-  s->remote_wired_pending=1;
-  remote_revoke_snapshot(s);
-  mu_cprx_client_close(&s->remote_client);
-  /* There is no verified OEM emergency-restore command for a remote DIO
-   * playing media. Do not return OK or claim original interface restored. */
+  if(!s->remote_wired_pending){
+   s->remote_wired_pending=1;
+   remote_revoke_snapshot(s);
+   /* Cancel any in-flight normal operation. If DIO was mutating, server's
+    * existing abandoned-client handler keeps rollback ownership. */
+   mu_cprx_client_close(&s->remote_client);
+  }
+  /* Resume the opt-in op12 only from a monotonic original owner tick.
+   * No DIO wired proof -> permanent RETRY and no fake wired success. */
   return CP_CLOUD_RETRY;
  }
  restored=native_restore(s);
@@ -799,6 +837,7 @@ int cp_cloud_end(struct cp_cloud_pipeline *s){
  }
  s->stopped=1;
  s->native_cleanup_pending=0;
+ if(s->remote_phase==4)s->remote_teardown_confirmed=1;
  if(s->bootstrap)cp_s4_revoke(s->bootstrap);
  return CP_CLOUD_OK;
 }

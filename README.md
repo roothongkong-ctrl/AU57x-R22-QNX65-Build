@@ -174,3 +174,7 @@ ongoing device authorization. Real DIO/MFi owner event sources remain
 unbound, and **the verified remote wired-preemption/force-restore ABI is
 still missing**, so no vehicle installation is safe. Full details in
 `docs/R84_SI_REMOTE_PIPELINE_CN.md`.
+
+### R85 — wired-priority cross-process original-DIO restore (NO INSTALL)
+
+Adds opt-in CPRX v3 op 12 for **independently attested physical wired takeover** on *both* SI and DIO original owners. Unlike normal media-aware STOP, op12 can ask the original DIO backend to restore while media is streaming, but its ACK cannot precede completed original STOP/interface restoration. On failure or missing witnesses, the remote pipeline stays in retryable pending state. A separate SI final teardown witness must complete before full success. Host-only regression uses actual AF_UNIX + OEM test callbacks; neither production callback has been located in original binaries. This code must not be installed. See `docs/R85_SI_DIO_WIRED_RESTORE_CN.md`.

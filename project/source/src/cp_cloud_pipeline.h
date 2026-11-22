@@ -71,7 +71,8 @@ struct cp_cloud_pipeline {
  int remote_media,remote_inner;
  unsigned remote_channels;
  uint64_t remote_sample_ms;
- int remote_wired_pending;
+ int remote_wired_pending; /* op12 pending until independent DIO verified */
+ int remote_teardown_confirmed; /* DIO restore ACK != full SI teardown */
  struct cp_handoff handoff;
  struct cp_cloud_owner owner;
  uint32_t epoch,bt_generation;
@@ -111,8 +112,10 @@ int cp_cloud_drive_remote_dio(struct cp_cloud_pipeline *,uint64_t now_ms);
  * not permanently granted streaming media. */
 int cp_cloud_remote_live_at(const struct cp_cloud_pipeline *,uint64_t now_ms);
 /* Normal idle STOP only; preserves R79 streaming BUSY semantics and waits
- * for DIO's actual original restore ACK. Wired takeover is fail-closed until
- * a verified original-DIO forced-restore path is available. */
+ * for DIO's actual original restore ACK. For wired takeover, the owner first
+ * calls cp_cloud_wired_preempt(), then repeatedly calls drive_remote_dio()
+ * to execute R85 opt-in op12. Without independent SI/DIO original physical
+ * wired proofs, the restore remains RETRY and is never reported complete. */
 int cp_cloud_remote_graceful_end(struct cp_cloud_pipeline *,uint64_t now_ms);
 /* Normal user disconnect: nonblocking SI v3 STOP on the same OEM owner
  * thread; returns RETRY for streaming/BUSY/in-progress OEM restoration and
