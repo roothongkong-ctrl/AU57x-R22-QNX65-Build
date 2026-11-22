@@ -313,6 +313,7 @@ static void automatic_native_carplay_start(void){
 struct fake_cf {uint32_t marker;char text[64];};
 static int native_owner_ok=1,native_listener=0,native_stop_pending=0,native_media_flag=0;
 static int native_inner=1,native_channel[5]={0,1,1,1,1};
+static int si_peer_allowed=1,si_peer_checks=0;
 static int queue_object,native_stop_calls=0;
 static char current_native_iface[32]="eth0";
 void *gAirPlayReceiverServer=&airplay_object;
@@ -384,6 +385,16 @@ static int rx_admitted(void *ctx,uint32_t generation){
 static int rx_si(void *ctx,uint32_t generation,uint64_t epoch,uint32_t session){
  (void)ctx;return generation==8&&epoch==8&&session==1234&&single&&wired;
 }
+static int rx_peer(void *ctx,int fd,uint32_t gen,uint64_t epoch,uint32_t session){
+ struct sockaddr_in peer={0};socklen_t size=sizeof peer;
+ (void)ctx;
+ si_peer_checks++;
+ /* This isolated host adapter checks peer address and a test authorization
+  * flag. Production MUST instead bind OS peer credentials to genuine SI. */
+ return si_peer_allowed&&fd>=0&&gen==8&&epoch==8&&session==1234&&
+  getpeername(fd,(struct sockaddr *)&peer,&size)==0&&
+  peer.sin_family==AF_INET&&ntohl(peer.sin_addr.s_addr)==INADDR_LOOPBACK;
+}
 static int rx_inner(void *ctx,uint32_t gen,uint64_t epoch,uint32_t session){
  (void)ctx;return gen==8&&epoch==8&&session==1234&&native_inner;
 }
@@ -402,11 +413,11 @@ static void native_rx_media_contract(void){
  const MuDioGuard guard={NULL,native_lib,native_owner,native_listening,
                          native_stopped,native_interface};
  const MuCprxEvidence evidence={.admitted=rx_admitted,.identity=rx_identity,
-   .media=rx_media,.si_admitted=rx_si,
+   .media=rx_media,.si_admitted=rx_si,.si_client_verified=rx_peer,
    .si_inner_iap2_mfi=rx_inner,.si_media_channel=rx_channel};
  void *h=dlopen(NULL,RTLD_NOW);assert(h);
  reset_fixture();native_owner_ok=1;native_listener=0;native_stop_pending=0;
- native_media_flag=0;native_inner=1;
+ native_media_flag=0;native_inner=1;si_peer_allowed=1;si_peer_checks=0;
  for(int i=1;i<5;i++)native_channel[i]=1;
  strcpy(current_native_iface,"eth0");
  mocked_oem(&b,&stock,1);cp_cloud_init(&p);
@@ -418,6 +429,10 @@ static void native_rx_media_contract(void){
                               8,&guard,"eth0","wlan0")==0);
  assert(cp_cloud_bind_native_dio(&p,&native)==CP_CLOUD_OK);
  assert(cp_cloud_native_rx_live(&p,0)==0);
+ /* No OS peer validator => do not open the privileged v3 listener. */
+ MuCprxEvidence missing_peer=evidence;
+ missing_peer.si_client_verified=NULL;
+ assert(mu_cprx_open_si(&rx,&native,&missing_peer,5000,8,1234)==-1);
  /* Same-process control socket, but dummy handset and media samples. */
  assert(mu_cprx_open_si(&rx,&native,&evidence,5000,8,1234)==0);
  rx.session=1235; /* reject stale/foreign SI session at bind time */
@@ -432,6 +447,9 @@ static void native_rx_media_contract(void){
  rx.evidence.si_media_channel=NULL;
  assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_PROOF);
  rx.evidence.si_media_channel=rx_channel;
+ rx.evidence.si_client_verified=NULL;
+ assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_PROOF);
+ rx.evidence.si_client_verified=rx_peer;
  /* START must arrive over the real local SI service v3 socket, NOT
   * via an independent call to the original receiver or a forged flag. */
  assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_OK);
@@ -439,11 +457,36 @@ static void native_rx_media_contract(void){
  assert(cp_cloud_prepare_receiver(&p,native.iface)==CP_CLOUD_RETRY);
  assert(native_start_calls==0);
  assert(cp_cloud_drive_native(&p,100)==CP_CLOUD_RETRY);
- int fd=socket(AF_INET,SOCK_STREAM,0);assert(fd>=0);
+ /* An unauthorized LOCAL process can know generation and SI session IDs:
+  * it still must not reach the native startServer call. */
+ int rejected=socket(AF_INET,SOCK_STREAM,0);assert(rejected>=0);
  struct sockaddr_in addr={0};
  addr.sin_family=AF_INET;
  addr.sin_port=htons(MU_CPRX_PORT);
  addr.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+ si_peer_allowed=0;
+ assert(connect(rejected,(struct sockaddr *)&addr,sizeof addr)==0);
+ unsigned char denied_req[32]={0};
+ memcpy(denied_req,"CPRX",4);denied_req[4]=3;denied_req[5]=1;
+ denied_req[8]=8;denied_req[12]=0x88;denied_req[13]=0x13;
+ denied_req[16]=8;denied_req[24]=0xd2;denied_req[25]=4;
+ assert(send(rejected,denied_req,sizeof denied_req,0)==(ssize_t)sizeof denied_req);
+ assert(cp_cloud_drive_native(&p,100)==CP_CLOUD_RETRY);
+ assert(native_start_calls==0&&!rx.started&&rx.client<0);
+ close(rejected);
+ si_peer_allowed=1;
+ int fd=socket(AF_INET,SOCK_STREAM,0);assert(fd>=0);
+ assert(connect(fd,(struct sockaddr *)&addr,sizeof addr)==0);
+ /* A previously admitted socket loses authority mid-connection. Its
+  * partial request must be dropped BEFORE native side effects. */
+ assert(cp_cloud_drive_native(&p,101)==CP_CLOUD_RETRY);
+ assert(rx.client>=0);
+ si_peer_allowed=0;
+ assert(cp_cloud_drive_native(&p,102)==CP_CLOUD_RETRY);
+ assert(rx.client<0&&!rx.started&&native_start_calls==0);
+ close(fd);
+ si_peer_allowed=1;
+ fd=socket(AF_INET,SOCK_STREAM,0);assert(fd>=0);
  assert(connect(fd,(struct sockaddr *)&addr,sizeof addr)==0);
  unsigned char req[32]={0};
  memcpy(req,"CPRX",4);req[4]=3;req[5]=1; /* v3 START */
@@ -455,7 +498,7 @@ static void native_rx_media_contract(void){
   assert(got==CP_CLOUD_RETRY||got==CP_CLOUD_PROOF);
  }
  assert(rx.started&&rx.start_confirmed);
- assert(native_start_calls==1);
+ assert(si_peer_checks>=2&&native_start_calls==1);
  unsigned char reply[8];
  assert(recv(fd,reply,sizeof reply,0)==(ssize_t)sizeof reply);
  assert(memcmp(reply,"CPRA",4)==0&&reply[5]==0);

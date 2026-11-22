@@ -139,6 +139,7 @@ static int native_rx_lease(const struct cp_cloud_pipeline *p,
     !rx->backend.start||!rx->backend.poll||!rx->backend.restore||
     rx->listener<0||rx->terminal||rx->cleaning||rx->backend_released||
     !rx->evidence.admitted||!rx->evidence.si_admitted||
+    !rx->evidence.si_client_verified||
     !rx->evidence.identity||!rx->evidence.media||
     !rx->evidence.si_inner_iap2_mfi||!rx->evidence.si_media_channel||
     rx->evidence.admitted(rx->evidence.opaque,rx->generation)!=1||

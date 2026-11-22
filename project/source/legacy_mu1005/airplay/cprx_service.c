@@ -27,13 +27,21 @@ static void reply(MuCprxService *s,unsigned code){memcpy(s->reply,"CPRA\2\0\0\0"
 static uint32_t gen(const unsigned char *p){return (uint32_t)p[0]|(uint32_t)p[1]<<8|(uint32_t)p[2]<<16|(uint32_t)p[3]<<24;}
 static uint64_t epoch64(const unsigned char *p){return (uint64_t)gen(p)|((uint64_t)gen(p+4)<<32);}
 static void put32(unsigned char*p,uint32_t v){for(unsigned i=0;i<4;i++)p[i]=(unsigned char)(v>>(i*8));}
+static int peer_verified(const MuCprxService *s,int fd){
+ return s&&fd>=0&&(s->version!=3||
+  (s->evidence.si_client_verified&&
+   s->evidence.si_client_verified(s->evidence.opaque,fd,s->generation,
+                                  s->epoch,s->session)==1));
+}
 static int authorized(MuCprxService *s){
  return s->evidence.admitted(s->evidence.opaque,s->generation)==1 &&
   (s->version==2 || (s->evidence.si_admitted && s->evidence.si_admitted(s->evidence.opaque,s->generation,s->epoch,s->session)==1));
 }
 static int open_service(MuCprxService *s,const MuReceiverBackend *b,const MuCprxEvidence *e,unsigned port,unsigned version,uint64_t epoch,uint32_t session){
  if(!s||!b||!b->opaque||!b->generation||!b->start||!b->poll||!b->restore||!e||!e->admitted||!e->identity||!e->media||!port||port>65535||e->admitted(e->opaque,b->generation)!=1)return -1;
- if(version==3&&(!epoch||!session||!e->si_admitted||e->si_admitted(e->opaque,b->generation,epoch,session)!=1))return -1;
+ if(version==3&&(!epoch||!session||!e->si_admitted||
+   !e->si_client_verified||
+   e->si_admitted(e->opaque,b->generation,epoch,session)!=1))return -1;
  int fd=socket(AF_INET,SOCK_STREAM,0);if(fd<0)return -1;
  struct sockaddr_in a;memset(&a,0,sizeof a);
 #ifdef __QNXNTO__
@@ -126,7 +134,17 @@ int mu_cprx_tick(MuCprxService *s,uint64_t now){
  if(s->cleaning||(s->terminal&&s->client<0)||!authorized(s))return mu_cprx_shutdown(s);
  if(s->listener<0)return -1;
  if(s->client<0){int fd=accept(s->listener,NULL,NULL);if(fd<0)return errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR?0:-1;
-  if(nonblock(fd)||safe_send(fd)){close(fd);return 0;}s->client=fd;s->deadline=now+6500;}
+  /* Admission happens BEFORE accepting request bytes or mutating DIO.
+   * Even a correctly formatted CPRX session token is not an OS peer proof. */
+  if(!peer_verified(s,fd)||nonblock(fd)||safe_send(fd)){close(fd);return 0;}
+  s->client=fd;s->deadline=now+6500;}
+ if(!peer_verified(s,s->client)){
+  /* The local SI process may have exited/relinquished this lease.
+   * If it was in a native mutation, preserve rollback semantics. */
+  int mutate=s->mutating;
+  drop(s);
+  return mutate?mu_cprx_shutdown(s):0;
+ }
  if(now>=s->deadline){int mutate=s->mutating;drop(s);return mutate?mu_cprx_shutdown(s):0;}
  if(s->used<s->required){ssize_t r=recv(s->client,s->req+s->used,s->required-s->used,0);if(r<=0){if(r<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))return 0;drop(s);return 0;}s->used+=(unsigned)r;if(s->used<s->required)return 0;
   if(s->required==16 && s->req[4]==3 && s->version==3){s->required=32;return 0;}}

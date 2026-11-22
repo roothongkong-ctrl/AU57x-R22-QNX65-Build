@@ -17,6 +17,13 @@ typedef struct {
  int (*identity)(void *,char *,size_t); /* actual advertised pi length; 0 pending, negative failure */
  int (*media)(void *); /* verified native flags 0,4,5,7; negative unknown */
  int (*si_admitted)(void *,uint32_t,uint64_t,uint32_t); /* actual SI epoch/session, not wire trust */
+ /* R75: independently authenticate the OS/local IPC peer, not just the
+  * generation/session numbers provided by that peer on the wire. Production
+  * adapter MUST verify kernel-backed identity and current SI process/owner.
+  * Called before a request is parsed and on every active owner tick.
+  * Never use a constant-true callback in the car. */
+ int (*si_client_verified)(void *,int accepted_fd,uint32_t generation,
+                           uint64_t epoch,uint32_t session);
  int (*metadata)(void *,const unsigned char *,size_t); /* 1 accepted, 0 retry, -1 rejected */
  int (*semantic_in)(void *,unsigned,const unsigned char *,size_t);
  int (*semantic_next)(void *,unsigned char *,size_t); /* size, 0 empty, negative failure */

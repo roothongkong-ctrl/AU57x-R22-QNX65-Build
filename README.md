@@ -59,3 +59,14 @@ phone's epoch-only success flags cannot authorize a new SI session. Runtime
 checks repeat on each owner tick; dropping any callback makes MEDIA_ACTIVE
 false immediately. CI uses independent host fixtures, not car callbacks.
 See `docs/R74_SI_SESSION_SCOPED_PROOFS_CN.md`.
+
+### R75 — local SI client admission for CPRX v3 (NO INSTALL)
+
+The original receiver control listener previously accepted any local TCP
+connection that knew the generation and session numbers. R75 requires a
+separate, owner-supplied **OS peer identity verification** callback before
+reading a v3 request, and repeats admission while the client is active.
+An unauthorized process cannot issue START/STOP or media metadata commands.
+No QNX peer-identity mechanism is guessed: the integration must provide a
+verified OEM implementation; host fixtures only check admission behavior.
+See `docs/R75_SI_IPC_CLIENT_ADMISSION_CN.md`.
