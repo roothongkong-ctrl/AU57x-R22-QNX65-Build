@@ -1,0 +1,9 @@
+AU57x Wireless CarPlay R88 — MU1005 OEM Bluetooth route proof + R45 native RFCOMM server-first to R87 handoff
+Baseline: 2017 Audi A6L C7 PA / MHI2_CN_AU57x_K1006_2/MU1005
+Date: 2026-11-22
+Project source C modules: 37 (36 from R87 + cp_wcp_r45_ingress.c)
+Original btstack 51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566
+Original bluetooth 7d5ae31396f016f811e18a7255bf1311e0bfa471b2a3252a6f2eb4bd3ad04272
+40/40 R45 RX instructions pinned; no original OEM image redistributed.
+Cloud QNX build must pass for R88 branch before claiming native compilation success.
+Research only: vehicle_verified=false, installable=false, safe_to_flash=false, NO_INSTALL

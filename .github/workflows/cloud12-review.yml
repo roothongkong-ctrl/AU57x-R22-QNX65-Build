@@ -1,7 +1,7 @@
 name: AU57x cloud-only 12-step evidence and lifecycle gates (NO INSTALL)
 on:
   push:
-    branches: [main, r87-wcp-congo-au57x-integration]
+    branches: [main, r88-mu1005-stock-rfcomm-ingress]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -33,6 +33,10 @@ jobs:
         run: bash ci/host_wcp_autoconnect.sh
       - name: R87 donor reference manifest negative tests (no donor blobs)
         run: python3 -m unittest discover -s tests -p test_wcp_donor_reference_audit.py -v
+      - name: R88 original R45 server-first RFCOMM into R87 (no phone/no OEM)
+        run: bash ci/host_wcp_r45_ingress.sh
+      - name: R88 pinned original MU1005 bluetooth vs btstack route audit (synthetic public tests)
+        run: python3 -m unittest discover -s tests -p test_mu1005_bt_iap_path_audit.py -v
       - name: R86 pinned exact MU1005 OEM delegate ABI parser negative tests (no OEM files)
         run: python3 -m unittest discover -s tests -p test_oem_delegate_audit.py -v
       - name: Pinned MU1005 callback snapshots and negative memory tests

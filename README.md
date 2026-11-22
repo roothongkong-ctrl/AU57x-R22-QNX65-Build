@@ -1,3 +1,13 @@
+## R88 / MU1005 original Bluetooth path (2026-11-22) — SOURCE ONLY
+
+R88 now compares the **user-owned, SHA256-pinned actual MU1005** `btstack` and `bluetooth` against the public MU0678 `IapDevice`/`IapServices` trace (https://github.com/joeyQuery/MHI2-wirelessCarPlay). The original MU1005 Bluetooth control binary has `bluetooth.enableIap` and `SERVICETYPE_IAP2`, while the original MU1005 `btstack` lacks **literal** `IapDevice`, `IapServices`, `/dev/iapDevice`, `CIapBTChannel` identifiers. The native stock RFCOMM/SDP and existing OBEX client paths **are** found. This does not prove that MU1005 lacks a dynamically formed iAP2 endpoint or that the native client-open ABI is known. Pinned ARM entry-word check: 40/40. OEM binaries stay private. See `docs/R88_MU1005_BT_IAP_PATH_CN.md` and the reproducible JSON.
+
+The **new functional C99 bridge** `cp_wcp_r45_ingress.[ch]` uses genuine, same-generation, original RFCOMM server connection ownership and R45 `AuRfIngress` to populate R87's `cp_wcp_bt_ops`. It only reports transport connected when the real R45 RF epoch/MAC, owner, pairing, published SDP and upstream IPC transport all still match; USB has priority. The *unverified* client-open/SDP methods are deliberately not implemented. **Step 2 is partial**, no executable native callback loader, no car validation, no SD installer and no claimed original MFi success.
+
+Run `bash ci/host_wcp_r45_ingress.sh` and `python3 -m unittest discover -s tests -p test_mu1005_bt_iap_path_audit.py -v`. Original files must be supplied privately to `tools/mu1005_bt_iap_path_audit.py`, not committed. `installable=false`, `safe_to_flash=false`.
+
+---
+
 # AU57x / MU1005 wireless CarPlay — R77 source research (NO INSTALL)
 
 **Research-only: Not a CarPlay wireless implementation validated on the vehicle.**
