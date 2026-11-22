@@ -1,7 +1,7 @@
 name: AU57x cloud-only 12-step evidence and lifecycle gates (NO INSTALL)
 on:
   push:
-    branches: [main, r91-exp-rf-zero-fastconnect]
+    branches: [main, r92-native-btstack-preload-owner-probe]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -35,6 +35,10 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_wcp_donor_reference_audit.py -v
       - name: R89 cross-process original R45 socket to R44/R87 transport contract
         run: bash ci/host_wcp_r45_remote.sh
+      - name: R92 native btstack LD_PRELOAD real constructor/pthread interposition host tests
+        run: bash ci/host_bt_preload_probe.sh
+      - name: R92 original btstack pthread entry audit synthetic mutation tests
+        run: python3 -m unittest discover -s tests -p test_mu1005_bt_preload_audit.py -v
       - name: R91 RFCOMM fast-connect experiment (both strict and experimental variants)
         run: bash ci/host_rf_arg_experiment.sh
       - name: R90 real TCP original R45/R44 iAP2 handshake and synthetic AA00-AA05 fail-closed test

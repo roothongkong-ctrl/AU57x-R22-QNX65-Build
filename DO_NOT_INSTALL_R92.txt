@@ -1,0 +1,3 @@
+R92 IS SOURCE-ONLY. DO NOT FLASH, INSTALL OR START A SECOND BTSTACK ON THE CAR.
+This new LD_PRELOAD shim observes original process startup and thread creations,
+not actual BlueSDK callbacks. Real iPhone Bluetooth iAP2 and MFi remain unproven.
