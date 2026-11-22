@@ -58,6 +58,12 @@ int cp_cloud_confirm_bootstrap_auth(struct cp_cloud_pipeline *);
 int cp_cloud_radio_start(struct cp_cloud_pipeline *);
 int cp_cloud_radio_result(struct cp_cloud_pipeline *,int association_succeeded,
                           int physical_disconnect_verified);
+/* Drive the ACTUAL already-bound OEM AirPlay server on the original owner
+ * thread, using the original CFString for the observed Wi-Fi interface.
+ * Returns RETRY until port 5000, Bonjour and SI identity are verified. */
+int cp_cloud_prepare_receiver(struct cp_cloud_pipeline *,const void *cf_interface);
+/* Confirms the authenticated 0x4301 reached link ACK, not merely an
+ * externally asserted 'request sent' flag. */
 int cp_cloud_carplay_request(struct cp_cloud_pipeline *);
 int cp_cloud_airplay_ready(struct cp_cloud_pipeline *,const char *observed_interface);
 int cp_cloud_inner_auth(struct cp_cloud_pipeline *);

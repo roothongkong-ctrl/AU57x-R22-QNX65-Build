@@ -6,7 +6,7 @@
 static int wired=1,bt=1,cap5=1,cap24=1,ap=1,associated=1;
 static int single=1,bonjour=1,listener=1,inner=1,request=1;
 static int media[5]={0,1,1,1,1};
-static unsigned ap_calls=0,observed_port=0;
+static unsigned ap_calls=0,observed_port=0,native_start_calls=0;
 static int airplay_object,airplay_owner,airplay_start_key,airplay_stop_key,airplay_interface_key;
 static int owner(void*ctx,uint32_t e,uint32_t g){(void)ctx;return bt&&e==8&&g==4;}
 static int stock_owner(void*ctx){(void)ctx;return 1;}
@@ -48,8 +48,10 @@ static int setprop(void*ctx,void*server,const void*key,const void*val){
  (void)ctx;return (server==&airplay_object&&key==&airplay_interface_key&&val)?0:-1;
 }
 static int control_ap(void*ctx,void*server,const void*key,const void*ownerptr){
- (void)ctx;return (server==&airplay_object&&ownerptr==&airplay_owner&&
-  (key==&airplay_start_key||key==&airplay_stop_key))?0:-1;
+ (void)ctx;
+ if(server!=&airplay_object||ownerptr!=&airplay_owner)return -1;
+ if(key==&airplay_start_key){native_start_calls++;return 0;}
+ return key==&airplay_stop_key?0:-1;
 }
 static int confirmed_ap(void*ctx,void*server,const void*ownerptr,unsigned port){
  (void)ctx;return listener&&server==&airplay_object&&ownerptr==&airplay_owner&&port==5000;
@@ -59,8 +61,6 @@ static void native_airplay(Mu34ApServer *ap){
   setprop,control_ap,confirmed_ap,NULL,&airplay_object,&airplay_owner,
   &airplay_interface_key,&airplay_start_key,&airplay_stop_key,8};
  assert(mu34_ap_server_init(ap,&bind)==0);
- assert(mu34_ap_server_set_interface(ap,8,"wlan0")==MU34_AP_OK);
- assert(mu34_ap_server_start(ap,8,5000)==MU34_AP_R_LISTENING_VERIFIED);
 }
 static const struct cp_cloud_owner ops={0,owner,wd,caps,ap_start,ap_ok,
  ap_closed,cp_start,si,bonjour_ok,airplay_ok,inner_ok,media_ok,torn};
@@ -86,7 +86,7 @@ static void mocked_oem(struct cp_step04_session *s,struct cp_stock_mfi *stock,in
 static void reset_fixture(void){
  wired=bt=cap5=cap24=ap=associated=single=bonjour=listener=inner=request=1;
  for(int i=1;i<5;i++)media[i]=1;
- ap_calls=0;observed_port=0;
+ ap_calls=0;observed_port=0;native_start_calls=0;
 }
 static void successful_dual_fallback(void){
  struct cp_cloud_pipeline s;struct cp_step04_session b;struct cp_stock_mfi stock;
@@ -104,14 +104,27 @@ static void successful_dual_fallback(void){
  assert(cp_cloud_radio_start(&s)==CP_CLOUD_OK&&s.band==CP_RADIO_24);
  assert(cp_cloud_radio_result(&s,1,0)==CP_CLOUD_OK);
  assert(cp_cloud_airplay_ready(&s,"wlan0")==CP_CLOUD_ORDER);
- request=0;assert(cp_cloud_carplay_request(&s)==CP_CLOUD_PROOF);
- request=1;assert(cp_cloud_carplay_request(&s)==CP_CLOUD_OK);
- assert(cp_cloud_airplay_ready(&s,"wlan0")==CP_CLOUD_PROOF); /* no native receiver */
+ assert(cp_cloud_carplay_request(&s)==CP_CLOUD_PROOF);
+ assert(cp_cloud_prepare_receiver(&s,"wlan0")==CP_CLOUD_PROOF);
  native_airplay(&real_airplay);
  assert(cp_cloud_bind_airplay(&s,&real_airplay)==CP_CLOUD_OK);
- bonjour=0;assert(cp_cloud_airplay_ready(&s,"wlan0")==CP_CLOUD_PROOF);
- bonjour=1;assert(cp_cloud_airplay_ready(&s,"../../etc")==CP_CLOUD_BAD);
- assert(cp_cloud_airplay_ready(&s,"wlan0")==CP_CLOUD_OK&&observed_port==5000);
+ /* Truly call the native binder's setProperty + startServer, once. */
+ bonjour=0;
+ assert(cp_cloud_prepare_receiver(&s,"wlan0")==CP_CLOUD_RETRY);
+ assert(native_start_calls==1);
+ bonjour=1;
+ assert(cp_cloud_prepare_receiver(&s,"wlan0")==CP_CLOUD_OK);
+ assert(native_start_calls==1&&observed_port==5000);
+ assert(cp_cloud_carplay_request(&s)==CP_CLOUD_PROOF); /* no real 4301 */
+ static const struct cp_session live_session={.airplay_port=5000};
+ b.wireless.session=&live_session;b.wireless_bound=1;
+ b.wireless.start_sent=1;b.wireless_pending=1;
+ assert(cp_cloud_carplay_request(&s)==CP_CLOUD_PROOF); /* ACK pending */
+ b.wireless_pending=0;b.link.outbound_pending=0;
+ request=0;assert(cp_cloud_carplay_request(&s)==CP_CLOUD_PROOF);
+ request=1;assert(cp_cloud_carplay_request(&s)==CP_CLOUD_OK);
+ assert(cp_cloud_airplay_ready(&s,"../../etc")==CP_CLOUD_BAD);
+ assert(cp_cloud_airplay_ready(&s,"wlan0")==CP_CLOUD_OK);
  inner=0;assert(cp_cloud_inner_auth(&s)==CP_CLOUD_PROOF);
  inner=1;assert(cp_cloud_inner_auth(&s)==CP_CLOUD_OK);
  inner=0;assert(cp_cloud_media_ready(&s)==CP_CLOUD_PROOF);

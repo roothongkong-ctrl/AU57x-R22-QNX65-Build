@@ -98,11 +98,54 @@ int cp_cloud_radio_result(struct cp_cloud_pipeline *s,int success,int disconnect
  if(r==CP_RADIO_PENDING)return CP_CLOUD_RETRY;
  return stop(s);
 }
+int cp_cloud_prepare_receiver(struct cp_cloud_pipeline *s,const void *iface_cf){
+ Mu34ApResult r;
+ Mu34ApState state;
+ const char *iface;
+ if(!eligible(s,1))return stop(s);
+ if(s->handoff.phase!=CP_HO_WIFI_ASSOCIATED)return CP_CLOUD_ORDER;
+ if(!s->airplay||s->airplay->generation!=s->epoch||
+    s->radio.epoch!=s->epoch||s->radio.phase!=CP_RADIO_ASSOCIATED||
+    !s->owner.ap_association||
+    s->owner.ap_association(s->owner.ctx,s->epoch,s->band)!=1||
+    s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1)
+  return CP_CLOUD_PROOF;
+ state=mu34_ap_server_state(s->airplay);
+ if(state==MU34_AP_BOUND){
+  if(!iface_cf)return CP_CLOUD_BAD;
+  r=mu34_ap_server_set_interface(s->airplay,s->epoch,iface_cf);
+  if(r!=MU34_AP_OK)return CP_CLOUD_PROOF;
+  state=MU34_AP_INTERFACE_SET;
+ }
+ if(state==MU34_AP_INTERFACE_SET){
+  r=mu34_ap_server_start(s->airplay,s->epoch,CP_CLOUD_PORT);
+ }else if(state==MU34_AP_START_REQUESTED||state==MU34_AP_LISTENING_VERIFIED){
+  r=mu34_ap_server_poll(s->airplay,s->epoch);
+ }else return CP_CLOUD_PROOF;
+ if(r==MU34_AP_R_START_REQUESTED)return CP_CLOUD_RETRY;
+ if(r!=MU34_AP_R_LISTENING_VERIFIED)return CP_CLOUD_PROOF;
+ if(s->airplay->expected_port!=CP_CLOUD_PORT)return CP_CLOUD_PROOF;
+ iface=mu34_ap_server_interface(s->airplay);
+ if(!iface[0]||s->owner.bonjour_identity_verified(s->owner.ctx,s->epoch,iface)!=1||
+    s->owner.airplay_listener_verified(s->owner.ctx,s->epoch,iface,CP_CLOUD_PORT)!=1)
+  return CP_CLOUD_RETRY;
+ return CP_CLOUD_OK;
+}
 int cp_cloud_carplay_request(struct cp_cloud_pipeline *s){
  if(!eligible(s,1))return stop(s);
  if(s->handoff.phase!=CP_HO_WIFI_ASSOCIATED)return CP_CLOUD_ORDER;
- if(s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1||
-    s->owner.carplay_request_sent(s->owner.ctx,s->epoch)!=1)return CP_CLOUD_PROOF;
+ /* A test/owner assertion alone can no longer advance the state: the
+  * 4301 is emitted by our iAP2 link and must receive its peer ACK. */
+ if(!s->bootstrap||!s->bootstrap->wireless_bound||
+    !s->bootstrap->wireless.start_sent||s->bootstrap->wireless_pending||
+    s->bootstrap->link.outbound_pending||
+    !s->bootstrap->wireless.session||
+    s->bootstrap->wireless.session->airplay_port!=CP_CLOUD_PORT||
+    !s->airplay||s->airplay->generation!=s->epoch||
+    mu34_ap_server_state(s->airplay)!=MU34_AP_LISTENING_VERIFIED||
+    s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1||
+    s->owner.carplay_request_sent(s->owner.ctx,s->epoch)!=1)
+  return CP_CLOUD_PROOF;
  return cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_CARPLAY_START_SENT,1)==CP_HO_OK?
    CP_CLOUD_OK:CP_CLOUD_ORDER;
 }
