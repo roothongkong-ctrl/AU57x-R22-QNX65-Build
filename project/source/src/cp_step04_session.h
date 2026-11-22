@@ -21,9 +21,9 @@ struct cp_step04_session {
  struct cp_s4_external ext;
  struct cp_lk_owner link_owner;
  struct cp_auth_owner auth_owner;
- uint32_t epoch,acked_token;
+ uint32_t epoch,acked_token,wireless_seq,wireless_token;
  uint64_t now;
- int auth_ready, ack_in_progress;
+ int auth_ready, ack_in_progress,wireless_pending;
 };
 int cp_s4_init(struct cp_step04_session *,struct cp_stock_mfi *,
                uint32_t epoch,const struct cp_s4_external *);
@@ -31,5 +31,7 @@ int cp_s4_accept_rf(struct cp_step04_session *,const AuRfWire *,uint64_t now);
 int cp_s4_flush_rf(struct cp_step04_session *,AuRfIngress *);
 int cp_s4_tick(struct cp_step04_session *,uint64_t now);
 int cp_s4_authenticated(struct cp_step04_session *);
+/* Post-auth sender for cp_wireless_init(), with separately tracked ACK. */
+int cp_s4_wireless_send(void *,const uint8_t *,size_t);
 void cp_s4_revoke(struct cp_step04_session *);
 #endif

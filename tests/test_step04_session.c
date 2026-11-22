@@ -13,6 +13,9 @@ static struct cp_step04_session s;
 static AuRfIngress rf;
 static struct cp_stock_mfi stock;
 static int up=1,control_up=1,peer_ok=0,wired=1;
+static int wifi_enabled=0;
+static struct cp_wireless wireless;
+static struct cp_oem_assertions proof={0,1,1,1,1,0};
 static unsigned cert_calls,signature_calls,tx_frames;
 int APSMFiPlatform_CopyCertificate(uint8_t **bytes,size_t *len){
  *bytes=malloc(4);if(!*bytes)return -1;
@@ -31,7 +34,13 @@ static int stock_fingerprint(void*p){(void)p;return up;}
 static int wi(void*p){(void)p;return wired;}
 static int peer(void*p,uint32_t e,uint32_t g){(void)p;return peer_ok&&e==7&&g==1;}
 static int other(void*p,const uint8_t *data,size_t n){
- (void)p;(void)data;(void)n;return 1;
+ (void)p;
+ if(wifi_enabled){
+  int rc=cp_step04_dispatch(&s.auth,&wireless,&proof,data,n);
+  if(rc==CP_WL_OK)return 1;
+  if(rc!=CP_WL_IGNORED)return 0;
+ }
+ return 1;
 }
 static void release(void*p,void*b){(void)p;free(b);}
 static int send_native(void*p,const uint8_t *d,size_t n){
@@ -112,6 +121,23 @@ int main(void){
  feed(b,n,8);assert(cp_s4_authenticated(&s));
  flush();
  assert(cert_calls==1&&signature_calls==1&&s.auth.stage==CP_AUTH_SUCCEEDED);
+ /* A real Bluetooth CONTROL packet 5702 must receive Wi-Fi 5703, then
+  * its iAP2 ACK must NOT re-enter the MFi AA01/AA03 acknowledgement FSM. */
+ static const struct cp_session config={
+  .wifi={.ssid="AUDI_REVIEW",.passphrase="review-password",.security=2,.channel=6}
+ };
+ cp_wireless_init(&wireless,&config,cp_s4_wireless_send,&s);
+ wifi_enabled=1;
+ control_msg(message,0x5702,NULL,0);
+ n=frame(b,0x40,46,101,10,message,6);
+ feed(b,n,9);
+ assert(wireless.wifi_pre_sent==1&&s.wireless_pending&&s.link.outbound_pending);
+ assert(s.link.outbound_seq==102);
+ flush();
+ n=frame(b,0x40,46,102,0,NULL,0);
+ feed(b,n,10);
+ assert(!s.wireless_pending&&!s.link.outbound_pending&&cp_s4_authenticated(&s));
+ wifi_enabled=0;
  /* A new generation cannot inherit old auth, and hard owner loss is final. */
  up=0;
  assert(cp_s4_tick(&s,200)==CP_LK_OWNER);

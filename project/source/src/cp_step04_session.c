@@ -57,6 +57,12 @@ static int link_control(void *opaque,const uint8_t *frame,size_t n){
 static int link_acked(void *opaque,uint32_t token){
  struct cp_step04_session *s=opaque;
  if(!s||!s->auth_ready||s->ack_in_progress)return -1;
+ /* Post-MFi Wi-Fi / CarPlay CONTROL frames use a distinct application
+  * token space; their ACK must never be mistaken for an AA01/AA03 ACK. */
+ if(s->wireless_pending&&token==s->wireless_token){
+  if(!cp_s4_authenticated(s))return -1;
+  s->wireless_pending=0;s->wireless_token=0;return 0;
+ }
  s->ack_in_progress=1;s->acked_token=token;
  int r=cp_auth_tx_confirm(&s->auth,token);
  s->ack_in_progress=0;s->acked_token=0;
@@ -101,9 +107,22 @@ int cp_s4_authenticated(struct cp_step04_session *s){
  if(!s||!s->auth_ready||s->link.phase!=CP_LK_NORMAL)return 0;
  return cp_auth_live(&s->auth);
 }
+/* Callback for cp_wireless_init(): transmit 5703 / 4301 on the same
+ * authenticated iAP2 CONTROL session after the stock MFi handshake. */
+int cp_s4_wireless_send(void *ctx,const uint8_t *frame,size_t len){
+ struct cp_step04_session *s=ctx;
+ uint32_t token;
+ if(!s||!frame||!len||!cp_s4_authenticated(s)||s->wireless_pending||
+    s->wireless_seq>=0x7fffffffu)return -1;
+ token=0x80000000u|(++s->wireless_seq);
+ if(cp_lk_queue_control(&s->link,frame,len,token,s->now)!=CP_LK_OK)return -1;
+ s->wireless_token=token;s->wireless_pending=1;
+ return 0;
+}
 void cp_s4_revoke(struct cp_step04_session *s){
  if(!s)return;
  cp_lk_revoke(&s->link);
  if(s->auth_ready)cp_auth_revoke(&s->auth);
  s->ack_in_progress=0;s->acked_token=0;
+ s->wireless_pending=0;s->wireless_token=0;
 }
