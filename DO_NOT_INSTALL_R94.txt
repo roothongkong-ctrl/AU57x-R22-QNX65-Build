@@ -1,0 +1,4 @@
+R94 source-only. DO NOT FLASH / DO NOT REPLACE connectivity.json ON VEHICLE.
+Offline generated wrapper/config are review artifacts, not an install package.
+Missing exact original configuration and in-car original event-owner verification.
+User preference: finish the feasible development before one final car visit.

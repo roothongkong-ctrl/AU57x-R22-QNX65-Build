@@ -1,0 +1,10 @@
+Version: R94 (2026-11-22)
+Branch: r94-launcher-preload-reversible-offline
+Firmware: MHI2_CN_AU57x_K1006_2 / MU1005 / QNX 6.5 ARMv7
+New completed offline tasks: pinned original launcher audit, reversible factory-configuration staging, 12 integration regression shells; R93 QNX CI verified.
+Unchanged/partially complete: R92/R93 native btstack LD_PRELOAD shim, R45 native RF binding pending original owner.
+DO NOT INSTALL: true
+STOCK BTSTACK FILE INCLUDED: false
+FACTORY LAUNCHER FILE INCLUDED: false
+ACTUAL CARPLAY LINK ESTABLISHED: false
+VEHICLE_VERIFIED: false

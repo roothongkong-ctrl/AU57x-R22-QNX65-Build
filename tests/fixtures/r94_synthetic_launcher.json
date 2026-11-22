@@ -1,0 +1,15 @@
+{
+  "schema": "SYNTHETIC_FIXTURE_NOT_OEM",
+  "modules": [
+    {
+      "name": "bluetooth",
+      "exec": "/eso/bin/apps/bluetooth"
+    },
+    {
+      "name": "btstack",
+      "exec": "/eso/bin/apps/btstack",
+      "preCondition": "/tmp/mvloaded",
+      "restart": true
+    }
+  ]
+}

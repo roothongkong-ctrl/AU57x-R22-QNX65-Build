@@ -257,3 +257,7 @@ no fake BT-only success can authorize CarPlay. The real AU57x SDK client-open
 and cancellation callbacks are **not yet located or implemented**, and the
 real car's AirPlay/media proof remains unbound. No executable vehicle test
 package, donor blobs or SD installer. See `docs/R87_CONGO_WCP_AU57X_INTEGRATION_CN.md`.
+
+## R94: 持续完成多项（2026-11-22）
+
+这轮完成 1) R93 QNX 云端结果验收；2) 原厂 MU1005 `connectivity_launcher` 精确 SHA 的启动器入口审计；3) 只面向电脑离线预览的 `connectivity.json` 可回退启动配置生成器；4) 保留 R90/R91 蓝牙/iAP2/MFi 和 SD 事务基础测试。**R94 不能直接刷进车机**，尚无真实 BlueSDK 运行时回调绑定。详细记录 `docs/R94_MULTI_STEP_PROGRESS_CN.md`。
