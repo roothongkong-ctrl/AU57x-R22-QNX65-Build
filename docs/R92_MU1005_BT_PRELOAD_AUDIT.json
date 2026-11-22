@@ -1,0 +1,17 @@
+{
+  "firmware": "MHI2_CN_AU57x_K1006_2/MU1005",
+  "btstack_sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
+  "elf32_arm_qnx": true,
+  "pthread_create_plt_va": "0x117390",
+  "original_pthread_create_callsites": [
+    "0x236668",
+    "0x2368c8",
+    "0x236c2c",
+    "0x236c48"
+  ],
+  "preload_supported_by_qnx65_docs": true,
+  "runtime_in_car_observed": false,
+  "real_rfcomm_hook_observed": false,
+  "iap2_mfi_vehicle_verified": false,
+  "safe_to_flash": false
+}

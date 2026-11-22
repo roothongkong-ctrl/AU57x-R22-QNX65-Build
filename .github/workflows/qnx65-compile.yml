@@ -1,7 +1,7 @@
 name: AU57x R52 QNX6.5 ARMv7 (REVIEW ONLY)
 on:
   push:
-    branches: [main, r91-exp-rf-zero-fastconnect]
+    branches: [main, r92-native-btstack-preload-owner-probe]
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
           if git ls-files | grep -Ei '\.(so|dll|elf|img|bin|7z|spk|key|pem|p12|pfx|o|a|zip)$'; then
             echo 'ERROR: this public repository must not contain proprietary binaries or keys'; exit 3
           fi
-          test "$(find project/source -name '*.c' | wc -l)" -eq 39
+          test "$(find project/source -name '*.c' | wc -l)" -eq 40
       - name: Host Bluetooth RF/IPC/socket contract (ASan + UBSan)
         shell: bash
         run: bash tests/run_bt_host.sh
@@ -47,6 +47,13 @@ jobs:
             -v "$GITHUB_WORKSPACE":/src -w /src \
             au57x-qnx65-cc:8.5 \
             bash /src/ci/compile_qnx_in_image.sh
+      - name: R92 QNX native LD_PRELOAD library is produced (no OEM calls)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s qnx_build_result/libau57x_bt_preload_qnx_REVIEW_ONLY.so
+          file qnx_build_result/libau57x_bt_preload_qnx_REVIEW_ONLY.so
+          grep -q 'Shared library: \[libc.so.3\]' qnx_build_result/logs/r92_preload_readelf.txt
       - name: Strict QNX ELF gate
         shell: bash
         run: |

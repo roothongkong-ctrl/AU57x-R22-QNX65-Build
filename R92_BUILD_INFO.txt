@@ -1,0 +1,10 @@
+R92 / 2026-11-22
+Target: Audi A6L 2017 C7 PA, MHI2_CN_AU57x_K1006_2 / MU1005
+Branch: r92-native-btstack-preload-owner-probe
+Original stock btstack SHA256: 51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566
+R92 new: LD_PRELOAD constructor, SHA256 image pin, pthread_create process-owner instrumentation
+R92 verified static OEM pthread_create callsites: 4 of 4, p LT 0x117390
+R92 host actual LD_PRELOAD tests: pass, including negative hash and opt-out
+QNX build: create libau57x_bt_preload_qnx_REVIEW_ONLY.so (cloud status to be checked)
+Car iPhone/MFi connection: NOT YET PROVEN
+Deliverable: SOURCE ONLY / NO INSTALL / NO OEM BINARIES / NO MFI KEYS

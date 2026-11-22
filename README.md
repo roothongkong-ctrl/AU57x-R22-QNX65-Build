@@ -1,3 +1,11 @@
+# R92：原厂 btstack QNX LD_PRELOAD 入口与线程追踪（SOURCE ONLY）
+
+**本版新增真实进程入口：** `bt_preload_probe.c` 实现已核验 MU1005 ELF 哈希的 QNX 动态预加载构造器、`pthread_create` 代理和日志观察。离线从原厂 ARM ELF 找出 4 个调用点，并可用主机真实 `LD_PRELOAD` 实测执行。新增 QNX ARMv7 `.so` 编译任务。**这不是实际车上蓝牙 RFCOMM 回调，也不能声称 iPhone 已接通。**
+
+参见 `docs/R92_STOCK_BTSTACK_PRELOAD_THREAD_ENTRY_CN.md`。执行 `bash ci/host_bt_preload_probe.sh` 检查注入机制。安装仍阻塞：需真实原厂进程运行及 BlueSDK owner 回调识别。**NO_INSTALL / safe_to_flash=false。**
+
+---
+
 ## R91 FAST-CONNECT EXPERIMENT (2026-11-22)
 
 User-priority change: attempt stock MU1005 Bluetooth iAP2 first connection as early as possible. See `docs/R91_FAST_CONNECT_CN.md`. R91 adds an **opt-in, unverified RFCOMM argument-0 trial** (`AU57X_FAST_CONNECT_EXPERIMENT=1`) only if the original owner does not provide a verified argument. Original MFi and iAP2 protocol gating remain intact. This is a compiled research source; **it does not contain a usable btstack loader, is not a working wireless CarPlay implementation, and is NOT INSTALLABLE**.

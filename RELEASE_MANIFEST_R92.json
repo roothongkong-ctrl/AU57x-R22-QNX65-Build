@@ -1,0 +1,1234 @@
+{
+  "version": "R92",
+  "firmware": "MHI2_CN_AU57x_K1006_2/MU1005",
+  "oem_btstack_sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
+  "stock_btstack_included": false,
+  "qnx_preload_implemented": true,
+  "oem_owner_callback_bound": false,
+  "iphone_iap2_mfi_verified": false,
+  "vehicle_verified": false,
+  "installable": false,
+  "safe_to_flash": false,
+  "files": [
+    {
+      "path": ".github/workflows/ci-watchdog-20m.yml",
+      "sha256": "5a7c0e3594ff8a4fdb77ac08dd835e75b25ff0ba51c7bafdef70a6082d7b58eb",
+      "bytes": 4905
+    },
+    {
+      "path": ".github/workflows/cloud12-review.yml",
+      "sha256": "c3849fadb922d80d486bf775b7e1a914b1761d748bbd376611f02cb8c694788d",
+      "bytes": 4805
+    },
+    {
+      "path": ".github/workflows/qnx65-compile.yml",
+      "sha256": "19a529103e4b79e811efc3bc33bfe7913b346081df15700c01f2c06a06c835da",
+      "bytes": 3465
+    },
+    {
+      "path": "DO_NOT_INSTALL.txt",
+      "sha256": "0068299c282cdfd634eb91d6f5ce40d4165c4ca98ee2d1e97a8ed9d9456f9831",
+      "bytes": 369
+    },
+    {
+      "path": "DO_NOT_INSTALL_R92.txt",
+      "sha256": "b65baae96e937c3eac318da30d0f6f0217fadd48f8c1dabb20779e55143e0e73",
+      "bytes": 243
+    },
+    {
+      "path": "GRAFT_LIFECYCLE_REWORK_R2_20261116.md",
+      "sha256": "20b76bce2eb3a47e2483db17d771783ba6c82085992da79000b0f7bd6d998b64",
+      "bytes": 2630
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "bytes": 35149
+    },
+    {
+      "path": "NOTICE_THIRD_PARTY_CN.md",
+      "sha256": "d8f45d12b95e38e694a99b47ce1a6cd875dcb690c59d86b30c17567064bee4c2",
+      "bytes": 2636
+    },
+    {
+      "path": "R87_BUILD_INFO.txt",
+      "sha256": "4ff9b0c45b8b986f185bc8d5b066619e901a538889d60d5aeefcb6bc4dce3d9d",
+      "bytes": 580
+    },
+    {
+      "path": "R88_BUILD_INFO.txt",
+      "sha256": "e995696e5e9a1689146a8405ab275fcafeb2117a98e7f2486d1db837fc7189fc",
+      "bytes": 668
+    },
+    {
+      "path": "R89_BUILD_INFO.txt",
+      "sha256": "12be69ab0955ae1dc39ae2eb75c9820e32fa085a22d517f27eb843deb696757d",
+      "bytes": 651
+    },
+    {
+      "path": "R90_BUILD_INFO.txt",
+      "sha256": "5b18f96551ba34834feb3b06dcaf9899374c9e856a63687021d18b3df5abe964",
+      "bytes": 958
+    },
+    {
+      "path": "R91_BUILD_INFO.txt",
+      "sha256": "f23032231699f69d38964420f81a2d315acb506276ca8660fae67c4da78c0cfb",
+      "bytes": 768
+    },
+    {
+      "path": "R92_BUILD_INFO.txt",
+      "sha256": "4b2ecad17de6cb5f385e3d340eb708ca4b973b6cfc7e86a08b75e6c494ac1059",
+      "bytes": 662
+    },
+    {
+      "path": "README.md",
+      "sha256": "d45b1d74e402503aceaabae5acbd5ecf4816be4711486366519e984e2f66f242",
+      "bytes": 19228
+    },
+    {
+      "path": "RELEASE_MANIFEST_R88.json",
+      "sha256": "053b25f1fa00d8555189934ee5ef140a4fb6494a2c1ee0cc02877003b58e1479",
+      "bytes": 450
+    },
+    {
+      "path": "RELEASE_MANIFEST_R90.json",
+      "sha256": "80818736249632c53224976d3988c9f7a814e397ed9f2bbc3b5c967a8009ea73",
+      "bytes": 24866
+    },
+    {
+      "path": "RELEASE_MANIFEST_R91.json",
+      "sha256": "e23b5d4e041e921005d131836f470d98294b26129d5f2d29a5b65dbbef17d584",
+      "bytes": 25887
+    },
+    {
+      "path": "SHA256SUMS_R88.txt",
+      "sha256": "8500fffcd905403ab4a0ed142a165a10a6230c0d3c735ebb8386760b53ecb262",
+      "bytes": 21075
+    },
+    {
+      "path": "SHA256SUMS_R90.txt",
+      "sha256": "01e6dd7f12dce4441e19b2bfc102e058fd60a8da3c4741694f1fe817f1c53517",
+      "bytes": 22649
+    },
+    {
+      "path": "SHA256SUMS_R91.txt",
+      "sha256": "94de768db165fc640ca0c32a2a99938758aad26d221ce56d604b92014989c67c",
+      "bytes": 23539
+    },
+    {
+      "path": "ci/build_cloud_review_bundle.sh",
+      "sha256": "5941bdf8f1da8771db7f5495998d10c45b8fa0c13211e1797494996b02c040b6",
+      "bytes": 1171
+    },
+    {
+      "path": "ci/compile_qnx_in_image.sh",
+      "sha256": "c0aa6b109570e794df5dd38f7f299b36a2e4b978b39665bae044e4a5e7761919",
+      "bytes": 3617
+    },
+    {
+      "path": "ci/host_bt_preload_probe.sh",
+      "sha256": "d7721503fa08145b602f4bcdb5a195ed5b330488868df3f31f4444e9521400b2",
+      "bytes": 2075
+    },
+    {
+      "path": "ci/host_cloud_media.sh",
+      "sha256": "a673212d0ee4f794064df927f07453d783cfc310fe3e504d56d165d6448d2691",
+      "bytes": 623
+    },
+    {
+      "path": "ci/host_cloud_pipeline.sh",
+      "sha256": "e3f228c3500a53698eb9625f1b641bb986c012854646a6f89c4f6cc8bfb386fb",
+      "bytes": 1501
+    },
+    {
+      "path": "ci/host_csm_fuzz.sh",
+      "sha256": "1677141a5befe2071ec34be05300099629809a67c77b083fbb3746a7fd5660a3",
+      "bytes": 608
+    },
+    {
+      "path": "ci/host_handoff.sh",
+      "sha256": "e4a6146f2d90d3166cee04b3192f89ec669624b89b667ab9813a3fd3ac9e452b",
+      "bytes": 543
+    },
+    {
+      "path": "ci/host_mu1005_bridge.sh",
+      "sha256": "f65ae557d5ee85bb98d32b789022431b29bd5daaadb2ace8498e2da6260398a8",
+      "bytes": 636
+    },
+    {
+      "path": "ci/host_mu1005_callback.sh",
+      "sha256": "4789fcd9896b4ae4dd1b0b1cdc8a8e1d6c96322eec4a0212e8c910afcc95d578",
+      "bytes": 476
+    },
+    {
+      "path": "ci/host_oem_guard.sh",
+      "sha256": "cc82a877e8a39ece137bc0e5105cc32bb08126c3cc6222826763e6c1b3093593",
+      "bytes": 622
+    },
+    {
+      "path": "ci/host_r14_native.sh",
+      "sha256": "6625efffe1f9459a13973b6e58825a24e1d54c93f2a3850acba6f27910d92a58",
+      "bytes": 661
+    },
+    {
+      "path": "ci/host_radio_policy.sh",
+      "sha256": "15a8eb97e45df0dce0fefdb25239dd9a8e5c583d0a8dc18d7d19d66503f8eda0",
+      "bytes": 461
+    },
+    {
+      "path": "ci/host_rf_arg_experiment.sh",
+      "sha256": "6568083ea0a6cb9c0f93cb2ff1b1fa682b324507a9b9bddb2eb45818b91d7815",
+      "bytes": 468
+    },
+    {
+      "path": "ci/host_sd_txn.sh",
+      "sha256": "1668aef76564afac73590f009e6033b1f34a9547a3c0f913f837072c2b08d848",
+      "bytes": 223
+    },
+    {
+      "path": "ci/host_step04_link.sh",
+      "sha256": "d2418198d51bb24717892600b9ee1fb5028438012f513642f622786675d0adcf",
+      "bytes": 575
+    },
+    {
+      "path": "ci/host_step04_session.sh",
+      "sha256": "e6a17bf609508afa2d2ccd5d2c44bab68530a752676f6800392edae008dc791e",
+      "bytes": 928
+    },
+    {
+      "path": "ci/host_step04_socket.sh",
+      "sha256": "b9ae176d036fc63667535a05818c2d5cbe58003fa2d52cd66ca372b7b14739ed",
+      "bytes": 1054
+    },
+    {
+      "path": "ci/host_step04_stock_mfi.sh",
+      "sha256": "0bc3a74d1bb9834fb60c18b34a9e103082e8efbac379f49352ba669ded050474",
+      "bytes": 793
+    },
+    {
+      "path": "ci/host_step04_tcp.sh",
+      "sha256": "3b5db9c4fcbdabbf3829d9faf49dbc9e12de82c989a042aa66d472cf77d9082a",
+      "bytes": 995
+    },
+    {
+      "path": "ci/host_wcp_autoconnect.sh",
+      "sha256": "09f4e38fe9533bc4b7acdd3176182ea1d0664079035a0658c55ba56c6c5b6836",
+      "bytes": 462
+    },
+    {
+      "path": "ci/host_wcp_r45_ingress.sh",
+      "sha256": "a45f4ce22f7fdd914173082da82fcc265e2434c9d88c03ac5a9b3f99d57c7c92",
+      "bytes": 459
+    },
+    {
+      "path": "ci/host_wcp_r45_remote.sh",
+      "sha256": "38ff2b85b9839aeb726d4f4cde6ea2ef2644038edf583a6a71c6c65f0cf97917",
+      "bytes": 719
+    },
+    {
+      "path": "ci/host_wcp_r45_remote_mfi.sh",
+      "sha256": "4f9bea9847d25f24304617a71ac6cfb0ffacf706d18b46017a0de1301cccf040",
+      "bytes": 735
+    },
+    {
+      "path": "ci/qnx_dlopen_smoke.c",
+      "sha256": "36f306644778ea51f65176abc1a71663120f0ffeae145d6ef5d3c1b42d8d1376",
+      "bytes": 8073
+    },
+    {
+      "path": "ci/qnx_runtime_smoke.sh",
+      "sha256": "b8bafe0c92291c49261e6afc666c79592249c15105b63248579ce927579f6800",
+      "bytes": 2361
+    },
+    {
+      "path": "ci/r92_qnx_manual_launch_example.sh",
+      "sha256": "08249db977278498cd77fdd74b5e4071b677625d8f8ff33b64f99e1e64ca647d",
+      "bytes": 798
+    },
+    {
+      "path": "docs/CLOUD12_LEDGER.json",
+      "sha256": "dd7ba1481c2405ad08100237a881d7f8c93a2923aa923f67d2a9cc63850c89c7",
+      "bytes": 7525
+    },
+    {
+      "path": "docs/CLOUD12_SCOPE_ACCEPTANCE_CN.md",
+      "sha256": "399efa971644f90f41c04a80b289c4e66ecf8ac1bf1de10431c81d2770ef1c26",
+      "bytes": 2035
+    },
+    {
+      "path": "docs/CLOUD_README_CN.md",
+      "sha256": "851d2e8ed7add63a2ea4d1e80b5e1a0d2ecc96d80dcba9b8d3dca14b255e4a4a",
+      "bytes": 2333
+    },
+    {
+      "path": "docs/R25_GITHUB_REUSE_MATRIX.json",
+      "sha256": "55069ef2980685c80ba119ee281eb66ce5f39556ea9de125e144f998c63c23a9",
+      "bytes": 2610
+    },
+    {
+      "path": "docs/R25_GITHUB_REUSE_MU1005_CN.md",
+      "sha256": "382907241b947d631031c3c9e765245247d670299fd231ba0b6e374c8fe91e6e",
+      "bytes": 6843
+    },
+    {
+      "path": "docs/R29_BLUETOOTH_DSI_OWNER_CN.md",
+      "sha256": "1fcb889910442f6401441a78aed90767630ca22007b5ee2b6df78166e3b7c495",
+      "bytes": 1768
+    },
+    {
+      "path": "docs/R29_BT_DSI_OWNER_AUDIT.json",
+      "sha256": "ba666a85230adb5a7e85abef75bd92b05afd0a7dc3a15be461a7f44d581d7995",
+      "bytes": 1289
+    },
+    {
+      "path": "docs/R31_MM_IPOD_AUDIT.json",
+      "sha256": "08df0371caa49a84f7cf43037d4028be1af2d345a9e2562b45f0fdbedabe5063",
+      "bytes": 645
+    },
+    {
+      "path": "docs/R31_MM_IPOD_LOADER_CN.md",
+      "sha256": "78de85ad511982219028a50a3face29169659e3deb5229bafd4bd18e7ec96a44",
+      "bytes": 1086
+    },
+    {
+      "path": "docs/R37_SD_TRANSACTION_SIM_CN.md",
+      "sha256": "e532550059e8ebf401ef0b94bef886b7e638413169f338e2efa266e02cf37c55",
+      "bytes": 783
+    },
+    {
+      "path": "docs/R38_MU1005_BLUETOOTH_CALLBACK_CN.md",
+      "sha256": "ef8684f02cf4d5c9789d7c3a14c2e0cef8a715ab15cb8a2a3a370b9b0b470d62",
+      "bytes": 986
+    },
+    {
+      "path": "docs/R39_CALLBACK_TO_NORMALIZED_RF_CN.md",
+      "sha256": "e0b63a420dd25139a434eb20c40b23dc63d41614cce078ad2217da2c389dec82",
+      "bytes": 868
+    },
+    {
+      "path": "docs/R40_PENDING_TX_AFTER_DISCONNECT_CN.md",
+      "sha256": "c1a3301313a79cb4918d295ebbadaccc56083ad31476dc12d73fe4740571e33f",
+      "bytes": 517
+    },
+    {
+      "path": "docs/R41_STOCK_MFI_INTEGRATION_CN.md",
+      "sha256": "ef64d586849add00d8f9634277b97a9e53e6d2d56eb62ae7e03a278dbaddf47e",
+      "bytes": 1742
+    },
+    {
+      "path": "docs/R42_IAP2_INTERLEAVED_AUTH_CN.md",
+      "sha256": "b5632f87a9a8d96c965c523426f8e68aac6718b4c3ee6d34ad294f6bd1f92c6c",
+      "bytes": 895
+    },
+    {
+      "path": "docs/R43_IAP2_LINK_UPSTREAM_PORT_CN.md",
+      "sha256": "7086dca2f1861a6f1e107ad7fc723beda9066ce61691cc02aff49ed7ee45bf9c",
+      "bytes": 1824
+    },
+    {
+      "path": "docs/R44_FULL_LINK_TO_STOCK_MFI_CN.md",
+      "sha256": "676afdb75cda39ed6112695bee35a3b4090a9dda56d5c765cb40ecc02978d7ff",
+      "bytes": 1232
+    },
+    {
+      "path": "docs/R45_MU1005_BTSTACK_STATIC_RECHECK.json",
+      "sha256": "0a9a8423c607f1213526821661795b8ae868de1f2c3b180a8e4eb44b704f2a39",
+      "bytes": 4046
+    },
+    {
+      "path": "docs/R45_NATIVE_BLUESDK_MU1005_CN.md",
+      "sha256": "3c13bca01613ec94e43286dfaa8e17e1ca5ccd8cb226bfd9424804d5cc453d6a",
+      "bytes": 3017
+    },
+    {
+      "path": "docs/R50_CLOUD_04_TO_11_CN.md",
+      "sha256": "32bf228a1992e8c25e8eb1323048d2d7caeb819f7a9d524f0e39472a9b0bd3ea",
+      "bytes": 2574
+    },
+    {
+      "path": "docs/R71_NATIVE_SI_MEDIA_CN.md",
+      "sha256": "166c2d02153cb0ca322aea0f1f498276fdbf1bf954259678520705b660b480e5",
+      "bytes": 1642
+    },
+    {
+      "path": "docs/R72_SINGLE_SI_RECEIVER_OWNER_CN.md",
+      "sha256": "f50092c4aef4d9ef18e7c89c0d3d7495b50d2bce1901ae97f6f927ed7b816f22",
+      "bytes": 1970
+    },
+    {
+      "path": "docs/R73_SI_OWNER_TICK_WIRED_RESTORE_CN.md",
+      "sha256": "45a617f39671bdf2b4f72a2dc56786d203d13f10d46ef3f49e478d329206e072",
+      "bytes": 2535
+    },
+    {
+      "path": "docs/R74_SI_SESSION_SCOPED_PROOFS_CN.md",
+      "sha256": "d7d26df8a932e0026d5c971e4a15285db3b48e33e99b38776b751031b7914bf5",
+      "bytes": 1589
+    },
+    {
+      "path": "docs/R75_SI_IPC_CLIENT_ADMISSION_CN.md",
+      "sha256": "80e27422e8f6465dbb7347f2188f96a343938923856b5c224f15f10a349a6e26",
+      "bytes": 1696
+    },
+    {
+      "path": "docs/R76_SI_UNIX_PEER_QNX65_CN.md",
+      "sha256": "e4ccb0e1c5cfd1b7b910bc9ecf447780ad54bb89fdcedc5a04bb9f60d70c96b1",
+      "bytes": 3154
+    },
+    {
+      "path": "docs/R77_SI_SOCKET_RESTORE_BARRIER_CN.md",
+      "sha256": "4a876869e38a2e5dffc0baed60e615526f5784e20007c1b6efb186039aef0a6e",
+      "bytes": 2440
+    },
+    {
+      "path": "docs/R78_SI_AUTO_START_CLIENT_CN.md",
+      "sha256": "35ed04d1c1a417524416bcc60ef208dba296ae69ac23306d0b4a3919dcc25f84",
+      "bytes": 2933
+    },
+    {
+      "path": "docs/R79_NATIVE_GRACEFUL_STOP_CN.md",
+      "sha256": "882b92b42fba2a11da9b59e5c7495650eb9248f0b0055d23c2c8c481fb7114d2",
+      "bytes": 3083
+    },
+    {
+      "path": "docs/R80_NATIVE_SESSION_WIRED_ROLLBACK_CN.md",
+      "sha256": "7d50f568cfd99d495e93838975d3bc500dd5507164fcbd316c1bad1e8d7dd04f",
+      "bytes": 3925
+    },
+    {
+      "path": "docs/R81_SI_DIO_SEPARATE_PROCESS_IPC_CN.md",
+      "sha256": "22c1540c930d695d32bfcfaeb9eb0bf21fa102db11eefcbef62b1868b6a82542",
+      "bytes": 3148
+    },
+    {
+      "path": "docs/R82_SI_DIO_READONLY_MEDIA_STATUS_CN.md",
+      "sha256": "46bafab0ef5f4effd856402fff3ab8d9cdf6a48f5bcdbfb5aed7f393b6c2b579",
+      "bytes": 2677
+    },
+    {
+      "path": "docs/R83_SI_DIO_SESSION_PROOF_CN.md",
+      "sha256": "70ffcae1bb1b26ccd8c957e3599dea54c74ed5957ffc328d6fc5ab2a588d21b1",
+      "bytes": 3206
+    },
+    {
+      "path": "docs/R84_SI_REMOTE_PIPELINE_CN.md",
+      "sha256": "3c236075f13d0332e70fcbfc9fdd0dd356cca2be03c2e7012fd02d136a038fef",
+      "bytes": 4812
+    },
+    {
+      "path": "docs/R85_SI_DIO_WIRED_RESTORE_CN.md",
+      "sha256": "54db1cff85e71bb71ca8bea17219db03150d42c7d17945d67bd1d9ee82fb6b0c",
+      "bytes": 3530
+    },
+    {
+      "path": "docs/R86_OEM_DELEGATE_AUDIT.json",
+      "sha256": "67b26279df0966e9b63a6de7ed85abe4ec242f1c52c9cb46056d53e940a3204a",
+      "bytes": 4574
+    },
+    {
+      "path": "docs/R86_ORIGINAL_OEM_DELEGATE_ABI_CN.md",
+      "sha256": "8afedc48d35026df28f94a68c49702a65af4aef3a8b16ca45dfe8c5cd6970e02",
+      "bytes": 3875
+    },
+    {
+      "path": "docs/R87_CONGO_WCP_AU57X_INTEGRATION_CN.md",
+      "sha256": "5b8506f8c9fb79ac72a4fc278278049a89dfd76b2b30f0f18212049aa0c97534",
+      "bytes": 5068
+    },
+    {
+      "path": "docs/R87_MHI2Q_REFERENCE_AUDIT.json",
+      "sha256": "fa85c324029f877f57d3324c1eb02e0ee35cf20e798271b581db07fdbad7fc64",
+      "bytes": 2359
+    },
+    {
+      "path": "docs/R88_MU1005_BT_IAP_PATH_AUDIT.json",
+      "sha256": "a2ab38509b1762a1891e6bbbf1dd582e795de7bc3602da09c142b6f97b978a9a",
+      "bytes": 3042
+    },
+    {
+      "path": "docs/R88_MU1005_BT_IAP_PATH_CN.md",
+      "sha256": "661f38a41ca5008c486f7c961fbde78de32bbdc00e88dcec4acde747f6aafddc",
+      "bytes": 4561
+    },
+    {
+      "path": "docs/R89_MU1005_RFCOMM_REGISTER_CALLERS.json",
+      "sha256": "7a201b6bec5146b89667502c8d22c16c19c2abe6179496697a217ccfc6e1234a",
+      "bytes": 782
+    },
+    {
+      "path": "docs/R89_REAL_BTSTACK_TO_R44_R87_CN.md",
+      "sha256": "6aa1170fb84c9e6e06c6f28e5c2988d7ce48d8f412aba8ab7209f74efb9e5c9f",
+      "bytes": 3869
+    },
+    {
+      "path": "docs/R90_MU1005_R45_IAP2_NORMAL_MFI_GATES_CN.md",
+      "sha256": "41c01e86d30ebab42c1936034daf062a0616c01465238e14a40583ec4d39d42a",
+      "bytes": 3396
+    },
+    {
+      "path": "docs/R91_FAST_CONNECT_CN.md",
+      "sha256": "74fd6657739b97624b8ce6d8b1d40b664d62ddd5c6a8899632f45f6e267dee5c",
+      "bytes": 2027
+    },
+    {
+      "path": "docs/R92_MU1005_BT_PRELOAD_AUDIT.json",
+      "sha256": "1107c0b1504c5295e5ffde27551666a797fb522faa67b41c14554a2d25b43faf",
+      "bytes": 491
+    },
+    {
+      "path": "docs/R92_STOCK_BTSTACK_PRELOAD_THREAD_ENTRY_CN.md",
+      "sha256": "979e818263997003d12edba37b6a918b706c279c56006134872a0e3ec3a4eb3d",
+      "bytes": 3877
+    },
+    {
+      "path": "docs/STEP04_MU1005_OEM_CALLMAP.md",
+      "sha256": "06cc08578b50e0b38681c5281bd3ba5090289f12d49a1d8dd5925f7e5ddd2da3",
+      "bytes": 8989
+    },
+    {
+      "path": "docs/STEP04_STATIC_EVIDENCE.json",
+      "sha256": "103ea1267a00cda98494677885938671ac322ee29dc08424c6149e5202a3c81a",
+      "bytes": 1998
+    },
+    {
+      "path": "docs/STEP05_MU1005_USB_PLUGIN_ABI_AUDIT.json",
+      "sha256": "33f1ad9e2597ffcb67e6ec88228d1a10a354553713488314c5e70353cc3dd659",
+      "bytes": 1183
+    },
+    {
+      "path": "docs/STEP05_R24_MU1005_OEM_LOADER_ABI_CN.md",
+      "sha256": "b4e43c53c513bb578cf239b46328f8bd990ff9d06bf4eed6df7abcbbb5644752",
+      "bytes": 3213
+    },
+    {
+      "path": "docs/STEP05_TO_12_R24_ACCEPTANCE_CN.md",
+      "sha256": "a1a3c91eced19f164e767d33ae0d08a18963254291299f55955ada566517146f",
+      "bytes": 1540
+    },
+    {
+      "path": "docs/STEPS05_TO_12_ACCEPTANCE_CN.md",
+      "sha256": "872ba9f06a7d4f366a69b5fb901712686137866b894ee0be697bb804d0ba89c0",
+      "bytes": 1568
+    },
+    {
+      "path": "graft_au57x_candidate.c",
+      "sha256": "315bfa4123a41777a8b5a9ae7f4d47cee774a9717ae227de6750a3bbda2aa674",
+      "bytes": 28785
+    },
+    {
+      "path": "project/source/legacy_mu1005/airplay/cprx_service.c",
+      "sha256": "90ae60e6b0804ad0ae326ee9b6b4e343118ebbdb0bec0986a91ebcecd67208d3",
+      "bytes": 30621
+    },
+    {
+      "path": "project/source/legacy_mu1005/airplay/cprx_service.h",
+      "sha256": "a2ba8abdda6fa4fbf95c0bdc7fb9d8db28a01a73cb2b1e4c57a22e9e1db8c78a",
+      "bytes": 10580
+    },
+    {
+      "path": "project/source/legacy_mu1005/airplay/mu1005_r34_ap_server.c",
+      "sha256": "e14c43532aa0de301fa1ce1cdd9c4ccb98120171e4ab8b7ef1442dc26903e026",
+      "bytes": 7841
+    },
+    {
+      "path": "project/source/legacy_mu1005/airplay/mu1005_r34_ap_server.h",
+      "sha256": "2590bd8e72491b3677d7ffe02b1cb559d921362968d28dbe06db5ead45e6dbc3",
+      "bytes": 4955
+    },
+    {
+      "path": "project/source/legacy_mu1005/airplay/native_exports.c",
+      "sha256": "99c97b64cb1c7b41ccc610ac768817794741161f7e364d4055b8f94de47ae6dd",
+      "bytes": 5833
+    },
+    {
+      "path": "project/source/legacy_mu1005/airplay/native_exports.h",
+      "sha256": "c58ae89ccfe44e6f4babcbdc0bcaf7930ffa76574af42a151a6b50b90be07883",
+      "bytes": 2817
+    },
+    {
+      "path": "project/source/legacy_mu1005/airplay/semantic.c",
+      "sha256": "bb5ad61ed5cd14fd288babf0ce2a5a239c42a44a2c9a9fd4cbca2939a632c00a",
+      "bytes": 1418
+    },
+    {
+      "path": "project/source/legacy_mu1005/airplay/semantic.h",
+      "sha256": "a44c82348cadb76a5b78beaf075afe138bb9ff797396077298b0305af3aef736",
+      "bytes": 673
+    },
+    {
+      "path": "project/source/legacy_mu1005/airplay/wifi_interface.c",
+      "sha256": "67cd6b8072d5c76d86b4c317d11b9c7e784dce3b843ec98db6d90453481c6b00",
+      "bytes": 1332
+    },
+    {
+      "path": "project/source/legacy_mu1005/airplay/wifi_interface.h",
+      "sha256": "c8280b87d3e32e45a6556badd00bee6868b3a0316ddc1b123131776d20820b88",
+      "bytes": 401
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/bt_preload_probe.c",
+      "sha256": "cbc982fb7fc9904c62fe964fcae4d2ccbc98f5438eaca048273d11d0dbe09306",
+      "bytes": 4053
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/bt_preload_probe.h",
+      "sha256": "1eb7698b1717f1da607edf1b998c8b4108d293397bbb6ac4f6071624951cb0bc",
+      "bytes": 244
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/inbound.c",
+      "sha256": "16bff9e51a970331bbf81954136a4444f1668d95a2edd055b830e3a64a19fb44",
+      "bytes": 6037
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/inbound.h",
+      "sha256": "e24078a03c28d90963541b00c842ad2de1a289c1212ab686d766f6df4860d536",
+      "bytes": 2598
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/inbound_r5.c",
+      "sha256": "9f3f6d8ce758fc78e68c55eb5782683d9901949df21bce88698ea2d6c798d131",
+      "bytes": 5327
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/inbound_r5.h",
+      "sha256": "43c5acfd82d4d018fb6e5fbbff355d5df59ac9f922288e7f97cb7fc407359157",
+      "bytes": 1420
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/mu1005_ipc_stream.c",
+      "sha256": "4de7ccfe5e40dcd8b291bce5b23e5c70a9705a37cfc051ea0f498f0239a95095",
+      "bytes": 2366
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/mu1005_ipc_stream.h",
+      "sha256": "ffdb6b013c32d98caaadb9c709c4016c1a3820f6d3ba36b8b3dc65d3b8068796",
+      "bytes": 775
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/mu1005_rf_ingress.c",
+      "sha256": "fc8ec1e960c2d6223808b762d0eaa48e2bdfde1c0bf36b86e1a5594e808d4645",
+      "bytes": 3257
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/mu1005_rf_ingress.h",
+      "sha256": "00e577821d87f946c1631ed5816cf79f9fe6bd5e9ba1b2b1e77d25c1a9025433",
+      "bytes": 1129
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/mu1005_socket_pump.c",
+      "sha256": "5518d686f698dc2774058d7ef063b2bfbe219dc3c99522ddfbafbef7e56271b4",
+      "bytes": 3177
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/mu1005_socket_pump.h",
+      "sha256": "14e044eceb819cff71cf9fd6fa379b51d7838b1ce435e0a5510b86e0e9b242ba",
+      "bytes": 540
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/native_binding.c",
+      "sha256": "54c422e6b5ae5de5b44fcd61552d2a2207f3270e72412165b37b88a686d4cf4a",
+      "bytes": 4194
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/native_binding.h",
+      "sha256": "4cf94eb93fa14dfffe162b58c68828633e3bb0e5a39bef58acdc1ac37832fcd5",
+      "bytes": 1227
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/native_binding_words.h",
+      "sha256": "fd885de6f3295cb548bffd6a64d587032427e01d39b7e28295e2545ff3fdfaac",
+      "bytes": 1246
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/native_event.c",
+      "sha256": "b92c3da12ee890d4d9593ad61f34073bf6d893eb35c3ef6cce9480146a2f723e",
+      "bytes": 2055
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/native_event.h",
+      "sha256": "2731906d3e07040536662449c8d774e3dda894c52917b639ea3a11826fca9f2e",
+      "bytes": 1195
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/rf_arg_experiment.c",
+      "sha256": "38b41288861a9de2dc6accb017b4d84cae26aab3f51209c32cfa77ab21a401f6",
+      "bytes": 556
+    },
+    {
+      "path": "project/source/legacy_mu1005/bluetooth/rf_arg_experiment.h",
+      "sha256": "8b5a3e5284b4ecf2504eaf8e3e5376bffe7edba8efa8e3e57c799dd458171b1d",
+      "bytes": 533
+    },
+    {
+      "path": "project/source/src/cp_bt_bridge.c",
+      "sha256": "1dede011bf353d914e4496788b995cffd944cc5ac068c44ee37a080ec58e28fa",
+      "bytes": 4822
+    },
+    {
+      "path": "project/source/src/cp_bt_bridge.h",
+      "sha256": "8d487e915775b9c37476ebddcfc9783967e3470539134c5ea1454cb7e81e9716",
+      "bytes": 3069
+    },
+    {
+      "path": "project/source/src/cp_bt_stream.c",
+      "sha256": "5ae894495bf3ab8c4cca934d9cd53cc4f89d3354047d96a8347ac0d41c0ee173",
+      "bytes": 3350
+    },
+    {
+      "path": "project/source/src/cp_bt_stream.h",
+      "sha256": "6f5ef238b3d2ce0227a3fa807e529c5f78592cc410ac54d92ecfec921649c552",
+      "bytes": 1903
+    },
+    {
+      "path": "project/source/src/cp_cloud_media.c",
+      "sha256": "383b2effda74389da2c576c4f35c2c4de76de580ab00e77951fea69ef465de65",
+      "bytes": 2298
+    },
+    {
+      "path": "project/source/src/cp_cloud_media.h",
+      "sha256": "504c4343e7ffc152b45cfb7755daa85aa3956eb53904dec6fde68322f8f242ba",
+      "bytes": 1432
+    },
+    {
+      "path": "project/source/src/cp_cloud_pipeline.c",
+      "sha256": "cc3156d308ea3087e4487a2b01d318e3416c0769153a2f1007229c6118b2fee0",
+      "bytes": 40385
+    },
+    {
+      "path": "project/source/src/cp_cloud_pipeline.h",
+      "sha256": "acd07156918a182e2a612c0d58139b80c875447d442aa93dfe4eac213344c7a8",
+      "bytes": 9040
+    },
+    {
+      "path": "project/source/src/cp_csm.c",
+      "sha256": "091acc4d3e9369c092deb5ec70460efcd892acc5d44f3ec1e75923132fa3d6bf",
+      "bytes": 6630
+    },
+    {
+      "path": "project/source/src/cp_csm.h",
+      "sha256": "76edd36081c217baae754a48d3070ef4b7b90ce49c39d1a7cb7fbb56f7e8371a",
+      "bytes": 1925
+    },
+    {
+      "path": "project/source/src/cp_event.c",
+      "sha256": "f7fc3a029a016b9687b98b5afbd5d29b1dfe8a22d51295fcbc3d9056fc95f2e6",
+      "bytes": 1510
+    },
+    {
+      "path": "project/source/src/cp_event.h",
+      "sha256": "ee0fbd7490a90c12244ea70959d04819704734b17a9167cd14e90a4eb44622bf",
+      "bytes": 807
+    },
+    {
+      "path": "project/source/src/cp_ipod_callback_observed.h",
+      "sha256": "e072d3180219f9bb75f7c6c132017761726e611be960e9e0e337b3872d56fa12",
+      "bytes": 1410
+    },
+    {
+      "path": "project/source/src/cp_ipod_module_layout.h",
+      "sha256": "2740842942468bf4c81bbe7c4b319dbf53b79e8c2ca69f9739263b2305e14b7f",
+      "bytes": 1471
+    },
+    {
+      "path": "project/source/src/cp_mu1005_bridge.c",
+      "sha256": "afe63bd0890e99be3bedbc57880e7c2b1c7af58dd5f1f8b40afaa0da33f42bd3",
+      "bytes": 2718
+    },
+    {
+      "path": "project/source/src/cp_mu1005_bridge.h",
+      "sha256": "63c3372e9421b629880fd806b4795f1728880738e98761ce43c7179f06a39dbb",
+      "bytes": 1170
+    },
+    {
+      "path": "project/source/src/cp_mu1005_callback.c",
+      "sha256": "63f6ee14134eff177a27487bc4ed00ea4f157eb8b388e1930e308f217c3ce53e",
+      "bytes": 1899
+    },
+    {
+      "path": "project/source/src/cp_mu1005_callback.h",
+      "sha256": "f6eed9889c26c0c5c5b2d9dc5f2d915dcf4e4f96dab88e3d77dcaadcac408d53",
+      "bytes": 1011
+    },
+    {
+      "path": "project/source/src/cp_oem_boundary.c",
+      "sha256": "5bc6e8dc878065097eadf38f8028a7ffd1c9be9de75668e6a679d385beec186b",
+      "bytes": 614
+    },
+    {
+      "path": "project/source/src/cp_oem_boundary.h",
+      "sha256": "c9a30d9e6953e46fd9dffdd2f883ef0af1505b6f2f427337a56fbd4b53f2676c",
+      "bytes": 857
+    },
+    {
+      "path": "project/source/src/cp_oem_handoff.c",
+      "sha256": "1712b1394a77a3304607805a905743965ec39fe42d054348d3599db88be01abe",
+      "bytes": 9295
+    },
+    {
+      "path": "project/source/src/cp_oem_handoff.h",
+      "sha256": "b71da9a29fb9d21f12604670fb6591867c1e7ba325d2705ba4b2b7ac613d8db0",
+      "bytes": 4774
+    },
+    {
+      "path": "project/source/src/cp_r12_pipeline.c",
+      "sha256": "b98b4ac8b0abdb952c5251c6b367d49d3d7445c7514673c763d151abfa07c088",
+      "bytes": 10250
+    },
+    {
+      "path": "project/source/src/cp_r12_pipeline.h",
+      "sha256": "3ccb034a1947a1bd894db39edca82465e2a45e5d79bc9eb4fa5fe593c5fff9f8",
+      "bytes": 4031
+    },
+    {
+      "path": "project/source/src/cp_radio_policy.c",
+      "sha256": "0999b8ad7df057539e24f6671d455875491e619d8c0fd73eae1459c6102c12fa",
+      "bytes": 3734
+    },
+    {
+      "path": "project/source/src/cp_radio_policy.h",
+      "sha256": "9b86f36f38759a095a55ccb0a03061831c3041ccfb80edc0b83fd9a9aa753a08",
+      "bytes": 2074
+    },
+    {
+      "path": "project/source/src/cp_session_handoff.c",
+      "sha256": "fd2e8a654852d6832d8abc846af19bb2114132b506666207fc5d19f32a85e1e1",
+      "bytes": 5194
+    },
+    {
+      "path": "project/source/src/cp_session_handoff.h",
+      "sha256": "189de9fd8f0d6f4f4d85c837a2f2700dcc9578a58406886b66a924f99f1be5b8",
+      "bytes": 2244
+    },
+    {
+      "path": "project/source/src/cp_step04_iap2_auth.c",
+      "sha256": "69f0166b41b5eda5c26df5239e3ce2d6bf808553789cf6f92daf5422fbbbd826",
+      "bytes": 5393
+    },
+    {
+      "path": "project/source/src/cp_step04_iap2_auth.h",
+      "sha256": "8b2c7e4bc66a69f1036be438b3189814edec69c590a560683f87433d3ba899c0",
+      "bytes": 2088
+    },
+    {
+      "path": "project/source/src/cp_step04_link.c",
+      "sha256": "fb67ddf7ee65e6b620a6b7d5e592884e01bee2b0e7e632a375dde2e0969c0a12",
+      "bytes": 10197
+    },
+    {
+      "path": "project/source/src/cp_step04_link.h",
+      "sha256": "048b0c4b260318a90196798ffeda08d125788b8b48e0c4d648861dd54f686f15",
+      "bytes": 2242
+    },
+    {
+      "path": "project/source/src/cp_step04_session.c",
+      "sha256": "0762a33ff71f5349badafa06e7cfa176ab07acde3bdfc3d9aa32f680d8e02590",
+      "bytes": 8844
+    },
+    {
+      "path": "project/source/src/cp_step04_session.h",
+      "sha256": "e5cecd184a8816d9460c5f98d9aec2218eef40557b6fa083ba5c3a48ac81c97f",
+      "bytes": 2475
+    },
+    {
+      "path": "project/source/src/cp_step04_socket_io.c",
+      "sha256": "7da2072ae7869399fb5687be876c5058ec75c8a05284512d2c644d1deb20ee65",
+      "bytes": 3803
+    },
+    {
+      "path": "project/source/src/cp_step04_socket_io.h",
+      "sha256": "d7d5c83ea405c7657554b9a5d2f8ed6faf19abd9f89edb1bc3838e208597c2a7",
+      "bytes": 1183
+    },
+    {
+      "path": "project/source/src/cp_step04_stock_mfi.c",
+      "sha256": "35bb1d9e312c9a64138ddb40b8daccad9ae80d5d4eb0f8ec0eb6599cc3436627",
+      "bytes": 3181
+    },
+    {
+      "path": "project/source/src/cp_step04_stock_mfi.h",
+      "sha256": "f6a759bf5da5053757fef01041ce593f78982cad3ec3811f8304f99261fa14d5",
+      "bytes": 1680
+    },
+    {
+      "path": "project/source/src/cp_step04_tcp_bridge.c",
+      "sha256": "dafee97c7b6171a8498a7d5b46570b07e5111168a16830e30870d5fc61efd7ab",
+      "bytes": 4526
+    },
+    {
+      "path": "project/source/src/cp_step04_tcp_bridge.h",
+      "sha256": "6f83da06818caaf29793ea52d5e9e87f678968178f95af539a69b38b311da572",
+      "bytes": 1425
+    },
+    {
+      "path": "project/source/src/cp_step2_ipc_link.c",
+      "sha256": "bf57d2561cd49f236c533db14372ac6644b7549ed77a449381e7733e1ee199f5",
+      "bytes": 6138
+    },
+    {
+      "path": "project/source/src/cp_step2_ipc_link.h",
+      "sha256": "1485803bde024d790260b7c8426ed59cad8d6ce05ef6dd6e51f1bbe50eb9ccf8",
+      "bytes": 2500
+    },
+    {
+      "path": "project/source/src/cp_step2_transport.c",
+      "sha256": "40abe0944c8553abf7793ae1c839bf40c10817bfb565b858fdfed57d8b82295e",
+      "bytes": 4068
+    },
+    {
+      "path": "project/source/src/cp_step2_transport.h",
+      "sha256": "6392f10fc816df90e1b912202e4a5dbf03e391978398ca31be95d646fa39e5fa",
+      "bytes": 3081
+    },
+    {
+      "path": "project/source/src/cp_wcp_autoconnect.c",
+      "sha256": "446021645ece81c9c457d53c65d16de84ae833ee8dc2a891e5cb25ada6b3970d",
+      "bytes": 4803
+    },
+    {
+      "path": "project/source/src/cp_wcp_autoconnect.h",
+      "sha256": "d707bb7a51ef5b8df2d5272e231eed8f2a6e58b062e7d3d162ed12b3eb7834c7",
+      "bytes": 2633
+    },
+    {
+      "path": "project/source/src/cp_wcp_handoff.c",
+      "sha256": "adf03a040b4c81c24448aaa7786621a009a619116d07299a9a19c04d99d3f8b4",
+      "bytes": 1205
+    },
+    {
+      "path": "project/source/src/cp_wcp_handoff.h",
+      "sha256": "1de2b1e2d1c4d9318642cbaf60fefe3ae914ab65331dea541f05837404733e9b",
+      "bytes": 711
+    },
+    {
+      "path": "project/source/src/cp_wcp_r45_ingress.c",
+      "sha256": "9b491b10da43c4dd3b20fb3526226a1ec2ca404ad3cb14b09e33fe2c5c812317",
+      "bytes": 3087
+    },
+    {
+      "path": "project/source/src/cp_wcp_r45_ingress.h",
+      "sha256": "7c18863975dc7ef9007de1cffec291bf078a406316948b3714d8a23c10f4236a",
+      "bytes": 1650
+    },
+    {
+      "path": "project/source/src/cp_wcp_r45_remote.c",
+      "sha256": "d10dfe69b7e764fd3d2461209533065f6c44d1491b10740835ed06c0ff34c095",
+      "bytes": 4377
+    },
+    {
+      "path": "project/source/src/cp_wcp_r45_remote.h",
+      "sha256": "cb19544b569bdfbb9dca9a4a5491341e054ca7d9c28809ce60f35537fc709901",
+      "bytes": 2093
+    },
+    {
+      "path": "project/source/src/cp_wireless.c",
+      "sha256": "f16b63e41f7ae2a3c7f9373964aba14035552550a6931298dbad68f251619c18",
+      "bytes": 4384
+    },
+    {
+      "path": "project/source/src/cp_wireless.h",
+      "sha256": "c7820417d6576d7c24d801164303e76b34c707df986d3f09a43ebdcd94cb4746",
+      "bytes": 1924
+    },
+    {
+      "path": "tests/r14_test_ir5.c",
+      "sha256": "d5671e3579c25875c8f29c392f69326774aa8fb4b3f9b6dd8f631d52125a0eb2",
+      "bytes": 4332
+    },
+    {
+      "path": "tests/r14_test_native_event.c",
+      "sha256": "a8e853b12a954b9281e9a7bb45edeb8116fe462787f82662fe0a03f533382d24",
+      "bytes": 7740
+    },
+    {
+      "path": "tests/r14_test_withdraw.c",
+      "sha256": "08e880a9c21e6f4cdb0c8934c87580234f91c8042309e6ec84093c5da4db2f36",
+      "bytes": 2497
+    },
+    {
+      "path": "tests/run_bt_host.sh",
+      "sha256": "12d615bd13803918f362ee17bdd30daeb64e0366dcd92ad4fa4927b5636a29d6",
+      "bytes": 535
+    },
+    {
+      "path": "tests/test_bt_contract.c",
+      "sha256": "7908d8af7e6680e5d8797bd2c68dab5b14bed3c662afb17946e30e5e37c84c20",
+      "bytes": 2355
+    },
+    {
+      "path": "tests/test_cloud12_gate.py",
+      "sha256": "a9c4ac6d48a4251923d0b22e7dfe4b3156b37a6d7001bd634591e95ce5f1e51e",
+      "bytes": 4058
+    },
+    {
+      "path": "tests/test_cloud_media.c",
+      "sha256": "5d1ca3078cfe18bf7fa094a254d6f68d7300a37fbd29b4c61df49e30e61ee26d",
+      "bytes": 3031
+    },
+    {
+      "path": "tests/test_cloud_pipeline.c",
+      "sha256": "2cf322b8d2b9a8b4d2077e318dadb798438bb2964b04deb2166f5016f6f55bb0",
+      "bytes": 72330
+    },
+    {
+      "path": "tests/test_cloud_sd_transaction_sim.py",
+      "sha256": "90aa41ac7e97531635a376c7deb7787a3654a8c78c854205d3894b2f613d95fe",
+      "bytes": 3348
+    },
+    {
+      "path": "tests/test_csm_parser_fuzz.c",
+      "sha256": "349bc4948be131c4c1250966b60c9361b2f53fd583b5466673505cc10b9c3630",
+      "bytes": 2158
+    },
+    {
+      "path": "tests/test_handoff_lifecycle.c",
+      "sha256": "7711ba88697decb754125a69d8279bd7f306dbde2f8854dbf2df0ced23e700f4",
+      "bytes": 2216
+    },
+    {
+      "path": "tests/test_mu1005_bridge.c",
+      "sha256": "52c51d3529035af80ffe43c0165cfe6f8f5a94e5782baabe74bb842e6e999e48",
+      "bytes": 2852
+    },
+    {
+      "path": "tests/test_mu1005_bt_iap_path_audit.py",
+      "sha256": "881150c34d539e36e2565a18fa9ebf34368112a106e041a133a86939bb0f0157",
+      "bytes": 2297
+    },
+    {
+      "path": "tests/test_mu1005_bt_preload_audit.py",
+      "sha256": "c7987e3947d14fabc2b66f0d1d7f01a40667a62a685210948bba9371c8f521fa",
+      "bytes": 1018
+    },
+    {
+      "path": "tests/test_mu1005_callback.c",
+      "sha256": "2916f99bfc96ddc6128cfb4140aa000aba57bcc9940e813a56d5a48bf14588c5",
+      "bytes": 2874
+    },
+    {
+      "path": "tests/test_mu1005_rf_register_sites.py",
+      "sha256": "4d7ccd4cf48e2f14fb4cb5decc4b9f5bab90276181241df1203fd59ea4028cbe",
+      "bytes": 3041
+    },
+    {
+      "path": "tests/test_oem_csm_guard.c",
+      "sha256": "872d4316c9719e61292613fa187ff7627b3b24243a2ea8fe178e19eb04cfdfbe",
+      "bytes": 3091
+    },
+    {
+      "path": "tests/test_oem_delegate_audit.py",
+      "sha256": "db90e13449a19d90f4796a87553c7b9f29f22760fd7f3a0df1b64c506eef17d5",
+      "bytes": 3136
+    },
+    {
+      "path": "tests/test_r92_fake_btstack.c",
+      "sha256": "73c6b9840140a9a74ab815c1f0a8206766041ada8e9d889e89dab027b14a101d",
+      "bytes": 500
+    },
+    {
+      "path": "tests/test_radio_policy.c",
+      "sha256": "c758f328568c9d42942ea59e7f2ee8fd16216d1aba2aa2889cae79fdafd28bfb",
+      "bytes": 3303
+    },
+    {
+      "path": "tests/test_rf_arg_experiment.c",
+      "sha256": "1000815db88295b0d1c440e5e32063b9afb0431713b1b085c76bfe4bdf83ad96",
+      "bytes": 820
+    },
+    {
+      "path": "tests/test_sd_package_audit.py",
+      "sha256": "b84ad9097b4fe49c06813a59b8c5027dd7939c591ebb0e8b4e45c2f06075d456",
+      "bytes": 2201
+    },
+    {
+      "path": "tests/test_step04_link.c",
+      "sha256": "a459ea808789a03077d78c0223842cf8f1ba1b08948b3590fee5fe53f1c880d3",
+      "bytes": 3802
+    },
+    {
+      "path": "tests/test_step04_session.c",
+      "sha256": "f6ac0aabd7b825a91ad9b15ffb729364fabca127c13e5e513667300bd7f3d8e5",
+      "bytes": 8837
+    },
+    {
+      "path": "tests/test_step04_socket_io.c",
+      "sha256": "efd4e3fe6e1f1193f2b4174444b086d733771473fff10d789ea1fd7f6af71eb2",
+      "bytes": 3560
+    },
+    {
+      "path": "tests/test_step04_stock_mfi.c",
+      "sha256": "40491950230fafc1080e1fd966e384b8e1e1c124ca50f7380cc5cf5a131f8394",
+      "bytes": 5364
+    },
+    {
+      "path": "tests/test_step04_tcp_bridge.c",
+      "sha256": "13fe0241fab83cf734190742ef3c4c72e52d2259ea83ddb217174b7f41d6b7a2",
+      "bytes": 5568
+    },
+    {
+      "path": "tests/test_wcp_autoconnect.c",
+      "sha256": "a821981040142f2640cd904c2ee2aebd7c5ca44b187b2d61aeb5fcfef5dc60e7",
+      "bytes": 3401
+    },
+    {
+      "path": "tests/test_wcp_donor_reference_audit.py",
+      "sha256": "d2e33566294491e4ff8909b34c5070562d7e20e1afdcad138c5999e2e91dcf63",
+      "bytes": 2026
+    },
+    {
+      "path": "tests/test_wcp_r45_ingress.c",
+      "sha256": "7bf7d87f895d45a408f789489ee8a11a40db39742e0b31c5802d407c72717c80",
+      "bytes": 3067
+    },
+    {
+      "path": "tests/test_wcp_r45_remote.c",
+      "sha256": "2f9ef4aeb7be36a40a13cb55bd2ee3a297ac5419bfab4287b13827c36a20a5c8",
+      "bytes": 7445
+    },
+    {
+      "path": "tests/test_wcp_r45_remote_mfi.c",
+      "sha256": "629279a2c40cd51aec77af12bf9ce1108c8e6835bb556a194ba24903882d221f",
+      "bytes": 10219
+    },
+    {
+      "path": "tools/cloud12_gate.py",
+      "sha256": "4682da91485520c421f8ccd2ca393fcced71d7d46b112220cebc8b94d42d0ccb",
+      "bytes": 7819
+    },
+    {
+      "path": "tools/cloud_sd_transaction_sim.py",
+      "sha256": "39da0071558070c88083015efa512ef055d14b57bab158ae5469e7f4decca160",
+      "bytes": 3836
+    },
+    {
+      "path": "tools/mu1005_bt_iap_path_audit.py",
+      "sha256": "5d79b2f14fb8c6f488b9a47f26aeb676a7c8b2bce041d9ac14b5f78c6d33f1a6",
+      "bytes": 6038
+    },
+    {
+      "path": "tools/mu1005_bt_preload_audit.py",
+      "sha256": "32689f53b7acf9e784537293f409e931f6d2acb9710f1943bac0f1de6c927e28",
+      "bytes": 2571
+    },
+    {
+      "path": "tools/mu1005_oem_delegate_audit.py",
+      "sha256": "c3e47eee70a5bf06afd83c31af4de21822fe4b4376fc8391b1613892cf305c0f",
+      "bytes": 9684
+    },
+    {
+      "path": "tools/mu1005_rf_register_sites.py",
+      "sha256": "4951f994134ea90d69796e4e542f53dec76a62dbd92237ba85a589d8330b1d4b",
+      "bytes": 3520
+    },
+    {
+      "path": "tools/review_txn/READ_FIRST_CN.md",
+      "sha256": "22f2d1f2839544c9cf7e493ae1ad0660f7e8ef45a556ccb49ba0ba1934232642",
+      "bytes": 2630
+    },
+    {
+      "path": "tools/review_txn/REVIEW_ONLY_MU1005.md",
+      "sha256": "99fa4dafdd29134ccb686fb1b1301c6a5224e4841e693eaacdf2d48dec3f44b6",
+      "bytes": 1256
+    },
+    {
+      "path": "tools/review_txn/build_qnx_example.sh",
+      "sha256": "4bc02f6a44a2233cba0666d3dfb20b73a1bec361b799b3bdf5195c4b1605f726",
+      "bytes": 371
+    },
+    {
+      "path": "tools/review_txn/build_recovery_lab.sh",
+      "sha256": "ae2989afa79d70da32a0ecedbaac742a43ea866b60c84496cdc8fab17785619d",
+      "bytes": 549
+    },
+    {
+      "path": "tools/review_txn/digest_cli.c",
+      "sha256": "2ed59bd460f50fcc52a3fbe0110897c4fb6b1bf47f90ed50eef881048fc1fab2",
+      "bytes": 295
+    },
+    {
+      "path": "tools/review_txn/fixture_cli.c",
+      "sha256": "eb5dd46154d5f6bc8d1585d7ca6d78c766c61cf9b8e59c4540676711b4b17389",
+      "bytes": 2279
+    },
+    {
+      "path": "tools/review_txn/fs_capability.c",
+      "sha256": "9e8e7110edefb691bc740380545dfdf4a2c562fb24c931c2d00b80bd46afc838",
+      "bytes": 3842
+    },
+    {
+      "path": "tools/review_txn/run_host.sh",
+      "sha256": "96b28dfbbcd36c5d27a8a0062eee75e4fed45666feb998283795327095ec7f83",
+      "bytes": 393
+    },
+    {
+      "path": "tools/review_txn/sha256.c",
+      "sha256": "175abb6bd16cb76a0e993a6ec7ebf0232e84e04291270fa73f9ed7c866fa1bad",
+      "bytes": 2322
+    },
+    {
+      "path": "tools/review_txn/sha256.h",
+      "sha256": "2cd5d4238edcc1d20d9c4a405f99fd772dbf98443bf0168f97d5668426d00228",
+      "bytes": 355
+    },
+    {
+      "path": "tools/review_txn/supervisor_fixture.c",
+      "sha256": "7b03e0abeaba8f6bc1413187259737c6488c98ed745655effca208a380d629e5",
+      "bytes": 2970
+    },
+    {
+      "path": "tools/review_txn/supervisor_fixture.h",
+      "sha256": "876f02170aaffd821c1fcece80530a344ab0d51a71bcec8b1fc0157ecfeeecab",
+      "bytes": 224
+    },
+    {
+      "path": "tools/review_txn/test_txn.py",
+      "sha256": "fa766fdd964970caa3926772fefaa77bd8ba472af12f3f759cc3f1375cab8983",
+      "bytes": 15701
+    },
+    {
+      "path": "tools/review_txn/trial_entry_lab.sh",
+      "sha256": "14c03ac1427257c4991927d168c64a7dce6b8475beaf25fee8ee2313d7896753",
+      "bytes": 520
+    },
+    {
+      "path": "tools/review_txn/txn.c",
+      "sha256": "ae9fc652b74b02ab662f9a44610b79e44ee0bc8746c90c13ae929880b2e1269a",
+      "bytes": 16104
+    },
+    {
+      "path": "tools/review_txn/txn.h",
+      "sha256": "9088fab1d656cfc1d5e97b5164c350ebc5c2e59ac3991ec11fcbeb04bf409dd1",
+      "bytes": 2528
+    },
+    {
+      "path": "tools/review_txn/txn_recovery_lab.c",
+      "sha256": "6efe013340956d9f1749fcabd8d1e57b1b447423b4545aeb57324a6ed0108611",
+      "bytes": 5820
+    },
+    {
+      "path": "tools/sd_package_audit.py",
+      "sha256": "023da58e66beea40ea125311a2b4f68fe361599d5cc092711d8e7188e8180ea4",
+      "bytes": 3776
+    },
+    {
+      "path": "tools/verify_mu1005_btstack_words.py",
+      "sha256": "e7f257f3e8ba01fd08087b07274371f6c6d4a75226f1018ce1a43106770b7e49",
+      "bytes": 2514
+    },
+    {
+      "path": "tools/verify_mu1005_dsi_boundary.py",
+      "sha256": "c7903157a7a3add8748e8a152a38a087021a1e1d8ea2754a923c3b93136c383e",
+      "bytes": 2449
+    },
+    {
+      "path": "tools/verify_mu1005_ipod_loader.py",
+      "sha256": "d903d5b243716aa7b598da6d220271e04c9ad5efedbde9bbbd22ffa3bf88bac9",
+      "bytes": 1625
+    },
+    {
+      "path": "tools/wcp_donor_reference_audit.py",
+      "sha256": "4aabba05ae60153e97b1bab198ada2a473d0de83cd0a6521d06117e0040786b9",
+      "bytes": 3222
+    }
+  ]
+}

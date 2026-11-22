@@ -82,6 +82,12 @@ int main(void) {
         dlclose(h);
         return 12;
     }
+    typedef int (*r92_fn)(void);
+    r92_fn r92=(r92_fn)dlsym(h,"au57x_r92_stock_image_verified");
+    if(!r92 || r92()!=0) {
+        puts("AU57X_R92_PRELOAD_GATE_FAILED");dlclose(h);return 21;
+    }
+    puts("AU57X_R92_PRELOAD_SOURCE_LOADED_DISABLED_OK");
     /* NULL must be rejected by the review-only state handler. */
     if (f(NULL) != 0) {
         puts("AU57X_SAFE_NULL_REJECT_FAILED");
