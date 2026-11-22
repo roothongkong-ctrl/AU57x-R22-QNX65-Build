@@ -1,0 +1,8 @@
+AU57x Wireless CarPlay R89 — MU1005 original btstack R45 remote normalized socket -> R44 iAP2/MFi -> R87 + pinned OEM RF profile guard
+Baseline: 2017 Audi A6L C7 PA / MHI2_CN_AU57x_K1006_2/MU1005
+Date: 2026-11-22
+Source C files: 38 (37 R88 + cp_wcp_r45_remote.c)
+Original btstack SHA256: 51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566
+Real OEM ARM callsite profiles: HFP=7, SIM=4. iAP2 value NOT proven; registration now fail-closed until owner attestation.
+Cloud QNX ARMv7 success must be verified independently; host GCC success is not car/iPhone proof.
+installable=false; safe_to_flash=false; vehicle_verified=false; NO_INSTALL

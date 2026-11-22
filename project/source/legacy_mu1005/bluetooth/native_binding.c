@@ -19,6 +19,17 @@ static int assoc(void *p,const void *ch,uint32_t a,unsigned code){
 }
 static int rd(void*p,uint32_t a,void*out,size_t n){Resident*r=p;return cert(r)&&r->owner.read_live(r->owner.opaque,a,out,n)==1;}
 static int auth(void*p,uint32_t a,const uint8_t mac[6]){Resident*r=p;return cert(r)&&r->owner.paired_authorized(r->owner.opaque,a,mac)==1;}
+/* Original MU1005 callers prove RF register arg3 is service-specific.
+ * R45 previously forwarded hardcoded zero. Do NOT call unknown OEM RF API
+ * until original-owner iAP2 profile has been independently established.
+ * This adapter intentionally retains NO guessed fallback profile. */
+static int register_verified(void *channel,uint8_t *slot,uint16_t ignored){
+ Resident *r=&res;uint8_t profile=0;
+ (void)ignored;
+ if(!cert(r)||!r->owner.iap2_profile_proven||
+    r->owner.iap2_profile_proven(r->owner.opaque,&profile)!=1)return -1;
+ return ((int (*)(void*,uint8_t*,uint16_t))(uintptr_t)0x277a18u)(channel,slot,profile);
+}
 static void callback(void *ch,const void *event){
  if(cert(&res)&&res.bridge.initialized&&ch==&res.bridge.service.rf)
   (void)mu38_dispatch(&res.bridge,&res.peer,ch,event);
@@ -34,10 +45,10 @@ static int words_ok(void){
 }
 #define RFN(type,a) ((type)(uintptr_t)(a))
 int mu_bt_native_attach(const MuBtOwner *o,int fd){
- if(!o||!o->owner_ready||!o->transport_ready||!o->read_live||!o->paired_authorized||res.attempted||fd<0||o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
+ if(!o||!o->owner_ready||!o->transport_ready||!o->read_live||!o->paired_authorized||!o->iap2_profile_proven||res.attempted||fd<0||o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
  if(!words_ok())return -1;
  res.attempted=1;res.owner=*o;res.peer=(Mu38PeerOps){&res,assoc,rd,auth};
- InboundOps n={0};n.reg=RFN(int (*)(void*,uint8_t*,uint16_t),0x277a18u);n.unreg=RFN(int (*)(void*,uint8_t*),0x2779b4u);
+ InboundOps n={0};n.reg=register_verified;n.unreg=RFN(int (*)(void*,uint8_t*),0x2779b4u);
  n.add=RFN(int (*)(void*),0x207244u);n.remove=RFN(int (*)(void*),0x2071c4u);
  n.accept=RFN(int (*)(void*,int),0x27733cu);n.limit=RFN(int (*)(void*),0x277074u);
  n.send=RFN(int (*)(void*,void*),0x2771f8u);n.disconnect=RFN(int (*)(void*),0x2773f8u);n.credit=RFN(int (*)(void*,int),0x27715cu);

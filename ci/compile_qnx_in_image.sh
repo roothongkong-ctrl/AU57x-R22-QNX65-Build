@@ -17,7 +17,7 @@ printf 'SDK: QNX_HOST=%s QNX_TARGET=%s\n' "${QNX_HOST:-missing}" "${QNX_TARGET:-
 test -e "${QNX_TARGET:-/nonexistent}/armle-v7/lib/libc.so.3" || { echo 'ERROR: QNX libc.so.3 missing'; exit 42; }
 "$CC" -dM -E -x c /dev/null | grep -E '(__QNXNTO__|__QNX__|__NTO__)' | head -10
 mapfile -t sources < <(find "$P/source/src" "$P/source/legacy_mu1005/airplay" "$P/source/legacy_mu1005/bluetooth" -maxdepth 1 -name '*.c' | sort)
-[ "${#sources[@]}" = 37 ] || { echo "ERROR: expected 37 C files got ${#sources[@]}"; exit 44; }
+[ "${#sources[@]}" = 38 ] || { echo "ERROR: expected 38 C files got ${#sources[@]}"; exit 44; }
 flags=(-std=c99 -O2 -Wall -Wextra -Werror -fPIC -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp -mno-unaligned-access
        -I"$P/source/src" -I"$P/source/legacy_mu1005/airplay" -I"$P/source/legacy_mu1005/bluetooth")
 for s in "${sources[@]}"; do

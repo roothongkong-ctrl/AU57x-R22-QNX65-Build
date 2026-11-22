@@ -1,0 +1,26 @@
+{
+  "firmware": "MHI2_CN_AU57x_K1006_2/MU1005",
+  "binary": "btstack",
+  "sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
+  "rf_register_va": "0x00277a18",
+  "direct_calls": [
+    {
+      "call_va": "0x002464b0",
+      "profile": 7,
+      "service": "HFP",
+      "source": "original ARM mov r2 immediate before BL"
+    },
+    {
+      "call_va": "0x0024dcac",
+      "profile": 4,
+      "service": "SIM",
+      "source": "original ARM mov r2 immediate before BL"
+    }
+  ],
+  "important": "Third argument varies by original service (HFP 7, SIM 4); no original iAP2 third argument established.",
+  "iap2_profile_proven": false,
+  "native_injection_proven": false,
+  "actual_iphone_connected": false,
+  "vehicle_verified": false,
+  "safe_to_flash": false
+}
