@@ -1,0 +1,5 @@
+R93 target MHI2_CN_AU57x_K1006_2 MU1005 / QNX 6.5 ARMv7
+Scope: QNX preload real owner-process identity gate, original private btstack dynamic PLT proof, one-click existing M.I.B. SD diag (read-only).
+Original OEM static evidence: 4/4 ARM BL 0x117390, pthread_create R_ARM_JUMP_SLOT GOT 0x2c148c, ldqnx.so.2.
+Current car loading: NOT YET OBSERVED; first item cannot be marked completed until car-run evidence.
+No SD install/flash, no extra btstack process, no changes to stock firmware, no bypass of MFi.

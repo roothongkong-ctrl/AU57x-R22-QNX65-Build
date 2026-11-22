@@ -1,0 +1,3 @@
+R93 is a non-installing QNX stock-loader evidence kit, not wireless CarPlay install firmware.
+The /mod/custom.sh diagnostic is READ ONLY, NO BTSTACK RESTART, NO OEM WRITES.
+It cannot claim OEM btstack has been preloaded until separately deployed and verified on car.

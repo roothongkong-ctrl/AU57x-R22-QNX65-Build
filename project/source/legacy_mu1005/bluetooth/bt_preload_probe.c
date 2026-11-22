@@ -21,6 +21,10 @@
 #endif
 #define BTSTACK_STOCK_PATH "/eso/bin/apps/btstack"
 #define BT_PROBE_LOG "/tmp/au57x_r92_bt_preload.log"
+/* QNX 6.5 public libc API: the program basename, not a user-set variable.
+ * R92 hashed stock btstack but did not verify WHICH process loaded the shim.
+ * Prevent an unrelated preloaded program from claiming stock btstack entry. */
+extern char *__progname;
 static volatile unsigned probe_enabled;
 static volatile unsigned thread_count;
 static const uint32_t stock_callers[4]={0x236668u,0x2368c8u,0x236c2cu,0x236c48u};
@@ -55,6 +59,9 @@ __attribute__((constructor)) static void au57x_probe_ctor(void){
  char digest[65];const char *path=BTSTACK_STOCK_PATH;
  const char *opt=getenv("AU57X_R92_PROBE");
  if(!opt||strcmp(opt,"1")!=0)return;
+ if(!__progname || strcmp(__progname,"btstack")!=0){
+  log_failure("wrong-process");return;
+ }
 #if defined(AU57X_R92_HOST_TEST) && AU57X_R92_HOST_TEST==1
  path=getenv("AU57X_R92_HOST_TARGET");
  if(!path)return;
