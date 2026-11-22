@@ -1,0 +1,16 @@
+{
+  "stock_executable_sha256": "08896149dcdcc2bc5a6b22ce78682ad5949fbeb8fdc0fb1249162861e40914b8",
+  "elf_class": "ELF32",
+  "machine": "ARM",
+  "kind": "ET_EXEC",
+  "has_osal_ProcessTNG_setExecutable_reference": true,
+  "has_connectivity_json_reference": true,
+  "has_JSONReader_reference": true,
+  "has_StartModule_reference": true,
+  "original_launch_manager_process_mechanism": "dynamic OSAL ProcessTNG / JSON config",
+  "proves_config_can_accept_our_wrapper": false,
+  "proves_supervisor_inherits_LD_PRELOAD": false,
+  "proves_real_btstack_loader": false,
+  "owner_callback_bound": false,
+  "scope": "exact-OEM-static-proof; never a runtime test"
+}
