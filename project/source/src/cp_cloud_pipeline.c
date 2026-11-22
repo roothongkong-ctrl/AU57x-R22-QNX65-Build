@@ -144,7 +144,8 @@ int cp_cloud_inner_auth(struct cp_cloud_pipeline *s){
 int cp_cloud_media_ready(struct cp_cloud_pipeline *s){
  if(!eligible(s,0))return stop(s);
  if(s->handoff.phase!=CP_HO_INNER_IAP_AUTH)return CP_CLOUD_ORDER;
- if(s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1)return CP_CLOUD_PROOF;
+ if(s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1||
+    s->owner.inner_iap2_mfi_verified(s->owner.ctx,s->epoch)!=1)return CP_CLOUD_PROOF;
  for(int channel=CP_CLOUD_VIDEO;channel<=CP_CLOUD_STEERING;channel++){
   if(s->owner.media_verified(s->owner.ctx,s->epoch,(enum cp_cloud_media)channel)!=1)
    return CP_CLOUD_PROOF;
@@ -196,6 +197,8 @@ int cp_cloud_is_active(const struct cp_cloud_pipeline *s){
     s->owner.radio_capability(s->owner.ctx,s->band)!=1)return 0;
  if(!s->owner.wired_idle||s->owner.wired_idle(s->owner.ctx)!=1||
     !s->owner.si_single_owner||s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1||
+    !s->owner.inner_iap2_mfi_verified||
+    s->owner.inner_iap2_mfi_verified(s->owner.ctx,s->epoch)!=1||
     !s->airplay||s->airplay->generation!=s->epoch||
     mu34_ap_server_state(s->airplay)!=MU34_AP_LISTENING_VERIFIED||
     !s->owner.airplay_listener_verified||
