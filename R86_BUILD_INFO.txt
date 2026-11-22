@@ -1,0 +1,7 @@
+AU57x R86: read-only exact MU1005 OEM AirPlay delegate registration ABI
+OEM SHA-256 pinned: dio_manager, libairplay.so, smartphone_integrator
+Server callsite: DIO 0x15DF68 / delegate 60 bytes / 11 callback fields
+Session callsite: DIO 0x159448 / delegate 56 bytes / 10 callback fields
+Verified by ARM32 ELF parser, PLT calls, PIC/GOT relocation cross-check and OEM library copy instructions
+GitHub/cloud host unit tests: no OEM binaries packaged; real OEM tests were local only
+research_only=true, vehicle_verified=false, safe_to_flash=false, NO_INSTALL
