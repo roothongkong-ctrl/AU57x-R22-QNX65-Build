@@ -22,6 +22,9 @@ struct cp_step04_session {
  struct cp_lk_owner link_owner;
  struct cp_auth_owner auth_owner;
  struct cp_wireless wireless;
+ const struct cp_identification *identity;
+ uint32_t identity_token;
+ int identity_sent,identity_pending,identity_accepted;
  void *wireless_ctx;
  int (*wireless_proof)(void *,uint32_t,uint32_t,struct cp_oem_assertions *);
  uint32_t epoch,acked_token,wireless_seq,wireless_token;
@@ -34,6 +37,9 @@ int cp_s4_accept_rf(struct cp_step04_session *,const AuRfWire *,uint64_t now);
 int cp_s4_flush_rf(struct cp_step04_session *,AuRfIngress *);
 int cp_s4_tick(struct cp_step04_session *,uint64_t now);
 int cp_s4_authenticated(struct cp_step04_session *);
+/* Optional original-OEM identity over iAP2 CONTROL 1D00/1D01/1D02. */
+int cp_s4_bind_identity(struct cp_step04_session *,
+                        const struct cp_identification *);
 /* Bind the live OEM radio + receiver proof provider and current AP identity;
  * caller owns config for entire single-generation link lifetime. */
 int cp_s4_bind_wireless(struct cp_step04_session *,const struct cp_session *,

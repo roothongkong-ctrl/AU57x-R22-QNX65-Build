@@ -94,6 +94,17 @@ int main(void){
   .public_key="review-pairing-identity",.source_version="review-only"
  };
  assert(cp_s4_bind_wireless(&s,&config,live_wireless_proof,NULL)==CP_LK_OK);
+ static const uint8_t bt_addr[6]={1,2,3,4,5,6};
+ static const uint16_t sent_ids[]={0xaa01,0xaa03,0x5703,0x4301};
+ static const uint16_t recv_ids[]={0xaa00,0xaa02,0xaa05,0x5702,0x4300};
+ static const struct cp_identification identity={
+  .name="Audi MMI review",.model="AU57x-MU1005",.manufacturer="Audi",
+  .serial="review-test-only",.firmware="MU1005",.hardware="R65-lab",
+  .bluetooth_name="Bluetooth",.wireless_ssid="AUDI_REVIEW",
+  .bluetooth_mac6=bt_addr,.accessory_messages=sent_ids,
+  .phone_messages=recv_ids,.accessory_message_count=4,.phone_message_count=5
+ };
+ assert(cp_s4_bind_identity(&s,&identity)==CP_LK_OK);
  au_rf_init(&rf,send_native,NULL);
  assert(au_rf_connected(&rf,mac)==0);
  assert(au_rf_set_max_payload(&rf,128)==0);
@@ -130,42 +141,55 @@ int main(void){
  feed(b,n,8);assert(cp_s4_authenticated(&s));
  flush();
  assert(cert_calls==1&&signature_calls==1&&s.auth.stage==CP_AUTH_SUCCEEDED);
+ /* iAP2 identification comes from a live OEM configuration, not a fake
+  * hard-coded identity. 1D01 must be ACKed before the phone's 1D02. */
+ control_msg(message,0x1d00,NULL,0);
+ n=frame(b,0x40,46,101,10,message,6);
+ feed(b,n,9);
+ assert(s.identity_sent&&s.identity_pending&&s.link.outbound_seq==102);
+ flush();
+ n=frame(b,0x40,46,102,0,NULL,0);
+ feed(b,n,10);assert(!s.identity_pending);
+ control_msg(message,0x1d02,NULL,0);
+ n=frame(b,0x40,47,102,10,message,6);
+ feed(b,n,11);flush();
+ assert(s.identity_accepted&&cp_s4_authenticated(&s));
  /* A real Bluetooth CONTROL packet 5702 must receive Wi-Fi 5703, then
   * its iAP2 ACK must NOT re-enter the MFi AA01/AA03 acknowledgement FSM. */
  /* Wi-Fi control is now routed directly, without a hand-written OEM callback. */
  control_msg(message,0x5702,NULL,0);
- n=frame(b,0x40,46,101,10,message,6);
- feed(b,n,9);
+ n=frame(b,0x40,48,102,10,message,6);
+ feed(b,n,12);
  assert(s.wireless.wifi_pre_sent==1&&s.wireless_pending&&s.link.outbound_pending);
- assert(s.link.outbound_seq==102);
+ assert(s.link.outbound_seq==103);
  flush();
  /* Phone's 4300 offer can arrive BEFORE Wi-Fi 5703 is ACKed. */
  static const uint8_t available[]={0x40,0x40,0,15,0x43,0x00,
                                     0,9,0,1,0,5,0,0,1};
  airplay_up=1;
- n=frame(b,0x40,47,101,10,available,sizeof available);
- feed(b,n,10);flush();
+ n=frame(b,0x40,49,102,10,available,sizeof available);
+ feed(b,n,13);flush();
  assert(s.wireless.availability_seen&&s.wireless.wireless_available==1);
  assert(s.wireless.start_sent==0&&s.wireless_pending);
  /* Receiver loses readiness while the 5703 ACK is in flight. */
  airplay_up=0;
- n=frame(b,0x40,47,102,0,NULL,0);
- feed(b,n,11);
+ n=frame(b,0x40,49,103,0,NULL,0);
+ feed(b,n,14);
  assert(!s.wireless_pending&&!s.link.outbound_pending&&cp_s4_authenticated(&s));
- assert(cp_s4_tick(&s,12)==CP_LK_OK&&!s.wireless.start_sent);
+ assert(cp_s4_tick(&s,15)==CP_LK_OK&&!s.wireless.start_sent);
  /* After DIO/AirPlay listens, the owner tick sends 4301 without
   * requiring the iPhone to send a duplicate 4300. */
  airplay_up=1;
- assert(cp_s4_tick(&s,13)==CP_LK_OK);
- assert(s.wireless.start_sent==1&&s.wireless_pending&&s.link.outbound_seq==103);
+ assert(cp_s4_tick(&s,16)==CP_LK_OK);
+ assert(s.wireless.start_sent==1&&s.wireless_pending&&s.link.outbound_seq==104);
  flush();
- n=frame(b,0x40,47,103,0,NULL,0);
- feed(b,n,14);
+ n=frame(b,0x40,49,104,0,NULL,0);
+ feed(b,n,17);
  assert(!s.wireless_pending&&cp_s4_authenticated(&s));
  /* Identification / unrelated OEM control remains with the original owner. */
- control_msg(message,0x1d00,NULL,0);
- n=frame(b,0x40,48,103,10,message,6);
- feed(b,n,15);flush();
+ control_msg(message,0x4e09,NULL,0);
+ n=frame(b,0x40,50,104,10,message,6);
+ feed(b,n,18);flush();
  assert(unrelated_count>0);
  /* A new generation cannot inherit old auth, and hard owner loss is final. */
  up=0;

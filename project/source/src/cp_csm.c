@@ -42,6 +42,17 @@ static void param_bytes(struct writer *w, uint16_t id, const uint8_t *p, size_t 
 static void param_u8(struct writer *w, uint16_t id, uint8_t x) {
     size_t start = beginparam(w,id); put8(w,x); endparam(w,start);
 }
+static void param_u16(struct writer *w,uint16_t id,uint16_t x){
+    size_t start=beginparam(w,id);put16(w,x);endparam(w,start);
+}
+static void param_flag(struct writer *w,uint16_t id){
+    size_t start=beginparam(w,id);endparam(w,start);
+}
+static void param_ids(struct writer *w,uint16_t id,const uint16_t *ids,size_t count){
+    size_t start=beginparam(w,id);
+    for(size_t i=0;i<count;i++)put16(w,ids[i]);
+    endparam(w,start);
+}
 static void param_u32(struct writer *w, uint16_t id, uint32_t x) {
     size_t start = beginparam(w,id); put32(w,x); endparam(w,start);
 }
@@ -79,6 +90,54 @@ int cp_encode_wifi_5703(const struct cp_wifi *wifi,
     param_u8(&w,4,wifi->channel);
     frame_finish(&w,written);
     return w.error;
+}
+static int nonempty(const char *s){return s&&s[0];}
+int cp_encode_identification_1d01(const struct cp_identification *id,
+                                  uint8_t *out,size_t cap,size_t *written){
+ struct writer w={out,0,cap,0};
+ size_t group;
+ if(written)*written=0;
+ if(!id||!out||!written||cap<6||
+    !nonempty(id->name)||!nonempty(id->model)||!nonempty(id->manufacturer)||
+    !nonempty(id->serial)||!nonempty(id->firmware)||!nonempty(id->hardware)||
+    !nonempty(id->bluetooth_name)||!nonempty(id->wireless_ssid)||
+    !id->bluetooth_mac6||!id->accessory_messages||!id->phone_messages||
+    !id->accessory_message_count||!id->phone_message_count||
+    id->accessory_message_count>128||id->phone_message_count>128)
+     return CP_BAD_ARGS;
+ frame_start(&w,0x1d01);
+ param_string(&w,0,id->name);
+ param_string(&w,1,id->model);
+ param_string(&w,2,id->manufacturer);
+ param_string(&w,3,id->serial);
+ param_string(&w,4,id->firmware);
+ param_string(&w,5,id->hardware);
+ param_ids(&w,6,id->accessory_messages,id->accessory_message_count);
+ param_ids(&w,7,id->phone_messages,id->phone_message_count);
+ param_u8(&w,8,0); /* No external power supply */
+ param_u16(&w,9,0);
+ param_string(&w,12,"en");
+ param_string(&w,13,"en");
+ /* Bluetooth iAP2 transport (subclass overrides id3 and repeats name4). */
+ group=beginparam(&w,17);
+ param_u16(&w,0,0);
+ param_string(&w,1,id->bluetooth_name);
+ param_flag(&w,2);
+ param_bytes(&w,3,id->bluetooth_mac6,6);
+ param_string(&w,4,id->bluetooth_name);
+ param_flag(&w,5);
+ endparam(&w,group);
+ /* Wireless CarPlay advertised on the actual same SSID as 0x5703. */
+ group=beginparam(&w,24);
+ param_u16(&w,0,1);
+ param_string(&w,1,id->wireless_ssid);
+ param_flag(&w,2);
+ param_u16(&w,3,1);
+ param_flag(&w,4);
+ param_flag(&w,5);
+ endparam(&w,group);
+ frame_finish(&w,written);
+ return w.error;
 }
 int cp_encode_start_4301(const struct cp_session *s,
                          uint8_t *output, size_t capacity, size_t *written) {

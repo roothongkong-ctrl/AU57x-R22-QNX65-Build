@@ -40,6 +40,18 @@ static int committed(void *opaque,uint32_t epoch,uint32_t gen,
  return s&&control_live(s,epoch,gen)&&s->ack_in_progress&&
   token&&s->acked_token==token;
 }
+static int respond_identification(struct cp_step04_session *s){
+ uint8_t frame[CP_LK_FRAME_MAX];
+ size_t n=0;
+ if(!s||!s->identity)return -1;
+ if(s->identity_accepted||s->identity_pending)return 0;
+ if(cp_encode_identification_1d01(s->identity,frame,sizeof frame,&n)!=CP_OK||
+    n>CP_LK_FRAME_MAX-10u)return -1;
+ if(cp_lk_queue_control(&s->link,frame,n,0x40000001u,s->now)!=CP_LK_OK)return -1;
+ s->identity_token=0x40000001u;
+ s->identity_pending=1;s->identity_sent=1;
+ return 0;
+}
 static int link_control(void *opaque,const uint8_t *frame,size_t n){
  struct cp_step04_session *s=opaque;
  if(!s||s->link.phase!=CP_LK_NORMAL)return -1;
@@ -50,6 +62,15 @@ static int link_control(void *opaque,const uint8_t *frame,size_t n){
  }
  int r=cp_auth_receive(&s->auth,frame,n);
  if(r==CP_AUTH_UNRELATED){
+  if(s->identity&&n>=6&&frame[0]==0x40&&frame[1]==0x40){
+   unsigned id=(unsigned)frame[4]*256u+frame[5];
+   if(id==0x1d00)return n==6?respond_identification(s):-1;
+   if(id==0x1d02){
+    if(n!=6||!s->identity_sent||s->identity_pending)return -1;
+    s->identity_accepted=1;return 0;
+   }
+   if(id==0x1d03)return -1; /* Phone rejected this identity. */
+  }
   /* Route Wi-Fi / availability directly over the original iAP2 CONTROL
    * session; unrelated identification and media CSMs stay with OEM owner. */
   if(s->wireless_bound){
@@ -58,6 +79,7 @@ static int link_control(void *opaque,const uint8_t *frame,size_t n){
    int wr;
    if(cp_decode_event(frame,n,&event)!=0)return -1;
    if(event.type!=CP_EVENT_OTHER){
+    if(s->identity&&!s->identity_accepted)return 0;
     if(s->wireless_proof(s->wireless_ctx,s->epoch,
                          s->link.generation,&proof)!=1)return 0;
     wr=cp_step04_dispatch(&s->auth,&s->wireless,&proof,frame,n);
@@ -76,6 +98,9 @@ static int link_control(void *opaque,const uint8_t *frame,size_t n){
 static int link_acked(void *opaque,uint32_t token){
  struct cp_step04_session *s=opaque;
  if(!s||!s->auth_ready||s->ack_in_progress)return -1;
+ if(s->identity_pending&&token==s->identity_token){
+  s->identity_pending=0;s->identity_token=0;return 0;
+ }
  /* Post-MFi Wi-Fi / CarPlay CONTROL frames use a distinct application
   * token space; their ACK must never be mistaken for an AA01/AA03 ACK. */
  if(s->wireless_pending&&token==s->wireless_token){
@@ -128,6 +153,16 @@ int cp_s4_authenticated(struct cp_step04_session *s){
  if(!s||!s->auth_ready||s->link.phase!=CP_LK_NORMAL)return 0;
  return cp_auth_live(&s->auth);
 }
+int cp_s4_bind_identity(struct cp_step04_session *s,
+                        const struct cp_identification *id){
+ if(!s||!id||s->identity||!s->epoch||
+    s->link.phase!=CP_LK_IDLE)return CP_LK_BAD;
+ if(s->wireless_bound&&s->wireless.session&&
+    (!s->wireless.session->wifi.ssid||
+     strcmp(s->wireless.session->wifi.ssid,id->wireless_ssid)!=0))
+    return CP_LK_BAD;
+ s->identity=id;return CP_LK_OK;
+}
 int cp_s4_bind_wireless(struct cp_step04_session *s,const struct cp_session *config,
                         int (*prove)(void *,uint32_t,uint32_t,
                                      struct cp_oem_assertions *),void *ctx){
@@ -143,6 +178,7 @@ int cp_s4_wireless_pump(struct cp_step04_session *s){
  struct cp_oem_assertions p={0};
  if(!s||!s->wireless_bound||s->wireless_pending||
     s->wireless.start_sent||!s->wireless.availability_seen||
+    (s->identity&&!s->identity_accepted)||
     !cp_s4_authenticated(s))return CP_WL_NOT_READY;
  if(s->wireless_proof(s->wireless_ctx,s->epoch,s->link.generation,&p)!=1||
     p.wired_active||!p.sole_dio_owner||
@@ -172,4 +208,5 @@ void cp_s4_revoke(struct cp_step04_session *s){
  s->ack_in_progress=0;s->acked_token=0;
  s->wireless_pending=0;s->wireless_token=0;
  s->wireless_bound=0;
+ s->identity_pending=0;s->identity_token=0;s->identity_accepted=0;
 }

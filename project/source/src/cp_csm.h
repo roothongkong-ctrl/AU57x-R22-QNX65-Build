@@ -26,6 +26,17 @@ struct cp_session {
     const char *public_key;
     const char *source_version;
 };
+/* The original OEM must supply its genuine identifier, Bluetooth address,
+ * advertised capabilities and Wi-Fi SSID. No test identity is installed. */
+struct cp_identification {
+    const char *name, *model, *manufacturer, *serial;
+    const char *firmware, *hardware, *bluetooth_name, *wireless_ssid;
+    const uint8_t *bluetooth_mac6;
+    const uint16_t *accessory_messages, *phone_messages;
+    size_t accessory_message_count, phone_message_count;
+};
+int cp_encode_identification_1d01(const struct cp_identification *,
+                                  uint8_t *,size_t,size_t *);
 /* Outputs full CSM frame: 0x4040, BE16 length, BE16 message ID, TLV body.
  * No iAP2 link framing, authentication, network or vehicle I/O is included.
  */
