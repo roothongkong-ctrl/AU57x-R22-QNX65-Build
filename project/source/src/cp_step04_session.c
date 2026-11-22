@@ -3,6 +3,7 @@
  * original AA00-AA05 MFi transcript, and peer ACK; no self-signed shortcut.
  */
 #include "cp_step04_session.h"
+#include "cp_event.h"
 #include <string.h>
 static int link_live(void *opaque,uint32_t epoch,uint32_t gen){
  struct cp_step04_session *s=opaque;
@@ -49,7 +50,22 @@ static int link_control(void *opaque,const uint8_t *frame,size_t n){
  }
  int r=cp_auth_receive(&s->auth,frame,n);
  if(r==CP_AUTH_UNRELATED){
-  /* Unrelated iAP2 CONTROL messages are not swallowed or falsely approved. */
+  /* Route Wi-Fi / availability directly over the original iAP2 CONTROL
+   * session; unrelated identification and media CSMs stay with OEM owner. */
+  if(s->wireless_bound){
+   struct cp_event event;
+   struct cp_oem_assertions proof={0};
+   int wr;
+   if(cp_decode_event(frame,n,&event)!=0)return -1;
+   if(event.type!=CP_EVENT_OTHER){
+    if(s->wireless_proof(s->wireless_ctx,s->epoch,
+                         s->link.generation,&proof)!=1)return 0;
+    wr=cp_step04_dispatch(&s->auth,&s->wireless,&proof,frame,n);
+    if(wr==CP_WL_OK||wr==CP_WL_NOT_READY||
+       wr==CP_WL_PHONE_UNAVAILABLE||wr==CP_WL_LIMIT_REACHED)return 0;
+    return -1;
+   }
+  }
   return s->ext.handoff_other_csm(s->ext.opaque,frame,n)==1?0:-1;
  }
  return (r==CP_AUTH_TX_PENDING||r==CP_AUTH_OK)?0:-1;
@@ -107,6 +123,15 @@ int cp_s4_authenticated(struct cp_step04_session *s){
  if(!s||!s->auth_ready||s->link.phase!=CP_LK_NORMAL)return 0;
  return cp_auth_live(&s->auth);
 }
+int cp_s4_bind_wireless(struct cp_step04_session *s,const struct cp_session *config,
+                        int (*prove)(void *,uint32_t,uint32_t,
+                                     struct cp_oem_assertions *),void *ctx){
+ if(!s||!config||!prove||s->wireless_bound||
+    !s->epoch||s->link.phase!=CP_LK_IDLE)return CP_LK_BAD;
+ cp_wireless_init(&s->wireless,config,cp_s4_wireless_send,s);
+ s->wireless_proof=prove;s->wireless_ctx=ctx;s->wireless_bound=1;
+ return CP_LK_OK;
+}
 /* Callback for cp_wireless_init(): transmit 5703 / 4301 on the same
  * authenticated iAP2 CONTROL session after the stock MFi handshake. */
 int cp_s4_wireless_send(void *ctx,const uint8_t *frame,size_t len){
@@ -125,4 +150,5 @@ void cp_s4_revoke(struct cp_step04_session *s){
  if(s->auth_ready)cp_auth_revoke(&s->auth);
  s->ack_in_progress=0;s->acked_token=0;
  s->wireless_pending=0;s->wireless_token=0;
+ s->wireless_bound=0;
 }

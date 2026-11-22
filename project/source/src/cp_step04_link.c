@@ -106,8 +106,10 @@ static int process(struct cp_step04_link *l,const uint8_t*h,const uint8_t*pl,
    /* Future/out-of-order packets are not delivered to MFi; ACK prior PSN. */
    return emit(l,LK_ACK,l->tx_psn,0,NULL,0);
   }
-  if(l->owner.control(l->owner.opaque,pl,n)!=0){cp_lk_revoke(l);return CP_LK_OWNER;}
+  /* A control callback may synchronously queue Wi-Fi 5703 / Start 4301.
+   * Its outgoing ACK field must confirm THIS inbound sequence, not the old one. */
   l->rx_psn=seq;
+  if(l->owner.control(l->owner.opaque,pl,n)!=0){cp_lk_revoke(l);return CP_LK_OWNER;}
   if(emit(l,LK_ACK,l->tx_psn,0,NULL,0)!=CP_LK_OK){cp_lk_revoke(l);return CP_LK_BACKPRESSURE;}
  }
  (void)now;

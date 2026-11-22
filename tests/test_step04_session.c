@@ -13,8 +13,8 @@ static struct cp_step04_session s;
 static AuRfIngress rf;
 static struct cp_stock_mfi stock;
 static int up=1,control_up=1,peer_ok=0,wired=1;
-static int wifi_enabled=0;
-static struct cp_wireless wireless;
+static int airplay_up=1;
+static unsigned unrelated_count=0;
 static struct cp_oem_assertions proof={0,1,1,1,1,0};
 static unsigned cert_calls,signature_calls,tx_frames;
 int APSMFiPlatform_CopyCertificate(uint8_t **bytes,size_t *len){
@@ -34,12 +34,13 @@ static int stock_fingerprint(void*p){(void)p;return up;}
 static int wi(void*p){(void)p;return wired;}
 static int peer(void*p,uint32_t e,uint32_t g){(void)p;return peer_ok&&e==7&&g==1;}
 static int other(void*p,const uint8_t *data,size_t n){
+ (void)p;(void)data;(void)n;unrelated_count++;return 1;
+}
+static int live_wireless_proof(void*p,uint32_t epoch,uint32_t generation,
+                               struct cp_oem_assertions *out){
  (void)p;
- if(wifi_enabled){
-  int rc=cp_step04_dispatch(&s.auth,&wireless,&proof,data,n);
-  if(rc==CP_WL_OK)return 1;
-  if(rc!=CP_WL_IGNORED)return 0;
- }
+ if(epoch!=7||generation!=1||!out)return 0;
+ *out=proof;out->network_airplay_ready=airplay_up;
  return 1;
 }
 static void release(void*p,void*b){(void)p;free(b);}
@@ -85,6 +86,14 @@ int main(void){
  void *lib=dlopen(NULL,RTLD_NOW);assert(lib);
  assert(cp_stock_mfi_bind(&stock,lib,&o,7,1)==CP_STOCK_OK);
  assert(cp_s4_init(&s,&stock,7,&ext)==CP_LK_OK);
+ static const char *const ips[]={"10.173.189.1"};
+ static const struct cp_session config={
+  .wifi={.ssid="AUDI_REVIEW",.passphrase="review-password",.security=2,.channel=6},
+  .ip_addresses=ips,.ip_address_count=1,.airplay_port=5000,
+  .device_identifier="02:00:00:00:00:01",
+  .public_key="review-pairing-identity",.source_version="review-only"
+ };
+ assert(cp_s4_bind_wireless(&s,&config,live_wireless_proof,NULL)==CP_LK_OK);
  au_rf_init(&rf,send_native,NULL);
  assert(au_rf_connected(&rf,mac)==0);
  assert(au_rf_set_max_payload(&rf,128)==0);
@@ -123,21 +132,37 @@ int main(void){
  assert(cert_calls==1&&signature_calls==1&&s.auth.stage==CP_AUTH_SUCCEEDED);
  /* A real Bluetooth CONTROL packet 5702 must receive Wi-Fi 5703, then
   * its iAP2 ACK must NOT re-enter the MFi AA01/AA03 acknowledgement FSM. */
- static const struct cp_session config={
-  .wifi={.ssid="AUDI_REVIEW",.passphrase="review-password",.security=2,.channel=6}
- };
- cp_wireless_init(&wireless,&config,cp_s4_wireless_send,&s);
- wifi_enabled=1;
+ /* Wi-Fi control is now routed directly, without a hand-written OEM callback. */
  control_msg(message,0x5702,NULL,0);
  n=frame(b,0x40,46,101,10,message,6);
  feed(b,n,9);
- assert(wireless.wifi_pre_sent==1&&s.wireless_pending&&s.link.outbound_pending);
+ assert(s.wireless.wifi_pre_sent==1&&s.wireless_pending&&s.link.outbound_pending);
  assert(s.link.outbound_seq==102);
  flush();
  n=frame(b,0x40,46,102,0,NULL,0);
  feed(b,n,10);
  assert(!s.wireless_pending&&!s.link.outbound_pending&&cp_s4_authenticated(&s));
- wifi_enabled=0;
+ /* The requested receiver was not yet listening: preserve iAP2, not crash. */
+ static const uint8_t available[]={0x40,0x40,0,15,0x43,0x00,
+                                    0,9,0,1,0,5,0,0,1};
+ airplay_up=0;
+ n=frame(b,0x40,47,102,10,available,sizeof available);
+ feed(b,n,11);flush();
+ assert(s.wireless.start_sent==0&&!s.wireless_pending);
+ /* Once original DIO/receiver is ready, send 4301 via the SAME iAP2 link. */
+ airplay_up=1;
+ n=frame(b,0x40,48,102,10,available,sizeof available);
+ feed(b,n,12);
+ assert(s.wireless.start_sent==1&&s.wireless_pending&&s.link.outbound_seq==103);
+ flush();
+ n=frame(b,0x40,48,103,0,NULL,0);
+ feed(b,n,13);
+ assert(!s.wireless_pending&&cp_s4_authenticated(&s));
+ /* Identification / unrelated OEM control remains with the original owner. */
+ control_msg(message,0x1d00,NULL,0);
+ n=frame(b,0x40,49,103,10,message,6);
+ feed(b,n,14);flush();
+ assert(unrelated_count>0);
  /* A new generation cannot inherit old auth, and hard owner loss is final. */
  up=0;
  assert(cp_s4_tick(&s,200)==CP_LK_OWNER);

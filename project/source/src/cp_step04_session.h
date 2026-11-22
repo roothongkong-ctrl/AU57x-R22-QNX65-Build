@@ -21,9 +21,12 @@ struct cp_step04_session {
  struct cp_s4_external ext;
  struct cp_lk_owner link_owner;
  struct cp_auth_owner auth_owner;
+ struct cp_wireless wireless;
+ void *wireless_ctx;
+ int (*wireless_proof)(void *,uint32_t,uint32_t,struct cp_oem_assertions *);
  uint32_t epoch,acked_token,wireless_seq,wireless_token;
  uint64_t now;
- int auth_ready, ack_in_progress,wireless_pending;
+ int auth_ready, ack_in_progress,wireless_pending,wireless_bound;
 };
 int cp_s4_init(struct cp_step04_session *,struct cp_stock_mfi *,
                uint32_t epoch,const struct cp_s4_external *);
@@ -31,6 +34,11 @@ int cp_s4_accept_rf(struct cp_step04_session *,const AuRfWire *,uint64_t now);
 int cp_s4_flush_rf(struct cp_step04_session *,AuRfIngress *);
 int cp_s4_tick(struct cp_step04_session *,uint64_t now);
 int cp_s4_authenticated(struct cp_step04_session *);
+/* Bind the live OEM radio + receiver proof provider and current AP identity;
+ * caller owns config for entire single-generation link lifetime. */
+int cp_s4_bind_wireless(struct cp_step04_session *,const struct cp_session *,
+                        int (*)(void *,uint32_t,uint32_t,
+                                 struct cp_oem_assertions *),void *);
 /* Post-auth sender for cp_wireless_init(), with separately tracked ACK. */
 int cp_s4_wireless_send(void *,const uint8_t *,size_t);
 void cp_s4_revoke(struct cp_step04_session *);
