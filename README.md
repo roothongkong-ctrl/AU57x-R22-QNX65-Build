@@ -161,3 +161,16 @@ witness callbacks fail closed; inconsistent responses and expired SI owner
 clear all cached observations. Linux fork() and hostile-response tests pass;
 OEM source callbacks are still HOST FIXTURES ONLY, not real vehicle bindings.
 See `docs/R83_SI_DIO_SESSION_PROOF_CN.md`. SOURCE ONLY / NO INSTALL.
+
+### R84 — SI remote-control pipeline integrated with original iAP2 state machine (NO INSTALL)
+
+The former same-process prototype could not directly serve the original
+MU1005 separate `smartphone_integrator` / `dio_manager` executables. R84
+adds an SI-side **remote-only** path to `cp_cloud_pipeline`: it drives the
+real AF_UNIX DIO START/ACK, existing iAP2 `0x4301`/peer ACK, R83 same-session
+op11 proof, and a confirmed idle STOP/restore, without storing DIO pointers
+in SI. A previous media snapshot expires in 500 ms and never represents
+ongoing device authorization. Real DIO/MFi owner event sources remain
+unbound, and **the verified remote wired-preemption/force-restore ABI is
+still missing**, so no vehicle installation is safe. Full details in
+`docs/R84_SI_REMOTE_PIPELINE_CN.md`.

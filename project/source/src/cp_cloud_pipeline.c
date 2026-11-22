@@ -4,6 +4,24 @@
  */
 #include "cp_cloud_pipeline.h"
 #include <string.h>
+static int iface_ok(const char *p);
+static int remote_owner_valid(struct cp_cloud_pipeline *p){
+ const MuCprxRemoteEndpoint *e;
+ if(!p||!p->remote_phase||!p->started||p->stopped||
+    !p->bootstrap||p->bootstrap->epoch!=p->epoch||
+    !cp_s4_authenticated(p->bootstrap)||
+    !p->owner.si_single_owner||
+    p->owner.si_single_owner(p->owner.ctx,p->epoch)!=1||
+    !p->owner.wired_idle||p->owner.wired_idle(p->owner.ctx)!=1||
+    !p->owner.bt_alive||p->owner.bt_alive(p->owner.ctx,p->epoch,p->bt_generation)!=1||
+    p->radio.epoch!=p->epoch||p->radio.phase!=CP_RADIO_ASSOCIATED||
+    !p->owner.ap_association||
+    p->owner.ap_association(p->owner.ctx,p->epoch,p->band)!=1)return 0;
+ e=&p->remote_dio;
+ return e->generation==p->epoch&&e->epoch==p->epoch&&e->session&&
+    e->airplay_port==CP_CLOUD_PORT&&e->si_owner_verified&&
+    e->si_owner_verified(e->owner_ctx,e->generation,e->epoch,e->session)==1;
+}
 static int actual_wireless_proof(void *opaque,uint32_t epoch,uint32_t generation,
                                  struct cp_oem_assertions *out){
  struct cp_cloud_pipeline *p=opaque;
@@ -29,8 +47,19 @@ static int actual_wireless_proof(void *opaque,uint32_t epoch,uint32_t generation
      p->owner.ap_hotspot_verified(p->owner.ctx,epoch,p->band)==1);
  if(!out->live_hotspot||p->radio.phase!=CP_RADIO_ASSOCIATED||
     p->owner.ap_association(p->owner.ctx,epoch,p->band)!=1||
-    !out->sole_dio_owner||!p->airplay||
-    p->airplay->generation!=epoch||
+    !out->sole_dio_owner)return 1;
+ /* The real SI process has no access to the original DIO AirPlay server
+  * pointer. Accept the actual remote START ACK only with independent OEM
+  * Bonjour/listener proofs. Never launch a second receiver in SI. */
+ if(p->remote_phase){
+  const char *ri=p->iface;
+  out->network_airplay_ready=p->remote_start_confirmed&&
+   p->remote_phase>=2&&ri[0]&&
+   p->owner.bonjour_identity_verified(p->owner.ctx,epoch,ri)==1&&
+   p->owner.airplay_listener_verified(p->owner.ctx,epoch,ri,CP_CLOUD_PORT)==1;
+  return 1;
+ }
+ if(!p->airplay||p->airplay->generation!=epoch||
     mu34_ap_server_poll(p->airplay,epoch)!=MU34_AP_R_LISTENING_VERIFIED)
   return 1;
  iface=mu34_ap_server_interface(p->airplay);
@@ -63,6 +92,8 @@ static int stop(struct cp_cloud_pipeline *s){
 void cp_cloud_init(struct cp_cloud_pipeline *s){
  if(!s)return;
  memset(s,0,sizeof *s);mu_cprx_client_init(&s->rx_client);
+ mu_cprx_client_init(&s->remote_client);
+ s->remote_media=s->remote_inner=-1;
  cp_radio_init(&s->radio);cp_ho_init(&s->handoff);
 }
 int cp_cloud_begin(struct cp_cloud_pipeline *s,struct cp_step04_session *b,
@@ -463,6 +494,165 @@ static int iface_ok(const char *p){
  }
  return i>0&&i<=CP_CLOUD_IFACE_MAX;
 }
+/* R84: production-shape, process-separated SI/DIO owner control. No
+ * original DIO manager/server pointers are used on the SI side. The DIO
+ * owner services each socket separately in its own original event loop. */
+int cp_cloud_bind_remote_dio(struct cp_cloud_pipeline *p,
+ const MuCprxRemoteEndpoint *e,const char *iface){
+ if(!p||!e||!iface||!iface_ok(iface)||!p->started||p->stopped||
+    p->remote_phase||p->native_dio||p->rx_service||p->airplay||
+    p->handoff.phase!=CP_HO_WIFI_ASSOCIATED||
+    p->radio.phase!=CP_RADIO_ASSOCIATED||
+    p->radio.epoch!=p->epoch||!cp_s4_authenticated(p->bootstrap)||
+    !eligible(p,1)||
+    e->generation!=p->epoch||e->epoch!=p->epoch||!e->session||
+    e->airplay_port!=CP_CLOUD_PORT||
+    !e->si_owner_verified||!e->dio_server_verified||
+    e->si_owner_verified(e->owner_ctx,e->generation,e->epoch,e->session)!=1||
+    p->owner.si_single_owner(p->owner.ctx,p->epoch)!=1)return CP_CLOUD_PROOF;
+ p->remote_dio=*e;
+ memcpy(p->iface,iface,strlen(iface)+1);
+ mu_cprx_client_init(&p->remote_client);
+ p->remote_media=p->remote_inner=-1;p->remote_channels=0;
+ p->remote_sample_ms=0;p->remote_snapshot_fresh=0;
+ p->remote_start_confirmed=0;p->remote_phase=1;
+ return CP_CLOUD_OK;
+}
+static void remote_revoke_snapshot(struct cp_cloud_pipeline *p){
+ if(!p)return;
+ p->remote_snapshot_fresh=0;p->remote_channels=0;
+ p->remote_media=p->remote_inner=-1;
+}
+static int remote_steady_proof(struct cp_cloud_pipeline *p){
+ if(!remote_owner_valid(p)||!p->remote_start_confirmed||
+    p->remote_media!=7||p->remote_inner!=1||p->remote_channels!=15||
+    !p->bootstrap->wireless.start_sent||p->bootstrap->wireless_pending||
+    p->bootstrap->link.outbound_pending||
+    !p->bootstrap->wireless.session||
+    p->bootstrap->wireless.session->airplay_port!=CP_CLOUD_PORT||
+    !p->owner.carplay_request_sent||
+    p->owner.carplay_request_sent(p->owner.ctx,p->epoch)!=1||
+    !p->owner.bonjour_identity_verified||
+    p->owner.bonjour_identity_verified(p->owner.ctx,p->epoch,p->iface)!=1||
+    !p->owner.airplay_listener_verified||
+    p->owner.airplay_listener_verified(p->owner.ctx,p->epoch,p->iface,CP_CLOUD_PORT)!=1||
+    !p->owner.airplay_session_connected||
+    p->owner.airplay_session_connected(p->owner.ctx,p->epoch,p->iface,CP_CLOUD_PORT)!=1||
+    !p->owner.inner_iap2_mfi_verified||
+    p->owner.inner_iap2_mfi_verified(p->owner.ctx,p->epoch)!=1)return 0;
+ for(int ch=1;ch<=4;ch++){
+  if(!p->owner.media_verified||
+     p->owner.media_verified(p->owner.ctx,p->epoch,(enum cp_cloud_media)ch)!=1)
+   return 0;
+ }
+ return 1;
+}
+/* A session sampled before its last transaction, before iPhone 4301 ACK,
+ * or more than 500ms ago must not report media active. */
+int cp_cloud_remote_live_at(const struct cp_cloud_pipeline *s,uint64_t now){
+ struct cp_cloud_pipeline *p=(struct cp_cloud_pipeline *)s;
+ if(!p||p->remote_phase!=2||!p->remote_snapshot_fresh||
+    p->handoff.phase!=CP_HO_MEDIA_ACTIVE||
+    !cp_ho_media_ready(&p->handoff)||now<p->remote_sample_ms||now-p->remote_sample_ms>500)return 0;
+ return remote_steady_proof(p);
+}
+int cp_cloud_drive_remote_dio(struct cp_cloud_pipeline *p,uint64_t now){
+ int r;
+ if(!p||!p->remote_phase||p->remote_phase==4)return CP_CLOUD_BAD;
+ if(p->remote_phase==3)return CP_CLOUD_RETRY; /* STOP in progress */
+ if(!remote_owner_valid(p)){
+  remote_revoke_snapshot(p);
+  /* DIO may still have an original receiver. Never report rollback until
+   * an authenticated DIO STOP response; wired priority is unresolved. */
+  return CP_CLOUD_PROOF;
+ }
+ if(p->remote_phase==1){
+  if(!p->remote_client.phase&&
+     mu_cprx_client_begin_remote(&p->remote_client,&p->remote_dio,1,now)!=0)
+   return CP_CLOUD_PROOF;
+  r=mu_cprx_client_tick(&p->remote_client,now);
+  if(r==MU_CPRX_CLIENT_PENDING)return CP_CLOUD_RETRY;
+  if(r!=MU_CPRX_CLIENT_CONFIRMED)return CP_CLOUD_PROOF;
+  mu_cprx_client_close(&p->remote_client);
+  p->remote_start_confirmed=1;
+  p->remote_phase=2;
+ }
+ /* The cross-process DIO ack is not an MFi success. Drive the existing
+  * iAP2 bootstrapping/4301 path through the ORIGINAL SI-owned link. */
+ if(p->bootstrap->wireless_ctx==p&&
+    p->bootstrap->wireless_proof==actual_wireless_proof){
+  r=cp_s4_tick(p->bootstrap,now);
+  if(r<0&&r!=CP_LK_BACKPRESSURE)return CP_CLOUD_RETRY;
+ }
+ if(!p->remote_client.phase){
+  remote_revoke_snapshot(p);
+  if(mu_cprx_client_begin_remote(&p->remote_client,&p->remote_dio,
+       MU_CPRX_OP_SESSION_STATUS,now)!=0)return CP_CLOUD_PROOF;
+ }
+ r=mu_cprx_client_tick(&p->remote_client,now);
+ if(r==MU_CPRX_CLIENT_PENDING)return CP_CLOUD_RETRY;
+ if(r==MU_CPRX_CLIENT_BUSY){
+  mu_cprx_client_close(&p->remote_client);
+  return CP_CLOUD_RETRY;
+ }
+ if(r!=MU_CPRX_CLIENT_CONFIRMED){
+  remote_revoke_snapshot(p);
+  return CP_CLOUD_PROOF;
+ }
+ p->remote_media=p->remote_client.observed_media;
+ p->remote_inner=p->remote_client.observed_inner;
+ p->remote_channels=p->remote_client.observed_channels;
+ mu_cprx_client_close(&p->remote_client);
+ p->remote_sample_ms=now;p->remote_snapshot_fresh=1;
+ if(!remote_steady_proof(p))return CP_CLOUD_RETRY;
+ /* An actual 4301 ACK + remote DIO session + live OEM callbacks justify
+  * only the CURRENT sampled state-machine transition. */
+ if(p->handoff.phase==CP_HO_WIFI_ASSOCIATED&&
+    cp_ho_signal(&p->handoff,p->epoch,CP_HO_EV_CARPLAY_START_SENT,1)!=CP_HO_OK)
+  return CP_CLOUD_PROOF;
+ if(p->handoff.phase==CP_HO_START_REQUESTED&&
+    cp_ho_signal(&p->handoff,p->epoch,CP_HO_EV_AIRPLAY_SESSION_CREATED,1)!=CP_HO_OK)
+  return CP_CLOUD_PROOF;
+ if(p->handoff.phase==CP_HO_AIRPLAY_SESSION&&
+    cp_ho_signal(&p->handoff,p->epoch,CP_HO_EV_IN_SESSION_IAP2_AUTHENTICATED,1)!=CP_HO_OK)
+  return CP_CLOUD_PROOF;
+ if(p->handoff.phase==CP_HO_INNER_IAP_AUTH&&
+    cp_ho_signal(&p->handoff,p->epoch,CP_HO_EV_MEDIA_CONFIRMED,1)!=CP_HO_OK)
+  return CP_CLOUD_PROOF;
+ return p->handoff.phase==CP_HO_MEDIA_ACTIVE?CP_CLOUD_OK:CP_CLOUD_RETRY;
+}
+int cp_cloud_remote_graceful_end(struct cp_cloud_pipeline *p,uint64_t now){
+ int r;
+ if(!p||!p->remote_phase)return CP_CLOUD_BAD;
+ if(p->remote_phase==4)return cp_cloud_end(p);
+ if(!p->remote_start_confirmed)return CP_CLOUD_BAD;
+ if(p->remote_phase!=3){
+  /* R79 native STOP must not forcibly kill a live iPhone session. A fresh
+   * idle sample (from DIO) is necessary. Wired preemption remains BLOCKED
+   * until the genuine DIO owner supplies a verified emergency restore. */
+  if(!remote_owner_valid(p)||!p->remote_snapshot_fresh||
+     now<p->remote_sample_ms||now-p->remote_sample_ms>500||
+     (p->remote_media!=0&&p->remote_media!=4&&p->remote_media!=5))
+   return CP_CLOUD_RETRY;
+  mu_cprx_client_close(&p->remote_client);
+  remote_revoke_snapshot(p);
+  if(mu_cprx_client_begin_remote(&p->remote_client,&p->remote_dio,2,now)!=0)
+   return CP_CLOUD_PROOF;
+  p->remote_phase=3;
+ }
+ r=mu_cprx_client_tick(&p->remote_client,now);
+ if(r==MU_CPRX_CLIENT_PENDING)return CP_CLOUD_RETRY;
+ if(r==MU_CPRX_CLIENT_BUSY){
+  p->remote_phase=2;
+  mu_cprx_client_close(&p->remote_client);
+  return CP_CLOUD_RETRY;
+ }
+ if(r!=MU_CPRX_CLIENT_CONFIRMED)return CP_CLOUD_PROOF;
+ mu_cprx_client_close(&p->remote_client);
+ p->remote_phase=4;p->remote_start_confirmed=0;
+ remote_revoke_snapshot(p);
+ return cp_cloud_end(p);
+}
 int cp_cloud_airplay_ready(struct cp_cloud_pipeline *s,const char *iface){
  if(!eligible(s,1))return stop(s);
  if(s->handoff.phase!=CP_HO_START_REQUESTED)return CP_CLOUD_ORDER;
@@ -579,6 +769,14 @@ int cp_cloud_wired_preempt(struct cp_cloud_pipeline *s){
   if(s->bootstrap)cp_s4_revoke(s->bootstrap);
  }
  if(cp_ho_wired_takeover(&s->handoff,1)!=CP_HO_OK)return CP_CLOUD_ORDER;
+ if(s->remote_phase&&s->remote_phase!=4){
+  s->remote_wired_pending=1;
+  remote_revoke_snapshot(s);
+  mu_cprx_client_close(&s->remote_client);
+  /* There is no verified OEM emergency-restore command for a remote DIO
+   * playing media. Do not return OK or claim original interface restored. */
+  return CP_CLOUD_RETRY;
+ }
  restored=native_restore(s);
  if(restored==CP_CLOUD_OK)s->native_cleanup_pending=0;
  return restored;
@@ -586,6 +784,7 @@ int cp_cloud_wired_preempt(struct cp_cloud_pipeline *s){
 int cp_cloud_end(struct cp_cloud_pipeline *s){
  int r;
  if(!s||!s->started||!s->epoch)return CP_CLOUD_BAD;
+ if(s->remote_phase&&s->remote_phase!=4)return CP_CLOUD_RETRY;
  r=native_restore(s);
  if(r!=CP_CLOUD_OK)return r;
  if(s->owner.teardown_confirmed(s->owner.ctx,s->epoch)!=1)return CP_CLOUD_PROOF;
@@ -604,6 +803,9 @@ int cp_cloud_end(struct cp_cloud_pipeline *s){
  return CP_CLOUD_OK;
 }
 int cp_cloud_is_active(const struct cp_cloud_pipeline *s){
+ /* No clock parameter here: a cross-process SI/DIO media snapshot cannot
+  * safely be treated as live indefinitely. Call remote_live_at(now). */
+ if(s&&s->remote_phase)return 0;
  if(!s||!s->started||s->stopped||s->graceful_stop_started||
     s->handoff.phase!=CP_HO_MEDIA_ACTIVE||!cp_ho_media_ready(&s->handoff))return 0;
  if(s->native_dio&&(!cp_cloud_native_rx_live(s,1)||

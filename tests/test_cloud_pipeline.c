@@ -1119,6 +1119,160 @@ static void native_r83_corrupt_session_snapshot(void){
   mu_cprx_client_close(&c);close(fd[1]);
  }
 }
+/* R84: SI-side cloud pipeline coordinates a DIO endpoint that has NO
+ * same-process MuDioNative* or MuCprxService* attached to the pipeline.
+ * The server's OEM operations are host stubs in a separate owner tick;
+ * R81 still exercises the same wire protocol in forked real processes. */
+static void native_remote_owner_cloud_pipeline(void){
+ struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
+ MuDioNative native={0};MuCprxService rx={0};
+ const MuDioGuard guard={NULL,native_lib,native_owner,native_listening,
+                        native_stopped,native_interface};
+ const MuCprxEvidence evidence={.admitted=rx_admitted,.identity=rx_identity,
+   .media=rx_media,.si_admitted=rx_si,.si_client_verified=rx_peer,
+   .si_inner_iap2_mfi=rx_inner,.si_media_channel=rx_channel};
+ static const uint8_t mac[6]={1,2,3,4,5,6};
+ static const uint16_t sent[]={0xaa01,0xaa03,0x5703,0x4301};
+ static const uint16_t received[]={0xaa00,0xaa02,0xaa05,0x5702,0x4300};
+ static const char *const ip[]={"10.0.0.1"};
+ static const struct cp_session config={
+  .wifi={.ssid="R84_FIXTURE",.passphrase="not-a-real-key",.security=2,.channel=6},
+  .ip_addresses=ip,.ip_address_count=1,.airplay_port=5000,
+  .public_key="only-a-host-test",.source_version="only-a-host-test"
+ };
+ static const struct cp_identification identity={
+  .name="R84",.model="MU1005",.manufacturer="Audi",.serial="not-real",
+  .firmware="MU1005",.hardware="offline",.bluetooth_name="offline-bt",
+  .wireless_ssid="R84_FIXTURE",.bluetooth_mac6=mac,
+  .accessory_messages=sent,.phone_messages=received,
+  .accessory_message_count=4,.phone_message_count=5
+ };
+ MuCprxRemoteEndpoint e={0};
+ char dir[]="/tmp/au57x-r84-cloud-XXXXXX";
+ void *h=dlopen(NULL,RTLD_NOW);assert(h);
+ reset_fixture();native_owner_ok=1;native_listener=0;
+ native_stop_pending=0;native_stop_calls=0;
+ native_media_flag=4;native_inner=1;si_peer_allowed=1;
+ for(int i=1;i<=4;i++)native_channel[i]=1;
+ strcpy(current_native_iface,"eth0");
+ mocked_oem(&b,&stock,1);cp_cloud_init(&p);
+ b.link.phase=CP_LK_IDLE;
+ assert(cp_cloud_bind_bootstrap(&p,&b,&config,&identity)==CP_CLOUD_OK);
+ b.link.phase=CP_LK_NORMAL;b.link.epoch=8;b.link.tx_psn=99;
+ b.link.owner.opaque=&b;b.link.owner.live=owner;
+ b.link.owner.acked=ack_wireless;
+ assert(cp_cloud_begin(&p,&b,&ops,8,4)==CP_CLOUD_OK);
+ assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_OK);
+ assert(mkdtemp(dir));
+ assert(mu_dio_bind_interface(&native,h,&airplay_object,&airplay_owner,
+                              8,&guard,"eth0","wlan0")==0);
+ assert(mu_cprx_open_si_unix(&rx,&native,&evidence,5000,8,1234,
+                              dir,geteuid(),getegid())==0);
+ strcpy(e.socket_path,rx.unix_path);
+ e.generation=8;e.epoch=8;e.session=1234;e.airplay_port=5000;
+ e.server_uid=geteuid();e.server_gid=getegid();
+ e.si_owner_verified=r81_si_owner;e.dio_server_verified=r81_dio_server;
+ assert(cp_cloud_bind_remote_dio(&p,&e,"../../bad")==CP_CLOUD_PROOF);
+ MuCprxRemoteEndpoint bad=e;bad.epoch=9;
+ assert(cp_cloud_bind_remote_dio(&p,&bad,"wlan0")==CP_CLOUD_PROOF);
+ assert(cp_cloud_bind_remote_dio(&p,&e,"wlan0")==CP_CLOUD_OK);
+ assert(!p.native_dio&&!p.rx_service&&!p.airplay&&p.remote_phase==1);
+ /* No ACK yet: even aborting the whole SI pipeline cannot assert DIO's
+  * original singleton has been safely restored. */
+ assert(cp_cloud_end(&p)==CP_CLOUD_RETRY);
+ assert(cp_cloud_bind_remote_dio(&p,&e,"wlan0")==CP_CLOUD_PROOF);
+ /* Actual remote START is sent and handled, without dereferencing DIO. */
+ int acked=0;
+ for(unsigned i=0;i<110&&!acked;i++){
+  int r=cp_cloud_drive_remote_dio(&p,100+i);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
+  assert(mu_cprx_tick(&rx,100+i)==0);
+  r=cp_cloud_drive_remote_dio(&p,100+i);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
+  acked=p.remote_start_confirmed;
+ }
+ assert(acked&&native_start_calls==1&&p.remote_phase==2);
+ assert(cp_cloud_end(&p)==CP_CLOUD_RETRY); /* cannot claim remote cleanup */
+ assert(!cp_cloud_is_active(&p)); /* no permanent cached remote proof */
+ b.identity_accepted=1;
+ b.wireless.availability_seen=1;b.wireless.wireless_available=1;
+ /* DIO media 4 must NOT be reported as active even if the old iAP2
+  * bootstrap has emitted 4301. */
+ for(unsigned i=0;i<50;i++){
+  int r=cp_cloud_drive_remote_dio(&p,300+i);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
+  assert(mu_cprx_tick(&rx,300+i)==0);
+  r=cp_cloud_drive_remote_dio(&p,300+i);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
+  if(b.wireless_pending&&!b.link.outbound_pending)break;
+ }
+ assert(!cp_cloud_remote_live_at(&p,352));
+ assert(b.wireless.start_sent&&b.wireless_pending);
+ /* Authentic iAP2 link ACK envelope, delivered into the existing link. */
+ unsigned seq=b.link.outbound_seq;
+ uint8_t ack[9]={0xff,0x5a,0,9,0x40,0,0,0,0};
+ ack[6]=(uint8_t)seq;ack[7]=(uint8_t)(seq>>8);ack[8]=sum8(ack,8);
+ assert(cp_lk_feed_bytes(&b.link,ack,sizeof ack,360)==CP_LK_OK);
+ assert(!b.wireless_pending&&!b.link.outbound_pending);
+ native_media_flag=7;
+ int got=0;uint64_t when=0;
+ for(unsigned i=0;i<140&&!got;i++){
+  uint64_t now=370+i;
+  int r=cp_cloud_drive_remote_dio(&p,now);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF||r==CP_CLOUD_OK);
+  if(r==CP_CLOUD_OK){got=1;when=now;break;}
+  assert(mu_cprx_tick(&rx,now)==0);
+  r=cp_cloud_drive_remote_dio(&p,now);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF||r==CP_CLOUD_OK);
+  got=(r==CP_CLOUD_OK);
+  if(got)when=now;
+ }
+ assert(got&&p.handoff.phase==CP_HO_MEDIA_ACTIVE);
+ assert(cp_cloud_remote_live_at(&p,when));
+ assert(!cp_cloud_remote_live_at(&p,when+501)); /* stale status */
+ assert(!cp_cloud_is_active(&p)); /* must call remote_live_at with clock */
+ /* DIO steering dropped while a cached 0x0f existed; the independent SI
+  * evidence rejects the same sample before the next IPC round. */
+ media[CP_CLOUD_STEERING]=0;
+ assert(!cp_cloud_remote_live_at(&p,when));
+ media[CP_CLOUD_STEERING]=1;
+ p.remote_dio.session=1235;
+ assert(!cp_cloud_remote_live_at(&p,when));
+ p.remote_dio.session=1234;
+ /* A media=7 snapshot may NEVER authorize a voluntary STOP. */
+ assert(cp_cloud_remote_graceful_end(&p,when)==CP_CLOUD_RETRY);
+ native_media_flag=0;
+ int idle=0;uint64_t idle_when=0;
+ for(unsigned i=0;i<130&&!idle;i++){
+  uint64_t now=600+i;
+  int r=cp_cloud_drive_remote_dio(&p,now);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF||r==CP_CLOUD_OK);
+  idle=p.remote_snapshot_fresh&&p.remote_media==0;
+  if(idle){idle_when=now;break;}
+  int sr=mu_cprx_tick(&rx,now);assert(sr==0);
+  r=cp_cloud_drive_remote_dio(&p,now);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF||r==CP_CLOUD_OK);
+  idle=p.remote_snapshot_fresh&&p.remote_media==0;
+  if(idle)idle_when=now;
+ }
+ assert(idle);
+ int ended=0;
+ for(unsigned i=0;i<50&&!ended;i++){
+  uint64_t now=idle_when+i;
+  int r=cp_cloud_remote_graceful_end(&p,now);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_OK);
+  int sr=mu_cprx_tick(&rx,now);assert(sr==0||sr==1);
+  r=cp_cloud_remote_graceful_end(&p,now);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_OK);
+  ended=r==CP_CLOUD_OK;
+ }
+ assert(ended&&rx.backend_released&&p.remote_phase==4&&p.stopped);
+ assert(native_stop_calls==1&&!native.initialized);
+ assert(!strcmp(current_native_iface,"eth0"));
+ assert(rmdir(dir)==0);dlclose(h);
+}
 static void native_dio_bound_pipeline(void){
  struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
  MuDioNative native={0};
@@ -1163,5 +1317,5 @@ static void native_dio_bound_pipeline(void){
  assert(p.handoff.phase==CP_HO_WIRED);
  dlclose(h);
 }
-int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();native_si_owner_loss_recovery();native_abandoned_mutation_rollback();native_remote_process_boundary();native_r83_corrupt_session_snapshot();
+int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();native_si_owner_loss_recovery();native_abandoned_mutation_rollback();native_remote_process_boundary();native_r83_corrupt_session_snapshot();native_remote_owner_cloud_pipeline();
  puts("AU57X_R47_CLOUD_04_05_06_07_08_09_OWNER_GATES_PASS");return 0;}

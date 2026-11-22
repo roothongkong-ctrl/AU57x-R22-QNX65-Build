@@ -62,6 +62,16 @@ struct cp_cloud_pipeline {
  int graceful_stop_started;
  /* A failed native lease owns a mandatory, retryable OEM restore barrier. */
  int native_cleanup_pending;
+ /* R84: SI and DIO are separate ORIGINAL processes. Never put DIO's
+  * MuCprxService * or MuDioNative * in an SI pipeline on the car. */
+ MuCprxRemoteEndpoint remote_dio;
+ MuCprxClient remote_client;
+ unsigned remote_phase; /* 0 unbound, 1 START, 2 snapshot, 3 STOP, 4 restored */
+ int remote_start_confirmed,remote_snapshot_fresh;
+ int remote_media,remote_inner;
+ unsigned remote_channels;
+ uint64_t remote_sample_ms;
+ int remote_wired_pending;
  struct cp_handoff handoff;
  struct cp_cloud_owner owner;
  uint32_t epoch,bt_generation;
@@ -87,6 +97,23 @@ int cp_cloud_bind_rx_service(struct cp_cloud_pipeline *,MuCprxService *);
 /* Owner-only opt-in after binding the authentic CPRX receiver. Once enabled,
  * drive_native sends the real v3 START and waits for an actual socket ACK. */
 int cp_cloud_enable_native_client(struct cp_cloud_pipeline *);
+/* R84: SI-only cross-process pipeline. The original DIO receiver lives in
+ * another process. Bind via the pinned AF_UNIX server endpoint; do not
+ * dereference/copy a DIO process pointer or synthesize inner MFi readiness.
+ * The caller supplies the observed OEM Wi-Fi interface. */
+int cp_cloud_bind_remote_dio(struct cp_cloud_pipeline *,
+ const MuCprxRemoteEndpoint *,const char *observed_iface);
+/* SI original-owner tick; a separate DIO original-owner tick services its
+ * socket. Reports OK only on a FRESH same-session op11 snapshot + original
+ * owner iAP2/4301/media evidence, never on an old START ACK. */
+int cp_cloud_drive_remote_dio(struct cp_cloud_pipeline *,uint64_t now_ms);
+/* Caller supplies a monotonic time; this is a time-bounded observation,
+ * not permanently granted streaming media. */
+int cp_cloud_remote_live_at(const struct cp_cloud_pipeline *,uint64_t now_ms);
+/* Normal idle STOP only; preserves R79 streaming BUSY semantics and waits
+ * for DIO's actual original restore ACK. Wired takeover is fail-closed until
+ * a verified original-DIO forced-restore path is available. */
+int cp_cloud_remote_graceful_end(struct cp_cloud_pipeline *,uint64_t now_ms);
 /* Normal user disconnect: nonblocking SI v3 STOP on the same OEM owner
  * thread; returns RETRY for streaming/BUSY/in-progress OEM restoration and
  * OK only after the authenticated STOP ACK and all teardown proofs.
