@@ -69,7 +69,8 @@ int cp_cloud_bind_airplay(struct cp_cloud_pipeline *,Mu34ApServer *);
 /* Bind original MU1005 AirPlay singleton + SI owner, verified by
  * mu_dio_bind_interface() INSIDE the original OEM process and thread. */
 int cp_cloud_bind_native_dio(struct cp_cloud_pipeline *,MuDioNative *);
-/* Advance R68 using binder-created native CFString, never guessed names. */
+/* Run SI CPRX tick, iAP2 inner-auth and native media confirmation in one
+ * owner-thread loop. Return OK only when MEDIA_ACTIVE remains live. */
 int cp_cloud_drive_native(struct cp_cloud_pipeline *,uint64_t now_ms);
 /* Bind an SI-owned v3 CPRX lease BEFORE its first START, avoiding competing
  * native AirPlay start operations. The local SI CPRX socket is ticked through
@@ -104,6 +105,7 @@ int cp_cloud_airplay_ready(struct cp_cloud_pipeline *,const char *observed_inter
 int cp_cloud_inner_auth(struct cp_cloud_pipeline *);
 int cp_cloud_media_ready(struct cp_cloud_pipeline *);
 int cp_cloud_bt_closed(struct cp_cloud_pipeline *,uint32_t generation);
+/* Always retry pending OEM restoration even after the initial wired takeover. */
 int cp_cloud_wired_preempt(struct cp_cloud_pipeline *);
 int cp_cloud_end(struct cp_cloud_pipeline *);
 int cp_cloud_is_active(const struct cp_cloud_pipeline *);

@@ -179,6 +179,7 @@ int cp_cloud_bind_native_dio(struct cp_cloud_pipeline *p,MuDioNative *n){
 int cp_cloud_drive_native(struct cp_cloud_pipeline *p,uint64_t now){
  int r;
  if(!p||!p->native_dio)return CP_CLOUD_BAD;
+ if(!p->started||p->stopped)return CP_CLOUD_STOPPED;
  if(!native_valid(p))return stop(p);
  /* The SI CPRX control service is the ONLY native start/stop authority.
   * Tick it on the original owner thread: a real v3 CPRX START first calls
@@ -188,7 +189,25 @@ int cp_cloud_drive_native(struct cp_cloud_pipeline *p,uint64_t now){
  r=mu_cprx_tick(p->rx_service,now);
  if(r!=0||!native_valid(p))return stop(p);
  if(!cp_cloud_native_rx_live(p,0))return CP_CLOUD_RETRY;
- return cp_cloud_drive_start(p,p->native_dio->iface,now);
+ r=cp_cloud_drive_start(p,p->native_dio->iface,now);
+ if(r!=CP_CLOUD_OK)return r;
+ /* A listener and 4301 ACK are not media. Advance the SAME session only
+  * after independently observed inner iAP2/MFi authentication, and then
+  * after native media==7 and all four OEM delivery/control witnesses. */
+ if(p->handoff.phase==CP_HO_AIRPLAY_SESSION){
+  r=cp_cloud_inner_auth(p);
+  if(r==CP_CLOUD_PROOF)return CP_CLOUD_RETRY;
+  if(r!=CP_CLOUD_OK)return r;
+ }
+ if(p->handoff.phase==CP_HO_INNER_IAP_AUTH){
+  r=cp_cloud_media_ready(p);
+  if(r==CP_CLOUD_PROOF)return CP_CLOUD_RETRY;
+  if(r!=CP_CLOUD_OK)return r;
+ }
+ /* Do not report success on a cached MEDIA_ACTIVE phase after a native
+  * stream or SI owner dropped. The next owner tick can trigger cleanup. */
+ return p->handoff.phase==CP_HO_MEDIA_ACTIVE&&cp_cloud_is_active(p)?
+        CP_CLOUD_OK:CP_CLOUD_RETRY;
 }
 /* Accept native stop only after the OEM confirms cleanup and original
  * interface restoration; preserve owner for retries otherwise. */
@@ -405,17 +424,19 @@ int cp_cloud_bt_closed(struct cp_cloud_pipeline *s,uint32_t gen){
  return CP_CLOUD_OK;
 }
 int cp_cloud_wired_preempt(struct cp_cloud_pipeline *s){
- int restored=CP_CLOUD_OK;
+ int restored;
  if(!s)return CP_CLOUD_BAD;
- /* Attempt OEM restore BEFORE giving up the exclusive wireless owner.
-  * If it remains pending, revoke wireless now but report incomplete cleanup. */
+ /* Revoke wireless control on first wired takeover. Do NOT report a
+  * completed native restore until mu_cprx_shutdown() and the original
+  * interface barrier really finish. Subsequent calls must retry even
+  * after the wireless session has already been marked stopped. */
  if(s->started&&!s->stopped){
-  restored=native_restore(s);
   s->stopped=1;
   if(s->radio.epoch)(void)cp_radio_revoke(&s->radio,s->epoch,1);
   if(s->bootstrap)cp_s4_revoke(s->bootstrap);
  }
  if(cp_ho_wired_takeover(&s->handoff,1)!=CP_HO_OK)return CP_CLOUD_ORDER;
+ restored=native_restore(s);
  return restored;
 }
 int cp_cloud_end(struct cp_cloud_pipeline *s){

@@ -447,18 +447,32 @@ static void native_rx_media_contract(void){
  assert(cp_cloud_native_rx_live(&p,0)==1);
  assert(cp_cloud_native_rx_live(&p,1)==0);
  p.handoff.phase=CP_HO_AIRPLAY_SESSION;
- assert(cp_cloud_inner_auth(&p)==CP_CLOUD_OK);
- assert(cp_cloud_media_ready(&p)==CP_CLOUD_PROOF);
- native_media_flag=4;
- assert(cp_cloud_media_ready(&p)==CP_CLOUD_PROOF);
- native_media_flag=5;
- assert(cp_cloud_media_ready(&p)==CP_CLOUD_PROOF);
- native_media_flag=7;
- assert(cp_cloud_media_ready(&p)==CP_CLOUD_OK);
  strcpy(p.iface,"wlan0");
+ /* Owner tick drives inner authentication and stock media in order;
+  * it must not hallucinate streaming after merely receiving START. */
+ inner=0;
+ assert(cp_cloud_drive_native(&p,120)==CP_CLOUD_RETRY);
+ assert(p.handoff.phase==CP_HO_AIRPLAY_SESSION);
+ inner=1;
+ assert(cp_cloud_drive_native(&p,121)==CP_CLOUD_RETRY);
+ assert(p.handoff.phase==CP_HO_INNER_IAP_AUTH);
+ native_media_flag=4;
+ assert(cp_cloud_drive_native(&p,122)==CP_CLOUD_RETRY);
+ assert(p.handoff.phase==CP_HO_INNER_IAP_AUTH);
+ native_media_flag=5;
+ assert(cp_cloud_drive_native(&p,123)==CP_CLOUD_RETRY);
+ native_media_flag=7;
+ media[CP_CLOUD_STEERING]=0;
+ assert(cp_cloud_drive_native(&p,124)==CP_CLOUD_RETRY);
+ media[CP_CLOUD_STEERING]=1;
+ assert(cp_cloud_drive_native(&p,125)==CP_CLOUD_OK);
+ assert(p.handoff.phase==CP_HO_MEDIA_ACTIVE&&cp_cloud_is_active(&p));
+ native_media_flag=0;
+ assert(cp_cloud_drive_native(&p,126)==CP_CLOUD_RETRY);
+ assert(!cp_cloud_is_active(&p));
+ native_media_flag=7;
+ assert(cp_cloud_drive_native(&p,127)==CP_CLOUD_OK);
  assert(cp_cloud_is_active(&p));
- native_media_flag=0;assert(!cp_cloud_is_active(&p));
- native_media_flag=7;assert(cp_cloud_is_active(&p));
  rx.session=1235;assert(!cp_cloud_is_active(&p));
  rx.session=1234;assert(cp_cloud_is_active(&p));
  wired=0;assert(!cp_cloud_native_rx_live(&p,0));
@@ -502,12 +516,17 @@ static void native_dio_bound_pipeline(void){
   * this isolated fixture exercises it without pretending to be the pipeline. */
  assert(mu_dio_start(&native,5000)==MU34_AP_R_LISTENING_VERIFIED);
  assert(native_start_calls==1&&!strcmp(current_native_iface,"wlan0"));
- /* First shutdown returns pending: never free the OEM singleton early. */
- assert(cp_cloud_end(&p)==CP_CLOUD_RETRY);
- assert(native.initialized&&native_stop_calls==1);
- assert(cp_cloud_end(&p)==CP_CLOUD_OK);
+ /* Wired takeover may revoke wireless immediately, but must remain
+  * retryable until the original owner completes STOP and restores iface. */
+ assert(cp_cloud_wired_preempt(&p)==CP_CLOUD_RETRY);
+ assert(p.stopped&&native.initialized&&native_stop_calls==1);
+ assert(p.handoff.wired_active&&p.handoff.phase==CP_HO_TEARDOWN);
+ assert(cp_cloud_wired_preempt(&p)==CP_CLOUD_OK);
  assert(!native.initialized&&native_stop_calls==1);
  assert(!strcmp(current_native_iface,"eth0"));
+ assert(cp_cloud_wired_preempt(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_end(&p)==CP_CLOUD_OK);
+ assert(p.handoff.phase==CP_HO_WIRED);
  dlclose(h);
 }
 int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();

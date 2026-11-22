@@ -42,3 +42,11 @@ pipeline may consider the receiver ready. Invalid epoch/session are rejected,
 while the OEM restoration barrier remains mandatory. See
 `docs/R72_SINGLE_SI_RECEIVER_OWNER_CN.md`. Host socket tests are not vehicle
 proof; real SI/DIO callbacks are still required.
+
+### R73 native SI owner loop + wired recovery (NO INSTALL)
+
+The single SI CPRX owner tick now advances independently verified inner iAP2
+and native media states (0/4/5 wait, 7 plus four media/HMI witnesses active),
+re-checks streaming each tick, and retries incomplete OEM restoration on
+repeated wired takeover calls. Host/OEM fixtures are **not** iPhone or car proof.
+See `docs/R73_SI_OWNER_TICK_WIRED_RESTORE_CN.md`.
