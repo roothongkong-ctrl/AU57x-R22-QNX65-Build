@@ -1,7 +1,7 @@
 name: AU57x cloud-only 12-step evidence and lifecycle gates (NO INSTALL)
 on:
   push:
-    branches: [main, r92-native-btstack-preload-owner-probe]
+    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -37,6 +37,8 @@ jobs:
         run: bash ci/host_wcp_r45_remote.sh
       - name: R92 native btstack LD_PRELOAD real constructor/pthread interposition host tests
         run: bash ci/host_bt_preload_probe.sh
+      - name: R93 exact stock ELF dynamic pthread relocation tests and SD evidence script syntax
+        run: bash ci/host_r93_plt_audit.sh
       - name: R92 original btstack pthread entry audit synthetic mutation tests
         run: python3 -m unittest discover -s tests -p test_mu1005_bt_preload_audit.py -v
       - name: R91 RFCOMM fast-connect experiment (both strict and experimental variants)

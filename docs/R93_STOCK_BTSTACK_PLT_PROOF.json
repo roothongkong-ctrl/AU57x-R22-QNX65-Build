@@ -1,0 +1,33 @@
+{
+  "target": "MHI2_CN_AU57x_K1006_2/MU1005",
+  "original_btstack_sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
+  "loader": "/usr/lib/ldqnx.so.2",
+  "original_got_pthread_create": "0x2c148c",
+  "original_plt_pthread_create": "0x117390",
+  "verified_calls": [
+    {
+      "arm_bl_site": "0x236668",
+      "target": "0x117390",
+      "instruction": "0xebfb8348"
+    },
+    {
+      "arm_bl_site": "0x2368c8",
+      "target": "0x117390",
+      "instruction": "0xebfb82b0"
+    },
+    {
+      "arm_bl_site": "0x236c2c",
+      "target": "0x117390",
+      "instruction": "0xebfb81d7"
+    },
+    {
+      "arm_bl_site": "0x236c48",
+      "target": "0x117390",
+      "instruction": "0xebfb81d0"
+    }
+  ],
+  "dynamic_interposition_structurally_possible": true,
+  "in_car_loaded": false,
+  "in_car_btstack_owner_verified": false,
+  "meaning": "binary callsites/relocations proven; no car or QNX execution"
+}

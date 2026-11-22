@@ -1,3 +1,17 @@
+# R93：原厂 btstack 动态调用核验 + SD 卡一键取证（研究与诊断版）
+
+**已完成：** 用户原始 MU1005 `btstack` 的 QNX 动态调用（4/4 ARM BL → PLT、`R_ARM_JUMP_SLOT pthread_create`）静态验收；预加载器加入真实进程名检查；实际动态预加载的主机测试通过。
+
+**尚未完成：** 必须在车上看到原厂 `btstack` 的 `LD_PRELOAD` 实际加载记录、对应 PID 和内存映射，才能把“第 2 步第 1 项”标记为完成。现有 R93 SD 脚本只收集事实，不安装也不注入，因此不会假称已加载。
+
+**SD 操作：** 将 `R93_SD_MIB_ROOT/mod/custom.sh` 放到已有 M.I.B. SD1 卡根目录的 `/mod/custom.sh`（如果原来存在，先备份），绿屏 M.I.B. → Advanced Settings → Run Custom Script；结果在 SD 根目录 `R93_BTSTACK_PROOF`。不需要 SSH。完整步骤看 `docs/R93_FIRST_ITEM_CN.md`。
+
+**本地运行：** `bash ci/host_bt_preload_probe.sh && bash ci/host_r93_plt_audit.sh`；私有原厂样本：`R93_PRIVATE_BTSTACK=/path/to/btstack bash ci/host_r93_plt_audit.sh`。
+
+**不含原厂二进制。禁止将此源代码 ZIP 当作可刷机固件。**
+
+---
+
 # R92：原厂 btstack QNX LD_PRELOAD 入口与线程追踪（SOURCE ONLY）
 
 **本版新增真实进程入口：** `bt_preload_probe.c` 实现已核验 MU1005 ELF 哈希的 QNX 动态预加载构造器、`pthread_create` 代理和日志观察。离线从原厂 ARM ELF 找出 4 个调用点，并可用主机真实 `LD_PRELOAD` 实测执行。新增 QNX ARMv7 `.so` 编译任务。**这不是实际车上蓝牙 RFCOMM 回调，也不能声称 iPhone 已接通。**
