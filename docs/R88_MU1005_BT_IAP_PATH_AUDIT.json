@@ -1,0 +1,114 @@
+{
+  "release": "R88",
+  "baseline": "MHI2_CN_AU57x_K1006_2/MU1005",
+  "audit_type": "pinned_original_static_readonly",
+  "originals_kept_private": true,
+  "btstack_sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
+  "bluetooth_sha256": "7d5ae31396f016f811e18a7255bf1311e0bfa471b2a3252a6f2eb4bd3ad04272",
+  "r45_checked_arm_instructions": 40,
+  "r45_checked_vas": [
+    "0x00277a18",
+    "0x00277a1c",
+    "0x00277a20",
+    "0x00277a24",
+    "0x002779b4",
+    "0x002779b8",
+    "0x002779bc",
+    "0x002779c0",
+    "0x00207244",
+    "0x00207248",
+    "0x0020724c",
+    "0x00207250",
+    "0x002071c4",
+    "0x002071c8",
+    "0x002071cc",
+    "0x002071d0",
+    "0x0027733c",
+    "0x00277340",
+    "0x00277344",
+    "0x00277348",
+    "0x00277074",
+    "0x00277078",
+    "0x0027707c",
+    "0x00277080",
+    "0x002771f8",
+    "0x002771fc",
+    "0x00277200",
+    "0x00277204",
+    "0x002773f8",
+    "0x002773fc",
+    "0x00277400",
+    "0x00277404",
+    "0x0027715c",
+    "0x00277160",
+    "0x00277164",
+    "0x00277168",
+    "0x00276f74",
+    "0x00276f78",
+    "0x00276f7c",
+    "0x00276f80"
+  ],
+  "btstack_markers": {
+    "joey_MU0678_IapDevice": {
+      "present": false,
+      "file_offset_hex": null
+    },
+    "joey_MU0678_IapServices": {
+      "present": false,
+      "file_offset_hex": null
+    },
+    "joey_MU0678_dev_iapDevice": {
+      "present": false,
+      "file_offset_hex": null
+    },
+    "joey_MU0678_CIapBTChannel": {
+      "present": false,
+      "file_offset_hex": null
+    },
+    "original_BT_QuerySdp_vtable": {
+      "present": true,
+      "file_offset_hex": "0xe7fc"
+    },
+    "original_BT_StartService_vtable": {
+      "present": true,
+      "file_offset_hex": "0xc707"
+    },
+    "original_BT_RF_tracing": {
+      "present": true,
+      "file_offset_hex": "0xd384"
+    },
+    "original_BT_OBEX_client_event": {
+      "present": true,
+      "file_offset_hex": "0x1b48c0"
+    }
+  },
+  "bluetooth_markers": {
+    "original_app_enableIap": {
+      "present": true,
+      "file_offset_hex": "0x1359ac"
+    },
+    "original_app_iap2_service": {
+      "present": true,
+      "file_offset_hex": "0x13cc2c"
+    },
+    "original_app_iapEnabled": {
+      "present": true,
+      "file_offset_hex": "0x1339b0"
+    }
+  },
+  "joey_MU0678_path_not_found_markers": [
+    "joey_MU0678_IapDevice",
+    "joey_MU0678_IapServices",
+    "joey_MU0678_dev_iapDevice",
+    "joey_MU0678_CIapBTChannel"
+  ],
+  "mu1005_existing_iapDevice_path_proven": false,
+  "mu1005_stock_rfcomm_server_code_proven": true,
+  "mu1005_obex_client_code_indicated": true,
+  "mu1005_client_open_abi_proven": false,
+  "recommended_next_path": "R45 native server ingress -> owner-bounded R87 -> R44 stock MFi",
+  "qualification": "Missing a literal is not proof the route cannot be generated dynamically. Original BT RFCOMM/client snippets do not prove RF_OpenClientChannel ABI or a live phone. The 40 R45 words prove image consistency, not safe runtime binding.",
+  "installable": false,
+  "safe_to_flash": false,
+  "vehicle_verified": false
+}

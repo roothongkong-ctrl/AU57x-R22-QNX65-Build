@@ -1,7 +1,7 @@
 name: AU57x R52 QNX6.5 ARMv7 (REVIEW ONLY)
 on:
   push:
-    branches: [main, r87-wcp-congo-au57x-integration]
+    branches: [main, r88-mu1005-stock-rfcomm-ingress]
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
           if git ls-files | grep -Ei '\.(so|dll|elf|img|bin|7z|spk|key|pem|p12|pfx|o|a|zip)$'; then
             echo 'ERROR: this public repository must not contain proprietary binaries or keys'; exit 3
           fi
-          test "$(find project/source -name '*.c' | wc -l)" -eq 36
+          test "$(find project/source -name '*.c' | wc -l)" -eq 37
       - name: Host Bluetooth RF/IPC/socket contract (ASan + UBSan)
         shell: bash
         run: bash tests/run_bt_host.sh
