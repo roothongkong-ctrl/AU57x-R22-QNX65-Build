@@ -1,4 +1,4 @@
-# AU57x / MU1005 wireless CarPlay — R32 public cloud research (NO INSTALL)
+# AU57x / MU1005 wireless CarPlay — R76 source research (NO INSTALL)
 
 **Research-only: Not a CarPlay wireless implementation validated on the vehicle.**
 2017 Audi A6L C7, MHI2_CN_AU57x_K1006_2 / MU1005, QNX 6.5 ARMv7.
@@ -70,3 +70,14 @@ An unauthorized process cannot issue START/STOP or media metadata commands.
 No QNX peer-identity mechanism is guessed: the integration must provide a
 verified OEM implementation; host fixtures only check admission behavior.
 See `docs/R75_SI_IPC_CLIENT_ADMISSION_CN.md`.
+
+
+### R76 SI v3 Unix peer credential migration (NO INSTALL)
+
+R76 shuts off the old SI v3 TCP control entrypoints (retained as fail-closed
+compatibility symbols) and adds explicit AF_UNIX access through a separately
+verified, private owner-supplied directory. On QNX 6.5 the service requests
+getpeereid(); Linux host CI uses SO_PEERCRED. Kernel effective UID/GID **do
+not identify a unique OEM process**; original SI owner/session verification
+remains mandatory. No path or OEM process hooks are invented. See
+`docs/R76_SI_UNIX_PEER_QNX65_CN.md`. SOURCE ONLY / NO INSTALL.

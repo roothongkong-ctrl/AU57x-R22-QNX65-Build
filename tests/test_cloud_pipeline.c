@@ -6,6 +6,9 @@
 #include <dlfcn.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <sys/un.h>
+#include <sys/stat.h>
+#include <errno.h>
 #include <unistd.h>
 #include <string.h>
 static int wired=1,bt=1,cap5=1,cap24=1,ap=1,associated=1;
@@ -386,14 +389,14 @@ static int rx_si(void *ctx,uint32_t generation,uint64_t epoch,uint32_t session){
  (void)ctx;return generation==8&&epoch==8&&session==1234&&single&&wired;
 }
 static int rx_peer(void *ctx,int fd,uint32_t gen,uint64_t epoch,uint32_t session){
- struct sockaddr_in peer={0};socklen_t size=sizeof peer;
+ struct sockaddr_un peer={0};socklen_t size=sizeof peer;
  (void)ctx;
  si_peer_checks++;
- /* This isolated host adapter checks peer address and a test authorization
-  * flag. Production MUST instead bind OS peer credentials to genuine SI. */
+ /* Host-only SI admission fixture; native kernel credentials are checked
+  * separately by the server before this callback is called. */
  return si_peer_allowed&&fd>=0&&gen==8&&epoch==8&&session==1234&&
   getpeername(fd,(struct sockaddr *)&peer,&size)==0&&
-  peer.sin_family==AF_INET&&ntohl(peer.sin_addr.s_addr)==INADDR_LOOPBACK;
+  peer.sun_family==AF_UNIX;
 }
 static int rx_inner(void *ctx,uint32_t gen,uint64_t epoch,uint32_t session){
  (void)ctx;return gen==8&&epoch==8&&session==1234&&native_inner;
@@ -429,12 +432,32 @@ static void native_rx_media_contract(void){
                               8,&guard,"eth0","wlan0")==0);
  assert(cp_cloud_bind_native_dio(&p,&native)==CP_CLOUD_OK);
  assert(cp_cloud_native_rx_live(&p,0)==0);
- /* No OS peer validator => do not open the privileged v3 listener. */
+ /* v3 TCP entrypoint must stay fail-closed. Only a preexisting 0700
+  * owner-private directory may host a credential-checked AF_UNIX listener. */
+ assert(mu_cprx_open_si(&rx,&native,&evidence,5000,8,1234)==-1);
+ char sockdir[]="/tmp/au57x-r76-si-XXXXXX";
+ assert(mkdtemp(sockdir));
+ assert(chmod(sockdir,0777)==0);
+ assert(mu_cprx_open_si_unix(&rx,&native,&evidence,5000,8,1234,
+                              sockdir,geteuid(),getegid())==-1);
+ assert(chmod(sockdir,0700)==0);
  MuCprxEvidence missing_peer=evidence;
  missing_peer.si_client_verified=NULL;
- assert(mu_cprx_open_si(&rx,&native,&missing_peer,5000,8,1234)==-1);
- /* Same-process control socket, but dummy handset and media samples. */
- assert(mu_cprx_open_si(&rx,&native,&evidence,5000,8,1234)==0);
+ assert(mu_cprx_open_si_unix(&rx,&native,&missing_peer,5000,8,1234,
+                              sockdir,geteuid(),getegid())==-1);
+ /* Valid SI lease and actual kernel AF_UNIX peer credentials. */
+ assert(mu_cprx_open_si_unix(&rx,&native,&evidence,5000,8,1234,
+                             sockdir,geteuid(),getegid())==0);
+ assert(rx.unix_listener&&rx.unix_path[0]);
+ struct stat sockstat;
+ assert(lstat(rx.unix_path,&sockstat)==0&&S_ISSOCK(sockstat.st_mode));
+ assert((sockstat.st_mode&0777)==0600);
+ char bound_path[MU_CPRX_UNIX_PATH_MAX];
+ strcpy(bound_path,rx.unix_path);
+ /* Never remove/replace an existing receiver socket. */
+ MuCprxService other={0};
+ assert(mu_cprx_open_si_unix(&other,&native,&evidence,5000,8,1234,
+                             sockdir,geteuid(),getegid())==-1);
  rx.session=1235; /* reject stale/foreign SI session at bind time */
  assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_PROOF);
  rx.session=1234;
@@ -459,11 +482,16 @@ static void native_rx_media_contract(void){
  assert(cp_cloud_drive_native(&p,100)==CP_CLOUD_RETRY);
  /* An unauthorized LOCAL process can know generation and SI session IDs:
   * it still must not reach the native startServer call. */
- int rejected=socket(AF_INET,SOCK_STREAM,0);assert(rejected>=0);
- struct sockaddr_in addr={0};
- addr.sin_family=AF_INET;
- addr.sin_port=htons(MU_CPRX_PORT);
- addr.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+ int rejected=socket(AF_UNIX,SOCK_STREAM,0);assert(rejected>=0);
+ struct sockaddr_un addr={0};
+ addr.sun_family=AF_UNIX;
+ strcpy(addr.sun_path,rx.unix_path);
+ /* A matching AF_INET connection to the obsolete port cannot reach v3. */
+ int tcp=socket(AF_INET,SOCK_STREAM,0);assert(tcp>=0);
+ struct sockaddr_in old={0};old.sin_family=AF_INET;
+ old.sin_addr.s_addr=htonl(INADDR_LOOPBACK);old.sin_port=htons(MU_CPRX_PORT);
+ assert(connect(tcp,(struct sockaddr*)&old,sizeof old)==-1);
+ close(tcp);
  si_peer_allowed=0;
  assert(connect(rejected,(struct sockaddr *)&addr,sizeof addr)==0);
  unsigned char denied_req[32]={0};
@@ -475,7 +503,14 @@ static void native_rx_media_contract(void){
  assert(native_start_calls==0&&!rx.started&&rx.client<0);
  close(rejected);
  si_peer_allowed=1;
- int fd=socket(AF_INET,SOCK_STREAM,0);assert(fd>=0);
+ /* Kernel UID mismatch must be rejected independent of SI wire/session. */
+ rx.peer_uid=geteuid()==0?1:0;
+ int wrong=socket(AF_UNIX,SOCK_STREAM,0);assert(wrong>=0);
+ assert(connect(wrong,(struct sockaddr*)&addr,sizeof addr)==0);
+ assert(cp_cloud_drive_native(&p,100)==CP_CLOUD_RETRY);
+ assert(rx.client<0&&native_start_calls==0);
+ close(wrong);rx.peer_uid=geteuid();
+ int fd=socket(AF_UNIX,SOCK_STREAM,0);assert(fd>=0);
  assert(connect(fd,(struct sockaddr *)&addr,sizeof addr)==0);
  /* A previously admitted socket loses authority mid-connection. Its
   * partial request must be dropped BEFORE native side effects. */
@@ -486,7 +521,7 @@ static void native_rx_media_contract(void){
  assert(rx.client<0&&!rx.started&&native_start_calls==0);
  close(fd);
  si_peer_allowed=1;
- fd=socket(AF_INET,SOCK_STREAM,0);assert(fd>=0);
+ fd=socket(AF_UNIX,SOCK_STREAM,0);assert(fd>=0);
  assert(connect(fd,(struct sockaddr *)&addr,sizeof addr)==0);
  unsigned char req[32]={0};
  memcpy(req,"CPRX",4);req[4]=3;req[5]=1; /* v3 START */
@@ -566,6 +601,8 @@ static void native_rx_media_contract(void){
  assert(cp_cloud_end(&p)==CP_CLOUD_OK);
  assert(rx.backend_released&&rx.listener==-1);
  assert(!native.initialized&&!strcmp(current_native_iface,"eth0"));
+ assert(lstat(bound_path,&sockstat)==-1&&errno==ENOENT);
+ assert(rmdir(sockdir)==0);
  dlclose(h);
 }
 static void native_dio_bound_pipeline(void){

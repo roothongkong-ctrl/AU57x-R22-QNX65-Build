@@ -1,8 +1,13 @@
+#define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #include "cprx_service.h"
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/un.h>
+#include <sys/stat.h>
+#include <stddef.h>
+#include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -22,47 +27,153 @@ static int safe_send(int fd){
  (void)fd;return -1; /* never risk killing DIO with SIGPIPE */
 #endif
 }
+static void release_unix_path(MuCprxService *s){
+ struct stat st;
+ /* Never unlink a pathname substituted by another process. */
+ if(s->unix_listener&&s->unix_path[0]&&
+    lstat(s->unix_path,&st)==0&&
+    st.st_dev==s->unix_dev&&st.st_ino==s->unix_ino){
+  (void)unlink(s->unix_path);
+ }
+ s->unix_path[0]=0;
+}
+/* QNX 6.5 ARM-v7 uses getpeereid() for AF_UNIX SOCK_STREAM peers;
+ * Linux host fixtures instead read kernel SO_PEERCRED. Any error denies. */
+static int kernel_peer(int fd,uid_t *uid,gid_t *gid){
+ struct sockaddr_storage sa; socklen_t len=(socklen_t)sizeof sa;
+ if(fd<0||!uid||!gid||getsockname(fd,(struct sockaddr*)&sa,&len)||
+    sa.ss_family!=AF_UNIX)return 0;
+#ifdef __QNXNTO__
+ return getpeereid(fd,uid,gid)==0;
+#elif defined(__linux__) && defined(SO_PEERCRED)
+ struct ucred creds;socklen_t n=(socklen_t)sizeof creds;
+ if(getsockopt(fd,SOL_SOCKET,SO_PEERCRED,&creds,&n)||n!=sizeof creds)
+  return 0;
+ *uid=creds.uid;*gid=creds.gid;return 1;
+#else
+ return 0;
+#endif
+}
+static int private_dir(const char *dir){
+ struct stat st;
+ size_t n;
+ if(!dir||dir[0]!='/'||(n=strlen(dir))<2||n>80||
+    dir[n-1]=='/'||strstr(dir,"//")||strstr(dir,"/../")||
+    strstr(dir,"/./")||!strcmp(dir,"/..")||!strcmp(dir,"/."))return 0;
+ return lstat(dir,&st)==0&&S_ISDIR(st.st_mode)&&
+        st.st_uid==geteuid()&&(st.st_mode&0777)==0700;
+}
 static void drop(MuCprxService *s){if(s->client>=0)close(s->client);s->client=-1;s->used=s->size=s->sent=0;s->required=16;s->mutating=0;s->length_used=s->payload_used=s->payload_need=0;}
 static void reply(MuCprxService *s,unsigned code){memcpy(s->reply,"CPRA\2\0\0\0",8);s->reply[5]=(unsigned char)code;s->size=8;s->sent=0;}
 static uint32_t gen(const unsigned char *p){return (uint32_t)p[0]|(uint32_t)p[1]<<8|(uint32_t)p[2]<<16|(uint32_t)p[3]<<24;}
 static uint64_t epoch64(const unsigned char *p){return (uint64_t)gen(p)|((uint64_t)gen(p+4)<<32);}
 static void put32(unsigned char*p,uint32_t v){for(unsigned i=0;i<4;i++)p[i]=(unsigned char)(v>>(i*8));}
 static int peer_verified(const MuCprxService *s,int fd){
- return s&&fd>=0&&(s->version!=3||
-  (s->evidence.si_client_verified&&
-   s->evidence.si_client_verified(s->evidence.opaque,fd,s->generation,
-                                  s->epoch,s->session)==1));
+ uid_t uid;gid_t gid;
+ if(!s||fd<0)return 0;
+ if(s->version!=3)return 1;
+ return s->unix_listener&&kernel_peer(fd,&uid,&gid)&&
+  uid==s->peer_uid&&gid==s->peer_gid&&
+  s->evidence.si_client_verified&&
+  s->evidence.si_client_verified(s->evidence.opaque,fd,s->generation,
+                                 s->epoch,s->session)==1;
 }
 static int authorized(MuCprxService *s){
  return s->evidence.admitted(s->evidence.opaque,s->generation)==1 &&
   (s->version==2 || (s->evidence.si_admitted && s->evidence.si_admitted(s->evidence.opaque,s->generation,s->epoch,s->session)==1));
 }
-static int open_service(MuCprxService *s,const MuReceiverBackend *b,const MuCprxEvidence *e,unsigned port,unsigned version,uint64_t epoch,uint32_t session){
+static int open_service(MuCprxService *s,const MuReceiverBackend *b,
+ const MuCprxEvidence *e,unsigned port,unsigned version,uint64_t epoch,
+ uint32_t session,const char *dir,uid_t expected_uid,gid_t expected_gid){
  if(!s||!b||!b->opaque||!b->generation||!b->start||!b->poll||!b->restore||!e||!e->admitted||!e->identity||!e->media||!port||port>65535||e->admitted(e->opaque,b->generation)!=1)return -1;
  if(version==3&&(!epoch||!session||!e->si_admitted||
    !e->si_client_verified||
    e->si_admitted(e->opaque,b->generation,epoch,session)!=1))return -1;
- int fd=socket(AF_INET,SOCK_STREAM,0);if(fd<0)return -1;
- struct sockaddr_in a;memset(&a,0,sizeof a);
+ int fd=-1;struct stat inode;char path[MU_CPRX_UNIX_PATH_MAX]={0};
+ if(version==3){
+  struct sockaddr_un a;size_t n;int flags;
+  /* No fallback to AF_INET: a loopback address proves no OS peer. */
+  if(!private_dir(dir))return -1;
+  n=strlen(dir)+sizeof("/cprx.sock");
+  if(n>sizeof a.sun_path||n>sizeof path)return -1;
+  (void)snprintf(path,sizeof path,"%s/cprx.sock",dir);
+  if(lstat(path,&inode)==0||errno!=ENOENT)return -1; /* never unlink stale */
+  fd=socket(AF_UNIX,SOCK_STREAM,0);if(fd<0)return -1;
+  flags=fcntl(fd,F_GETFD);
+  if(flags<0||fcntl(fd,F_SETFD,flags|FD_CLOEXEC)<0||nonblock(fd)){
+   close(fd);return -1;
+  }
+  memset(&a,0,sizeof a);a.sun_family=AF_UNIX;
+  memcpy(a.sun_path,path,strlen(path)+1);
 #ifdef __QNXNTO__
- a.sin_len=sizeof a;
+  /* QNX 6.5 UNIX(4): SUN_LEN excludes the terminating NUL. */
+  a.sun_len=(unsigned char)SUN_LEN(&a);
+  if(bind(fd,(struct sockaddr*)&a,(socklen_t)SUN_LEN(&a))){
+#else
+  if(bind(fd,(struct sockaddr*)&a,
+      (socklen_t)(offsetof(struct sockaddr_un,sun_path)+strlen(path)+1))){
 #endif
- a.sin_family=AF_INET;a.sin_port=htons(MU_CPRX_PORT);a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
- int yes=1;if(setsockopt(fd,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof yes)||nonblock(fd)||bind(fd,(struct sockaddr*)&a,sizeof a)||listen(fd,2)){close(fd);return -1;}
- memset(s,0,sizeof *s);s->listener=s->client=-1;s->backend=*b;s->evidence=*e;s->generation=b->generation;s->port=port;s->version=version;s->epoch=epoch;s->session=session;s->required=16;
+   close(fd);return -1;
+  }
+  if(chmod(path,0600)||lstat(path,&inode)||!S_ISSOCK(inode.st_mode)||
+     inode.st_uid!=geteuid()||listen(fd,2)){
+   /* Path is owned by us in our verified private directory. */
+   (void)unlink(path);close(fd);return -1;
+  }
+ }else{
+  struct sockaddr_in a;int yes=1;
+  fd=socket(AF_INET,SOCK_STREAM,0);if(fd<0)return -1;
+  memset(&a,0,sizeof a);
+#ifdef __QNXNTO__
+  a.sin_len=sizeof a;
+#endif
+  a.sin_family=AF_INET;a.sin_port=htons(MU_CPRX_PORT);
+  a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+  if(setsockopt(fd,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof yes)||
+     nonblock(fd)||bind(fd,(struct sockaddr*)&a,sizeof a)||listen(fd,2)){
+   close(fd);return -1;
+  }
+ }
+ memset(s,0,sizeof *s);s->listener=s->client=-1;
+ s->backend=*b;s->evidence=*e;s->generation=b->generation;
+ s->port=port;s->version=version;s->epoch=epoch;s->session=session;s->required=16;
+ if(version==3){
+  s->unix_listener=1;s->peer_uid=expected_uid;s->peer_gid=expected_gid;
+  s->unix_dev=inode.st_dev;s->unix_ino=inode.st_ino;
+  memcpy(s->unix_path,path,strlen(path)+1);
+ }
  s->listener=fd;return 0;
 }
 static int stock_start(void *p,unsigned port){return mu_dio_start(p,port);}
 static int stock_poll(void *p){return mu_dio_poll(p);}
 static int stock_restore(void *p){MuDioNative *n=p;return n->initialized?mu_dio_restore(n):0;}
-static int open_stock(MuCprxService *s,MuDioNative *n,const MuCprxEvidence *e,unsigned port,unsigned version,uint64_t epoch,uint32_t session){
+static int open_stock(MuCprxService *s,MuDioNative *n,const MuCprxEvidence *e,
+ unsigned port,unsigned version,uint64_t epoch,uint32_t session,
+ const char *dir,uid_t uid,gid_t gid){
  if(!n||!n->initialized)return -1;
  MuReceiverBackend b={n,n->ap.generation,stock_start,stock_poll,stock_restore};
- return open_service(s,&b,e,port,version,epoch,session);
+ return open_service(s,&b,e,port,version,epoch,session,dir,uid,gid);
 }
-int mu_cprx_open(MuCprxService *s,MuDioNative *n,const MuCprxEvidence *e,unsigned port){return open_stock(s,n,e,port,2,0,0);}
-int mu_cprx_open_si(MuCprxService *s,MuDioNative *n,const MuCprxEvidence *e,unsigned port,uint64_t epoch,uint32_t session){return open_stock(s,n,e,port,3,epoch,session);}
-int mu_cprx_open_backend_si(MuCprxService *s,const MuReceiverBackend *b,const MuCprxEvidence *e,unsigned port,uint64_t epoch,uint32_t session){return open_service(s,b,e,port,3,epoch,session);}
+int mu_cprx_open(MuCprxService *s,MuDioNative *n,const MuCprxEvidence *e,
+ unsigned port){return open_stock(s,n,e,port,2,0,0,NULL,0,0);}
+/* Never leave an insecure SI v3 TCP entry reachable from existing callers. */
+int mu_cprx_open_si(MuCprxService *s,MuDioNative *n,const MuCprxEvidence *e,
+ unsigned port,uint64_t epoch,uint32_t session){
+ (void)s;(void)n;(void)e;(void)port;(void)epoch;(void)session;return -1;
+}
+int mu_cprx_open_backend_si(MuCprxService *s,const MuReceiverBackend *b,
+ const MuCprxEvidence *e,unsigned port,uint64_t epoch,uint32_t session){
+ (void)s;(void)b;(void)e;(void)port;(void)epoch;(void)session;return -1;
+}
+int mu_cprx_open_si_unix(MuCprxService *s,MuDioNative *n,const MuCprxEvidence *e,
+ unsigned port,uint64_t epoch,uint32_t session,const char *dir,uid_t uid,gid_t gid){
+ return open_stock(s,n,e,port,3,epoch,session,dir,uid,gid);
+}
+int mu_cprx_open_backend_si_unix(MuCprxService *s,const MuReceiverBackend *b,
+ const MuCprxEvidence *e,unsigned port,uint64_t epoch,uint32_t session,
+ const char *dir,uid_t uid,gid_t gid){
+ return open_service(s,b,e,port,3,epoch,session,dir,uid,gid);
+}
 static int restore_backend(MuCprxService *s){
  if(s->backend_released)return 0;
  int r=s->backend.restore(s->backend.opaque);
@@ -72,6 +183,7 @@ static int restore_backend(MuCprxService *s){
 int mu_cprx_shutdown(MuCprxService *s){
  if(!s||!s->backend.restore)return -1;
  drop(s);if(s->listener>=0){close(s->listener);s->listener=-1;}
+ release_unix_path(s);
  s->terminal=1;
  if(restore_backend(s)!=0)return -1;
  s->started=s->start_confirmed=s->cleaning=0;return 1;

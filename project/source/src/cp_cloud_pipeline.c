@@ -134,6 +134,7 @@ static int native_rx_lease(const struct cp_cloud_pipeline *p,
  if(!p||!p->native_dio||!rx||rx->version!=3||
     rx->generation!=p->epoch||rx->epoch!=p->epoch||
     rx->port!=CP_CLOUD_PORT||!rx->session||
+    !rx->unix_listener||!rx->unix_path[0]||
     rx->backend.opaque!=p->native_dio||
     rx->backend.generation!=p->epoch||
     !rx->backend.start||!rx->backend.poll||!rx->backend.restore||

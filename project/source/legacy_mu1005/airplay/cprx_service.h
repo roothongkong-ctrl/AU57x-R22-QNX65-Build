@@ -2,12 +2,14 @@
 #define MU1005_CPRX_SERVICE_H
 #include "native_exports.h"
 #include "semantic.h"
+#include <sys/types.h>
 /* Port override is for isolated host tests only. */
 #if defined(MU_CPRX_HOST_TEST) && !defined(__QNXNTO__)
 #define MU_CPRX_PORT 57344u
 #else
 #define MU_CPRX_PORT 57343u
 #endif
+#define MU_CPRX_UNIX_PATH_MAX 108u
 /* CPRX v2 / SI-bound v3 basic control, one authorized generation, owner-thread nonblocking tick.
  * Not a DIO loader. Production caller must supply actual owner and admission,
  * factory Bonjour pi and media observation. Never run from a socket worker. */
@@ -56,6 +58,14 @@ typedef struct {
  unsigned version, required;
  unsigned port;
  int listener, client, started, start_confirmed, cleaning, terminal, mutating;
+ /* v3 only: private AF_UNIX stream socket with kernel peer credentials.
+  * v2 legacy loopback stays separate; never accept TCP for SI v3. */
+ int unix_listener;
+ uid_t peer_uid;
+ gid_t peer_gid;
+ dev_t unix_dev;
+ ino_t unix_ino;
+ char unix_path[MU_CPRX_UNIX_PATH_MAX];
  unsigned used, sent, size;
  unsigned identity_len;
  char identity_value[252];
@@ -70,9 +80,21 @@ int mu_cprx_open(MuCprxService *,MuDioNative *,const MuCprxEvidence *,unsigned a
  * No donor adapter is implemented by this interface.
  * Failed open leaves caller object unchanged; successful open requires an unused
  * or fully restored service object. */
+/* Legacy v3 TCP entrypoints are intentionally fail-closed. Retained only for
+ * binary/source symbol compatibility; call the explicit UNIX variants. */
 int mu_cprx_open_backend_si(MuCprxService *,const MuReceiverBackend *,const MuCprxEvidence *,unsigned,uint64_t,uint32_t);
+/* dir: existing owner-owned private (0700) directory; a new 'cprx.sock'
+ * pathname is created there. Never pass /tmp directly or choose a car path
+ * until the real SI owner/dir has been independently verified. expected
+ * uid/gid are pinned from original SI owner, NOT accepted from wire data.
+ * QNX uses getpeereid(); Linux host tests use SO_PEERCRED. */
+int mu_cprx_open_backend_si_unix(MuCprxService *,const MuReceiverBackend *,
+ const MuCprxEvidence *,unsigned,uint64_t,uint32_t,const char *dir,
+ uid_t expected_uid,gid_t expected_gid);
 /* Operations 8–10 require verified owner callbacks; missing backend is rejected. */
 int mu_cprx_open_si(MuCprxService *,MuDioNative *,const MuCprxEvidence *,unsigned,uint64_t,uint32_t);
+int mu_cprx_open_si_unix(MuCprxService *,MuDioNative *,const MuCprxEvidence *,
+ unsigned,uint64_t,uint32_t,const char *dir,uid_t expected_uid,gid_t expected_gid);
 /* Call on genuine owner periodically, with monotonic milliseconds. 0 active,
  * 1 ended, -1 cleanup pending/error (retain object and retry shutdown). */
 int mu_cprx_tick(MuCprxService *,uint64_t now);
