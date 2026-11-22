@@ -612,6 +612,9 @@ static void native_rx_media_contract(void){
  assert(cp_cloud_drive_native(&p,129)==CP_CLOUD_OK);
  assert(cp_cloud_is_active(&p));
  rx.session=1235;assert(!cp_cloud_is_active(&p));
+ /* Even a previously acknowledged START must fail if SI lease changes. */
+ MuCprxClient stale=p.rx_client;
+ assert(mu_cprx_client_tick(&stale,130)==MU_CPRX_CLIENT_ERROR);
  rx.session=1234;assert(cp_cloud_is_active(&p));
  wired=0;assert(!cp_cloud_native_rx_live(&p,0));
  wired=1;
@@ -631,6 +634,134 @@ static void native_rx_media_contract(void){
  assert(!native.initialized&&!strcmp(current_native_iface,"eth0"));
  assert(lstat(bound_path,&sockstat)==-1&&errno==ENOENT);
  assert(rmdir(sockdir)==0);
+ dlclose(h);
+}
+/* R79: exercise actual CPRX STOP protocol in addition to direct OEM
+ * rollback. BUSY must not stop live phone media. Idle STOP must await the
+ * original backend's multi-tick restoration, not only write a request. */
+static void native_graceful_stop_protocol(void){
+ MuDioNative native={0};MuCprxService rx={0};
+ MuCprxClient start,stopper;
+ const MuDioGuard guard={NULL,native_lib,native_owner,native_listening,
+                         native_stopped,native_interface};
+ const MuCprxEvidence evidence={.admitted=rx_admitted,.identity=rx_identity,
+   .media=rx_media,.si_admitted=rx_si,.si_client_verified=rx_peer,
+   .si_inner_iap2_mfi=rx_inner,.si_media_channel=rx_channel};
+ void *h=dlopen(NULL,RTLD_NOW);assert(h);
+ char dir[]="/tmp/au57x-r79-stop-XXXXXX";
+ reset_fixture();native_owner_ok=1;native_listener=0;
+ native_stop_pending=0;native_stop_calls=0;native_media_flag=0;
+ si_peer_allowed=1;strcpy(current_native_iface,"eth0");
+ assert(mkdtemp(dir));
+ assert(mu_dio_bind_interface(&native,h,&airplay_object,&airplay_owner,
+                              8,&guard,"eth0","wlan0")==0);
+ assert(mu_cprx_open_si_unix(&rx,&native,&evidence,5000,8,1234,
+                              dir,geteuid(),getegid())==0);
+ char unix_path[MU_CPRX_UNIX_PATH_MAX];strcpy(unix_path,rx.unix_path);
+ mu_cprx_client_init(&start);mu_cprx_client_init(&stopper);
+ assert(mu_cprx_client_begin_stop(&stopper,&rx,200)==-1);
+ assert(mu_cprx_client_begin(&start,&rx,200)==0);
+ int result=MU_CPRX_CLIENT_PENDING;
+ for(unsigned i=0;i<24&&result==MU_CPRX_CLIENT_PENDING;i++){
+  result=mu_cprx_client_tick(&start,200+i);
+  assert(result==MU_CPRX_CLIENT_PENDING||result==MU_CPRX_CLIENT_CONFIRMED);
+  assert(mu_cprx_tick(&rx,200+i)==0);
+  if(result==MU_CPRX_CLIENT_PENDING)
+   result=mu_cprx_client_tick(&start,200+i);
+ }
+ assert(result==MU_CPRX_CLIENT_CONFIRMED);
+ assert(rx.started&&rx.start_confirmed&&native_start_calls==1);
+ native_media_flag=7;
+ assert(mu_cprx_client_begin_stop(&stopper,&rx,300)==0);
+ result=MU_CPRX_CLIENT_PENDING;
+ for(unsigned i=0;i<24&&result==MU_CPRX_CLIENT_PENDING;i++){
+  result=mu_cprx_client_tick(&stopper,300+i);
+  assert(result==MU_CPRX_CLIENT_PENDING||result==MU_CPRX_CLIENT_BUSY);
+  assert(mu_cprx_tick(&rx,300+i)==0);
+  if(result==MU_CPRX_CLIENT_PENDING)
+   result=mu_cprx_client_tick(&stopper,300+i);
+ }
+ assert(result==MU_CPRX_CLIENT_BUSY);
+ assert(rx.started&&rx.start_confirmed&&native_stop_calls==0);
+ assert(mu_cprx_client_tick(&stopper,400)==MU_CPRX_CLIENT_BUSY);
+ mu_cprx_client_close(&stopper);
+ /* Correct media-off confirmation enables the SAME leased receiver to STOP.
+  * R77's pathname remains reserved until native backend restores. */
+ native_media_flag=0;
+ assert(mu_cprx_client_begin_stop(&stopper,&rx,500)==0);
+ result=MU_CPRX_CLIENT_PENDING;
+ int saw_pending_restore=0;
+ for(unsigned i=0;i<32&&result==MU_CPRX_CLIENT_PENDING;i++){
+  result=mu_cprx_client_tick(&stopper,500+i);
+  assert(result==MU_CPRX_CLIENT_PENDING||result==MU_CPRX_CLIENT_CONFIRMED);
+  int srv=mu_cprx_tick(&rx,500+i);
+  assert(srv==0||srv==1);
+  if(native_stop_calls==1&&!rx.backend_released){
+   struct stat st;
+   saw_pending_restore=1;
+   assert(lstat(unix_path,&st)==0&&S_ISSOCK(st.st_mode));
+  }
+  if(result==MU_CPRX_CLIENT_PENDING)
+   result=mu_cprx_client_tick(&stopper,500+i);
+ }
+ assert(result==MU_CPRX_CLIENT_CONFIRMED);
+ assert(saw_pending_restore);
+ assert(rx.backend_released&&native_stop_calls==1);
+ assert(!native.initialized&&!strcmp(current_native_iface,"eth0"));
+ struct stat st;
+ assert(lstat(unix_path,&st)==-1&&errno==ENOENT);
+ assert(mu_cprx_client_tick(&start,601)==MU_CPRX_CLIENT_ERROR);
+ assert(mu_cprx_client_tick(&stopper,601)==MU_CPRX_CLIENT_CONFIRMED);
+ mu_cprx_client_close(&start);mu_cprx_client_close(&stopper);
+ assert(rmdir(dir)==0);dlclose(h);
+}
+/* R79 end-to-end pipeline: verified native START -> media-aware STOP ->
+ * confirmed native restoration and original session teardown. */
+static void native_graceful_pipeline_end(void){
+ struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
+ MuDioNative native={0};MuCprxService rx={0};
+ const MuDioGuard guard={NULL,native_lib,native_owner,native_listening,
+                         native_stopped,native_interface};
+ const MuCprxEvidence evidence={.admitted=rx_admitted,.identity=rx_identity,
+   .media=rx_media,.si_admitted=rx_si,.si_client_verified=rx_peer,
+   .si_inner_iap2_mfi=rx_inner,.si_media_channel=rx_channel};
+ void *h=dlopen(NULL,RTLD_NOW);assert(h);
+ char dir[]="/tmp/au57x-r79-pipeline-XXXXXX";
+ reset_fixture();native_owner_ok=1;native_listener=0;
+ native_stop_pending=0;native_stop_calls=0;native_media_flag=0;
+ si_peer_allowed=1;strcpy(current_native_iface,"eth0");
+ mocked_oem(&b,&stock,1);cp_cloud_init(&p);
+ assert(cp_cloud_begin(&p,&b,&ops,8,4)==CP_CLOUD_OK);
+ assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_OK);
+ assert(mu_dio_bind_interface(&native,h,&airplay_object,&airplay_owner,
+                              8,&guard,"eth0","wlan0")==0);
+ assert(cp_cloud_bind_native_dio(&p,&native)==CP_CLOUD_OK);
+ assert(mkdtemp(dir));
+ assert(mu_cprx_open_si_unix(&rx,&native,&evidence,5000,8,1234,
+                              dir,geteuid(),getegid())==0);
+ assert(cp_cloud_bind_rx_service(&p,&rx)==CP_CLOUD_OK);
+ assert(cp_cloud_enable_native_client(&p)==CP_CLOUD_OK);
+ for(unsigned i=0;i<24&&!rx.start_confirmed;i++){
+  int rc=cp_cloud_drive_native(&p,200+i);
+  assert(rc==CP_CLOUD_RETRY||rc==CP_CLOUD_PROOF);
+ }
+ assert(rx.started&&rx.start_confirmed&&p.rx_client.phase==4);
+ native_media_flag=7;
+ assert(cp_cloud_graceful_native_end(&p,300)==CP_CLOUD_RETRY);
+ assert(!p.graceful_stop_started&&native_stop_calls==0&&rx.started);
+ native_media_flag=0;
+ int r=CP_CLOUD_RETRY;
+ for(unsigned i=0;i<32&&r==CP_CLOUD_RETRY;i++){
+  r=cp_cloud_graceful_native_end(&p,301+i);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_OK);
+ }
+ assert(r==CP_CLOUD_OK);
+ assert(p.stopped&&!p.native_dio&&!p.rx_service&&!p.rx_client.phase);
+ assert(rx.backend_released&&native_stop_calls==1);
+ assert(!native.initialized&&!strcmp(current_native_iface,"eth0"));
+ assert(rmdir(dir)==0);
  dlclose(h);
 }
 static void native_dio_bound_pipeline(void){
@@ -677,5 +808,5 @@ static void native_dio_bound_pipeline(void){
  assert(p.handoff.phase==CP_HO_WIRED);
  dlclose(h);
 }
-int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();
+int main(void){successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();
  puts("AU57X_R47_CLOUD_04_05_06_07_08_09_OWNER_GATES_PASS");return 0;}

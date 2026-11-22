@@ -211,6 +211,7 @@ int cp_cloud_drive_native(struct cp_cloud_pipeline *p,uint64_t now){
  int r;
  if(!p||!p->native_dio)return CP_CLOUD_BAD;
  if(!p->started||p->stopped)return CP_CLOUD_STOPPED;
+ if(p->graceful_stop_started)return CP_CLOUD_RETRY;
  if(!native_valid(p))return stop(p);
  /* The SI CPRX control service is the ONLY native start/stop authority.
   * Tick it on the original owner thread: a real v3 CPRX START first calls
@@ -267,10 +268,11 @@ static int native_restore(struct cp_cloud_pipeline *p){
  if(!p||!p->native_dio)return CP_CLOUD_OK;
  /* Revoke the sender before releasing the SI receiver lease; the
   * original backend must still acknowledge native restore separately. */
- if(p->rx_client_enabled){
+ if(p->rx_client_enabled||p->rx_client.phase){
   mu_cprx_client_close(&p->rx_client);
-  p->rx_client_enabled=0;
  }
+ p->rx_client_enabled=0;
+ p->graceful_stop_started=0;
  /* Release the SI receiver lease before touching the underlying AirPlay
   * singleton. A pending native stop is NOT confirmed cleanup. */
  if(p->rx_service){
@@ -483,6 +485,51 @@ int cp_cloud_bt_closed(struct cp_cloud_pipeline *s,uint32_t gen){
   return CP_CLOUD_ORDER;
  return CP_CLOUD_OK;
 }
+int cp_cloud_graceful_native_end(struct cp_cloud_pipeline *s,uint64_t now){
+ int r,t;
+ if(!s||!s->started||!s->native_dio||!s->rx_service)
+  return CP_CLOUD_BAD;
+ if(s->stopped)return CP_CLOUD_STOPPED;
+ if(!s->graceful_stop_started){
+  /* Normal disconnect is voluntary: do not cut off actively streaming
+   * native media. For immediate wired priority, call wired_preempt instead. */
+  if(!native_valid(s)||!native_rx_lease(s,s->rx_service))return stop(s);
+  if(!s->rx_service->started||!s->rx_service->start_confirmed||
+     s->rx_service->evidence.media(s->rx_service->evidence.opaque)==7)
+   return CP_CLOUD_RETRY;
+  if(s->rx_client_enabled&&s->rx_client.phase!=4)
+   return CP_CLOUD_RETRY;
+  mu_cprx_client_close(&s->rx_client);
+  s->rx_client_enabled=0;
+  if(mu_cprx_client_begin_stop(&s->rx_client,s->rx_service,now)!=0)
+   return CP_CLOUD_PROOF;
+  s->graceful_stop_started=1;
+ }
+ r=mu_cprx_client_tick(&s->rx_client,now);
+ if(r==MU_CPRX_CLIENT_ERROR)return stop(s);
+ if(r==MU_CPRX_CLIENT_BUSY){
+  mu_cprx_client_close(&s->rx_client);
+  s->graceful_stop_started=0;
+  return CP_CLOUD_RETRY;
+ }
+ t=mu_cprx_tick(s->rx_service,now);
+ if(t<0)return stop(s);
+ if(r!=MU_CPRX_CLIENT_CONFIRMED)
+  r=mu_cprx_client_tick(&s->rx_client,now);
+ if(r==MU_CPRX_CLIENT_ERROR)return stop(s);
+ if(r==MU_CPRX_CLIENT_BUSY){
+  mu_cprx_client_close(&s->rx_client);
+  s->graceful_stop_started=0;
+  return CP_CLOUD_RETRY;
+ }
+ if(r!=MU_CPRX_CLIENT_CONFIRMED)return CP_CLOUD_RETRY;
+ /* Service may have been terminated after emitting the last authenticated
+  * ACK; that is expected only if it already finished OEM restoration. */
+ if(!s->rx_service->backend_released)return stop(s);
+ mu_cprx_client_close(&s->rx_client);
+ s->graceful_stop_started=0;
+ return cp_cloud_end(s);
+}
 int cp_cloud_wired_preempt(struct cp_cloud_pipeline *s){
  int restored;
  if(!s)return CP_CLOUD_BAD;
@@ -519,7 +566,7 @@ int cp_cloud_end(struct cp_cloud_pipeline *s){
  return CP_CLOUD_OK;
 }
 int cp_cloud_is_active(const struct cp_cloud_pipeline *s){
- if(!s||!s->started||s->stopped||
+ if(!s||!s->started||s->stopped||s->graceful_stop_started||
     s->handoff.phase!=CP_HO_MEDIA_ACTIVE||!cp_ho_media_ready(&s->handoff))return 0;
  if(s->native_dio&&(!cp_cloud_native_rx_live(s,1)||
                    !native_inner_live(s)))return 0;

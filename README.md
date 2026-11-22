@@ -104,3 +104,16 @@ test. UID/session/socket inode and restoration barriers remain enforced.
 This is source-only: native `smartphone_integrator` runtime binding and real
 phone video/audio are unverified. Details in
 `docs/R78_SI_AUTO_START_CLIENT_CN.md`.
+
+### R79 — matched SI START/STOP with OEM restore acknowledgement (NO INSTALL)
+
+R79 adds a **nonblocking CPRX v3 STOP sender** beside the existing START
+client, and connects it to `cp_cloud_graceful_native_end()` on the original
+SI owner thread. Streaming native media remains protected: STOP receives an
+explicit BUSY and must be retried after media is independently observed idle.
+A successful STOP needs the OEM's original `stopServer`/interface-restore
+barrier and the actual AF_UNIX acknowledgement; writing STOP bytes is not
+success. Wired CarPlay preemption remains a separate immediate-priority
+recovery path. An old START acknowledgement also ceases to be valid if its SI
+session has ended. Host-only fixtures do not establish vehicle compatibility.
+See `docs/R79_NATIVE_GRACEFUL_STOP_CN.md`.

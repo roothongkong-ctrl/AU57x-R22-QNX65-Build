@@ -58,6 +58,8 @@ struct cp_cloud_pipeline {
   * AF_UNIX START client. Never auto-start an unverified receiver. */
  MuCprxClient rx_client;
  int rx_client_enabled;
+ /* R79: same sender drives media-aware STOP and awaits OEM restore ACK. */
+ int graceful_stop_started;
  struct cp_handoff handoff;
  struct cp_cloud_owner owner;
  uint32_t epoch,bt_generation;
@@ -83,6 +85,11 @@ int cp_cloud_bind_rx_service(struct cp_cloud_pipeline *,MuCprxService *);
 /* Owner-only opt-in after binding the authentic CPRX receiver. Once enabled,
  * drive_native sends the real v3 START and waits for an actual socket ACK. */
 int cp_cloud_enable_native_client(struct cp_cloud_pipeline *);
+/* Normal user disconnect: nonblocking SI v3 STOP on the same OEM owner
+ * thread; returns RETRY for streaming/BUSY/in-progress OEM restoration and
+ * OK only after the authenticated STOP ACK and all teardown proofs.
+ * Wired preemption must still use cp_cloud_wired_preempt(). */
+int cp_cloud_graceful_native_end(struct cp_cloud_pipeline *,uint64_t now_ms);
 /* Require the real current SI lease (generation+epoch+session), with
  * independently observed native owner proof; optionally native media=7.
  * R74 binds inner iAP2/MFi and four channels to this exact SI session. */

@@ -306,14 +306,17 @@ static int client_fail(MuCprxClient *c){
  c->fd=-1;c->phase=5;
  return MU_CPRX_CLIENT_ERROR;
 }
-int mu_cprx_client_begin(MuCprxClient *c,MuCprxService *s,uint64_t now){
+static int client_begin_op(MuCprxClient *c,MuCprxService *s,uint64_t now,
+                           unsigned operation){
  struct sockaddr_un addr;struct stat inode;
  int fd,flags,rc;
  uid_t uid;gid_t gid;
  size_t len;
  if(!c||c->phase||!s||s->version!=3||!s->unix_listener||
+    (operation!=1&&operation!=2)||
     s->listener<0||s->backend_released||s->terminal||s->cleaning||
-    s->started||s->start_confirmed||
+    (operation==1&&(s->started||s->start_confirmed))||
+    (operation==2&&(!s->started||!s->start_confirmed))||
     !s->generation||!s->epoch||!s->session||!s->port||s->port>65535||
     !s->unix_path[0]||!s->evidence.si_admitted||
     s->evidence.si_admitted(s->evidence.opaque,s->generation,
@@ -352,10 +355,11 @@ int mu_cprx_client_begin(MuCprxClient *c,MuCprxService *s,uint64_t now){
   close(fd);return -1;
  }
  mu_cprx_client_init(c);
- c->service=s;c->fd=fd;c->phase=rc<0?1:2;
+ c->service=s;c->fd=fd;c->phase=rc<0?1:2;c->operation=operation;
  c->generation=s->generation;c->epoch=s->epoch;c->session=s->session;
  c->deadline=now+6500;
- memcpy(c->request,"CPRX",4);c->request[4]=3;c->request[5]=1;
+ memcpy(c->request,"CPRX",4);c->request[4]=3;
+ c->request[5]=(unsigned char)operation;
  put32(c->request+8,s->generation);
  c->request[12]=(unsigned char)s->port;
  c->request[13]=(unsigned char)(s->port>>8);
@@ -364,18 +368,35 @@ int mu_cprx_client_begin(MuCprxClient *c,MuCprxService *s,uint64_t now){
  put32(c->request+24,s->session);
  return 0;
 }
+int mu_cprx_client_begin(MuCprxClient *c,MuCprxService *s,uint64_t now){
+ return client_begin_op(c,s,now,1);
+}
+int mu_cprx_client_begin_stop(MuCprxClient *c,MuCprxService *s,uint64_t now){
+ return client_begin_op(c,s,now,2);
+}
 int mu_cprx_client_tick(MuCprxClient *c,uint64_t now){
  MuCprxService *s;
  uid_t uid;gid_t gid;
  if(!c||!c->phase)return MU_CPRX_CLIENT_ERROR;
- if(c->phase==4)return MU_CPRX_CLIENT_CONFIRMED;
  if(c->phase==5)return MU_CPRX_CLIENT_ERROR;
+ if(c->phase==6)return MU_CPRX_CLIENT_BUSY;
  s=c->service;
  if(!s||s->generation!=c->generation||s->epoch!=c->epoch||
-    s->session!=c->session||s->terminal||s->backend_released||
-    now>=c->deadline||!s->evidence.si_admitted||
+    s->session!=c->session||!s->evidence.si_admitted||
     s->evidence.si_admitted(s->evidence.opaque,s->generation,
                            s->epoch,s->session)!=1)
+  return client_fail(c);
+ /* An old START ACK isn't permanent proof of a live SI session. A STOP
+  * ACK must be backed by a completed native restoration, never only bytes. */
+ if(c->phase==4){
+  if(c->operation==1&&(!s->started||!s->start_confirmed||
+                        s->terminal||s->backend_released))return client_fail(c);
+  if(c->operation==2&&!s->backend_released)return client_fail(c);
+  return MU_CPRX_CLIENT_CONFIRMED;
+ }
+ if(now>=c->deadline||
+    (c->operation==1&&(s->terminal||s->backend_released))||
+    (c->operation==2&&s->backend_released&&c->phase!=3))
   return client_fail(c);
  if(c->phase==1){
   int error=0;socklen_t n=(socklen_t)sizeof error;
@@ -409,8 +430,15 @@ int mu_cprx_client_tick(MuCprxClient *c,uint64_t now){
   if(n==0)return client_fail(c);
   c->received+=(unsigned)n;
   if(c->received!=8)return MU_CPRX_CLIENT_PENDING;
-  if(memcmp(c->reply,"CPRA",4)||c->reply[4]!=2||c->reply[5]!=0||
-     c->reply[6]||c->reply[7]||!s->start_confirmed)
+  if(memcmp(c->reply,"CPRA",4)||c->reply[4]!=2||
+     c->reply[6]||c->reply[7])return client_fail(c);
+  if(c->operation==2&&c->reply[5]==3){
+   close(c->fd);c->fd=-1;c->phase=6;
+   return MU_CPRX_CLIENT_BUSY;
+  }
+  if(c->reply[5]!=0||
+     (c->operation==1&&(!s->start_confirmed||!s->started))||
+     (c->operation==2&&!s->backend_released))
    return client_fail(c);
   close(c->fd);c->fd=-1;c->phase=4;
   return MU_CPRX_CLIENT_CONFIRMED;

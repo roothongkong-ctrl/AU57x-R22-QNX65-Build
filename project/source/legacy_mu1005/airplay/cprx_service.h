@@ -107,9 +107,11 @@ int mu_cprx_shutdown(MuCprxService *);
 #define MU_CPRX_CLIENT_ERROR (-1)
 #define MU_CPRX_CLIENT_PENDING 1
 #define MU_CPRX_CLIENT_CONFIRMED 2
+#define MU_CPRX_CLIENT_BUSY 3 /* STOP refused: native media still active */
 typedef struct {
  MuCprxService *service;
  int fd, phase;
+ unsigned operation; /* 1=START, 2=graceful STOP */
  uint32_t generation, session;
  uint64_t epoch, deadline;
  unsigned sent, received;
@@ -119,8 +121,13 @@ void mu_cprx_client_init(MuCprxClient *);
 /* Caller must be on the verified, current original SI owner thread.
  * Starts only when an owner-owned AF_UNIX v3 receiver lease is active. */
 int mu_cprx_client_begin(MuCprxClient *,MuCprxService *,uint64_t now_ms);
+/* Graceful, media-aware STOP uses the same *real* SI v3 control protocol.
+ * Native media=7 receives BUSY, never an implied teardown; confirmed STOP
+ * is emitted only after the original backend restore barrier succeeds. */
+int mu_cprx_client_begin_stop(MuCprxClient *,MuCprxService *,uint64_t now_ms);
 /* Advance without blocking; call the server's mu_cprx_tick between ticks.
- * A non-zero failure is terminal: reinitialize only for a NEW SI session. */
+ * After BUSY, caller may close and reinitialize when media is independently
+ * known idle. Any ERROR is terminal and requires a new verified SI session. */
 int mu_cprx_client_tick(MuCprxClient *,uint64_t now_ms);
 void mu_cprx_client_close(MuCprxClient *);
 #endif
