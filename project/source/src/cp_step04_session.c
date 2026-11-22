@@ -63,6 +63,9 @@ static int link_control(void *opaque,const uint8_t *frame,size_t n){
     wr=cp_step04_dispatch(&s->auth,&s->wireless,&proof,frame,n);
     if(wr==CP_WL_OK||wr==CP_WL_NOT_READY||
        wr==CP_WL_PHONE_UNAVAILABLE||wr==CP_WL_LIMIT_REACHED)return 0;
+    /* Phone can send 4300 while 5703 is still awaiting link ACK.
+     * Keep its offer and retry only AFTER the earlier frame is committed. */
+    if(wr==CP_WL_TRANSPORT_ERROR&&s->wireless_pending)return 0;
     return -1;
    }
   }
@@ -117,6 +120,8 @@ int cp_s4_tick(struct cp_step04_session *s,uint64_t now){
  s->now=now;
  int r=cp_lk_tick(&s->link,now);
  if(s->link.phase==CP_LK_DEAD)cp_s4_revoke(s);
+ else if(r==CP_LK_OK&&s->wireless_bound)
+  (void)cp_s4_wireless_pump(s);
  return r;
 }
 int cp_s4_authenticated(struct cp_step04_session *s){
@@ -131,6 +136,22 @@ int cp_s4_bind_wireless(struct cp_step04_session *s,const struct cp_session *con
  cp_wireless_init(&s->wireless,config,cp_s4_wireless_send,s);
  s->wireless_proof=prove;s->wireless_ctx=ctx;s->wireless_bound=1;
  return CP_LK_OK;
+}
+/* Send one pending CarPlay start after a real OEM receiver becomes ready.
+ * Called on the authorized owner tick, not from the Bluetooth callback. */
+int cp_s4_wireless_pump(struct cp_step04_session *s){
+ struct cp_oem_assertions p={0};
+ if(!s||!s->wireless_bound||s->wireless_pending||
+    s->wireless.start_sent||!s->wireless.availability_seen||
+    !cp_s4_authenticated(s))return CP_WL_NOT_READY;
+ if(s->wireless_proof(s->wireless_ctx,s->epoch,s->link.generation,&p)!=1||
+    p.wired_active||!p.sole_dio_owner||
+    !p.verified_control_session||!p.live_hotspot||
+    !p.network_airplay_ready)return CP_WL_NOT_READY;
+ s->wireless.authenticated=1;
+ s->wireless.hotspot_ready=1;
+ s->wireless.airplay_ready=1;
+ return cp_wireless_start_if_ready(&s->wireless);
 }
 /* Callback for cp_wireless_init(): transmit 5703 / 4301 on the same
  * authenticated iAP2 CONTROL session after the stock MFi handshake. */

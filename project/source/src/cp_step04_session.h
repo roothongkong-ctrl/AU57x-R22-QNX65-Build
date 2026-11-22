@@ -39,6 +39,8 @@ int cp_s4_authenticated(struct cp_step04_session *);
 int cp_s4_bind_wireless(struct cp_step04_session *,const struct cp_session *,
                         int (*)(void *,uint32_t,uint32_t,
                                  struct cp_oem_assertions *),void *);
+/* Retry a previously received phone offer once OEM AirPlay is listening. */
+int cp_s4_wireless_pump(struct cp_step04_session *);
 /* Post-auth sender for cp_wireless_init(), with separately tracked ACK. */
 int cp_s4_wireless_send(void *,const uint8_t *,size_t);
 void cp_s4_revoke(struct cp_step04_session *);

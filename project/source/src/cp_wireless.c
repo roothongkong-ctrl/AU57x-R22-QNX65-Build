@@ -66,6 +66,15 @@ static int transmit(struct cp_wireless *s,int start) {
     if (s->send(s->send_ctx,buf,written)!=0) return CP_WL_TRANSPORT_ERROR;
     return CP_WL_OK;
 }
+int cp_wireless_start_if_ready(struct cp_wireless *s){
+ int r;
+ if(!ready(s)||!s->availability_seen||s->wireless_available!=1||
+    !s->airplay_ready)return CP_WL_NOT_READY;
+ if(s->start_sent>=START_MAX)return CP_WL_LIMIT_REACHED;
+ r=transmit(s,1);
+ if(r==CP_WL_OK)s->start_sent++;
+ return r;
+}
 int cp_wireless_receive(struct cp_wireless *s,const uint8_t *f,size_t n) {
     struct cp_event e;
     int state,r;
@@ -91,14 +100,12 @@ int cp_wireless_receive(struct cp_wireless *s,const uint8_t *f,size_t n) {
         case CP_EVENT_CARPLAY_AVAILABLE:
             r=cp_availability_wireless_4300(f,n,&state);
             if (r<0) return CP_WL_BAD_FRAME;
-            if (r==0) {s->wireless_available=-1;return CP_WL_PHONE_UNAVAILABLE;}
+            if (r==0) {s->wireless_available=-1;s->availability_seen=0;
+                       return CP_WL_PHONE_UNAVAILABLE;}
             s->wireless_available=state;
-            if (state!=1) return CP_WL_PHONE_UNAVAILABLE;
-            if (!s->airplay_ready) return CP_WL_NOT_READY;
-            if (s->start_sent>=START_MAX) return CP_WL_LIMIT_REACHED;
-            r=transmit(s,1);
-            if (r==CP_WL_OK) s->start_sent++;
-            return r;
+            s->availability_seen=(state==1);
+            if(state!=1)return CP_WL_PHONE_UNAVAILABLE;
+            return cp_wireless_start_if_ready(s);
         case CP_EVENT_WIRELESS_STATUS:
             s->wireless_available=e.available;
             return CP_WL_OK;

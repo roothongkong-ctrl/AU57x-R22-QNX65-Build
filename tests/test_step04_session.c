@@ -139,29 +139,33 @@ int main(void){
  assert(s.wireless.wifi_pre_sent==1&&s.wireless_pending&&s.link.outbound_pending);
  assert(s.link.outbound_seq==102);
  flush();
- n=frame(b,0x40,46,102,0,NULL,0);
- feed(b,n,10);
- assert(!s.wireless_pending&&!s.link.outbound_pending&&cp_s4_authenticated(&s));
- /* The requested receiver was not yet listening: preserve iAP2, not crash. */
+ /* Phone's 4300 offer can arrive BEFORE Wi-Fi 5703 is ACKed. */
  static const uint8_t available[]={0x40,0x40,0,15,0x43,0x00,
                                     0,9,0,1,0,5,0,0,1};
- airplay_up=0;
- n=frame(b,0x40,47,102,10,available,sizeof available);
- feed(b,n,11);flush();
- assert(s.wireless.start_sent==0&&!s.wireless_pending);
- /* Once original DIO/receiver is ready, send 4301 via the SAME iAP2 link. */
  airplay_up=1;
- n=frame(b,0x40,48,102,10,available,sizeof available);
- feed(b,n,12);
+ n=frame(b,0x40,47,101,10,available,sizeof available);
+ feed(b,n,10);flush();
+ assert(s.wireless.availability_seen&&s.wireless.wireless_available==1);
+ assert(s.wireless.start_sent==0&&s.wireless_pending);
+ /* Receiver loses readiness while the 5703 ACK is in flight. */
+ airplay_up=0;
+ n=frame(b,0x40,47,102,0,NULL,0);
+ feed(b,n,11);
+ assert(!s.wireless_pending&&!s.link.outbound_pending&&cp_s4_authenticated(&s));
+ assert(cp_s4_tick(&s,12)==CP_LK_OK&&!s.wireless.start_sent);
+ /* After DIO/AirPlay listens, the owner tick sends 4301 without
+  * requiring the iPhone to send a duplicate 4300. */
+ airplay_up=1;
+ assert(cp_s4_tick(&s,13)==CP_LK_OK);
  assert(s.wireless.start_sent==1&&s.wireless_pending&&s.link.outbound_seq==103);
  flush();
- n=frame(b,0x40,48,103,0,NULL,0);
- feed(b,n,13);
+ n=frame(b,0x40,47,103,0,NULL,0);
+ feed(b,n,14);
  assert(!s.wireless_pending&&cp_s4_authenticated(&s));
  /* Identification / unrelated OEM control remains with the original owner. */
  control_msg(message,0x1d00,NULL,0);
- n=frame(b,0x40,49,103,10,message,6);
- feed(b,n,14);flush();
+ n=frame(b,0x40,48,103,10,message,6);
+ feed(b,n,15);flush();
  assert(unrelated_count>0);
  /* A new generation cannot inherit old auth, and hard owner loss is final. */
  up=0;

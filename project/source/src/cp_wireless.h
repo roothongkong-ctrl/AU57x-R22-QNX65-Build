@@ -25,6 +25,7 @@ struct cp_wireless {
     int airplay_ready;
     int transport_notified;
     int wireless_available; /* 0=no, 1=yes, -1=unknown */
+    int availability_seen; /* only set by valid phone 4300, not 4E0D */
     unsigned wifi_pre_sent;
     unsigned wifi_post_sent;
     unsigned start_sent;
@@ -38,6 +39,8 @@ void cp_wireless_init(struct cp_wireless *state, const struct cp_session *sessio
 /* Reassembled, complete 0x4040 CSM frame, after iAP2 authentication.
    No link frame parsing, MFi handling, Wi-Fi setup, QNX IPC or AirPlay setup. */
 int cp_wireless_receive(struct cp_wireless *state,const uint8_t *frame,size_t len);
+/* Re-try a phone's valid 4300 after original receiver becomes ready. */
+int cp_wireless_start_if_ready(struct cp_wireless *state);
 /* Accessory Wi-Fi config is already in cp_csm.c; this finds the optional
    "wireless available" boolean in CarPlayAvailability group 1. */
 int cp_availability_wireless_4300(const uint8_t *frame,size_t len,int *value);
