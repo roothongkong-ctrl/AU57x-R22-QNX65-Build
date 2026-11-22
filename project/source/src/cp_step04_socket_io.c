@@ -79,6 +79,9 @@ int cp_s4_socket_poll(struct cp_s4_socket_io *w,uint64_t now){
   cp_s4_socket_abort(w);return CP_LK_DEAD_LINK;
  }
  if(w->bridge->closed){cp_s4_socket_abort(w);return CP_LK_DEAD_LINK;}
+ /* A newly accepted socket has no RFCOMM generation until CONNECT arrives.
+  * Ticking the idle link here would incorrectly revoke a valid peer. */
+ if(!w->bridge->connected)return CP_LK_OK;
  result=cp_s4_tcp_tick(w->bridge,now);
  if(result!=CP_LK_OK&&result!=CP_LK_BACKPRESSURE){
   cp_s4_socket_abort(w);return result;

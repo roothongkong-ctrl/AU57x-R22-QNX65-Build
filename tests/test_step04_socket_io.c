@@ -72,6 +72,8 @@ int main(void){
  assert(cp_s4_tcp_init(&bridge,&session,peer,NULL)==CP_LK_OK);
  listener=make_pair(&client);
  assert(cp_s4_socket_attach(&worker,&bridge,accepted_fd,attest,NULL)==CP_LK_OK);
+ assert(cp_s4_socket_poll(&worker,0)==CP_LK_OK); /* idle accepted socket must survive */
+ assert(worker.attached&&!bridge.connected);
  assert(send(client,connect_frame,sizeof connect_frame,0)==(ssize_t)sizeof connect_frame);
  assert(cp_s4_socket_poll(&worker,0)==CP_LK_OK);
  assert(bridge.connected&&bridge.generation==1);
