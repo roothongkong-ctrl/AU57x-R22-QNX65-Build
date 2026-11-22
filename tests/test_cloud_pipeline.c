@@ -114,12 +114,16 @@ static void successful_dual_fallback(void){
  assert(cp_cloud_airplay_ready(&s,"wlan0")==CP_CLOUD_OK&&observed_port==5000);
  inner=0;assert(cp_cloud_inner_auth(&s)==CP_CLOUD_PROOF);
  inner=1;assert(cp_cloud_inner_auth(&s)==CP_CLOUD_OK);
+ inner=0;assert(cp_cloud_media_ready(&s)==CP_CLOUD_PROOF);
+ inner=1;
  media[CP_CLOUD_STEERING]=0;
  assert(cp_cloud_media_ready(&s)==CP_CLOUD_PROOF);
  media[CP_CLOUD_STEERING]=1;
  assert(cp_cloud_media_ready(&s)==CP_CLOUD_OK&&cp_cloud_is_active(&s));
  single=0;assert(!cp_cloud_is_active(&s));
  single=1;assert(cp_cloud_is_active(&s));
+ inner=0;assert(!cp_cloud_is_active(&s)); /* authenticated inner session expired */
+ inner=1;assert(cp_cloud_is_active(&s));
  listener=0;assert(!cp_cloud_is_active(&s));
  listener=1;assert(cp_cloud_is_active(&s));
  /* Cached media authorization is invalid after the live AP drops. */
