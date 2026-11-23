@@ -32,6 +32,32 @@ jobs:
             "$D/src/iap2_link.cpp" "$D/src/au57x_iap2_capi.cpp" \
             "$D/tests/test_au57x_capi.cpp" -o /tmp/au57x_iap2_cbridge
           /tmp/au57x_iap2_cbridge
+          # Compile actual original MU1005 C RFCOMM backend + R113 owner gate,
+          # not a mock implementation of inbound_send().
+          gcc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+            -Iproject/source/legacy_mu1005/bluetooth -Ir113/src \
+            -Ir113/third_party -I"$D/include" \
+            -c project/source/legacy_mu1005/bluetooth/inbound.c -o /tmp/mu_inbound.o
+          gcc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+            -Iproject/source/legacy_mu1005/bluetooth -Ir113/src \
+            -Ir113/third_party -I"$D/include" \
+            -c r113/src/au108_oem_port.c -o /tmp/mu_owner.o
+          gcc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+            -Iproject/source/legacy_mu1005/bluetooth -Ir113/src \
+            -Ir113/third_party -I"$D/include" \
+            -c r113/third_party/r105_owner_gate.c -o /tmp/mu_r105.o
+          gcc -std=c11 -O2 -Wall -Wextra -Werror -pedantic \
+            -Iproject/source/legacy_mu1005/bluetooth -Ir113/src \
+            -Ir113/third_party -I"$D/include" \
+            -c r113/src/mu1005_iap2_stream.c -o /tmp/mu_iap2_join.o
+          g++ -std=gnu++11 -O2 -Wall -Wextra -Werror -pedantic \
+            -I"$D/include" -Iproject/source/legacy_mu1005/bluetooth \
+            -Ir113/src -Ir113/third_party \
+            "$D/src/iap2_link.cpp" "$D/src/au57x_iap2_capi.cpp" \
+            r113/tests/test_mu1005_native_iap2_stream.cpp \
+            /tmp/mu_inbound.o /tmp/mu_owner.o /tmp/mu_r105.o /tmp/mu_iap2_join.o \
+            -o /tmp/mu1005_upstream_native_stream
+          /tmp/mu1005_upstream_native_stream
           echo 'PASS: unmodified GPL3 donor iAP2 wire/link host compile and tests'
   upstream-iap2-qnx-arm:
     needs: upstream-iap2-host
@@ -63,7 +89,12 @@ jobs:
             $CXX $OPTS -c "$D/src/iap2_link.cpp" -o qnx_iap2_reuse_result/iap2_link.o
             $CXX $OPTS -c "$D/src/iap2_wire.cpp" -o qnx_iap2_reuse_result/iap2_wire.o
             $CXX $OPTS -c "$D/src/au57x_iap2_capi.cpp" -o qnx_iap2_reuse_result/au57x_iap2_capi.o
-            $AR rcs qnx_iap2_reuse_result/libau57x_upstream_iap2_REVIEW_ONLY.a qnx_iap2_reuse_result/iap2_link.o qnx_iap2_reuse_result/iap2_wire.o qnx_iap2_reuse_result/au57x_iap2_capi.o
+            CC=/opt/qnx650/host/linux/x86/usr/bin/arm-unknown-nto-qnx6.5.0eabi-gcc
+            $CC -std=c11 -O2 -Wall -Wextra -Werror -fPIC -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp \
+              -I$D/include -Iproject/source/legacy_mu1005/bluetooth \
+              -Ir113/src -Ir113/third_party \
+              -c r113/src/mu1005_iap2_stream.c -o qnx_iap2_reuse_result/mu1005_iap2_stream.o
+            $AR rcs qnx_iap2_reuse_result/libau57x_upstream_iap2_REVIEW_ONLY.a qnx_iap2_reuse_result/iap2_link.o qnx_iap2_reuse_result/iap2_wire.o qnx_iap2_reuse_result/au57x_iap2_capi.o qnx_iap2_reuse_result/mu1005_iap2_stream.o
             $RE -h qnx_iap2_reuse_result/iap2_link.o > qnx_iap2_reuse_result/link_elf.txt
             $RE -h qnx_iap2_reuse_result/iap2_wire.o > qnx_iap2_reuse_result/wire_elf.txt
             grep -q "Machine:.*ARM" qnx_iap2_reuse_result/link_elf.txt
