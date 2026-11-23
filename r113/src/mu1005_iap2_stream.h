@@ -19,13 +19,13 @@ typedef struct {
  au57x_iap2_link *core;
  uint8_t fifo[MU1005_IAP2_TX_CAP];
  uint8_t chunk[MAX_DATA];
- size_t head, queued;
+ au57x_iap2_size_t head, queued;
  uint8_t active, stopped;
  uint32_t generation;
 } Mu1005Iap2Stream;
 void mu1005_iap2_stream_init(Mu1005Iap2Stream *,Inbound *,Au108Port *);
 int mu1005_iap2_stream_on_open(Mu1005Iap2Stream *,uint32_t generation);
-int mu1005_iap2_stream_on_bytes(Mu1005Iap2Stream *,const uint8_t *,size_t);
+int mu1005_iap2_stream_on_bytes(Mu1005Iap2Stream *,const uint8_t *,au57x_iap2_size_t);
 int mu1005_iap2_stream_tick(Mu1005Iap2Stream *,int64_t monotonic_ms);
 /* CALL after original inbound_event(code=6) has cleared busy; also after RX
  * is fully dispatched, never from within the SDK TX callback itself.

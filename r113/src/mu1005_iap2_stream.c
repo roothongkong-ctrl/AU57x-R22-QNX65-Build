@@ -5,12 +5,12 @@ static int authorized(Mu1005Iap2Stream *s){
   s->generation && s->authorization->generation==s->generation &&
   s->rf->state==IN_LINK && au108_live(s->authorization)==1;
 }
-static int enqueue(void *ctx,const uint8_t *bytes,size_t count){
+static int enqueue(void *ctx,const uint8_t *bytes,au57x_iap2_size_t count){
  Mu1005Iap2Stream *s=(Mu1005Iap2Stream *)ctx;
  if(!s||!s->active||s->stopped||(!bytes&&count)||!count||
     count>MU1005_IAP2_TX_CAP-s->queued)return 0;
- size_t tail=(s->head+s->queued)%MU1005_IAP2_TX_CAP;
- size_t first=MU1005_IAP2_TX_CAP-tail;
+ au57x_iap2_size_t tail=(s->head+s->queued)%MU1005_IAP2_TX_CAP;
+ au57x_iap2_size_t first=MU1005_IAP2_TX_CAP-tail;
  if(first>count)first=count;
  memcpy(s->fifo+tail,bytes,first);
  if(count>first)memcpy(s->fifo,bytes+first,count-first);
@@ -39,11 +39,11 @@ int mu1005_iap2_stream_pump(Mu1005Iap2Stream *s){
  if(!s->queued||s->rf->busy)return 0;
  int limit=s->rf->ops.limit(&s->rf->rf);
  if(limit<=0){fail(s);return -2;}
- size_t n=s->queued;
- if(n>(size_t)limit)n=(size_t)limit;
+ au57x_iap2_size_t n=s->queued;
+ if(n>(au57x_iap2_size_t)limit)n=(au57x_iap2_size_t)limit;
  if(n>MAX_DATA)n=MAX_DATA;
  if(!n){fail(s);return -2;}
- size_t first=MU1005_IAP2_TX_CAP-s->head;
+ au57x_iap2_size_t first=MU1005_IAP2_TX_CAP-s->head;
  if(first>n)first=n;
  memcpy(s->chunk,s->fifo+s->head,first);
  if(n>first)memcpy(s->chunk+first,s->fifo,n-first);

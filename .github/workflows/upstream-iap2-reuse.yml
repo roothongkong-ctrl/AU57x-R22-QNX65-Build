@@ -105,7 +105,7 @@ jobs:
             $CC -std=c11 -O2 -Wall -Wextra -Werror -fPIC -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp -Ir113/third_party \
               -c r113/third_party/r105_owner_gate.c -o qnx_iap2_reuse_result/mu1005_r105.o
             $AR rcs qnx_iap2_reuse_result/libau57x_upstream_iap2_REVIEW_ONLY.a qnx_iap2_reuse_result/iap2_link.o qnx_iap2_reuse_result/iap2_wire.o qnx_iap2_reuse_result/au57x_iap2_capi.o qnx_iap2_reuse_result/mu1005_iap2_stream.o qnx_iap2_reuse_result/mu1005_inbound.o qnx_iap2_reuse_result/mu1005_owner.o qnx_iap2_reuse_result/mu1005_r105.o
-                        # Full dynamically loadable ELF, but NO OEM callback/installer:
+            # Full dynamically loadable ELF, but NO OEM callback/installer:
             # verify that C++ runtime is self-contained instead of depending on
             # the ancient stock libstdc++.so.6.
             $CXX -shared -Wl,--hash-style=sysv -Wl,--no-undefined \
@@ -123,7 +123,7 @@ jobs:
             if grep -q 'Shared library: \\[libstdc++' qnx_iap2_reuse_result/full_link_deps.txt; then
               echo 'FAIL: depends on incompatible OEM libstdc++' >&2; exit 1
             fi
-$RE -h qnx_iap2_reuse_result/iap2_link.o > qnx_iap2_reuse_result/link_elf.txt
+            $RE -h qnx_iap2_reuse_result/iap2_link.o > qnx_iap2_reuse_result/link_elf.txt
             $RE -h qnx_iap2_reuse_result/iap2_wire.o > qnx_iap2_reuse_result/wire_elf.txt
             grep -q "Machine:.*ARM" qnx_iap2_reuse_result/link_elf.txt
             grep -q "Machine:.*ARM" qnx_iap2_reuse_result/wire_elf.txt
