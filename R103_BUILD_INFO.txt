@@ -1,0 +1,14 @@
+R103 upstream source integration, user-approved AU57x project
+Original upstream: luka-dev/mib2q-carplay-rgi@91e301dfed64bdb1982c036fcf7f0eb568f0bc8a
+Exact original upstream source objects:
+  Cargo.toml c0aca0a954c5bfb4b9b963c479b555bb49de39ad
+  src/lib.rs c64c8949718bdcd20e96d77b59fd70293bcc7a1e
+  tests/engine.rs 2808827cef6545716bbd37b52ed6bf311da46ef2
+Host C strict compiler 45/45 passed
+Host RFCOMM C wire test passed
+Rust iAP2 source and adapter tests: PENDING GITHUB CI
+Original MU1005 live RF registration: NOT VERIFIED
+QNX ARM Rust executable: NOT BUILT
+Wireless CarPlay: NOT VERIFIED
+Not installable, no vehicle test.
+Host Rust real-loopback socket integration added; no QNX process hook.

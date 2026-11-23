@@ -1,0 +1,9 @@
+# R103 host-only verification workspace; NOT an Audi/QNX binary or installer.
+[workspace]
+resolver = "2"
+members = [
+ "third_party/luka-dev/mib2q-carplay-rgi/wireless/daemon/vendor/iap2-link",
+ "integration/r103_iap2_bridge",
+]
+[workspace.package]
+edition = "2024"

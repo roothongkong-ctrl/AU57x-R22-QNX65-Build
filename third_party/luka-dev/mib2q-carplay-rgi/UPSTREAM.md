@@ -19,3 +19,13 @@ The donor also contains useful but target-specific modules which are **not copie
 - `wireless/graft/graft.c`: original MHI2Q loader addresses are NOT MU1005 addresses.
 - `wireless/daemon/vendor/iap2-link`: protocol/link implementation in Rust; QNX toolchain/lifecycle integration pending.
 - `wireless/integration/install_wireless_candidate.sh`: candidate lifecycle source; does not confer compatibility with AU57x.
+
+## R103 additional exact upstream Rust iAP2 Link crate
+
+Original and UNMODIFIED files from the same pinned upstream commit:
+
+- `wireless/daemon/vendor/iap2-link/Cargo.toml` Git object `c0aca0a954c5bfb4b9b963c479b555bb49de39ad`
+- `wireless/daemon/vendor/iap2-link/src/lib.rs` Git object `c64c8949718bdcd20e96d77b59fd70293bcc7a1e`
+- `wireless/daemon/vendor/iap2-link/tests/engine.rs` Git object `2808827cef6545716bbd37b52ed6bf311da46ef2`
+
+This is GPL-3.0 code, preserved byte-exact. New adapter under `integration/r103_iap2_bridge` uses upstream `LinkEngine`. Host Cargo workspace inherits Rust edition 2024 because the original crate declares `edition.workspace=true`. This adds no production QNX Rust toolchain. The R103 bridge has no Apple MFi, real phone pairing, or BlueSDK registration evidence.

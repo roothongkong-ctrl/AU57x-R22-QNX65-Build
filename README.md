@@ -1,3 +1,9 @@
+# R103: 上游原版 iAP2 链路引擎和 AU57x RFCOMM 帧桥（源码版禁止装车）
+
+本轮严格复用 `luka-dev/mib2q-carplay-rgi` 的 `iap2-link` 三个上游原始文件（逐个 Git object SHA-1 验证），新增 `integration/r103_iap2_bridge`，把 R45/R88 8 字节 little-endian RFCOMM 连接/数据/断开事件交给实际 LuKa `LinkEngine`，并将它的 Marker、SYN/LSP/ACK 结果包装为原来的 RFCOMM DATA。无 MFi 密钥、无原厂蓝牙注册、无 WIFI/AirPlay，只作主机验证。
+
+执行：`bash ci/host_r103_upstream_link.sh`（需要 Rust 2024 edition 工具链）；原有 C 严格编译仍用 `bash ci/host_r95_source_compile.sh`。不装车。
+
 # R101：MU1005 原厂 RFCOMM 通道范围与注册参数审计（禁止装车）
 
 **本轮新增**：确认原厂 HFP=7、SIM=4 都流向同一原厂注册函数，并写进原厂通道对象；此参数看起来更像 SCN，而非已证实的 profile ID。修复原 C 代码错误的 1～6 通道限制为标准 1～30，将验证的 SCN 值冻结为一次会话快照，防止参数前后变化。详见 `docs/R101_RFCOMM_SERVER_CHANNEL_CN.md`。
