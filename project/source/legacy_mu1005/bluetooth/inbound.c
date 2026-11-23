@@ -24,17 +24,24 @@ int inbound_prepare(Inbound*s,const InboundOps*o,uint32_t cb){
  ((uint8_t*)&s->sdp)[8]=2;put32(&s->sdp,12,a);((uint8_t*)&s->carplay)[8]=1;put32(&s->carplay,12,ca);
  s->state=IN_PREPARED;return 0;
 }
-int inbound_register_rf(Inbound*s){
+static int inbound_register_rf_with_option(Inbound*s,uint16_t arg3){
  if(!ok(s)||s->state!=IN_PREPARED||s->ops.ready(s->ops.opaque)!=1)return -1;
- /* Upstream donor uses zero third argument; not initial RX credits. */
+ /* The original OEM RF argument is owner-attested for MU1005; zero is donor-only. */
  s->uncertain_mask=IN_RF;
- int r=s->ops.reg(&s->rf,&s->slot,0);
+ int r=s->ops.reg(&s->rf,&s->slot,arg3);
  if(r||s->slot<MU_RFCOMM_SCN_MIN||s->slot>MU_RFCOMM_SCN_MAX){s->state=IN_DIRTY;return -2;}
  /* R101 correction: native RFCOMM SCN range is 1..30, not donor 1..6.
   * The SDK output channel must match SDP before advertisement. */
  s->published_mask=IN_RF;s->uncertain_mask=0;
  s->state=IN_REGISTERED;s->protocol[13]=s->slot;
  return 0;
+}
+/* Preserve original donor compatibility, but never select this entry for
+ * the pinned original MU1005 native owner without a proved registration mode. */
+int inbound_register_rf(Inbound*s){return inbound_register_rf_with_option(s,0);}
+int inbound_register_rf_original(Inbound*s,uint8_t attested_arg3){
+ if(attested_arg3<MU_RFCOMM_SCN_MIN || attested_arg3>MU_RFCOMM_SCN_MAX)return -1;
+ return inbound_register_rf_with_option(s,attested_arg3);
 }
 int inbound_publish_sdp(Inbound*s){
  if(!ok(s)||s->state!=IN_REGISTERED||s->ops.ready(s->ops.opaque)!=1||

@@ -8,7 +8,7 @@ static int idle(void *v){Mu1005NativeGateAdapter *a=v;return a->proof.wired_idle
 static int register_rf(void *v,uint8_t *scn){
  Mu1005NativeGateAdapter *a=v;int rc;
  if(!scn||a->service->state!=IN_PREPARED)return -1;
- *scn=0;rc=inbound_register_rf(a->service);
+ *scn=0;rc=inbound_register_rf_original(a->service,a->frozen_arg3);
  if(rc!=0)return rc;
  *scn=a->service->slot;return 0;
 }
@@ -45,8 +45,16 @@ int mu1005_native_gate_make(Mu1005NativeGateAdapter *a,Inbound *s,
  if(!a||!s||!p||!out||s->state!=IN_PREPARED||
     !p->exact_image_live||!p->on_original_owner_thread||
     !p->paired_phone||!p->mfi_hardware_ready||!p->wired_idle||
-    !p->rf_sdp_visible||!p->callbacks_quiesced||!p->withdraw_barrier)return -1;
- memset(a,0,sizeof(*a));a->service=s;a->proof=*p;
+    !p->rf_sdp_visible||!p->callbacks_quiesced||
+    !p->withdraw_barrier||!p->rf_arg3_proven)return -1;
+ /* Verify original image/thread BEFORE calling OEM profile witness. Freeze
+  * the attested RF input once; never use a donor-only zero on MU1005. */
+ if(p->exact_image_live(p->context)!=1 ||
+    p->on_original_owner_thread(p->context)!=1)return -1;
+ uint8_t frozen=0;
+ if(p->rf_arg3_proven(p->context,&frozen)!=1 ||
+    frozen<MU_RFCOMM_SCN_MIN||frozen>MU_RFCOMM_SCN_MAX)return -1;
+ memset(a,0,sizeof(*a));a->service=s;a->proof=*p;a->frozen_arg3=frozen;
  memset(out,0,sizeof(*out));out->context=a;
  out->exact_image_live=exact;out->on_original_owner_thread=owner;
  out->paired_phone=paired;out->mfi_hardware_ready=mfi;out->wired_idle=idle;
