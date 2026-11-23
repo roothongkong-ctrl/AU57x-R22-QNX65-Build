@@ -2,6 +2,9 @@
 #define AU57X_R108_OEM_PORT_H
 #include <stdint.h>
 #include "r105_owner_gate.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 /* Source-only ABI contract; callbacks MUST be implemented in the verified
  * MU1005 btstack owner's serialized context. No injection or installer. */
 typedef struct {
@@ -36,4 +39,7 @@ void au108_init(Au108Port *port);
 int au108_bind(Au108Port *port,const Au108OEM *owner,uint32_t generation);
 int au108_live(Au108Port *port);
 int au108_withdraw(Au108Port *port);
+#ifdef __cplusplus
+}
+#endif
 #endif

@@ -5,6 +5,9 @@
  * contain 32-bit addresses; host tests use explicit token mappings. */
 #include <stdint.h>
 #include <stddef.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 enum { RF_SIZE=176, PACKET_SIZE=100, SDP_SIZE=36, MAX_DATA=5035, MU_RFCOMM_SCN_MIN=1, MU_RFCOMM_SCN_MAX=30 };
 typedef struct { uint32_t words[RF_SIZE/4]; } RfObject;
 typedef struct { uint32_t words[PACKET_SIZE/4]; } RfPacket;
@@ -54,4 +57,7 @@ int inbound_withdraw(Inbound*,int (*barrier)(void*,const Inbound*),void*);
 int inbound_event(Inbound*,void* channel,unsigned code,unsigned status,
                   const uint8_t* payload,unsigned length,uint32_t packet_address);
 int inbound_send(Inbound*,const uint8_t*,unsigned);
+#ifdef __cplusplus
+}
+#endif
 #endif
