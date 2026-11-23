@@ -119,9 +119,9 @@ jobs:
               qnx_iap2_reuse_result/mu1005_owner.o \
               qnx_iap2_reuse_result/mu1005_r105.o
             $RE -d qnx_iap2_reuse_result/libau57x_iap2_native_REVIEW_ONLY.so > qnx_iap2_reuse_result/full_link_deps.txt
-            grep -q 'Shared library: \\[libc.so.3\\]' qnx_iap2_reuse_result/full_link_deps.txt
-            if grep -q 'Shared library: \\[libstdc++' qnx_iap2_reuse_result/full_link_deps.txt; then
-              echo 'FAIL: depends on incompatible OEM libstdc++' >&2; exit 1
+            grep -Fq "Shared library: [libc.so.3]" qnx_iap2_reuse_result/full_link_deps.txt
+            if grep -Fq "Shared library: [libstdc++" qnx_iap2_reuse_result/full_link_deps.txt; then
+              echo "FAIL: depends on incompatible OEM libstdc++" >&2; exit 1
             fi
             $RE -h qnx_iap2_reuse_result/iap2_link.o > qnx_iap2_reuse_result/link_elf.txt
             $RE -h qnx_iap2_reuse_result/iap2_wire.o > qnx_iap2_reuse_result/wire_elf.txt
