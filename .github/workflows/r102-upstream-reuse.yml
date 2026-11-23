@@ -1,0 +1,25 @@
+name: R102 GPL upstream EIR source reuse / AU57x host proof (NO INSTALL)
+on:
+  push:
+    branches:
+      - r102-upstream-source-reuse-au57x
+  pull_request:
+    paths:
+      - 'project/source/legacy_mu1005/bluetooth/au102_eir_advertisement.*'
+      - 'third_party/luka-dev/**'
+      - 'tests/test_r102_upstream_eir.c'
+      - 'ci/host_r102_upstream_reuse.sh'
+      - '.github/workflows/r102-upstream-reuse.yml'
+  workflow_dispatch:
+jobs:
+  source-byte-provenance-and-host-code:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: GPL source SHA pinned + strict host compile + behavioral gates
+        run: bash ci/host_r102_upstream_reuse.sh
+      - name: This is NOT an installable vehicle release
+        run: |
+          grep -q 'installable=false' R102_BUILD_INFO.txt
+          grep -q 'vehicle_verified=false' R102_BUILD_INFO.txt
+          test -f LICENSE
