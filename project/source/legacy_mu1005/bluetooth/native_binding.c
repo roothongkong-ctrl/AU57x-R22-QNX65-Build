@@ -20,16 +20,20 @@ static int assoc(void *p,const void *ch,uint32_t a,unsigned code){
 }
 static int rd(void*p,uint32_t a,void*out,size_t n){Resident*r=p;return cert(r)&&r->owner.read_live(r->owner.opaque,a,out,n)==1;}
 static int auth(void*p,uint32_t a,const uint8_t mac[6]){Resident*r=p;return cert(r)&&r->owner.paired_authorized(r->owner.opaque,a,mac)==1;}
-/* Original MU1005 callers prove RF register arg3 is service-specific.
- * R45 previously forwarded hardcoded zero. Do NOT call unknown OEM RF API
- * until original-owner iAP2 profile has been independently established.
- * This adapter intentionally retains NO guessed fallback profile. */
+/* Original MU1005 HFP passes 7 and SIM passes 4 to arg3; the vendor
+ * function copies that value into RF channel-state fields. The value is
+ * CHANNEL-LIKE, not a verified "profile enumeration". iAP2 must still get
+ * an original-owner attestation of its own SCN and ABI context; never reuse
+ * HFP's 7 or SIM's 4 by inference. */
 static int register_verified(void *channel,uint8_t *slot,uint16_t ignored){
- Resident *r=&res;uint8_t profile=0;
+ Resident *r=&res;
  (void)ignored;
- if(!cert(r)||mu_rf_arg_choose(r->owner.iap2_profile_proven,
-    r->owner.opaque,&profile)==MU_RF_ARG_DENY)return -1;
- return ((int (*)(void*,uint8_t*,uint16_t))(uintptr_t)0x277a18u)(channel,slot,profile);
+ if(!cert(r)||r->owner.rf_arg3_snapshot_valid!=1u||
+    r->owner.rf_arg3_snapshot<1u||r->owner.rf_arg3_snapshot>30u)return -1;
+ /* Do not call the external proof function a second time after RFCOMM/TCP
+  * setup: its answer could change between check and native registration. */
+ return ((int (*)(void*,uint8_t*,uint16_t))(uintptr_t)0x277a18u)
+     (channel,slot,r->owner.rf_arg3_snapshot);
 }
 static void callback(void *ch,const void *event){
  if(cert(&res)&&res.bridge.initialized&&ch==&res.bridge.service.rf)
@@ -46,7 +50,9 @@ static int words_ok(void){
 }
 #define RFN(type,a) ((type)(uintptr_t)(a))
 int mu_bt_native_attach(const MuBtOwner *o,int fd){
- if(!o||!o->owner_ready||!o->transport_ready||!o->read_live||!o->paired_authorized||res.attempted||fd<0||o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
+ if(!o||!o->owner_ready||!o->transport_ready||!o->read_live||!o->paired_authorized||
+    o->rf_arg3_snapshot_valid!=1u||o->rf_arg3_snapshot<1u||o->rf_arg3_snapshot>30u||
+    res.attempted||fd<0||o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
  if(!words_ok())return -1;
  res.attempted=1;res.owner=*o;res.peer=(Mu38PeerOps){&res,assoc,rd,auth};
  InboundOps n={0};n.reg=register_verified;n.unreg=RFN(int (*)(void*,uint8_t*),0x2779b4u);

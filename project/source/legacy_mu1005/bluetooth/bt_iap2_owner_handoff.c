@@ -56,7 +56,7 @@ error:
  (void)close(fd);return -1;
 }
 int au98_publish(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*owner,unsigned port){
- unsigned char profile=0;
+ unsigned char candidate_scn=0;
  int fd,rc;
  if(!s||!h||!owner||s->state!=AU98_EMPTY||
     !h->original_image_verified||!h->on_original_iap2_owner||
@@ -71,12 +71,16 @@ int au98_publish(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*owner,unsigned 
     h->original_iap2_service_verified(h->opaque)!=1||
     owner->owner_ready(owner->opaque)!=1||
     owner->transport_ready(owner->opaque)!=1||
-    mu_rf_arg_choose(owner->iap2_profile_proven,owner->opaque,&profile)==MU_RF_ARG_DENY)return -1;
+    mu_rf_arg_choose(owner->iap2_profile_proven,owner->opaque,&candidate_scn)!=MU_RF_ARG_VERIFIED)return -1;
  fd=connected(port);if(fd<0)return -1;
  /* No callback/owner claim may be reused after this point, even after
   * failure. The native SDK may have published partial RF/SDP storage. */
  s->state=AU98_POISONED;s->fd=fd;s->hooks=*h;s->native_owner=*owner;
- rc=h->attach(h->opaque,owner,fd);
+ /* One attested value for the complete owner lifetime, including the
+  * original BlueSDK RF call. No re-reading a changing profile callback. */
+ s->native_owner.rf_arg3_snapshot=candidate_scn;
+ s->native_owner.rf_arg3_snapshot_valid=1u;
+ rc=h->attach(h->opaque,&s->native_owner,fd);
  if(rc==0){s->state=AU98_PUBLISHED;++s->generations;return 0;}
  /* Never close/free callback-backed SDK storage on an ambiguous attach. */
  return -2;

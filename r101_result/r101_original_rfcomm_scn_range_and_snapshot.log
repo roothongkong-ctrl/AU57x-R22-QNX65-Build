@@ -1,0 +1,16 @@
+{"PASS": true, "report": "r101_result/R101_MU1005_SCN_AUDIT.json", "ABI_PROVEN": false, "safe_to_flash": false}
+R101 RFCOMM SCN 1..30, SDP sync, no publish on invalid: PASS (MOCK SDK)
+R101 RFCOMM arg range validation: PASS (arg3 ABI still unverified)
+R101 RFCOMM arg range validation: PASS (arg3 ABI still unverified)
+test_bl_targets_same_registration (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_bl_targets_same_registration) ... ok
+test_each_instruction_mutation_refuses (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_each_instruction_mutation_refuses) ... ok
+test_no_chance_executing_or_modifying_original (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_no_chance_executing_or_modifying_original) ... ok
+test_reject_mock_when_pinned_sha_required (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_reject_mock_when_pinned_sha_required) ... ok
+test_reject_truncated_header (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_reject_truncated_header) ... ok
+test_reject_unsupported_arch (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_reject_unsupported_arch) ... ok
+test_valid_mock_structure_never_means_vehicle_works (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_valid_mock_structure_never_means_vehicle_works) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.023s
+
+OK

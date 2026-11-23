@@ -16,73 +16,73 @@
       "name": "strict_compile_44",
       "result": "PASS",
       "exit": 0,
-      "seconds": 0.5
+      "seconds": 0.52
     },
     {
       "name": "exact_oem_feature_detector_negative",
       "result": "PASS",
       "exit": 0,
-      "seconds": 0.96
+      "seconds": 0.98
     },
     {
       "name": "iap2_live_loopback_fixture",
       "result": "PASS",
       "exit": 0,
-      "seconds": 0.14
+      "seconds": 0.15
     },
     {
       "name": "original_iap2_dual_config_23",
       "result": "PASS",
       "exit": 0,
-      "seconds": 1.35
+      "seconds": 1.55
     },
     {
       "name": "native_hfp_callback_observer",
       "result": "PASS",
       "exit": 0,
-      "seconds": 0.26
+      "seconds": 0.24
     },
     {
       "name": "native_worker_owner_lifecycle",
       "result": "PASS",
       "exit": 0,
-      "seconds": 0.29
+      "seconds": 0.24
     },
     {
       "name": "original_process_preload_identity",
       "result": "PASS",
       "exit": 0,
-      "seconds": 0.46
+      "seconds": 0.45
     },
     {
       "name": "pinned_stock_launcher_config",
       "result": "PASS",
       "exit": 0,
-      "seconds": 1.54
+      "seconds": 1.42
     },
     {
       "name": "c_sd_transaction_backup_recovery",
       "result": "PASS",
       "exit": 0,
-      "seconds": 2.68
+      "seconds": 2.39
     },
     {
       "name": "r96_supervised_recovery",
       "result": "PASS",
       "exit": 0,
-      "seconds": 2.71
+      "seconds": 2.82
     },
     {
       "name": "r45_iap2_mfi_gates_fixture",
       "result": "PASS",
       "exit": 0,
-      "seconds": 0.72
+      "seconds": 0.76
     },
     {
       "name": "wired_first_priority",
       "result": "PASS",
       "exit": 0,
-      "seconds": 3.81
+      "seconds": 3.75
     }
   ],
   "passed": 12,

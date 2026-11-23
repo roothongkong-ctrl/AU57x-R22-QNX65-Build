@@ -1,7 +1,7 @@
 name: AU57x cloud-only 12-step evidence and lifecycle gates (NO INSTALL)
 on:
   push:
-    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline, r95-offline-steps-03-to-17, r96-oneclick-lab-and-release-review, r97-stock-thread-origin-handoff, r98-stock-iap2-owner-transport]
+    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline, r95-offline-steps-03-to-17, r96-oneclick-lab-and-release-review, r97-stock-thread-origin-handoff, r98-stock-iap2-owner-transport, r99-stock-iap2-two-config-fallback, r100-failclosed-dual-route-graft, r101-rfcomm-scn-and-owner-snapshot]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -109,6 +109,10 @@ jobs:
         run: bash ci/host_r99_stock_iap2.sh
       - name: R100 pinned original MU1005 feature triage and runtime route gate (never activates OEM code)
         run: bash ci/host_r100_route_audit.sh
+      - name: R101 original vendor RFCOMM arg3 static audit negatives + 1..30 C SDP/owner snapshot checks (NO OEM)
+        run: bash ci/host_r101_scn_audit.sh
+      - name: R101 all 13 offline suites and pinned-original ELF boundary (NO INSTALL)
+        run: python3 ci/host_r101_continuous.py
       - name: Assemble source-only review ZIP and SHA256
         if: always()
         run: bash ci/build_cloud_review_bundle.sh
@@ -124,5 +128,7 @@ jobs:
             r97_result/
             r98_result/
             r99_result/
+            r100_result/
+            r101_result/
           if-no-files-found: warn
           retention-days: 14

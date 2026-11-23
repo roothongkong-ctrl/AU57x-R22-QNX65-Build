@@ -1,0 +1,13 @@
+R100 strict_compile_44 PASS
+R100 exact_oem_feature_detector_negative PASS
+R100 iap2_live_loopback_fixture PASS
+R100 original_iap2_dual_config_23 PASS
+R100 native_hfp_callback_observer PASS
+R100 native_worker_owner_lifecycle PASS
+R100 original_process_preload_identity PASS
+R100 pinned_stock_launcher_config PASS
+R100 c_sd_transaction_backup_recovery PASS
+R100 r96_supervised_recovery PASS
+R100 r45_iap2_mfi_gates_fixture PASS
+R100 wired_first_priority PASS
+R100_TOTAL 12 / 12

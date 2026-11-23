@@ -18,11 +18,18 @@ static int yes_thread(void*p){return ((Fixture*)p)->thread;}
 static int yes_service(void*p){return ((Fixture*)p)->service;}
 static int yes_owner(void*p){return ((Fixture*)p)->owner;}
 static int yes_transport(void*p){return ((Fixture*)p)->transport;}
-static int yes_profile(void*p,uint8_t *v){Fixture*f=p;if(!f->profile)return 0;*v=0;return 1;}
+/* Fixture mode 1 supplies a fake but valid SCN. 2/3 deliberately return
+ * invalid 0/31 despite reporting "proven" and must never open the socket. */
+static int yes_profile(void*p,uint8_t *v){
+ Fixture*f=p;if(!f->profile)return 0;
+ *v=(uint8_t)(f->profile==2?0:f->profile==3?31:5);return 1;
+}
 static int dummy_read(void*p,uint32_t a,void*b,size_t n){(void)p;(void)a;(void)b;(void)n;return 1;}
 static int dummy_auth(void*p,uint32_t a,const uint8_t b[6]){(void)p;(void)a;(void)b;return 1;}
 static int fake_attach(void*p,const MuBtOwner*owner,int fd){Fixture*f=p;struct sockaddr_in sa;socklen_t n=sizeof sa;
- assert(owner->opaque==p);assert(getpeername(fd,(struct sockaddr*)&sa,&n)==0);
+ assert(owner->opaque==p);
+ assert(owner->rf_arg3_snapshot_valid==1u && owner->rf_arg3_snapshot==5u);
+ assert(getpeername(fd,(struct sockaddr*)&sa,&n)==0);
  assert(sa.sin_addr.s_addr==htonl(INADDR_LOOPBACK));assert(fcntl(fd,F_GETFD)&FD_CLOEXEC);
  f->got_fd=fd;f->calls++;return f->attach;
 }
@@ -55,7 +62,10 @@ int main(void){
  f.original=0;assert(au98_publish(&h,&k,&o,port)<0&&h.state==AU98_EMPTY);f.original=1;
  f.thread=0;assert(au98_publish(&h,&k,&o,port)<0&&h.state==AU98_EMPTY);f.thread=1;
  f.service=0;assert(au98_publish(&h,&k,&o,port)<0&&h.state==AU98_EMPTY);f.service=1;
- f.profile=0;assert(au98_publish(&h,&k,&o,port)<0&&h.state==AU98_EMPTY);f.profile=1;
+ f.profile=0;assert(au98_publish(&h,&k,&o,port)<0&&h.state==AU98_EMPTY);
+ f.profile=2;assert(au98_publish(&h,&k,&o,port)<0&&h.state==AU98_EMPTY);
+ f.profile=3;assert(au98_publish(&h,&k,&o,port)<0&&h.state==AU98_EMPTY);
+ f.profile=1;
  f.transport=0;assert(au98_publish(&h,&k,&o,port)<0&&h.state==AU98_EMPTY);f.transport=1;
  k.attach=NULL;assert(au98_publish(&h,&k,&o,port)<0&&h.state==AU98_EMPTY);k.attach=fake_attach;
  assert(au98_publish(&h,&k,&o,0)<0&&h.state==AU98_EMPTY);
@@ -64,8 +74,13 @@ int main(void){
  assert(au98_publish(&h,&k,&o,port)==0);
  accepted=accept(listen_fd,NULL,NULL);assert(accepted>=0);
  assert(h.state==AU98_PUBLISHED&&h.generations==1&&f.calls==1&&f.got_fd==h.fd);
+ /* A proof provider changing its reply after setup cannot change the
+  * session-bound value that native_binding uses. */
+ f.profile=3;
+ assert(h.native_owner.rf_arg3_snapshot_valid==1u && h.native_owner.rf_arg3_snapshot==5u);
  assert(au98_publish(&h,&k,&o,port)<0);
  assert(au98_tick(&h)==0&&f.calls==2);
+ f.profile=1;
  f.thread=0;assert(au98_tick(&h)<0&&f.calls==2);
  assert(au98_withdraw(&h,barrier,&ok)<0&&h.state==AU98_PUBLISHED);
  f.thread=1;

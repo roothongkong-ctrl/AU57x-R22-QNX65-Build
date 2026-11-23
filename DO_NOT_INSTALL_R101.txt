@@ -1,0 +1,3 @@
+R101 = SOURCE ONLY. DO NOT COPY TO SD FOR INSTALL, DO NOT FLASH.
+
+Original MU1005 BlueSDK iAP2 owner and registration parameter unverified.

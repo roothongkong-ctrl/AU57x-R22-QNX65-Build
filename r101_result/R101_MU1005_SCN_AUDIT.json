@@ -1,0 +1,38 @@
+{
+  "baseline": "MHI2_CN_AU57x_K1006_2/MU1005",
+  "oem_elf": "btstack",
+  "sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
+  "elf32_arm_et_exec_pinned": true,
+  "instruction_sites_checked": 13,
+  "original_rf_function_va": "0x277a18",
+  "original_callers": [
+    {
+      "service": "HFP",
+      "caller_va": "0x2464b0",
+      "arg3_immediate": 7
+    },
+    {
+      "service": "SIM",
+      "caller_va": "0x24dcac",
+      "arg3_immediate": 4
+    }
+  ],
+  "arg3_native_dataflow": [
+    "caller r2 -> function r6",
+    "strb r6, [r4,#0x8b]",
+    "strh r6, [r4,#0x86]",
+    "original r1 forwarded to internal function"
+  ],
+  "interpretation": "ARG3_IS_CHANNEL_LIKE (not conclusively proved SCN)",
+  "rfcomm_service_channel_range": [
+    1,
+    30
+  ],
+  "donor_code_rejected_valid_scns_7_to_30": true,
+  "iap2_scn_discovered": false,
+  "zero_means_auto_alloc_proven": false,
+  "native_owner_thread_proven": false,
+  "in_car_rf_registration_proven": false,
+  "installable": false,
+  "vehicle_verified": false
+}
