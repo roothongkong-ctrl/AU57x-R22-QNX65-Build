@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/upstream-iap2-reuse.yml'
       - 'third_party/entrynav2_iap2/**'
+      - 'r113/src/mu1005_iap2_stream.*'
+      - 'r113/tests/test_mu1005_native_iap2_stream.cpp'
   workflow_dispatch:
 permissions:
   contents: read
