@@ -1,0 +1,57 @@
+name: AU57x R113-R116 QNX6.5 ARM review (NO INSTALL)
+on:
+  push:
+    branches: [r113-r116-cloud-review]
+    paths:
+      - '.github/workflows/r113-r116-review.yml'
+      - 'docs/R113_R116_CLOUD_REVIEW_CN.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qnx-owner-bridge-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 140
+    steps:
+      - uses: actions/checkout@v4
+      - name: Source provenance and non-installable guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f docs/R113_R116_CLOUD_REVIEW_CN.md
+          test "$(find project/source -type f -name '*.c' | wc -l)" = 34
+          ! find . -name '*.img' -o -name '*.key' -o -name '*.pem' | grep -q .
+          echo "NO_INSTALL: host + QNX ABI verification only, no car payload"
+      - name: Host core regression + sanitizers
+        shell: bash
+        run: bash tests/run_bt_host.sh
+      - name: Build pinned QNX 6.5 ARMv7 compiler image
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git init -q /tmp/qnx65
+          git -C /tmp/qnx65 remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C /tmp/qnx65 fetch -q --depth=1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C /tmp/qnx65 checkout -q FETCH_HEAD
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t au57x-r114-qnx65:8.5 /tmp/qnx65
+      - name: Cross compile and link original public MU1005 bridge (QNX)
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker run --rm --platform linux/amd64 -v "$GITHUB_WORKSPACE":/src -w /src au57x-r114-qnx65:8.5 bash /src/ci/compile_qnx_in_image.sh
+      - name: Check target ELF headers, dependencies and QEMU smoke
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 project/tools/qnx_elf_gate.py --candidate qnx_build_result/libau57x_r24_native_qnx_REVIEW_ONLY.so --output qnx_build_result/logs/r114_qnx_elf_gate.json
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+          bash ci/qnx_runtime_smoke.sh
+      - name: Preserve compiler and smoke logs on failure or success
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AU57x-R114-QNX65-REVIEW_ONLY
+          path: qnx_build_result/
+          if-no-files-found: warn
+          retention-days: 10
