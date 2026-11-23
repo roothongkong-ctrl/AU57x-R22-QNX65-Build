@@ -1,0 +1,74 @@
+{
+  "version": "R97",
+  "baseline": "MHI2_CN_AU57x_K1006_2/MU1005",
+  "genuine_oem_binary_static_audit": "PRIVATE_LOCAL_ONLY_NOT_IN_CI",
+  "r97_owner_thread": "HOST_CODE_TESTED_NOT_OEM_THREAD_VERIFIED",
+  "r97_hfp_got": "HOST_FORWARDING_TESTED_NOT_OEM_CALLBACK_OBSERVED",
+  "oem_hfp_got_opt_in": "OFF_BY_DEFAULT",
+  "iap2_native_registration": "MISSING",
+  "apple_mfi_actual_handset": "MISSING",
+  "airplay_actual_vehicle": "MISSING",
+  "stage18_19_vehicle_installer": "NOT_READY",
+  "installable": false,
+  "vehicle_verified": false,
+  "safe_to_flash": false,
+  "tests": {
+    "oem_got_relocation_mutations": {
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 0.97,
+      "log": "oem_got_relocation_mutations.log"
+    },
+    "actual_host_pthread_origin": {
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 0.24,
+      "log": "actual_host_pthread_origin.log"
+    },
+    "hfp_got_callback_forwarding": {
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 0.23,
+      "log": "hfp_got_callback_forwarding.log"
+    },
+    "preload_sha_and_process_identity": {
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 0.47,
+      "log": "preload_sha_and_process_identity.log"
+    },
+    "launcher_opt_in_rollback": {
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 0.81,
+      "log": "launcher_opt_in_rollback.log"
+    },
+    "original_launcher_staging": {
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 1.31,
+      "log": "original_launcher_staging.log"
+    },
+    "strict_c_42": {
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 0.47,
+      "log": "strict_c_42.log"
+    },
+    "r96_install_rollback_review": {
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 14.16,
+      "log": "r96_install_rollback_review.log"
+    },
+    "stock_r45_tcp_iap2": {
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 1.07,
+      "log": "stock_r45_tcp_iap2.log"
+    }
+  },
+  "passed": 9,
+  "total": 9,
+  "warning": "A test is NOT an original QNX runtime or Bluetooth RF/iAP2 handshake."
+}

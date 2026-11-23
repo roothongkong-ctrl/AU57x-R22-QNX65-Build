@@ -10,6 +10,8 @@ hash=$(sha256sum "$w/btstack" | cut -d' ' -f1)
 $cc -std=c99 -O2 -D_FORTIFY_SOURCE=2 -Wall -Wextra -Werror -fPIC -shared -pthread \
  -DAU57X_R92_HOST_TEST=1 -DAU57X_R92_STOCK_SHA256='"'"$hash"'"' \
  project/source/legacy_mu1005/bluetooth/bt_preload_probe.c \
+ project/source/legacy_mu1005/bluetooth/bt_thread_owner.c \
+ project/source/legacy_mu1005/bluetooth/bt_got_observer.c \
  tools/review_txn/sha256.c -ldl -o "$w/libprobe.so"
 rm -f /tmp/au57x_r92_bt_preload.log
 # A true btstack-named process must pass both program identity and SHA.
@@ -27,6 +29,8 @@ grep -q 'wrong-process' /tmp/au57x_r92_bt_preload.log
 $cc -std=c99 -O2 -D_FORTIFY_SOURCE=2 -Wall -Wextra -Werror -fPIC -shared -pthread \
  -DAU57X_R92_HOST_TEST=1 -DAU57X_R92_STOCK_SHA256='"'"$(printf '%064d' 0)"'"' \
  project/source/legacy_mu1005/bluetooth/bt_preload_probe.c \
+ project/source/legacy_mu1005/bluetooth/bt_thread_owner.c \
+ project/source/legacy_mu1005/bluetooth/bt_got_observer.c \
  tools/review_txn/sha256.c -ldl -o "$w/libbad.so"
 rm -f /tmp/au57x_r92_bt_preload.log
 AU57X_R92_PROBE=1 AU57X_R92_HOST_TARGET="$w/btstack" LD_PRELOAD="$w/libbad.so" "$w/btstack" > "$w/bad.log"
@@ -37,4 +41,10 @@ rm -f /tmp/au57x_r92_bt_preload.log
 AU57X_R92_PROBE=0 AU57X_R92_HOST_TARGET="$w/btstack" LD_PRELOAD="$w/libprobe.so" "$w/btstack" > "$w/disabled.log"
 grep -q 'fake-btstack-thread-forwarding-ok' "$w/disabled.log"
 test ! -e /tmp/au57x_r92_bt_preload.log
+# R97 explicit opt-in must be recognized but host must NEVER patch an OEM address.
+rm -f /tmp/au57x_r92_bt_preload.log
+AU57X_R92_PROBE=1 AU57X_R97_GOT_PROBE=1 AU57X_R92_HOST_TARGET="$w/btstack" \
+ LD_PRELOAD="$w/libprobe.so" "$w/btstack" > "$w/hfp_opt_in_host.log"
+grep -q 'hfp-got-observer-unavailable' /tmp/au57x_r92_bt_preload.log
+! grep -q 'hfp-got-observer-bound' /tmp/au57x_r92_bt_preload.log
 echo 'R93 preload host tests PASS: actual shared-library constructor; 2 intercepted/forwarded pthread_create calls; SHA rejection; opt-out.'

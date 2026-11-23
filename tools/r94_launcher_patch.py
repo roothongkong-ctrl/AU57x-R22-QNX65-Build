@@ -48,7 +48,7 @@ def target_nodes(config):
     return node
 
 
-def stage(content, out_dir, wrapper=WRAPPER, preload=PRELOAD, expected_sha=None):
+def stage(content, out_dir, wrapper=WRAPPER, preload=PRELOAD, expected_sha=None, hfp_probe=False):
     if expected_sha is not None and digest(content) != expected_sha:
         raise ValueError("original launcher configuration SHA256 mismatch")
     if not wrapper.startswith("/") or not preload.startswith("/") or "\n" in wrapper + preload:
@@ -63,6 +63,8 @@ def stage(content, out_dir, wrapper=WRAPPER, preload=PRELOAD, expected_sha=None)
     # Verify original supervisor gate/other keys are left unmodified.
     assert node.get("preCondition", None) == old_precondition
     modified = (json.dumps(config, indent=2, ensure_ascii=False) + "\n").encode()
+    if type(hfp_probe) is not bool:
+        raise ValueError("R97 HFP probe mode must be an explicit boolean")
     # A self-contained wrapper replaces the *same* process with exec; not a second btstack.
     sh = ("#!/bin/sh\n# R94 experimental launcher wrapper; not an installer\n"
           "# Only activate when manually reviewed and deliberately placed in verified OEM supervisor config.\n"
@@ -72,11 +74,16 @@ def stage(content, out_dir, wrapper=WRAPPER, preload=PRELOAD, expected_sha=None)
           f"LD_PRELOAD={shlex.quote(preload)}\n"
           "export AU57X_R92_PROBE LD_PRELOAD\n"
           f"exec {shlex.quote(STOCK)} \"$@\"\n")
-    report = {"version": "R94", "scope": "OFFLINE_STAGING_ONLY", "installable": False,
+    if hfp_probe:
+        sh=sh.replace("export AU57X_R92_PROBE LD_PRELOAD\n",
+                      "AU57X_R97_GOT_PROBE=1\nexport AU57X_R92_PROBE LD_PRELOAD AU57X_R97_GOT_PROBE\n")
+    report = {"version": "R97" if hfp_probe else "R94", "scope": "OFFLINE_STAGING_ONLY", "installable": False,
               "ready_for_vehicle": False, "vehicle_verified": False,
               "original_config_sha256": digest(content), "staged_config_sha256": digest(modified),
               "entry_wrapper_sha256": digest(sh.encode()), "stock_btstack_sha256": STOCK_SHA,
               "original_exec": STOCK, "staged_exec": wrapper, "preload": preload,
+              "hfp_got_observer_opt_in": hfp_probe,
+              "hfp_is_not_iap2": True,
               "precondition_unmodified": True, "no_second_btstack": True,
               "factory_supervisor_environment_inheritance_proven": False,
               "rfcomm_callback_bound": False,
@@ -105,11 +112,13 @@ def main():
     p.add_argument("--config", required=True)
     p.add_argument("--out", required=True)
     p.add_argument("--expected-sha256")
+    p.add_argument("--experimental-hfp-observer",action="store_true",
+                   help="R97 original HFP callback observer only; not an iAP2 service")
     p.add_argument("--wrapper", default=WRAPPER)
     p.add_argument("--preload", default=PRELOAD)
     args = p.parse_args()
     try:
-        report = stage(pathlib.Path(args.config).read_bytes(), args.out, args.wrapper, args.preload, args.expected_sha256)
+        report = stage(pathlib.Path(args.config).read_bytes(), args.out, args.wrapper, args.preload, args.expected_sha256, args.experimental_hfp_observer)
     except (OSError, ValueError, AssertionError, json.JSONDecodeError) as err:
         print(f"R94 DENY: {err}", file=sys.stderr)
         return 2

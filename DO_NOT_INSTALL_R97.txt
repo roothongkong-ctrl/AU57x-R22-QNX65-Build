@@ -1,0 +1,5 @@
+R97 DEVELOPMENT / SOURCE ONLY / NO INSTALL.
+DO NOT put this source package through M.I.B. install/update or the red SWDL update menu.
+Opt-in HFP GOT hook is experimentally designed; not tested in original running QNX btstack.
+No real Apple iAP2/MFi phone session or AirPlay video/audio is verified.
+Not installable. Not safe to flash. Do not start a second btstack.

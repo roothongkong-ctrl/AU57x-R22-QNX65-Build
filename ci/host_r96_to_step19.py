@@ -10,7 +10,7 @@ import time
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/'r96_result'
 SUITES=[
- ('strict_c_40','ci/host_r95_source_compile.sh'),
+ ('strict_c_42','ci/host_r95_source_compile.sh'),
  ('native_sd_txn_67','ci/host_sd_txn.sh'),
  ('oneclick_supervised_12','ci/host_r96_oneclick.sh'),
  ('review_candidate_9','ci/host_r96_candidate.sh'),
