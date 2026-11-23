@@ -1,0 +1,29 @@
+{
+  "version": "R97",
+  "scope": "EXACT_OEM_STATIC_ONLY",
+  "original_sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
+  "oem_elf": "QNX6.5_ARM32_ET_EXEC",
+  "original_got": {
+    "SimClientRfCallback": {
+      "slot_va": "0x2c18c8",
+      "target_va": "0x24c578"
+    },
+    "HfRfCallback": {
+      "slot_va": "0x2c23c8",
+      "target_va": "0x2481f0"
+    }
+  },
+  "original_arm_words": {
+    "0x24648c": "0xe7943003",
+    "0x2464ac": "0xe5853014",
+    "0x2464b0": "0xeb00c558",
+    "0x24dc9c": "0xe5843010",
+    "0x24dcac": "0xeb00a759"
+  },
+  "original_got_in_writable_segment": true,
+  "original_hfp_callback_address_known": true,
+  "original_iap2_callback_known": false,
+  "real_original_hfp_callback_observed": false,
+  "vehicle_verified": false,
+  "safe_to_flash": false
+}

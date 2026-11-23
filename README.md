@@ -1,3 +1,11 @@
+# R97 — 原厂 HFP 回调 GOT 观察器 + btstack 线程归属接线（仅源码）
+
+**R97 新增工作：** 从你原厂 MU1005 `btstack` 的真实 ELF 动态重定位表，定位了 HFP `HfRfCallback` 的 `R_ARM_GLOB_DAT` 指针槽 (`0x2c23c8`，原目标 `0x2481f0`)，以及 SIM 的只读参考槽。新增可选的原厂 HFP 回调透传观察器和真实 pthread 线程入口追踪；主机 9 组连续回归全部通过，42 个 C 模块严格编译通过。
+
+**边界：** 这不是 iAP2 CarPlay 注册，原车实际回调和 iPhone MFi / AirPlay 仍未验证；没有原厂 `connectivity.json` 或 OEM 的运行时 owner 证据，R97 **不是可装车包**。完整技术说明在 `docs/R97_STOCK_HFP_GOT_THREAD_OWNER_CN.md`。
+
+---
+
 # R96: steps 18-19 (host lab + non-executable release review; NOT A CAR INSTALLER)
 
 R96 adds a generated, SHA256-pinned supervised host lab for actual C file backup, replacement, candidate-process health and rollback, and a deterministic verified non-executable SD review bundle. New tests and Chinese handoff: `docs/R96_STEPS_18_19_CN.md`.

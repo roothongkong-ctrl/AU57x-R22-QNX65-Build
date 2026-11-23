@@ -5,6 +5,8 @@
  */
 #define _POSIX_C_SOURCE 200809L
 #include "bt_preload_probe.h"
+#include "bt_thread_owner.h"
+#include "bt_got_observer.h"
 #include "../../../../tools/review_txn/sha256.h"
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -72,6 +74,12 @@ __attribute__((constructor)) static void au57x_probe_ctor(void){
  /* Only an exact stock executable is admitted; no mutation or vendor calls. */
  probe_enabled=1;
  log_one("stock-image-pinned",0,0,1);
+ /* Experimental original-HFP observer only; separate opt-in, never iAP2. */
+ if(getenv("AU57X_R97_GOT_PROBE") &&
+    strcmp(getenv("AU57X_R97_GOT_PROBE"),"1")==0){
+  int rc=au97_install_original_hfp_observer();
+  log_one(rc==0?"hfp-got-observer-bound":"hfp-got-observer-unavailable",0,0,rc==0);
+ }
 }
 int au57x_r92_stock_image_verified(void){return probe_enabled==1;}
 unsigned au57x_r92_threads_seen(void){return thread_count;}
@@ -96,6 +104,7 @@ int pthread_create(pthread_t *t,const pthread_attr_t *attr,
     if((site&~(uintptr_t)1u)==(uintptr_t)stock_callers[i]+4u)matched=1;
   (void)__sync_fetch_and_add(&thread_count,1u);
   log_one("pthread_create",site,(uintptr_t)start,matched);
+  if(matched) return au97_pthread_create(t,attr,start,arg,site,orig);
  }
  return orig(t,attr,start,arg);
 }

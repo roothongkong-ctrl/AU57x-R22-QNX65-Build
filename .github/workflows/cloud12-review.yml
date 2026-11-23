@@ -1,7 +1,7 @@
 name: AU57x cloud-only 12-step evidence and lifecycle gates (NO INSTALL)
 on:
   push:
-    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline, r95-offline-steps-03-to-17, r96-oneclick-lab-and-release-review]
+    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline, r95-offline-steps-03-to-17, r96-oneclick-lab-and-release-review, r97-stock-thread-origin-handoff]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -35,6 +35,16 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_wcp_donor_reference_audit.py -v
       - name: R89 cross-process original R45 socket to R44/R87 transport contract
         run: bash ci/host_wcp_r45_remote.sh
+      - name: R97 original pinned HFP/SIM callback GOT relocation synthetic audit
+        run: python3 -m unittest discover -s tests -p test_r97_stock_hfp_got_audit.py -v
+      - name: R97 real host HFP GOT callback forwarding and thread association
+        run: bash ci/host_r97_hfp_got.sh
+      - name: R97 opt-in stock supervisor launcher lifecycle negative tests
+        run: python3 -m unittest discover -s tests -p test_r97_hfp_launcher.py -v
+      - name: R97 continuous offline native Bluetooth and installer matrix
+        run: python3 ci/host_r97_continuous.py
+      - name: R97 original btstack pthread worker origin and lifetime regression
+        run: bash ci/host_r97_owner_thread.sh
       - name: R92 native btstack LD_PRELOAD real constructor/pthread interposition host tests
         run: bash ci/host_bt_preload_probe.sh
       - name: R94 exact MU1005 launcher static audit and reversible same-process launch staging
@@ -77,7 +87,7 @@ jobs:
         run: bash ci/host_cloud_media.sh
       - name: R11 recovered 67 native C transaction and independent rollback tests
         run: bash ci/host_sd_txn.sh
-      - name: R95 host strict compile of 40 native C modules
+      - name: R97 host strict compile of 42 native C modules
         run: bash ci/host_r95_source_compile.sh
       - name: R95 continuous offline steps 03-17 evidence matrix (records failures, no car)
         run: bash ci/host_r95_to_step17.sh
@@ -103,5 +113,6 @@ jobs:
             cloud12_result/
             r95_result/
             r96_result/
+            r97_result/
           if-no-files-found: warn
           retention-days: 14

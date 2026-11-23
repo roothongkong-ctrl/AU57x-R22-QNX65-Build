@@ -1,0 +1,6 @@
+R97 2026-11-23; original btstack passive HFP callback GOT and stock thread origin bridge.
+Target: 2017 Audi A6L C7 PA, MHI2_CN_AU57x_K1006_2/MU1005, QNX 6.5 ARM32.
+Changes: 2 new C modules, 2 headers, 2 new host integration tests, exact private OEM ELF relocation auditor,
+opt-in R94 supervisor environment generator, multi-suite regression, QNX preload linking.
+Original user btstack is audited private only and NOT distributed.
+HFP telemetry is NOT Apple iAP2; OEM execution NOT verified. No vehicle installer, source only.
