@@ -59,7 +59,7 @@ jobs:
             CXX=/opt/qnx650/host/linux/x86/usr/bin/arm-unknown-nto-qnx6.5.0eabi-g++
             AR=/opt/qnx650/host/linux/x86/usr/bin/arm-unknown-nto-qnx6.5.0eabi-ar
             RE=/opt/qnx650/host/linux/x86/usr/bin/arm-unknown-nto-qnx6.5.0eabi-readelf
-            OPTS="-std=gnu++11 -O2 -Wall -Wextra -Werror -fPIC -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp -I$D/include"
+            OPTS="-std=gnu++11 -O2 -Wall -Wextra -Werror -Wno-ignored-attributes -fPIC -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp -I$D/include"
             $CXX $OPTS -c "$D/src/iap2_link.cpp" -o qnx_iap2_reuse_result/iap2_link.o
             $CXX $OPTS -c "$D/src/iap2_wire.cpp" -o qnx_iap2_reuse_result/iap2_wire.o
             $CXX $OPTS -c "$D/src/au57x_iap2_capi.cpp" -o qnx_iap2_reuse_result/au57x_iap2_capi.o
