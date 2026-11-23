@@ -3,11 +3,12 @@
 #include <stdio.h>
 #include <string.h>
 typedef struct {
- int pre,usb,reg_result,allocated_scn,publish_result,published,quiesced;
+ int pre,usb,paired,reg_result,allocated_scn,publish_result,published,quiesced;
  int registrations,advertisements,unregistrations,live_checks;
 } Fixture;
 static int pre(void *v){return ((Fixture*)v)->pre;}
 static int usb(void *v){return ((Fixture*)v)->usb;}
+static int paired(void *v){return ((Fixture*)v)->paired;}
 static int reg(void *v,uint8_t *scn){
  Fixture *f=v;f->registrations++;*scn=(uint8_t)f->allocated_scn;return f->reg_result;
 }
@@ -22,14 +23,26 @@ static int unreg(void *v){((Fixture*)v)->unregistrations++;return 0;}
 static int quiesced(void *v){return ((Fixture*)v)->quiesced;}
 static Au108OEM owner(Fixture *f){
  Au108OEM o;memset(&o,0,sizeof o);o.context=f;o.exact_image_live=pre;
- o.on_original_owner_thread=pre;o.paired_phone=pre;o.mfi_hardware_ready=pre;
+ o.on_original_owner_thread=pre;o.paired_phone=paired;o.mfi_hardware_ready=pre;
  o.wired_idle=usb;o.register_iap2_rfcomm=reg;o.publish_iap2_sdp=advertise;
  o.published_iap2_service=published;o.unregister_iap2=unreg;
  o.callbacks_quiesced=quiesced;return o;
 }
-static Fixture basic(void){Fixture f={0};f.pre=1;f.usb=1;f.allocated_scn=3;f.published=1;f.quiesced=1;return f;}
+static Fixture basic(void){Fixture f={0};f.pre=1;f.usb=1;f.paired=1;f.allocated_scn=3;f.published=1;f.quiesced=1;return f;}
 int main(void){
  Au108Port p;Fixture f;Au108OEM o;
+ /* No paired handset at startup: service MUST be advertised before pairing. */
+ f=basic();f.paired=0;o=owner(&f);au108_init(&p);
+ assert(au108_bind(&p,&o,9)==0 && p.state==AU108_ADVERTISING);
+ assert(f.registrations==1 && f.advertisements==1);
+ assert(p.gate.state==R105_EMPTY && p.evidence.paired_authorized==0);
+ assert(au108_live(&p)==0 && p.state==AU108_ADVERTISING);
+ f.paired=1;
+ assert(au108_live(&p)==1 && p.gate.state==R105_ARMED);
+ assert(au108_withdraw(&p)==0);
+ f=basic();f.paired=0;o=owner(&f);au108_init(&p);
+ assert(au108_bind(&p,&o,9)==0 && p.state==AU108_ADVERTISING);
+ assert(au108_withdraw(&p)==0 && f.unregistrations==1);
  f=basic();o=owner(&f);au108_init(&p);
  assert(au108_bind(&p,&o,10)==0);
  assert(p.evidence.scn==3 && f.registrations==1 && f.advertisements==1);

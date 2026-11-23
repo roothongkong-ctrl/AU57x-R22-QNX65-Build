@@ -22,7 +22,7 @@ typedef struct {
  int (*unregister_iap2)(void *);
  int (*callbacks_quiesced)(void *);
 } Au108OEM;
-typedef enum { AU108_EMPTY=0,AU108_LIVE=1,AU108_POISONED=2,AU108_RETIRED=3,AU108_SUSPENDED=4 } Au108State;
+typedef enum { AU108_EMPTY=0,AU108_LIVE=1,AU108_POISONED=2,AU108_RETIRED=3,AU108_SUSPENDED=4,AU108_ADVERTISING=5 } Au108State;
 typedef struct {
  Au108State state;
  Au108OEM owner;

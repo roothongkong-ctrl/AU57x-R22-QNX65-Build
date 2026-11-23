@@ -14,16 +14,19 @@ static int teardown_owner(const Au108OEM *o){
   o->exact_image_live(o->context)==1 &&
   o->on_original_owner_thread(o->context)==1;
 }
-static int preflight(const Au108OEM *o){
+/* RFCOMM and SDP discovery must precede first handset pairing. */
+static int publication_preflight(const Au108OEM *o){
  return all_functions(o) && o->exact_image_live(o->context)==1 &&
   o->on_original_owner_thread(o->context)==1 &&
-  o->paired_phone(o->context)==1 &&
   o->mfi_hardware_ready(o->context)==1 && o->wired_idle(o->context)==1;
+}
+static int session_preflight(const Au108OEM *o){
+ return publication_preflight(o) && o->paired_phone(o->context)==1;
 }
 void au108_init(Au108Port *p){if(p){memset(p,0,sizeof(*p));r105_gate_init(&p->gate);}}
 int au108_bind(Au108Port *p,const Au108OEM *o,uint32_t generation){
  uint8_t scn=0;int ret;
- if(!p||p->state!=AU108_EMPTY||!generation||!preflight(o))return -1;
+ if(!p||p->state!=AU108_EMPTY||!generation||!publication_preflight(o))return -1;
  p->owner=*o;p->generation=generation;
  /* From here we may have changed the native SDK even if it reports failure.
   * Never auto-retry, and never free resident callback/SDP storage. */
@@ -31,28 +34,40 @@ int au108_bind(Au108Port *p,const Au108OEM *o,uint32_t generation){
  ret=p->owner.register_iap2_rfcomm(p->owner.context,&scn);
  if(ret!=0||scn<R105_SCN_MIN||scn>R105_SCN_MAX)return -2;
  /* SCN is the SDK's RETURNED byte. Recheck owner and USB before publishing. */
- if(!preflight(&p->owner) ||
+ if(!publication_preflight(&p->owner) ||
     p->owner.publish_iap2_sdp(p->owner.context,scn)!=0)return -2;
- if(!preflight(&p->owner) ||
+ if(!publication_preflight(&p->owner) ||
     p->owner.published_iap2_service(p->owner.context,scn)!=1)return -2;
- p->evidence=(R105Evidence){generation,scn,1,1,1,1,1,0};
- if(r105_gate_arm(&p->gate,&p->evidence)!=0)return -2;
- if(!preflight(&p->owner)){
-  r105_gate_revoke(&p->gate);return -2;
- }
- p->state=AU108_LIVE;return 0;
+ /* Never fabricate pairing proof merely because SDP was published. */
+ p->evidence=(R105Evidence){generation,scn,1,1,1,0,1,0};
+ if(!publication_preflight(&p->owner))return -2;
+ p->state=AU108_ADVERTISING;return 0;
 }
 int au108_live(Au108Port *p){
- if(!p||p->state!=AU108_LIVE)return 0;
- if(!preflight(&p->owner)||
-    p->owner.published_iap2_service(p->owner.context,p->evidence.scn)!=1||
+ if(!p||(p->state!=AU108_ADVERTISING&&p->state!=AU108_LIVE))return 0;
+ if(!publication_preflight(&p->owner)||
+    p->owner.published_iap2_service(p->owner.context,p->evidence.scn)!=1){
+  p->state=AU108_SUSPENDED;r105_gate_revoke(&p->gate);return 0;
+ }
+ if(p->state==AU108_ADVERTISING){
+  if(p->owner.paired_phone(p->owner.context)!=1)return 0;
+  p->evidence.paired_authorized=1;
+  if(r105_gate_arm(&p->gate,&p->evidence)!=0||
+     !session_preflight(&p->owner)||
+     r105_gate_allow(&p->gate,&p->evidence)!=1){
+   p->state=AU108_SUSPENDED;r105_gate_revoke(&p->gate);return 0;
+  }
+  p->state=AU108_LIVE;return 1;
+ }
+ if(!session_preflight(&p->owner)||
     r105_gate_allow(&p->gate,&p->evidence)!=1){
   p->state=AU108_SUSPENDED;r105_gate_revoke(&p->gate);return 0;
  }
  return 1;
 }
 int au108_withdraw(Au108Port *p){
- if(!p||(p->state!=AU108_LIVE&&p->state!=AU108_SUSPENDED)||
+ if(!p||(p->state!=AU108_LIVE&&p->state!=AU108_SUSPENDED&&
+           p->state!=AU108_ADVERTISING)||
     !teardown_owner(&p->owner))return -1;
  /* Do not call SDK unregistration if callbacks can still refer to the memory. */
  if(p->owner.callbacks_quiesced(p->owner.context)!=1)return -1;

@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/r113-r116-review.yml'
       - 'r113/**'
+      - 'project/source/legacy_mu1005/bluetooth/inbound.c'
+      - 'project/source/legacy_mu1005/bluetooth/inbound.h'
       - 'docs/R113_R116_CLOUD_REVIEW_CN.md'
   workflow_dispatch:
 permissions:
