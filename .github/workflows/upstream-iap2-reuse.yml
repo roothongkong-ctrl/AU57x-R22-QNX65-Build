@@ -27,6 +27,11 @@ jobs:
           g++ -std=gnu++11 -O2 -Wall -Wextra -Werror -pedantic \
             -I"$D/include" -c "$D/src/iap2_wire.cpp" \
             -o /tmp/au57x_upstream_iap2_wire.o
+          g++ -std=gnu++11 -O2 -Wall -Wextra -Werror -pedantic \
+            -I"$D/include" \
+            "$D/src/iap2_link.cpp" "$D/src/au57x_iap2_capi.cpp" \
+            "$D/tests/test_au57x_capi.cpp" -o /tmp/au57x_iap2_cbridge
+          /tmp/au57x_iap2_cbridge
           echo 'PASS: unmodified GPL3 donor iAP2 wire/link host compile and tests'
   upstream-iap2-qnx-arm:
     needs: upstream-iap2-host
@@ -57,7 +62,8 @@ jobs:
             OPTS="-std=gnu++11 -O2 -Wall -Wextra -Werror -fPIC -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp -I$D/include"
             $CXX $OPTS -c "$D/src/iap2_link.cpp" -o qnx_iap2_reuse_result/iap2_link.o
             $CXX $OPTS -c "$D/src/iap2_wire.cpp" -o qnx_iap2_reuse_result/iap2_wire.o
-            $AR rcs qnx_iap2_reuse_result/libau57x_upstream_iap2_REVIEW_ONLY.a qnx_iap2_reuse_result/iap2_link.o qnx_iap2_reuse_result/iap2_wire.o
+            $CXX $OPTS -c "$D/src/au57x_iap2_capi.cpp" -o qnx_iap2_reuse_result/au57x_iap2_capi.o
+            $AR rcs qnx_iap2_reuse_result/libau57x_upstream_iap2_REVIEW_ONLY.a qnx_iap2_reuse_result/iap2_link.o qnx_iap2_reuse_result/iap2_wire.o qnx_iap2_reuse_result/au57x_iap2_capi.o
             $RE -h qnx_iap2_reuse_result/iap2_link.o > qnx_iap2_reuse_result/link_elf.txt
             $RE -h qnx_iap2_reuse_result/iap2_wire.o > qnx_iap2_reuse_result/wire_elf.txt
             grep -q "Machine:.*ARM" qnx_iap2_reuse_result/link_elf.txt
