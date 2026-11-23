@@ -11,3 +11,4 @@ Original MU1005 live RF registration: NOT VERIFIED
 QNX ARM Rust executable: NOT BUILT
 Wireless CarPlay: NOT VERIFIED
 Not installable, no vehicle test.
+Host Rust real-loopback socket integration added; no QNX process hook.

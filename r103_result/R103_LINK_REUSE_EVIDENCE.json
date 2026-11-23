@@ -14,5 +14,6 @@
   "qnx_rust_compiled": false,
   "vehicle_verified": false,
   "mfi_verified": false,
-  "installable": false
+  "installable": false,
+  "host_loopback_socket_test": "pending GitHub CI"
 }
