@@ -33,6 +33,12 @@ for s in "$ROOT/tools/review_txn/sha256.c" "$ROOT/tools/review_txn/txn.c"; do
     printf 'COMPILE REVIEW_ONLY SD_TRANSACTION %s\n' "$b"
     "$CC" "${flags[@]}" -c "$s" -o "$OUT/review_txn/$b.o"
 done
+# R96: independently cross-compile the actual supervised rollback owner adapter,
+# strictly as a QNX *lab fixture object*, never a production boot callback.
+printf 'COMPILE R96 QNX supervised transaction LAB lifecycle fixture\n'
+"$CC" "${flags[@]}" -I"$ROOT/tools/review_txn" -c \
+  "$ROOT/tools/review_txn/supervisor_fixture.c" \
+  -o "$OUT/review_txn/supervisor_fixture_R96_LAB_ONLY.o"
 printf 'LINK QNX .so\n'
 # Keep a direct NEEDED entry for QNX libc.so.3: the ordinary
 # -shared link permits unresolved externals and drops libc on this SDK.

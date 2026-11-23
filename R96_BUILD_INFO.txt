@@ -1,0 +1,11 @@
+R96 | 2026-11-23
+BASE: MHI2_CN_AU57x_K1006_2 / MU1005 | QNX 6.5 ARMv7
+SCOPE: STEPS 18–19 SOURCE+HOST LAB ONLY / NO INSTALL
+R95 03–17 offline evidence carried forward unchanged; original OEM boundaries unresolved.
+NEW: real C supervised host one-click lifecycle; rollback, crash recovery, boot revalidation.
+NEW: deterministic, audited SD NONEXECUTING REVIEW ZIP, Chinese gate report.
+INSTALLABLE=false
+SAFE_TO_FLASH=false
+VEHICLE_VERIFIED=false
+GENUINE_MFI_VERIFIED=false
+CAR_SUPERVISOR_BOUND=false

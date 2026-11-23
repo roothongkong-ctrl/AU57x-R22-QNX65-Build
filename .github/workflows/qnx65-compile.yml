@@ -1,7 +1,7 @@
 name: AU57x R52 QNX6.5 ARMv7 (REVIEW ONLY)
 on:
   push:
-    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline, r95-offline-steps-03-to-17]
+    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline, r95-offline-steps-03-to-17, r96-oneclick-lab-and-release-review]
   workflow_dispatch:
 permissions:
   contents: read
@@ -52,6 +52,12 @@ jobs:
             -v "$GITHUB_WORKSPACE":/src -w /src \
             au57x-qnx65-cc:8.5 \
             bash /src/ci/compile_qnx_in_image.sh
+      - name: R96 QNX supervised SD transaction lifecycle object (LAB ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s qnx_build_result/review_txn/supervisor_fixture_R96_LAB_ONLY.o
+          file qnx_build_result/review_txn/supervisor_fixture_R96_LAB_ONLY.o
       - name: R92 QNX native LD_PRELOAD library is produced (no OEM calls)
         shell: bash
         run: |

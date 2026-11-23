@@ -1,0 +1,6 @@
+THIS IS NOT A VEHICLE INSTALLER. NEVER FLASH THIS ARCHIVE.
+R96 one-click is a host LAB MOCK, not a true stock MU1005 lifecycle controller.
+R96 SD review ZIP is documentation-only and deliberately contains NO executable.
+Original btstack dynamic startup, real Apple MFi, original 2.4 GHz Wi-Fi/AirPlay
+and genuine head unit boot recovery have not been validated.
+This project deliberately preserves original USB CarPlay and OEM ELF sources.

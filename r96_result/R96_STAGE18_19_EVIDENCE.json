@@ -1,0 +1,76 @@
+{
+  "version": "R96",
+  "baseline": "MHI2_CN_AU57x_K1006_2 / MU1005",
+  "utc": "2026-11-23T01:36:10.369912+00:00",
+  "previous_stage": "R95",
+  "stage18_offline_auto_installer": "HOST_LAB_IMPLEMENTED",
+  "stage19_offline_source_review": "DOCUMENT_ONLY_BUILT",
+  "stage18_vehicle_installer": "NOT_READY",
+  "stage19_car_installable_candidate": "NOT_READY",
+  "stage20": "NOT_ATTEMPTED",
+  "can_flash": false,
+  "vehicle_verified": false,
+  "genuine_apple_mfi_verified": false,
+  "stock_btstack_live_loaded": false,
+  "production_airplay_verified": false,
+  "tests": {
+    "strict_c_40": {
+      "result": "PASS",
+      "reason": "exit=0",
+      "duration_s": 0.45,
+      "log": "strict_c_40.log"
+    },
+    "native_sd_txn_67": {
+      "result": "PASS",
+      "reason": "exit=0",
+      "duration_s": 2.83,
+      "log": "native_sd_txn_67.log"
+    },
+    "oneclick_supervised_12": {
+      "result": "PASS",
+      "reason": "exit=0",
+      "duration_s": 2.63,
+      "log": "oneclick_supervised_12.log"
+    },
+    "review_candidate_9": {
+      "result": "PASS",
+      "reason": "exit=0",
+      "duration_s": 1.91,
+      "log": "review_candidate_9.log"
+    },
+    "stock_blue_rfc": {
+      "result": "PASS",
+      "reason": "exit=0",
+      "duration_s": 0.67,
+      "log": "stock_blue_rfc.log"
+    },
+    "stock_iap2_mfi_mock": {
+      "result": "PASS",
+      "reason": "exit=0",
+      "duration_s": 0.7,
+      "log": "stock_iap2_mfi_mock.log"
+    },
+    "airplay_pipeline_fixture": {
+      "result": "PASS",
+      "reason": "exit=0",
+      "duration_s": 3.81,
+      "log": "airplay_pipeline_fixture.log"
+    },
+    "wired_priority_fixture": {
+      "result": "PASS",
+      "reason": "exit=0",
+      "duration_s": 0.15,
+      "log": "wired_priority_fixture.log"
+    }
+  },
+  "offline_suites_passed": 8,
+  "offline_suites_total": 8,
+  "unresolved_real_integration": [
+    "original MU1005 supervisor launch config and runtime loader",
+    "real BlueSDK RFCOMM iAP2 callback ownership",
+    "genuine OEM MFi and iPhone link",
+    "real 2.4GHz Wi-Fi AirPlay session",
+    "trusted startup health and rollback on head unit"
+  ],
+  "note": "Every PASS is HOST/QNX OFFLINE only. Do not interpret as in-car installation."
+}

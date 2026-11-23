@@ -1,3 +1,11 @@
+# R96: steps 18-19 (host lab + non-executable release review; NOT A CAR INSTALLER)
+
+R96 adds a generated, SHA256-pinned supervised host lab for actual C file backup, replacement, candidate-process health and rollback, and a deterministic verified non-executable SD review bundle. New tests and Chinese handoff: `docs/R96_STEPS_18_19_CN.md`.
+
+Commands: `bash ci/host_r96_oneclick.sh`, `bash ci/host_r96_candidate.sh`, `bash ci/host_r96_to_step19.sh`. Production OEM process stop/start, live iAP2/MFi, 2.4 GHz AirPlay, boot recovery and vehicle wiring are NOT proven. Do not install any R96 archive on a vehicle.
+
+---
+
 # R95：直接连续推进第 3～17 步（离线工程；禁止装车）
 
 本版将第 3～17 步合成**一次不中断的离线回归**，`tools/r95_stage_review.py` 实际运行 **15/15 组主机测试通过**，每个步骤独立记录真车欠缺项。`bash ci/host_r95_to_step17.sh` 可重新生成 `r95_result/R95_STEPS_03_TO_17_EVIDENCE.json`。**这里的 15/15 是离线测试通过，不是 15 个真实装车步骤全部完成。**
