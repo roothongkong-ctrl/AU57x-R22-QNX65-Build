@@ -9,6 +9,9 @@
  * completion event code 6. The adapter buffers upstream iAP2 bytes in FIFO
  * and pumps at most one OEM packet at a time, after serialized owner events.
  * NOT installable: exact btstack owner callback remains unverified. */
+#ifdef __cplusplus
+extern "C" {
+#endif
 #define MU1005_IAP2_TX_CAP 32768u
 typedef struct {
  Inbound *rf;
@@ -29,4 +32,7 @@ int mu1005_iap2_stream_tick(Mu1005Iap2Stream *,int64_t monotonic_ms);
  * >0: one OEM packet queued, 0: busy/empty, <0: fatal/unauthorized. */
 int mu1005_iap2_stream_pump(Mu1005Iap2Stream *);
 void mu1005_iap2_stream_stop(Mu1005Iap2Stream *);
+#ifdef __cplusplus
+}
+#endif
 #endif
