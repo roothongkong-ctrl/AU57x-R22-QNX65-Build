@@ -28,7 +28,10 @@ static void fail(Mu1005Iap2Stream *s){
  if(s->core)au57x_iap2_reset(s->core); /* no RST through OEM after fault */
 }
 void mu1005_iap2_stream_init(Mu1005Iap2Stream *s,Inbound *rf,Au108Port *auth){
- if(!s)return;memset(s,0,sizeof(*s));s->rf=rf;s->authorization=auth;
+ if(!s)return;
+ memset(s,0,sizeof(*s));
+ s->rf=rf;
+ s->authorization=auth;
 }
 int mu1005_iap2_stream_pump(Mu1005Iap2Stream *s){
  if(!authorized(s)){fail(s);return -1;}
