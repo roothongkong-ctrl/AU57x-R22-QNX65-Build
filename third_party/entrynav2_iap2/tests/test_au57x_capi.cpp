@@ -5,7 +5,8 @@
 struct S { unsigned tx_count;unsigned state_count;unsigned rx_count;uint8_t first[6];size_t n; };
 static int tx(void *v,const uint8_t *b,size_t n){
  S *s=static_cast<S*>(v);s->tx_count++;s->n=n;
- if(n>=6)std::memcpy(s->first,b,6);return 1;
+ if(n>=6)std::memcpy(s->first,b,6);
+ return 1;
 }
 static void rx(void *v,uint8_t id,const uint8_t *b,size_t n){
  (void)id;(void)b;(void)n;static_cast<S*>(v)->rx_count++;
