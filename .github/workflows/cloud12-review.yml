@@ -41,8 +41,6 @@ jobs:
         run: bash ci/host_r97_hfp_got.sh
       - name: R97 opt-in stock supervisor launcher lifecycle negative tests
         run: python3 -m unittest discover -s tests -p test_r97_hfp_launcher.py -v
-      - name: R97 continuous offline native Bluetooth and installer matrix
-        run: python3 ci/host_r97_continuous.py
       - name: R97 original btstack pthread worker origin and lifetime regression
         run: bash ci/host_r97_owner_thread.sh
       - name: R92 native btstack LD_PRELOAD real constructor/pthread interposition host tests
@@ -101,6 +99,10 @@ jobs:
         run: bash ci/host_r96_candidate.sh
       - name: R96 multi-suite stage 18-19 final evidence (not a car installer)
         run: bash ci/host_r96_to_step19.sh
+      # Run LAST. It reuses R95/R96 evidence and must not generate a stale
+      # R96 review ZIP before R95 refreshes its evidence ledger.
+      - name: R97 continuous offline native Bluetooth and installer matrix
+        run: python3 ci/host_r97_continuous.py
       - name: Assemble source-only review ZIP and SHA256
         if: always()
         run: bash ci/build_cloud_review_bundle.sh
