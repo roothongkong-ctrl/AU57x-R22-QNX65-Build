@@ -117,7 +117,8 @@ jobs:
               qnx_iap2_reuse_result/mu1005_iap2_stream.o \
               qnx_iap2_reuse_result/mu1005_inbound.o \
               qnx_iap2_reuse_result/mu1005_owner.o \
-              qnx_iap2_reuse_result/mu1005_r105.o
+              qnx_iap2_reuse_result/mu1005_r105.o \
+              -Wl,--no-as-needed -lc -lm
             $RE -d qnx_iap2_reuse_result/libau57x_iap2_native_REVIEW_ONLY.so > qnx_iap2_reuse_result/full_link_deps.txt
             grep -Fq "Shared library: [libc.so.3]" qnx_iap2_reuse_result/full_link_deps.txt
             if grep -Fq "Shared library: [libstdc++" qnx_iap2_reuse_result/full_link_deps.txt; then
