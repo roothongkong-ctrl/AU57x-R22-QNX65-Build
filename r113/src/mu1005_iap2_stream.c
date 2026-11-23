@@ -35,6 +35,7 @@ void mu1005_iap2_stream_init(Mu1005Iap2Stream *s,Inbound *rf,Au108Port *auth){
 }
 int mu1005_iap2_stream_pump(Mu1005Iap2Stream *s){
  if(!authorized(s)){fail(s);return -1;}
+ if(s->core && au57x_iap2_state(s->core)==4){fail(s);return -2;}
  if(!s->queued||s->rf->busy)return 0;
  int limit=s->rf->ops.limit(&s->rf->rf);
  if(limit<=0){fail(s);return -2;}
@@ -64,12 +65,16 @@ int mu1005_iap2_stream_on_open(Mu1005Iap2Stream *s,uint32_t generation){
 }
 int mu1005_iap2_stream_on_bytes(Mu1005Iap2Stream *s,const uint8_t *p,size_t n){
  if(!authorized(s)||!s->core||(!p&&n)||!n||n>MAX_DATA){fail(s);return -1;}
- if(au57x_iap2_feed(s->core,p,n)!=1){fail(s);return -2;}
+ if(au57x_iap2_feed(s->core,p,n)!=1 || au57x_iap2_state(s->core)==4){
+  fail(s);return -2;
+ }
  return 0; /* owner MUST pump after vendor callback unwinds */
 }
 int mu1005_iap2_stream_tick(Mu1005Iap2Stream *s,int64_t ms){
  if(!authorized(s)||!s->core||ms<0){fail(s);return -1;}
- if(au57x_iap2_tick(s->core,ms)!=1){fail(s);return -2;}
+ if(au57x_iap2_tick(s->core,ms)!=1 || au57x_iap2_state(s->core)==4){
+  fail(s);return -2;
+ }
  return mu1005_iap2_stream_pump(s)<0?-2:0;
 }
 void mu1005_iap2_stream_stop(Mu1005Iap2Stream *s){
