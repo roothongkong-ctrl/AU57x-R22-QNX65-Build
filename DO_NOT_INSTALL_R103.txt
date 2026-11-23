@@ -1,0 +1,4 @@
+R103 = GPL SOURCE & HOST TESTS ONLY. NOT A QNX 6.5 RUST BINARY.
+Do not copy any R103 review file to the car/SD for installation.
+No stock btstack/iAP2 registration binding, iPhone MFi auth or Wi-Fi/AirPlay verified.
+Wired CarPlay and original firmware must remain untouched.

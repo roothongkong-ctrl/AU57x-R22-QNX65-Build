@@ -1,0 +1,18 @@
+{
+  "version": "R103",
+  "upstream_repository": "luka-dev/mib2q-carplay-rgi",
+  "upstream_commit": "91e301dfed64bdb1982c036fcf7f0eb568f0bc8a",
+  "upstream_iap2_link_hashes": {
+    "Cargo.toml": "c0aca0a954c5bfb4b9b963c479b555bb49de39ad",
+    "src/lib.rs": "c64c8949718bdcd20e96d77b59fd70293bcc7a1e",
+    "tests/engine.rs": "2808827cef6545716bbd37b52ed6bf311da46ef2"
+  },
+  "original_files_match": true,
+  "host_c_wire_test_passed": true,
+  "host_c_strict_compile_passed": true,
+  "host_rust_tests_passed": null,
+  "qnx_rust_compiled": false,
+  "vehicle_verified": false,
+  "mfi_verified": false,
+  "installable": false
+}

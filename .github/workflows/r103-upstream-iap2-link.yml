@@ -1,0 +1,20 @@
+name: R103 original upstream iAP2 link + AU57x frame bridge (NO INSTALL)
+on:
+  push:
+    branches: [r103-upstream-iap2-link-bridge]
+  pull_request:
+    paths:
+      - 'third_party/luka-dev/mib2q-carplay-rgi/wireless/daemon/vendor/iap2-link/**'
+      - 'integration/r103_iap2_bridge/**'
+      - 'Cargo.toml'
+      - 'ci/host_r103_upstream_link.sh'
+      - '.github/workflows/r103-upstream-iap2-link.yml'
+jobs:
+  host-upstream-link:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact donor upstream object SHA-1 and build with Rust
+        run: |
+          bash ci/host_r103_c_wire.sh
+          bash ci/host_r103_upstream_link.sh
