@@ -51,10 +51,10 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          docker run --rm --platform linux/amd64 -v "$GITHUB_WORKSPACE":/src -w /src au57x-r114-qnx65:8.5 bash -lc '
+          docker run --rm --platform linux/amd64 -v "$GITHUB_WORKSPACE":/src -w /src au57x-r114-qnx65:8.5 bash -c '
             set -Eeuo pipefail
-            CC=arm-unknown-nto-qnx6.5.0eabi-gcc
-            RE=arm-unknown-nto-qnx6.5.0eabi-readelf
+            CC=/opt/qnx650/host/linux/x86/usr/bin/arm-unknown-nto-qnx6.5.0eabi-gcc
+            RE=/opt/qnx650/host/linux/x86/usr/bin/arm-unknown-nto-qnx6.5.0eabi-readelf
             mkdir -p qnx_build_result/r113
             CFLAGS="-std=c99 -O2 -Wall -Wextra -Werror -fPIC -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp -Ir113/src -Ir113/third_party"
             $CC $CFLAGS -c r113/src/au108_oem_port.c -o qnx_build_result/r113/au108_oem_port.o
