@@ -48,3 +48,19 @@ Roland8810 的 MH2p `smartphone_integrator` 有 5GHz 运行时门禁，但它不
 - EntryNav2 GPL3 iAP2: https://github.com/oguzkarcan/EntryNav2-CarPlay
 - Our previous R41/R88/R100/R101 audit and source under project/source and docs
 安全状态：`installable=false`; `safe_to_flash=false`; `vehicle_wireless_verified=false`.
+
+
+## 补充候选 F：同为 MHI2 的大众/Škoda 无线实验包（2026-11-17）
+新发现：omonob/VW-MHI2-Wireless-Carplay-Maps V3.2：
+https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps/releases/tag/v3.2
+其 README 说明 MU1102、MU1367 和 Škoda MU1440（特定仪表）为实验范围；MU1367 有 SD 注册/功能安装的用户反馈，但不等于全部无线音视频已完成本版实车验收；**没有支持 MU1005/AU57x 的依据**。
+与 AU57x 最值得研究的不是成品 ZIP，而是：
+- 保留原厂连接管理二进制，仅匹配固件后接入无线引导；USB 有线可保留
+- btstack 的进程级 LD_PRELOAD 包装；不要把环境继承给其它进程
+- 取得本机 SSID/密码，明确手机配对蓝牙和加入车机 AP 是两个条件
+- 投屏/接收器/原厂 HMI/音视频会话权属分开；SD 软件更新注册与真正功能安装分开
+- 事务备份、校验、失败回滚，未知 OEM SHA256 明确拒绝
+**不能做**：将他们 MU1102/1367/1440 的 RF 固件映像、连接程序、签名参数、仪表分辨率、安装脚本直接用于 K1006_2/MU1005。
+V3.2 release 只公开独立安装包和文档，没有单独可重复构建的全部源码，不能据此将载荷冒充开源 MU1005 适配或“已实测”。
+额外参考：
+https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps/blob/main/docs/WIRELESS_DEVELOPMENT.zh-CN.md
