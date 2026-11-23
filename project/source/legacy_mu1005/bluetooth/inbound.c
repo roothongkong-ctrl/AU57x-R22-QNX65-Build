@@ -29,7 +29,9 @@ int inbound_publish(Inbound*s){
  /* Upstream donor uses zero third argument; not initial RX credits. */
  s->uncertain_mask=IN_RF;
  int r=s->ops.reg(&s->rf,&s->slot,0);
- if(r||s->slot<1||s->slot>6){s->state=IN_DIRTY;return -2;}
+ if(r||s->slot<MU_RFCOMM_SCN_MIN||s->slot>MU_RFCOMM_SCN_MAX){s->state=IN_DIRTY;return -2;}
+ /* R101 correction: native RFCOMM SCN range is 1..30, not donor 1..6.
+  * The SDK output channel must match SDP before advertisement. */
  s->published_mask=IN_RF;s->uncertain_mask=0;
  s->state=IN_REGISTERED;s->protocol[13]=s->slot;
  /* Do not assume a nonzero vendor return means nothing was mutated. Preserve
