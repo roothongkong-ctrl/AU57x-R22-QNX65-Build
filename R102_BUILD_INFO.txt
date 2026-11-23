@@ -1,0 +1,10 @@
+R102 UPSTREAM SOURCE REUSE - AU57x / MU1005
+upstream=luka-dev/mib2q-carplay-rgi
+upstream_commit=91e301dfed64bdb1982c036fcf7f0eb568f0bc8a
+upstream_blob_eir=99f42933e7c6b98af11fb387a1e68727ffe31997
+imported_code=third_party/luka-dev/mib2q-carplay-rgi/wireless/graft/eir.c
+integrated_wrapper=project/source/legacy_mu1005/bluetooth/au102_eir_advertisement.c
+host_eir_tests=PASS
+installable=false
+vehicle_verified=false
+safe_to_flash=false
