@@ -64,11 +64,13 @@ jobs:
             grep -q "Shared library: \\[libc.so.3\\]" qnx_build_result/r113/readelf.txt
             echo "R113 QNX ARM owner boundary linked -- NO OEM callbacks, NOT installable"
           '
+          sudo chown -R "$(id -u):$(id -g)" qnx_build_result
           python3 r113/../project/tools/qnx_elf_gate.py --candidate qnx_build_result/r113/libau57x_r113_REVIEW_ONLY.so --output qnx_build_result/r113/elf_gate.json
       - name: Check target ELF headers, dependencies and QEMU smoke
         shell: bash
         run: |
           set -Eeuo pipefail
+          sudo chown -R "$(id -u):$(id -g)" qnx_build_result
           python3 project/tools/qnx_elf_gate.py --candidate qnx_build_result/libau57x_r24_native_qnx_REVIEW_ONLY.so --output qnx_build_result/logs/r114_qnx_elf_gate.json
           sudo apt-get update -qq
           sudo apt-get install -y -qq qemu-system-arm
