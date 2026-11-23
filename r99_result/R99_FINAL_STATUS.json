@@ -1,0 +1,21 @@
+{
+  "release": "R99",
+  "milestone": "OFFLINE_OEM_IAP2_TWO_CONFIG_STAGING_AND_REVERSIBLE_CHECK",
+  "milestone_offline_complete": true,
+  "pinned_actual_oem_bluetooth_sha256": "7d5ae31396f016f811e18a7255bf1311e0bfa471b2a3252a6f2eb4bd3ad04272",
+  "pinned_actual_oem_iap2_driver_sha256": "42fd984ebbdccd11595bd45909683829565147c8cbc8a482618d6dd8e564d3bf",
+  "private_oem_files_included": false,
+  "synthetic_demo_only": true,
+  "new_tests_passed": 23,
+  "old_r98_loopback_host_test_passed": true,
+  "previous_native_c_modules_compile_passed": 43,
+  "route_switched": "prefer stock iAP2 configuration when original schemas and owner are proven; retain R98 graft as fallback",
+  "genuine_vehicle_bluetooth_config_provided": false,
+  "genuine_vehicle_iap2_cfg_provided": false,
+  "stock_iap2_rfcomm_runtime_verified": false,
+  "apple_mfi_verified": false,
+  "airplay_verified": false,
+  "installable": false,
+  "safe_to_flash": false,
+  "vehicle_verified": false
+}

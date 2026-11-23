@@ -1,0 +1,51 @@
+{
+  "release": "R99",
+  "route": "OEM_NATIVE_IAP2_CONFIG_FIRST",
+  "original_platform": "MHI2_CN_AU57x_K1006_2/MU1005",
+  "verified_oem_bluetooth": {
+    "sha256": "7d5ae31396f016f811e18a7255bf1311e0bfa471b2a3252a6f2eb4bd3ad04272",
+    "elf": "ELF32_LE_ARM",
+    "stock_markers_present": [
+      "bluetooth.enableIap",
+      "SERVICETYPE_IAP2",
+      "iapEnabled"
+    ]
+  },
+  "verified_oem_iap2_driver": {
+    "sha256": "42fd984ebbdccd11595bd45909683829565147c8cbc8a482618d6dd8e564d3bf",
+    "elf": "ELF32_LE_ARM",
+    "stock_markers_present": [
+      "BluetoothiAP2Link",
+      "BluetoothTransportComponent",
+      "WiFiTransportComponent"
+    ]
+  },
+  "changes": {
+    "bluetooth": {
+      "selected_key": "enableIap",
+      "before": false,
+      "after": true
+    },
+    "iap2_driver": {
+      "style": "new section after one commented template",
+      "before": "commented",
+      "after": "1"
+    }
+  },
+  "files": {
+    "bluetooth.original.json": "7221e5fd2324870ef3eb48df73ef8d53d3e95f8c6605169e97c075753a1493d5",
+    "bluetooth.STAGED_REVIEW_ONLY.json": "c9fc20e25519a673f97abd89aeba06a1ecb483fb74dc9bc26b4a8cf1c5e52562",
+    "iap2.original.cfg": "0b433bbf2a37455f01e77f624a8e8d075da2bd5c5a7686aa2d0921dc31eace50",
+    "iap2.STAGED_REVIEW_ONLY.cfg": "1eca66b9003e621e6e96730c64df1f6743f865e64e2bee3ea31750ce09aa8d5b"
+  },
+  "rollback": "Restore the two ORIGINAL byte-exact files, with their original permissions and ownership; do not mix versions.",
+  "experimental_r98_btstack_injection_required": false,
+  "stock_runtime_iap2_registration_proven": false,
+  "stock_bt_rfcomm_transport_proven": false,
+  "real_mfi_proven": false,
+  "wireless_airplay_proven": false,
+  "vehicle_verified": false,
+  "installable": false,
+  "safe_to_flash": false,
+  "result": "TWO_CONFIG_OFFLINE_STAGING_DONE__RUNTIME_NO_GO"
+}

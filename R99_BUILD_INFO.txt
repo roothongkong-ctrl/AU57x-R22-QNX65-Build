@@ -1,0 +1,8 @@
+R99_FACTORY_IAP2_NATIVE_ROUTE_2026_11_23
+Base: R98, QNX 6.5 ARM32 MU1005
+Change: alternate OEM iAP2 configuration route staged reversibly, no btstack preload requirement.
+Tests: 23/23 new host unit tests PASS + pinned private OEM ELF check PASS + demo CLI PASS.
+Do not put demo config or staging ZIP into car. Runtime activation & authentication unproven.
+installable=false
+vehicle_verified=false
+safe_to_flash=false

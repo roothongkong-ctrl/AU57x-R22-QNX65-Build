@@ -1,0 +1,4 @@
+R99 SOURCE ONLY. DO NOT INSTALL.
+The sample configurations are SYNTHETIC and NOT valid evidence of any real vehicle settings.
+No actual MU1005 Bluetooth/iAP2 configuration or running RFCOMM service has been validated.
+Apple MFi, wireless CarPlay, SD activation/rollback and real car state NOT verified.
