@@ -1,0 +1,148 @@
+{
+  "factory_iap2_runtime_proven": false,
+  "iap2_driver_bluetooth_component_marker_observed": true,
+  "installable": false,
+  "kind": "R100_PINNED_ORIGINAL_MU1005_OFFLINE_ROUTE_AUDIT",
+  "missing_graft_proofs": [
+    "verified OEM supervisor launch config",
+    "live original BlueSDK owner callback",
+    "verified RFCOMM iAP2 registration profile",
+    "trusted rollback controller",
+    "live Apple original MFi path and AirPlay handoff"
+  ],
+  "original_binary_evidence": {
+    "bluetooth": {
+      "machine": "ARM32 little-endian QNX ELF",
+      "markers": {
+        "enable_iap_config_key": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": true,
+          "offset_hex": "0x1359ac"
+        },
+        "iap2_service_enum": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": true,
+          "offset_hex": "0x13cc2c"
+        },
+        "iap_enabled_key": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": true,
+          "offset_hex": "0x1339b0"
+        }
+      },
+      "sha256": "7d5ae31396f016f811e18a7255bf1311e0bfa471b2a3252a6f2eb4bd3ad04272",
+      "size": 1410944,
+      "type": "ET_EXEC"
+    },
+    "btstack": {
+      "machine": "ARM32 little-endian QNX ELF",
+      "markers": {
+        "apple_iap_sdp_uuid_text": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": false,
+          "offset_hex": null
+        },
+        "builtin_rfcomm_text": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": true,
+          "offset_hex": "0xd393"
+        },
+        "hfp_callback_symbol": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": true,
+          "offset_hex": "0x13af4"
+        },
+        "iap2_accessory_marker": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": false,
+          "offset_hex": null
+        },
+        "iap_device_marker": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": false,
+          "offset_hex": null
+        },
+        "iap_services_marker": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": false,
+          "offset_hex": null
+        },
+        "pthread_create_import_name": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": true,
+          "offset_hex": "0x9617"
+        },
+        "sim_callback_symbol": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": true,
+          "offset_hex": "0xba70"
+        }
+      },
+      "sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
+      "size": 1846436,
+      "type": "ET_EXEC"
+    },
+    "connectivity_launcher": {
+      "machine": "ARM32 little-endian QNX ELF",
+      "markers": {
+        "stock_btstack_module_name": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": true,
+          "offset_hex": "0x33d40"
+        },
+        "stock_launcher_config_name": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": true,
+          "offset_hex": "0x36402"
+        }
+      },
+      "sha256": "08896149dcdcc2bc5a6b22ce78682ad5949fbeb8fdc0fb1249162861e40914b8",
+      "size": 236912,
+      "type": "ET_EXEC"
+    },
+    "ipod-drvr-iap2.so": {
+      "machine": "ARM32 little-endian QNX ELF",
+      "markers": {
+        "bluetooth_component_text": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": true,
+          "offset_hex": "0x25a18"
+        },
+        "bluetooth_iap2_link_text": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": true,
+          "offset_hex": "0x220ac"
+        },
+        "iap2_config_path": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": true,
+          "offset_hex": "0x2355c"
+        }
+      },
+      "sha256": "42fd984ebbdccd11595bd45909683829565147c8cbc8a482618d6dd8e564d3bf",
+      "size": 739925,
+      "type": "ET_DYN"
+    },
+    "smartphone_integrator": {
+      "machine": "ARM32 little-endian QNX ELF",
+      "markers": {
+        "carplay_name": {
+          "evidence_scope": "LITERAL_MARKER_ONLY",
+          "found": true,
+          "offset_hex": "0xaadc"
+        }
+      },
+      "sha256": "2c61e7a17d5c77df2f97023284b948b66dc4052010acad74be9bfa63b339de0b",
+      "size": 806818,
+      "type": "ET_EXEC"
+    }
+  },
+  "original_files_distributed": false,
+  "route_eligible_for_auto_activation": false,
+  "route_recommendation": "FALLBACK_GRAFT_RESEARCH",
+  "safe_to_flash": false,
+  "stock_btstack_named_iap_endpoint_observed": false,
+  "stock_btstack_named_iap_services_observed": false,
+  "vehicle_verified": false,
+  "warning": "No matching plaintext string does not prove code or a feature is absent."
+}

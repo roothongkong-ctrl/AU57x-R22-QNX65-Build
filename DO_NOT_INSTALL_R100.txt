@@ -1,0 +1,1 @@
+R100 is SOURCE ONLY. Do not copy to SD as a vehicle installer. No vehicle boot hook, owner callback, RF channel profile, MFi or AirPlay runtime proof. It contains original binaries' static evidence only, not OEM binaries. Preserve original wired CarPlay.

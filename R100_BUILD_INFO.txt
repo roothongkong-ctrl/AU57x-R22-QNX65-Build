@@ -1,0 +1,5 @@
+AU57x R100 | SOURCE ONLY | MU1005 | QNX6.5 ARMv7 | NO INSTALL
+One-turn goal: switch from speculative factory iAP2 enabling to evidence-first reversible btstack graft; add actual C runtime route gate before the R98 native registration call.
+All OEM binaries private; no stock file writes; wired CarPlay remains an independent stock system.
+Status: audit REAL OEM=PASS, host source modules=44, route gate=17 assertions, OEM route audit=7 tests, QNX cloud=pending until run completed.
+No OEM BlueSDK/iAP2 real runtime proof or iPhone MFi/CarPlay verification. safe_to_flash=false.

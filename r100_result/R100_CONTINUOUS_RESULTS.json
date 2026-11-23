@@ -1,0 +1,96 @@
+{
+  "release": "R100",
+  "baseline": "MHI2_CN_AU57x_K1006_2 / MU1005",
+  "scope": "FACTORY_TO_GRAFT_FAIL_CLOSED_QNX_NATIVE_SOURCE",
+  "authorized_route": "GRAFT_RESEARCH_OPT_IN_APPROVED_BY_USER",
+  "factory_iap2_runtime_proven": false,
+  "graft_blue_sdk_owner_runtime_proven": false,
+  "oem_prepinned_ELF_static_audit": "PRIVATE_LOCAL_PASS",
+  "live_iap2_mfi_apple_proof": false,
+  "ready_to_install": false,
+  "safe_to_flash": false,
+  "wired_carplay_preserved_in_production": "REQUIRED_NOT_VEHICLE_TESTED",
+  "vehicle_verified": false,
+  "suites": [
+    {
+      "name": "strict_compile_44",
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 0.5
+    },
+    {
+      "name": "exact_oem_feature_detector_negative",
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 0.96
+    },
+    {
+      "name": "iap2_live_loopback_fixture",
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 0.14
+    },
+    {
+      "name": "original_iap2_dual_config_23",
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 1.35
+    },
+    {
+      "name": "native_hfp_callback_observer",
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 0.26
+    },
+    {
+      "name": "native_worker_owner_lifecycle",
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 0.29
+    },
+    {
+      "name": "original_process_preload_identity",
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 0.46
+    },
+    {
+      "name": "pinned_stock_launcher_config",
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 1.54
+    },
+    {
+      "name": "c_sd_transaction_backup_recovery",
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 2.68
+    },
+    {
+      "name": "r96_supervised_recovery",
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 2.71
+    },
+    {
+      "name": "r45_iap2_mfi_gates_fixture",
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 0.72
+    },
+    {
+      "name": "wired_first_priority",
+      "result": "PASS",
+      "exit": 0,
+      "seconds": 3.81
+    }
+  ],
+  "passed": 12,
+  "total": 12,
+  "limitations": [
+    "exact OEM connectivity.json not available",
+    "no original iAP2 BlueSDK owner callback or register parameter evidence",
+    "real iPhone and MFi authorization not tested",
+    "no QNX vehicle installer or boot recovery proof"
+  ]
+}
