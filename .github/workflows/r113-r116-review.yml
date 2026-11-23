@@ -74,6 +74,10 @@ jobs:
           python3 project/tools/qnx_elf_gate.py --candidate qnx_build_result/libau57x_r24_native_qnx_REVIEW_ONLY.so --output qnx_build_result/logs/r114_qnx_elf_gate.json
           sudo apt-get update -qq
           sudo apt-get install -y -qq qemu-system-arm
+          # Match the existing smoke script's upstream path and image alias.
+          # This is a CI harness repair, not proof of actual Bluetooth/MFi.
+          ln -s /tmp/qnx65 /tmp/qnx65-toolchain
+          docker tag au57x-r114-qnx65:8.5 au57x-qnx65-cc:8.5
           bash ci/qnx_runtime_smoke.sh
       - name: Preserve compiler and smoke logs on failure or success
         if: always()
