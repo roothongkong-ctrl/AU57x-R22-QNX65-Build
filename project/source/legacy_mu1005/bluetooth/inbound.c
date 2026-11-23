@@ -24,7 +24,7 @@ int inbound_prepare(Inbound*s,const InboundOps*o,uint32_t cb){
  ((uint8_t*)&s->sdp)[8]=2;put32(&s->sdp,12,a);((uint8_t*)&s->carplay)[8]=1;put32(&s->carplay,12,ca);
  s->state=IN_PREPARED;return 0;
 }
-int inbound_publish(Inbound*s){
+int inbound_register_rf(Inbound*s){
  if(!ok(s)||s->state!=IN_PREPARED||s->ops.ready(s->ops.opaque)!=1)return -1;
  /* Upstream donor uses zero third argument; not initial RX credits. */
  s->uncertain_mask=IN_RF;
@@ -34,6 +34,13 @@ int inbound_publish(Inbound*s){
   * The SDK output channel must match SDP before advertisement. */
  s->published_mask=IN_RF;s->uncertain_mask=0;
  s->state=IN_REGISTERED;s->protocol[13]=s->slot;
+ return 0;
+}
+int inbound_publish_sdp(Inbound*s){
+ if(!ok(s)||s->state!=IN_REGISTERED||s->ops.ready(s->ops.opaque)!=1||
+    s->uncertain_mask||s->published_mask!=IN_RF||
+    s->slot<MU_RFCOMM_SCN_MIN||s->slot>MU_RFCOMM_SCN_MAX||
+    s->protocol[13]!=s->slot)return -1;
  /* Do not assume a nonzero vendor return means nothing was mutated. Preserve
   * storage, flag dirty, require owner-supervised rollback on partial failure. */
  s->uncertain_mask=IN_IAP_SDP;
@@ -42,6 +49,10 @@ int inbound_publish(Inbound*s){
  if(s->ops.add(&s->carplay)){s->state=IN_DIRTY;return -2;}
  s->published_mask|=IN_CP_SDP;s->uncertain_mask=0;
  s->state=IN_PUBLISHED;return 0;
+}
+int inbound_publish(Inbound*s){
+ int rc=inbound_register_rf(s);
+ return rc?rc:inbound_publish_sdp(s);
 }
 int inbound_event(Inbound*s,void*ch,unsigned code,unsigned status,const uint8_t*data,unsigned n,uint32_t packet_addr){
  if(!ok(s)||ch!=&s->rf||s->state<IN_REGISTERED||s->state>=IN_DIRTY)return -1;

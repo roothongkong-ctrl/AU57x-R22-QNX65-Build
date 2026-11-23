@@ -43,6 +43,9 @@ enum { IN_EMPTY,IN_PREPARED,IN_REGISTERED,IN_PUBLISHED,IN_LINK,IN_DIRTY,IN_WITHD
 enum { IN_RF=1, IN_IAP_SDP=2, IN_CP_SDP=4 };
 /* Zero-initialize stable instance ONCE; cannot move until OEM reclamation. */
 int inbound_prepare(Inbound*,const InboundOps*,uint32_t callback_address);
+/* Explicit guarded boundary between native RF registration and SDP publish. */
+int inbound_register_rf(Inbound*);
+int inbound_publish_sdp(Inbound*);
 int inbound_publish(Inbound*);
 /* Owner-supervised only: barrier must cover callback exclusion, native idle,
  * no outstanding packets and service membership; no memory reclamation. */
