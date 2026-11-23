@@ -6,6 +6,14 @@ static int all_functions(const Au108OEM *o){
   o->register_iap2_rfcomm && o->publish_iap2_sdp &&
   o->published_iap2_service && o->unregister_iap2 && o->callbacks_quiesced;
 }
+/* Unregister may be necessary AFTER USB takeover or BT/MFi disconnection.
+ * Do not require a still paired phone or an idle wired session on teardown. */
+static int teardown_owner(const Au108OEM *o){
+ return o && o->exact_image_live && o->on_original_owner_thread &&
+  o->callbacks_quiesced && o->unregister_iap2 &&
+  o->exact_image_live(o->context)==1 &&
+  o->on_original_owner_thread(o->context)==1;
+}
 static int preflight(const Au108OEM *o){
  return all_functions(o) && o->exact_image_live(o->context)==1 &&
   o->on_original_owner_thread(o->context)==1 &&
@@ -39,12 +47,13 @@ int au108_live(Au108Port *p){
  if(!preflight(&p->owner)||
     p->owner.published_iap2_service(p->owner.context,p->evidence.scn)!=1||
     r105_gate_allow(&p->gate,&p->evidence)!=1){
-  p->state=AU108_POISONED;r105_gate_revoke(&p->gate);return 0;
+  p->state=AU108_SUSPENDED;r105_gate_revoke(&p->gate);return 0;
  }
  return 1;
 }
 int au108_withdraw(Au108Port *p){
- if(!p||p->state!=AU108_LIVE||!preflight(&p->owner))return -1;
+ if(!p||(p->state!=AU108_LIVE&&p->state!=AU108_SUSPENDED)||
+    !teardown_owner(&p->owner))return -1;
  /* Do not call SDK unregistration if callbacks can still refer to the memory. */
  if(p->owner.callbacks_quiesced(p->owner.context)!=1)return -1;
  p->state=AU108_POISONED;

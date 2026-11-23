@@ -22,7 +22,7 @@ typedef struct {
  int (*unregister_iap2)(void *);
  int (*callbacks_quiesced)(void *);
 } Au108OEM;
-typedef enum { AU108_EMPTY=0,AU108_LIVE=1,AU108_POISONED=2,AU108_RETIRED=3 } Au108State;
+typedef enum { AU108_EMPTY=0,AU108_LIVE=1,AU108_POISONED=2,AU108_RETIRED=3,AU108_SUSPENDED=4 } Au108State;
 typedef struct {
  Au108State state;
  Au108OEM owner;
@@ -30,6 +30,8 @@ typedef struct {
  R105Evidence evidence;
  uint32_t generation;
 } Au108Port;
+/* SUSPENDED blocks any further wireless use but preserves native registration
+ * until its genuine serialized OEM owner can safely withdraw it. */
 void au108_init(Au108Port *port);
 int au108_bind(Au108Port *port,const Au108OEM *owner,uint32_t generation);
 int au108_live(Au108Port *port);

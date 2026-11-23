@@ -53,8 +53,21 @@ int main(void){
  assert(f.advertisements==1 && f.live_checks==1);
  f=basic();o=owner(&f);au108_init(&p);
  assert(au108_bind(&p,&o,13)==0);f.usb=0;
- assert(au108_live(&p)==0 && p.state==AU108_POISONED);
+ assert(au108_live(&p)==0 && p.state==AU108_SUSPENDED);
+ assert(au108_withdraw(&p)==0 && f.unregistrations==1);
+ /* No phone / no MFi must not block service retirement once owner is safe. */
+ f=basic();o=owner(&f);au108_init(&p);
+ assert(au108_bind(&p,&o,15)==0);
+ f.pre=0;
+ assert(au108_live(&p)==0 && p.state==AU108_SUSPENDED);
  assert(au108_withdraw(&p)==-1 && f.unregistrations==0);
+ f.pre=1;
+ assert(au108_withdraw(&p)==0 && f.unregistrations==1);
+ f=basic();o=owner(&f);au108_init(&p);
+ assert(au108_bind(&p,&o,16)==0);f.quiesced=0;f.usb=0;
+ assert(au108_live(&p)==0 && p.state==AU108_SUSPENDED);
+ assert(au108_withdraw(&p)==-1 && f.unregistrations==0);
+ f.quiesced=1;assert(au108_withdraw(&p)==0 && f.unregistrations==1);
  f=basic();o=owner(&f);au108_init(&p);
  assert(au108_bind(&p,&o,14)==0);f.quiesced=0;
  assert(au108_withdraw(&p)==-1 && f.unregistrations==0);
