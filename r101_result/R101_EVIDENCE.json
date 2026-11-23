@@ -21,13 +21,13 @@
       "name": "r100_12_suite_inherited",
       "exit": 0,
       "passed": true,
-      "seconds": 16.12
+      "seconds": 15.87
     },
     {
       "name": "r101_original_rfcomm_scn_range_and_snapshot",
       "exit": 0,
       "passed": true,
-      "seconds": 1.71
+      "seconds": 2.39
     }
   ],
   "unresolved": [

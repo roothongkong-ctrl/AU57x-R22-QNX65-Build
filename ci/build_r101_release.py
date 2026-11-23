@@ -6,7 +6,7 @@ import pathlib
 import zipfile
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 BASE=pathlib.Path('/mnt/data/AU57x_R100_Factory_to_Graft_FailClosed_Source_ONLY_NO_INSTALL.zip')
-OUT=pathlib.Path('/mnt/data/AU57x_R101_RFCOMM_SCN_OEM_Dataflow_Source_ONLY_NO_INSTALL.zip')
+OUT=pathlib.Path('/mnt/data/AU57x_R101_RFCOMM_SCN_OEM_Dataflow_FIX1_Source_ONLY_NO_INSTALL.zip')
 SOURCE_FILES=[
  'README.md','R101_BUILD_INFO.txt','DO_NOT_INSTALL_R101.txt',
  'docs/R101_RFCOMM_SERVER_CHANNEL_CN.md',
@@ -19,6 +19,7 @@ SOURCE_FILES=[
  'project/source/legacy_mu1005/bluetooth/bt_iap2_owner_handoff.c',
  'tests/test_r101_scn_contract.c','tests/test_r101_rfcomm_scn_audit.py',
  'tests/test_rf_arg_experiment.c','tests/test_r98_iap2_owner_handoff.c',
+ 'tests/test_mu1005_rf_register_sites.py',
  'tools/r101_rfcomm_scn_audit.py',
  'ci/host_r101_scn_audit.sh','ci/host_r101_continuous.py','ci/build_r101_release.py',
  '.github/workflows/cloud12-review.yml','.github/workflows/qnx65-compile.yml',
@@ -56,7 +57,7 @@ def build():
  if result['aggregate_suites_passed']!=13 or result['installable'] or result['vehicle_verified']:
   raise ValueError('Incomplete software verification')
  manifest={
-  'release':'R101','baseline':'MHI2_CN_AU57x_K1006_2 / MU1005',
+  'release':'R101','revision':'FIX1','baseline':'MHI2_CN_AU57x_K1006_2 / MU1005',
   'source_only':True,'installable':False,'safe_to_flash':False,'vehicle_verified':False,
   'native_rfcomm_owner_proven':False,'original_iap2_scn_proven':False,
   'host_test_suite_count':13,'native_module_compile_count':44,

@@ -11,6 +11,17 @@ test_reject_unsupported_arch (test_r101_rfcomm_scn_audit.OriginalRFRegisterStruc
 test_valid_mock_structure_never_means_vehicle_works (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_valid_mock_structure_never_means_vehicle_works) ... ok
 
 ----------------------------------------------------------------------
-Ran 7 tests in 0.023s
+Ran 7 tests in 0.052s
+
+OK
+test_changed_original_caller_is_rejected (test_mu1005_rf_register_sites.R89StaticCallers.test_changed_original_caller_is_rejected) ... ok
+test_invalid_header_rejected_even_if_hash_matches (test_mu1005_rf_register_sites.R89StaticCallers.test_invalid_header_rejected_even_if_hash_matches) ... ok
+test_known_two_direct_callers_and_no_iap2_profile (test_mu1005_rf_register_sites.R89StaticCallers.test_known_two_direct_callers_and_no_iap2_profile) ... ok
+test_native_registration_requires_proven_profile (test_mu1005_rf_register_sites.R89StaticCallers.test_native_registration_requires_proven_profile) ... ok
+test_original_hash_guard (test_mu1005_rf_register_sites.R89StaticCallers.test_original_hash_guard) ... ok
+test_unrecognised_third_caller_is_rejected (test_mu1005_rf_register_sites.R89StaticCallers.test_unrecognised_third_caller_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.343s
 
 OK

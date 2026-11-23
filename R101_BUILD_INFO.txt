@@ -9,3 +9,5 @@ NOT PROVIDED: OEM runtime hook, valid original iAP2 SCN, Apple MFi,
 installable=false
 safe_to_flash=false
 vehicle_verified=false
+
+FIX1: synchronize historical R89 static test with frozen R101 original-owner arg3; rerun R89 as part of R101 CI.

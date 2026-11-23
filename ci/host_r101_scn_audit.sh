@@ -3,6 +3,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 python3 -m unittest discover -s tests -p 'test_r101_rfcomm_scn_audit.py' -v
+python3 -m unittest discover -s tests -p 'test_mu1005_rf_register_sites.py' -v
 if [ -f /mnt/data/R99_private/btstack ];then
   python3 tools/r101_rfcomm_scn_audit.py --btstack /mnt/data/R99_private/btstack --output r101_result/R101_MU1005_SCN_AUDIT.json
 else

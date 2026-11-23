@@ -35,3 +35,5 @@
 3. 蓝牙 iAP2 真实链路、苹果 MFi、Wi-Fi AirPlay、原厂开机恢复与 SD 装车安装都未验收。
 
 **状态：完整工程源码继续研发，`installable=false`、`safe_to_flash=false`、`vehicle_verified=false`，不安排中途上车。**
+
+**FIX1 修订**：将 R89 旧测试由“注册时再次读取外部 profile 回调”改为验证 R98 前置证明、R101 冻结快照与原厂调用使用同一数值。不会弱化原厂运行条件。
