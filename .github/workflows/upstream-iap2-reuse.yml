@@ -98,8 +98,32 @@ jobs:
               -I$D/include -Iproject/source/legacy_mu1005/bluetooth \
               -Ir113/src -Ir113/third_party \
               -c r113/src/mu1005_iap2_stream.c -o qnx_iap2_reuse_result/mu1005_iap2_stream.o
-            $AR rcs qnx_iap2_reuse_result/libau57x_upstream_iap2_REVIEW_ONLY.a qnx_iap2_reuse_result/iap2_link.o qnx_iap2_reuse_result/iap2_wire.o qnx_iap2_reuse_result/au57x_iap2_capi.o qnx_iap2_reuse_result/mu1005_iap2_stream.o
-            $RE -h qnx_iap2_reuse_result/iap2_link.o > qnx_iap2_reuse_result/link_elf.txt
+            $CC -std=c11 -O2 -Wall -Wextra -Werror -fPIC -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp -Iproject/source/legacy_mu1005/bluetooth \
+              -c project/source/legacy_mu1005/bluetooth/inbound.c -o qnx_iap2_reuse_result/mu1005_inbound.o
+            $CC -std=c11 -O2 -Wall -Wextra -Werror -fPIC -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp -Ir113/src -Ir113/third_party \
+              -c r113/src/au108_oem_port.c -o qnx_iap2_reuse_result/mu1005_owner.o
+            $CC -std=c11 -O2 -Wall -Wextra -Werror -fPIC -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp -Ir113/third_party \
+              -c r113/third_party/r105_owner_gate.c -o qnx_iap2_reuse_result/mu1005_r105.o
+            $AR rcs qnx_iap2_reuse_result/libau57x_upstream_iap2_REVIEW_ONLY.a qnx_iap2_reuse_result/iap2_link.o qnx_iap2_reuse_result/iap2_wire.o qnx_iap2_reuse_result/au57x_iap2_capi.o qnx_iap2_reuse_result/mu1005_iap2_stream.o qnx_iap2_reuse_result/mu1005_inbound.o qnx_iap2_reuse_result/mu1005_owner.o qnx_iap2_reuse_result/mu1005_r105.o
+                        # Full dynamically loadable ELF, but NO OEM callback/installer:
+            # verify that C++ runtime is self-contained instead of depending on
+            # the ancient stock libstdc++.so.6.
+            $CXX -shared -Wl,--hash-style=sysv -Wl,--no-undefined \
+              -static-libstdc++ -static-libgcc \
+              -o qnx_iap2_reuse_result/libau57x_iap2_native_REVIEW_ONLY.so \
+              qnx_iap2_reuse_result/iap2_link.o \
+              qnx_iap2_reuse_result/iap2_wire.o \
+              qnx_iap2_reuse_result/au57x_iap2_capi.o \
+              qnx_iap2_reuse_result/mu1005_iap2_stream.o \
+              qnx_iap2_reuse_result/mu1005_inbound.o \
+              qnx_iap2_reuse_result/mu1005_owner.o \
+              qnx_iap2_reuse_result/mu1005_r105.o
+            $RE -d qnx_iap2_reuse_result/libau57x_iap2_native_REVIEW_ONLY.so > qnx_iap2_reuse_result/full_link_deps.txt
+            grep -q 'Shared library: \\[libc.so.3\\]' qnx_iap2_reuse_result/full_link_deps.txt
+            if grep -q 'Shared library: \\[libstdc++' qnx_iap2_reuse_result/full_link_deps.txt; then
+              echo 'FAIL: depends on incompatible OEM libstdc++' >&2; exit 1
+            fi
+$RE -h qnx_iap2_reuse_result/iap2_link.o > qnx_iap2_reuse_result/link_elf.txt
             $RE -h qnx_iap2_reuse_result/iap2_wire.o > qnx_iap2_reuse_result/wire_elf.txt
             grep -q "Machine:.*ARM" qnx_iap2_reuse_result/link_elf.txt
             grep -q "Machine:.*ARM" qnx_iap2_reuse_result/wire_elf.txt
