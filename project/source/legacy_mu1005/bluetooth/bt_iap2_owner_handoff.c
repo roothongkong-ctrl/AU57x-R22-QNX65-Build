@@ -112,7 +112,8 @@ static int native_withdraw_adapter(void*unused,int(*barrier)(void*,const Inbound
 }
 int au98_bind_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*o){
  Au98Hooks h;
- if(!p||!p->original_image_verified||!p->on_original_iap2_owner||
+ if(!p||au100_route_select(p->route_evidence)!=AU100_GRAFT_RFCOMM_ROUTE||
+    !p->original_image_verified||!p->on_original_iap2_owner||
     !p->original_iap2_service_verified)return -1;
  memset(&h,0,sizeof h);
  h.opaque=p->opaque;h.original_image_verified=p->original_image_verified;

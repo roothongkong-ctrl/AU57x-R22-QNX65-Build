@@ -5,6 +5,7 @@
  * A successful publication does NOT mean a handset, iAP2 or MFi is connected.
  */
 #include "native_binding.h"
+#include "bt_route_gate.h"
 #include <stdint.h>
 
 typedef enum {
@@ -42,6 +43,8 @@ typedef struct {
  int (*original_image_verified)(void*);
  int (*on_original_iap2_owner)(void*);
  int (*original_iap2_service_verified)(void*);
+ /* R100 explicit software-graft evidence; no endpoint/owner inference from HFP. */
+ const Au100Evidence *route_evidence;
 } Au98OwnerProof;
 int au98_bind_stock_native(Au98Handoff*,const Au98OwnerProof*,const MuBtOwner*);
 
