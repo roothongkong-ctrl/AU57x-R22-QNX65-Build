@@ -40,6 +40,17 @@ jobs:
             r113/src/au108_oem_port.c r113/third_party/r105_owner_gate.c \
             r113/tests/test_owner.c -o /tmp/r113-owner-test
           /tmp/r113-owner-test
+      - name: Native MU1005 inbound -> R113 owner integration test
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -pedantic -O2 \
+            -Iproject/source/legacy_mu1005/bluetooth -Ir113/src -Ir113/third_party \
+            project/source/legacy_mu1005/bluetooth/inbound.c \
+            r113/src/mu1005_native_gate_adapter.c \
+            r113/src/au108_oem_port.c r113/third_party/r105_owner_gate.c \
+            r113/tests/test_native_join.c -o /tmp/mu1005-native-join
+          /tmp/mu1005-native-join
       - name: Build pinned QNX 6.5 ARMv7 compiler image
         shell: bash
         run: |
@@ -65,8 +76,9 @@ jobs:
             mkdir -p qnx_build_result/r113
             CFLAGS="-std=c99 -O2 -Wall -Wextra -Werror -fPIC -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp -Ir113/src -Ir113/third_party"
             $CC $CFLAGS -c r113/src/au108_oem_port.c -o qnx_build_result/r113/au108_oem_port.o
+            $CC $CFLAGS -Iproject/source/legacy_mu1005/bluetooth -c r113/src/mu1005_native_gate_adapter.c -o qnx_build_result/r113/mu1005_native_gate_adapter.o
             $CC $CFLAGS -c r113/third_party/r105_owner_gate.c -o qnx_build_result/r113/r105_owner_gate.o
-            $CC -shared -Wl,--hash-style=sysv -o qnx_build_result/r113/libau57x_r113_REVIEW_ONLY.so qnx_build_result/r113/au108_oem_port.o qnx_build_result/r113/r105_owner_gate.o -Wl,--no-as-needed -lc -Wl,--as-needed
+            $CC -shared -Wl,--hash-style=sysv -o qnx_build_result/r113/libau57x_r113_REVIEW_ONLY.so qnx_build_result/r113/au108_oem_port.o qnx_build_result/r113/mu1005_native_gate_adapter.o qnx_build_result/r113/r105_owner_gate.o qnx_build_result/objects/inbound.o -Wl,--no-as-needed -lc -Wl,--as-needed
             $RE -h -d qnx_build_result/r113/libau57x_r113_REVIEW_ONLY.so > qnx_build_result/r113/readelf.txt
             grep -q "Shared library: \\[libc.so.3\\]" qnx_build_result/r113/readelf.txt
             echo "R113 QNX ARM owner boundary linked -- NO OEM callbacks, NOT installable"
