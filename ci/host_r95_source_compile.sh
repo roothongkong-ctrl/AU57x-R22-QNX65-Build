@@ -8,5 +8,5 @@ while IFS= read -r -d '' f; do
     gcc -std=c99 -Wall -Wextra -Werror -D_DEFAULT_SOURCE -fsyntax-only "${inc[@]}" "$f"
     count=$((count+1))
 done < <(find project/source/src project/source/legacy_mu1005/airplay project/source/legacy_mu1005/bluetooth -maxdepth 1 -name '*.c' -print0)
-test "$count" -eq 42
-printf 'R95 HOST STRICT COMPILE: %d/42 source modules PASS\n' "$count"
+test "$count" -eq 43
+printf 'R95 HOST STRICT COMPILE: %d/43 source modules PASS\n' "$count"

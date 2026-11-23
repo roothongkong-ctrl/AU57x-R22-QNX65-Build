@@ -1,0 +1,6 @@
+R98 / AU57x original iAP2 owner guarded native handoff
+Baseline MHI2_CN_AU57x_K1006_2 / MU1005
+New native C module bt_iap2_owner_handoff.c
+Original RFCOMM native binding is in native_binding.c (source only)
+Stock owner iAP2 real callback unknown / MFi not verified
+DO NOT INSTALL; NO OEM files in public ZIP

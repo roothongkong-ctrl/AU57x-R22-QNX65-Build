@@ -1,0 +1,17 @@
+{
+  "version": "R98",
+  "firmware": "MHI2_CN_AU57x_K1006_2/MU1005",
+  "r97_qnx_6_5_armv7_cloud": "success",
+  "original_elf_private_hash_pinned": true,
+  "r98_actual_loopback_socket_host": "PASS",
+  "r98_qnx_bind_stock_native_source": "IMPLEMENTED",
+  "r98_stock_iap2_real_callback_owner": "UNKNOWN",
+  "r98_original_rf_registration_argument": "UNKNOWN_EXPERIMENTAL_ZERO_OPT_IN",
+  "r98_original_runtime_activation": "NOT_VERIFIED",
+  "r98_original_apple_mfi": "NOT_VERIFIED",
+  "r98_original_wifi_airplay": "NOT_VERIFIED",
+  "installable": false,
+  "vehicle_verified": false,
+  "safe_to_flash": false,
+  "tests": ["host_r98_iap2_handoff.sh", "host_r95_source_compile.sh", "host_r97_continuous.py"]
+}

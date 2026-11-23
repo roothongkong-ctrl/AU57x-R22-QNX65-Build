@@ -1,7 +1,7 @@
 name: AU57x cloud-only 12-step evidence and lifecycle gates (NO INSTALL)
 on:
   push:
-    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline, r95-offline-steps-03-to-17, r96-oneclick-lab-and-release-review, r97-stock-thread-origin-handoff]
+    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline, r95-offline-steps-03-to-17, r96-oneclick-lab-and-release-review, r97-stock-thread-origin-handoff, r98-stock-iap2-owner-transport]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -85,7 +85,7 @@ jobs:
         run: bash ci/host_cloud_media.sh
       - name: R11 recovered 67 native C transaction and independent rollback tests
         run: bash ci/host_sd_txn.sh
-      - name: R97 host strict compile of 42 native C modules
+      - name: R98 host strict compile of 43 native C modules
         run: bash ci/host_r95_source_compile.sh
       - name: R95 continuous offline steps 03-17 evidence matrix (records failures, no car)
         run: bash ci/host_r95_to_step17.sh
@@ -103,6 +103,8 @@ jobs:
       # R96 review ZIP before R95 refreshes its evidence ledger.
       - name: R97 continuous offline native Bluetooth and installer matrix
         run: python3 ci/host_r97_continuous.py
+      - name: R98 genuine loopback socket -> original-owner gated iAP2 service attach laboratory
+        run: bash ci/host_r98_iap2_handoff.sh
       - name: Assemble source-only review ZIP and SHA256
         if: always()
         run: bash ci/build_cloud_review_bundle.sh
@@ -116,5 +118,6 @@ jobs:
             r95_result/
             r96_result/
             r97_result/
+            r98_result/
           if-no-files-found: warn
           retention-days: 14
