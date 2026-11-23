@@ -1,7 +1,7 @@
 name: AU57x R52 QNX6.5 ARMv7 (REVIEW ONLY)
 on:
   push:
-    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline, r95-offline-steps-03-to-17, r96-oneclick-lab-and-release-review, r97-stock-thread-origin-handoff, r98-stock-iap2-owner-transport, r99-stock-iap2-two-config-fallback, r100-failclosed-dual-route-graft]
+    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline, r95-offline-steps-03-to-17, r96-oneclick-lab-and-release-review, r97-stock-thread-origin-handoff, r98-stock-iap2-owner-transport, r99-stock-iap2-two-config-fallback, r100-failclosed-dual-route-graft, r101-rfcomm-scn-and-owner-snapshot]
   workflow_dispatch:
 permissions:
   contents: read
@@ -70,6 +70,14 @@ jobs:
         run: |
           test -s qnx_build_result/objects/bt_route_gate.o
           readelf -Ws qnx_build_result/libau57x_r24_native_qnx_REVIEW_ONLY.so | grep -q au100_route_select
+      - name: R101 QNX native inbound RFCOMM SCN/SDP and frozen owner interface compiled (NO OEM registration)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s qnx_build_result/objects/inbound.o
+          test -s qnx_build_result/objects/native_binding.o
+          test -s qnx_build_result/objects/bt_iap2_owner_handoff.o
+          readelf -Ws qnx_build_result/libau57x_r24_native_qnx_REVIEW_ONLY.so | grep -q inbound_publish
       - name: R98 native QNX original R45 registration bridge exported (NO OEM event proof)
         shell: bash
         run: |

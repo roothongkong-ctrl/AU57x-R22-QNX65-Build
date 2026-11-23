@@ -1,0 +1,13 @@
+R101 MU1005 RFCOMM server channel audit + range/TOCTOU hardening
+Parent: R100 factory-to-graft fail-closed source-only
+Baseline: MHI2_CN_AU57x_K1006_2 / MU1005, QNX6.5 ARMv7
+Actual: exact OEM HFP/SIM RF function dataflow, 1..30 SDP channel code fix,
+        original-owner arg3 1..30 validation, R98 frozen session arg3,
+        original ELF private static audit, 44 C modules, host regression.
+NOT PROVIDED: OEM runtime hook, valid original iAP2 SCN, Apple MFi,
+              AirPlay session, vehicle install/rollback, in-car test.
+installable=false
+safe_to_flash=false
+vehicle_verified=false
+
+FIX1: synchronize historical R89 static test with frozen R101 original-owner arg3; rerun R89 as part of R101 CI.

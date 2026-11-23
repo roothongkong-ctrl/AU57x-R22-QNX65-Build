@@ -29,8 +29,11 @@ int inbound_publish(Inbound*s){
  /* Upstream donor uses zero third argument; not initial RX credits. */
  s->uncertain_mask=IN_RF;
  int r=s->ops.reg(&s->rf,&s->slot,0);
- if(r||s->slot<1||s->slot>6){s->state=IN_DIRTY;return -2;}
+ if(r||s->slot<MU_RFCOMM_SCN_MIN||s->slot>MU_RFCOMM_SCN_MAX){s->state=IN_DIRTY;return -2;}
  s->published_mask=IN_RF;s->uncertain_mask=0;
+ /* RFCOMM server channels use the full 1..30 range. A previous donor-only
+ * 1..6 cap rejected valid OEM-assigned channels such as 7. The returned
+ * channel must agree with SDP ProtocolDescriptorList before publication. */
  s->state=IN_REGISTERED;s->protocol[13]=s->slot;
  /* Do not assume a nonzero vendor return means nothing was mutated. Preserve
   * storage, flag dirty, require owner-supervised rollback on partial failure. */

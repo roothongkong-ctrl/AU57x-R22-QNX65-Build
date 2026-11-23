@@ -1,0 +1,38 @@
+{
+  "release": "R101",
+  "baseline": "MHI2_CN_AU57x_K1006_2 / MU1005",
+  "change": "R14 original rfcomm slot range 1..30 and session-frozen OEM arg3",
+  "host_legacy_suites_passed": 12,
+  "new_offline_suite_passed": true,
+  "aggregate_suites_passed": 13,
+  "aggregate_suites_total": 13,
+  "strict_c_modules_passed": 44,
+  "static_original_ELF_audited_locally": true,
+  "oem_rf_api_arg3_sc_number_proven": false,
+  "original_iap2_scn_proven": false,
+  "in_car_hook_proven": false,
+  "apple_mfi_verified": false,
+  "wifi_airplay_live": false,
+  "installable": false,
+  "safe_to_flash": false,
+  "vehicle_verified": false,
+  "suites": [
+    {
+      "name": "r100_12_suite_inherited",
+      "exit": 0,
+      "passed": true,
+      "seconds": 15.87
+    },
+    {
+      "name": "r101_original_rfcomm_scn_range_and_snapshot",
+      "exit": 0,
+      "passed": true,
+      "seconds": 2.39
+    }
+  ],
+  "unresolved": [
+    "OEM iAP2 SDK event-thread and registration parameter not proven",
+    "Original connectivity launcher and live SD rollback owner unavailable",
+    "No original Apple iAP2/MFi/CarPlay session proof"
+  ]
+}

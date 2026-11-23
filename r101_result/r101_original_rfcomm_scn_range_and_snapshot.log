@@ -1,0 +1,27 @@
+{"PASS": true, "report": "r101_result/R101_MU1005_SCN_AUDIT.json", "ABI_PROVEN": false, "safe_to_flash": false}
+R101 RFCOMM SCN 1..30, SDP sync, no publish on invalid: PASS (MOCK SDK)
+R101 RFCOMM arg range validation: PASS (arg3 ABI still unverified)
+R101 RFCOMM arg range validation: PASS (arg3 ABI still unverified)
+test_bl_targets_same_registration (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_bl_targets_same_registration) ... ok
+test_each_instruction_mutation_refuses (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_each_instruction_mutation_refuses) ... ok
+test_no_chance_executing_or_modifying_original (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_no_chance_executing_or_modifying_original) ... ok
+test_reject_mock_when_pinned_sha_required (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_reject_mock_when_pinned_sha_required) ... ok
+test_reject_truncated_header (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_reject_truncated_header) ... ok
+test_reject_unsupported_arch (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_reject_unsupported_arch) ... ok
+test_valid_mock_structure_never_means_vehicle_works (test_r101_rfcomm_scn_audit.OriginalRFRegisterStructuralTest.test_valid_mock_structure_never_means_vehicle_works) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.052s
+
+OK
+test_changed_original_caller_is_rejected (test_mu1005_rf_register_sites.R89StaticCallers.test_changed_original_caller_is_rejected) ... ok
+test_invalid_header_rejected_even_if_hash_matches (test_mu1005_rf_register_sites.R89StaticCallers.test_invalid_header_rejected_even_if_hash_matches) ... ok
+test_known_two_direct_callers_and_no_iap2_profile (test_mu1005_rf_register_sites.R89StaticCallers.test_known_two_direct_callers_and_no_iap2_profile) ... ok
+test_native_registration_requires_proven_profile (test_mu1005_rf_register_sites.R89StaticCallers.test_native_registration_requires_proven_profile) ... ok
+test_original_hash_guard (test_mu1005_rf_register_sites.R89StaticCallers.test_original_hash_guard) ... ok
+test_unrecognised_third_caller_is_rejected (test_mu1005_rf_register_sites.R89StaticCallers.test_unrecognised_third_caller_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.343s
+
+OK

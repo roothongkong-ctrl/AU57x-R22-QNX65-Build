@@ -66,9 +66,19 @@ class R89StaticCallers(unittest.TestCase):
                 mod.audit(bytes(b))
 
     def test_native_registration_requires_proven_profile(self):
-        src = (ROOT / "project/source/legacy_mu1005/bluetooth/native_binding.c").read_text()
+        # R101 moves the external attestation read to au98_publish() and
+        # freezes a 1..30 value before entering the native BlueSDK caller.
+        # The R89 raw-HFP/SIM static evidence does not prove iAP2 arg3.
+        root = ROOT / "project/source/legacy_mu1005/bluetooth"
+        src = (root / "native_binding.c").read_text()
+        hdr = (root / "native_binding.h").read_text()
+        handoff = (root / "bt_iap2_owner_handoff.c").read_text()
         self.assertIn("n.reg=register_verified", src)
-        self.assertIn("iap2_profile_proven", src)
+        self.assertIn("iap2_profile_proven", hdr)
+        self.assertIn("mu_rf_arg_choose(owner->iap2_profile_proven", handoff)
+        self.assertIn("s->native_owner.rf_arg3_snapshot=candidate_scn", handoff)
+        self.assertIn("r->owner.rf_arg3_snapshot_valid!=1u", src)
+        self.assertIn("(channel,slot,r->owner.rf_arg3_snapshot)", src)
         self.assertNotIn("n.reg=RFN(int (*)(void*,uint8_t*,uint16_t),0x277a18u)", src)
 
 

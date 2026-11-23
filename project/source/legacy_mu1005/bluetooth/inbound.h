@@ -5,7 +5,7 @@
  * contain 32-bit addresses; host tests use explicit token mappings. */
 #include <stdint.h>
 #include <stddef.h>
-enum { RF_SIZE=176, PACKET_SIZE=100, SDP_SIZE=36, MAX_DATA=5035 };
+enum { RF_SIZE=176, PACKET_SIZE=100, SDP_SIZE=36, MAX_DATA=5035, MU_RFCOMM_SCN_MIN=1, MU_RFCOMM_SCN_MAX=30 };
 typedef struct { uint32_t words[RF_SIZE/4]; } RfObject;
 typedef struct { uint32_t words[PACKET_SIZE/4]; } RfPacket;
 typedef struct { uint32_t words[SDP_SIZE/4]; } SdpRecord;
