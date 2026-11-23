@@ -26,8 +26,14 @@ static int visible(void *v,uint8_t scn){
 }
 static int quiet(void *v){
  Mu1005NativeGateAdapter *a=v;Inbound *s=a->service;
- if(s->state!=IN_PUBLISHED||s->pending||s->busy||s->uncertain_mask||
-    s->published_mask!=(IN_RF|IN_IAP_SDP|IN_CP_SDP))return 0;
+ if(s->pending||s->busy||s->uncertain_mask)return 0;
+ /* Same owner barrier must remain valid after the real inbound_withdraw()
+  * changes state to RETIRED and clears all native registrations. */
+ if(s->state==IN_PUBLISHED){
+  if(s->published_mask!=(IN_RF|IN_IAP_SDP|IN_CP_SDP))return 0;
+ }else if(s->state==IN_RETIRED){
+  if(s->published_mask!=0)return 0;
+ }else return 0;
  return a->proof.callbacks_quiesced(a->proof.context,s)==1;
 }
 static int unregister_rf(void *v){
