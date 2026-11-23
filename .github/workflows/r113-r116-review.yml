@@ -4,6 +4,7 @@ on:
     branches: [r113-r116-cloud-review]
     paths:
       - '.github/workflows/r113-r116-review.yml'
+      - 'r113/**'
       - 'docs/R113_R116_CLOUD_REVIEW_CN.md'
   workflow_dispatch:
 permissions:
@@ -25,6 +26,13 @@ jobs:
       - name: Host core regression + sanitizers
         shell: bash
         run: bash tests/run_bt_host.sh
+      - name: R113 native publication guard HOST tests
+        run: |
+          set -Eeuo pipefail
+          cc -std=c99 -O2 -Wall -Wextra -Werror -Ir113/src -Ir113/third_party \
+            r113/src/au108_oem_port.c r113/third_party/r105_owner_gate.c \
+            r113/tests/test_owner.c -o /tmp/r113-owner-test
+          /tmp/r113-owner-test
       - name: Build pinned QNX 6.5 ARMv7 compiler image
         shell: bash
         run: |
@@ -39,6 +47,24 @@ jobs:
         run: |
           set -Eeuo pipefail
           docker run --rm --platform linux/amd64 -v "$GITHUB_WORKSPACE":/src -w /src au57x-r114-qnx65:8.5 bash /src/ci/compile_qnx_in_image.sh
+      - name: R113 owner publication source TARGET QNX ARM link
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker run --rm --platform linux/amd64 -v "$GITHUB_WORKSPACE":/src -w /src au57x-r114-qnx65:8.5 bash -lc '
+            set -Eeuo pipefail
+            CC=arm-unknown-nto-qnx6.5.0eabi-gcc
+            RE=arm-unknown-nto-qnx6.5.0eabi-readelf
+            mkdir -p qnx_build_result/r113
+            CFLAGS="-std=c99 -O2 -Wall -Wextra -Werror -fPIC -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp -Ir113/src -Ir113/third_party"
+            $CC $CFLAGS -c r113/src/au108_oem_port.c -o qnx_build_result/r113/au108_oem_port.o
+            $CC $CFLAGS -c r113/third_party/r105_owner_gate.c -o qnx_build_result/r113/r105_owner_gate.o
+            $CC -shared -Wl,--hash-style=sysv -o qnx_build_result/r113/libau57x_r113_REVIEW_ONLY.so qnx_build_result/r113/au108_oem_port.o qnx_build_result/r113/r105_owner_gate.o -Wl,--no-as-needed -lc -Wl,--as-needed
+            $RE -h -d qnx_build_result/r113/libau57x_r113_REVIEW_ONLY.so > qnx_build_result/r113/readelf.txt
+            grep -q "Shared library: \\[libc.so.3\\]" qnx_build_result/r113/readelf.txt
+            echo "R113 QNX ARM owner boundary linked -- NO OEM callbacks, NOT installable"
+          '
+          python3 r113/../project/tools/qnx_elf_gate.py --candidate qnx_build_result/r113/libau57x_r113_REVIEW_ONLY.so --output qnx_build_result/r113/elf_gate.json
       - name: Check target ELF headers, dependencies and QEMU smoke
         shell: bash
         run: |
