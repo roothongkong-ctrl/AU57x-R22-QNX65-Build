@@ -15,7 +15,7 @@ SUITES=[
  ('preload_sha_and_process_identity',['bash','ci/host_bt_preload_probe.sh']),
  ('launcher_opt_in_rollback',['python3','-m','unittest','discover','-s','tests','-p','test_r97_hfp_launcher.py','-v']),
  ('original_launcher_staging',['bash','ci/host_r94_launcher.sh']),
- ('strict_c_42',['bash','ci/host_r95_source_compile.sh']),
+ ('strict_c_43',['bash','ci/host_r95_source_compile.sh']),
  ('r96_install_rollback_review',['bash','ci/host_r96_to_step19.sh']),
  ('stock_r45_tcp_iap2',['bash','ci/host_wcp_r45_remote_mfi.sh']),
 ]
