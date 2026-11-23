@@ -105,6 +105,8 @@ jobs:
         run: python3 ci/host_r97_continuous.py
       - name: R98 genuine loopback socket -> original-owner gated iAP2 service attach laboratory
         run: bash ci/host_r98_iap2_handoff.sh
+      - name: R99 original iAP2 two-config reversible staging and 23 fail-closed tests
+        run: bash ci/host_r99_stock_iap2.sh
       - name: Assemble source-only review ZIP and SHA256
         if: always()
         run: bash ci/build_cloud_review_bundle.sh
@@ -119,5 +121,6 @@ jobs:
             r96_result/
             r97_result/
             r98_result/
+            r99_result/
           if-no-files-found: warn
           retention-days: 14

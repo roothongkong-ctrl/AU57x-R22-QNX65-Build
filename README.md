@@ -1,3 +1,9 @@
+# R99：改走原厂 iAP2 现成代码分支（离线双配置生成/恢复工具已完成；禁止装车）
+
+**本轮完成一项独立交付**：严格哈希固定原厂 `bluetooth`/`ipod-drvr-iap2.so`；蓝牙 JSON + iAP2 INI 两份配置一次性生成离线启用稿，双份原件备份，独立 SHA256/差异复核。新增 23 项测试通过。原车配置未知时拒绝修改；不再硬猜 HFP 到 iAP2 入口。参见 `docs/R99_FACTORY_IAP2_ROUTE_CN.md`。**实车 iAP2/MFi/AirPlay 尚未证明，不能安装。**
+
+---
+
 # R97 — 原厂 HFP 回调 GOT 观察器 + btstack 线程归属接线（仅源码）
 
 **R97 新增工作：** 从你原厂 MU1005 `btstack` 的真实 ELF 动态重定位表，定位了 HFP `HfRfCallback` 的 `R_ARM_GLOB_DAT` 指针槽 (`0x2c23c8`，原目标 `0x2481f0`)，以及 SIM 的只读参考槽。新增可选的原厂 HFP 回调透传观察器和真实 pthread 线程入口追踪；主机 9 组连续回归全部通过，42 个 C 模块严格编译通过。

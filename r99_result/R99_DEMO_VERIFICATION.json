@@ -1,0 +1,7 @@
+{
+  "R99_STAGE_VERIFIED": true,
+  "no_install_payload": true,
+  "factory_iap2_runtime_unproven": true,
+  "bluetooth.original.sha256": "7221e5fd2324870ef3eb48df73ef8d53d3e95f8c6605169e97c075753a1493d5",
+  "iap2.original.sha256": "0b433bbf2a37455f01e77f624a8e8d075da2bd5c5a7686aa2d0921dc31eace50"
+}
