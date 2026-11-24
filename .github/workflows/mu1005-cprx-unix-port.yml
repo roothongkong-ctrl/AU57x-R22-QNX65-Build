@@ -428,6 +428,25 @@ jobs:
           echo MU1005_TESTED_SOURCE_RUST_C_NATIVE_BUILD_OK_NO_OEM_NO_INSTALL | tee evidence/summary.log
           cp evidence/{daemon-elf.log,c-receiver-build.log,source-patch.sha256,summary.log} unified-review/evidence/
           cp -R mu1005/project/source/legacy_mu1005/airplay unified-review/source/
+          # Reuse the exact owner transport already tested on QNX and with Rust.
+          git fetch --depth 1 origin cad53f1684c12e61e06449e4ec0088622692e1b8
+          test "$(git rev-parse FETCH_HEAD)" = cad53f1684c12e61e06449e4ec0088622692e1b8
+          mkdir -p owner-stage unified-review/source/owner
+          git archive FETCH_HEAD integration/mu1005_owner_ingress integration/mu1005_direct_daemon project/source/legacy_mu1005/bluetooth | tar -x -C owner-stage
+          base64 -d owner-stage/integration/mu1005_owner_ingress/source.zip.b64 > "$RUNNER_TEMP/owner-source.zip"
+          echo "06ec91615807315a9f6f3df7d3fb5ce59125b2217962491a4562709b16170040  $RUNNER_TEMP/owner-source.zip" | sha256sum -c
+          unzip -q "$RUNNER_TEMP/owner-source.zip" -d unified-review/source/owner
+          old=owner-stage/project/source/legacy_mu1005/bluetooth
+          cp "$old"/mu1005_ipc_stream.{c,h} "$old"/mu1005_socket_pump.{c,h} owner-stage/integration/mu1005_direct_daemon/daemon_client.{c,h} unified-review/source/owner/
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5-rust bash -c '
+            set -eux
+            a=unified-review/source/owner
+            C=arm-unknown-nto-qnx6.5.0eabi-gcc
+            "$C" -std=gnu99 -include stddef.h -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -I"$a" "$a"/{outbound_session,callback_handoff,mu1005_rf_ingress,owner_bridge,mu1005_ipc_stream,mu1005_socket_pump,daemon_client}.c -lsocket -o unified-review/payload/libowner_transport.so
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW unified-review/payload/libowner_transport.so
+          ' 2>&1 | tee unified-review/evidence/owner-elf.log
+          grep -Eq 'Machine:.*ARM' unified-review/evidence/owner-elf.log
+          printf '%s\n' 'owner_source=cad53f1684c12e61e06449e4ec0088622692e1b8' 'receiver_source=7f595231394d97091ec0fee209677b6e45fd50dc' 'daemon_source=20c94f51c0f0ae88b154c12e4f604643ba23022c' > unified-review/evidence/locked-revisions.txt
           printf '%s\n' 'NO INSTALL / REVIEW COMPONENTS ONLY' 'Target MU1005 QNX ARM' 'OEM SI adapter, genuine authentication, Bluetooth owner attachment and physical session are NOT verified.' 'No original firmware or installation scripts included.' > unified-review/README.txt
           (cd unified-review && find payload source evidence -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS && sha256sum -c SHA256SUMS)
       - uses: actions/upload-artifact@v4
