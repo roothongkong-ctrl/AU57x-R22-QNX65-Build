@@ -1,0 +1,90 @@
+name: MU1005 upstream functional port baseline (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-upstream-functional-port]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  UPSTREAM: 20c94f51c0f0ae88b154c12e4f604643ba23022c
+  TOOLCHAIN: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+jobs:
+  upstream-protocol:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Fetch pinned mature upstream
+        run: |
+          set -euxo pipefail
+          git init upstream
+          git -C upstream remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C upstream fetch --depth 1 origin "$UPSTREAM"
+          git -C upstream checkout --detach FETCH_HEAD
+          test "$(git -C upstream rev-parse HEAD)" = "$UPSTREAM"
+      - name: Compile and test original wireless daemon (host protocol only)
+        run: |
+          set -o pipefail
+          mkdir -p evidence
+          rustc --version | tee evidence/rust-version.txt
+          cargo test --manifest-path upstream/wireless/daemon/Cargo.toml --locked --offline 2>&1 | tee evidence/daemon-tests.log
+      - name: Run receiver protocol and semantic delivery tests
+        if: always()
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          for test in test_identity_protocol test_semantic_delivery; do
+            cc -std=c11 -O2 -Wall -Wextra -Werror "upstream/wireless/receiver_bridge/$test.c" -o "/tmp/$test"
+            "/tmp/$test" | tee "evidence/$test.log"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upstream-protocol-evidence
+          path: evidence/
+          retention-days: 7
+  qnx-port-baseline:
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [receiver-bridge, wireless-hook]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Fetch pinned source and compiler
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence Patches
+          for item in upstream toolchain; do
+            if [ "$item" = upstream ]; then dir=Patches/mhi2-carplay; remote=luka-dev/mib2q-carplay-rgi; pin="$UPSTREAM"; else dir=toolchain; remote=luka-dev/qnx65-armv7-toolchain; pin="$TOOLCHAIN"; fi
+            git init "$dir"
+            git -C "$dir" remote add origin "https://github.com/$remote.git"
+            git -C "$dir" fetch --depth 1 origin "$pin"
+            git -C "$dir" checkout --detach FETCH_HEAD
+            test "$(git -C "$dir" rev-parse HEAD)" = "$pin"
+            git -C "$dir" rev-parse HEAD > "evidence/$item.commit"
+          done
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee evidence/toolchain.log
+          docker tag qnx65-armv7-toolchain:8.5 qnx65-armv7-toolchain:latest
+      - name: Build original receiver bridge sources (compile only)
+        if: matrix.component == 'receiver-bridge'
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD/Patches/mhi2-carplay":/src:ro -v "$PWD/evidence":/out -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            set -eux
+            arm-unknown-nto-qnx6.5.0eabi-gcc -std=c11 -fPIC -shared -Os -Wall -Wextra -Werror -DMHI2Q_CAPTURE_BRIDGE -DMHI2Q_BRIDGE_PRESTART -DMHI2Q_BRIDGE_DISPLAY_MODE=0 "-DMHI2Q_CAPTURE_INTERFACE_NAME=\"uap0\"" -DMHI2Q_BRIDGE_STOCK210 -DMHI2Q_BRIDGE_SI_TRANSPORT -DMHI2Q_BRIDGE_PROPERTY_HANDOFF wireless/receiver_bridge/{capture_probe,bridge,property_handoff,si_transport,now_playing,si_state,si_location}.c -lsocket -o /out/UPSTREAM_MU1316_ONLY.so
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h -d /out/UPSTREAM_MU1316_ONLY.so
+            rm /out/UPSTREAM_MU1316_ONLY.so
+          ' 2>&1 | tee evidence/bridge-compile.log
+      - name: Build original wireless receiver hook (compile only)
+        if: matrix.component == 'wireless-hook'
+        run: |
+          set -euxo pipefail
+          cd Patches/mhi2-carplay
+          QNX_TOOLCHAIN_VARIANT=8.5 HOOK_AUDIO=0 bash scripts/build_hook_wireless.sh 2>&1 | tee ../../evidence/hook-compile.log
+          file build/wireless/libcarplay_hook.so | tee ../../evidence/hook-elf.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upstream-qnx-${{ matrix.component }}-logs-only
+          path: evidence/
+          retention-days: 7
