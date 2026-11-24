@@ -1,0 +1,45 @@
+name: MU1005 SI profile read-only donor verification (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-stock210-source-port]
+    paths: [integration/mu1005_si_profile/**, .github/workflows/mu1005-si-profile-review.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  donor-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify mapping tool against pinned upstream ELF
+        run: |
+          set -euxo pipefail
+          mkdir evidence
+          git init upstream
+          git -C upstream remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C upstream fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C upstream checkout --detach FETCH_HEAD
+          test "$(git -C upstream rev-parse HEAD)" = 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          tool=integration/mu1005_si_profile/compare_si.py
+          si=upstream/deploy/smartphone_integrator/smartphone_integrator
+          python3 "$tool" --source "$si" --self-review --out evidence/donor-self-review.json
+          cp "$si" tampered
+          printf X | dd of=tampered bs=1 seek=0 conv=notrunc status=none
+          if python3 "$tool" --source tampered --self-review --out evidence/reject.json; then
+            echo "unexpected acceptance"; exit 1
+          fi
+          test ! -e evidence/reject.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open("evidence/donor-self-review.json"))
+          assert len(d["points"])==25 and d["scope"]=="DONOR_SELF_REVIEW_ONLY"
+          assert not d["runtime_approved"] and not d["installable"]
+          print("SI_25_ENTRY_DONOR_MAP_REVIEW_NO_TARGET_NO_INSTALL")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: si-profile-review-metadata-only
+          path: evidence/
+          retention-days: 7
