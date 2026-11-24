@@ -1,4 +1,4 @@
-name: R129 QNX native driver call adapter (NO INSTALL)
+name: R131 QNX native driver adapter (NO INSTALL)
 on:
   push:
     branches: [r129-native-driver-review]
@@ -13,34 +13,21 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate shell scripts before building toolchain
         run: |
-          bash -n ci/target_plugin.sh ci/host_and_qnx.sh
-          test "$(grep -c '^echo AU57X_R125_QNX_ARM_PLUGIN_LINKED_REVIEW_ONLY
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq qemu-system-arm
-      - name: Verify R125 source hashes, compile QNX ARM plugin and load in QEMU
-        run: bash ci/host_and_qnx.sh
-      - name: Upload actual target evidence even on failure
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: R129-QNX-DRIVER-REVIEW-NO-INSTALL
-          path: build/qnx/
-          if-no-files-found: warn
-          retention-days: 14
- ci/target_plugin.sh)" -eq 1
+          bash -n ci/target_plugin.sh
+          bash -n ci/host_and_qnx.sh
+          test "$(grep -Fxc 'echo AU57X_R125_QNX_ARM_PLUGIN_LINKED_REVIEW_ONLY' ci/target_plugin.sh)" -eq 1
           test "$(tail -n 1 ci/target_plugin.sh)" = "echo AU57X_R125_QNX_ARM_PLUGIN_LINKED_REVIEW_ONLY"
       - name: Install QEMU
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq qemu-system-arm
-      - name: Verify R125 source hashes, compile QNX ARM plugin and load in QEMU
+      - name: Verify sources, compile QNX ARM plugin and load in QEMU
         run: bash ci/host_and_qnx.sh
       - name: Upload actual target evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: R129-QNX-DRIVER-REVIEW-NO-INSTALL
+          name: R131-QNX-DRIVER-REVIEW-NO-INSTALL
           path: build/qnx/
           if-no-files-found: warn
           retention-days: 14
