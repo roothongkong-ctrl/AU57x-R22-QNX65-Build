@@ -1,0 +1,69 @@
+name: MU1005 actual QNX daemon config execution (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-daemon-native-startup]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  UPSTREAM: 20c94f51c0f0ae88b154c12e4f604643ba23022c
+  TOOLCHAIN: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+jobs:
+  qnx-native-config:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned daemon and compiler
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          for item in upstream toolchain; do
+            if [ "$item" = upstream ]; then remote=luka-dev/mib2q-carplay-rgi; pin="$UPSTREAM"; else remote=luka-dev/qnx65-armv7-toolchain; pin="$TOOLCHAIN"; fi
+            git init "$item"
+            git -C "$item" remote add origin "https://github.com/$remote.git"
+            git -C "$item" fetch --depth 1 origin "$pin"
+            git -C "$item" checkout --detach FETCH_HEAD
+            test "$(git -C "$item" rev-parse HEAD)" = "$pin"
+          done
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+          docker build --platform linux/amd64 --target with-rust --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5-rust toolchain 2>&1 | tee evidence/toolchain.log
+      - name: Cross-build unmodified daemon and native subprocess runner
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD/upstream":/src -w /src qnx65-armv7-toolchain:8.5-rust /opt/rust/qnx-cargo build --locked --manifest-path /src/wireless/daemon/Cargo.toml --bin mhi2q-wireless-daemon 2>&1 | tee evidence/daemon-compile.log
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5-rust arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror integration/mu1005_daemon_startup/config_runtime.c -o /src/evidence/config_runtime
+          f=$(find upstream/wireless/daemon/target -type f -name mhi2q-wireless-daemon -print -quit)
+          test -n "$f"
+          cp "$f" evidence/mhi2q-wireless-daemon
+          sha256sum evidence/mhi2q-wireless-daemon | tee evidence/daemon.sha256
+          printf '%s\n' '{"iap2":{"accessoryIdentification":{"displayName":"OFFLINE_FIXTURE","manufacturer":"FIXTURE","firmwareVersion":"MU1005_REVIEW"}}}' > evidence/dio_manager.json
+      - name: Boot native QNX and execute actual daemon config subprocesses
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("toolchain/tests/qemu-run.sh")
+          s=p.read_text()
+          a='cp "$BIN" "$WORK/$NAME"\n'
+          b='cp "$BIN" "$WORK/$NAME"\ncp "$DAEMON_FIXTURE" "$WORK/mhi2q-wireless-daemon"\ncp "$DIO_FIXTURE" "$WORK/dio_manager.json"\n'
+          assert s.count(a)==1
+          s=s.replace(a,b,1)
+          a='$NAME\nEOF\n'
+          b='$NAME\nmhi2q-wireless-daemon\n[perms=+r,-x]\ndio_manager.json\nEOF\n'
+          assert s.count(a)==1
+          s=s.replace(a,b,1)
+          p.with_name("qemu-run-mu1005-daemon.sh").write_text(s)
+          PY
+          DAEMON_FIXTURE="$PWD/evidence/mhi2q-wireless-daemon" DIO_FIXTURE="$PWD/evidence/dio_manager.json" QEMU_KEEP_LOG="$PWD/evidence/qemu-boot.log" QEMU_RUN_SECS=25 QEMU_TIMEOUT=95 bash toolchain/tests/qemu-run-mu1005-daemon.sh "$PWD/evidence/config_runtime" 8.5-rust 2>&1 | tee evidence/native-runtime.log
+          grep -Fq AU57X_UPSTREAM_QNX_CONFIG_5_CASES_OK_NO_HARDWARE evidence/native-runtime.log
+      - name: Remove binary and dummy configuration before log upload
+        if: always()
+        run: rm -f evidence/config_runtime evidence/mhi2q-wireless-daemon evidence/dio_manager.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: MU1005-daemon-native-config-logs-only
+          path: evidence/
+          retention-days: 7
