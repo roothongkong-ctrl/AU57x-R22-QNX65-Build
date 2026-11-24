@@ -1,0 +1,38 @@
+name: MU1005 Stock210 source port (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-stock210-source-port]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-port:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned upstream and apply candidate
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          git init upstream
+          git -C upstream remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C upstream fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C upstream checkout --detach FETCH_HEAD
+          python3 integration/mu1005_stock210/apply_profile.py upstream | tee evidence/port.log
+          git -C upstream diff --check
+          git -C upstream diff > evidence/mu1005-upstream-source.patch
+          test "$(git -C upstream diff --name-only | wc -l)" = 3
+          if python3 integration/mu1005_stock210/apply_profile.py upstream; then exit 1; fi
+      - name: Compile actual upstream receiver ABI module
+        run: |
+          set -euxo pipefail
+          cc -std=gnu99 -O2 -Wall -Wextra -Werror -fPIC -c upstream/hook/wireless/stock210_abi.c -o /tmp/stock210-disabled.o
+          cc -std=gnu99 -O2 -Wall -Wextra -Werror -fPIC -DAU57X_MU1005_OFFLINE_REVIEW=1 -c upstream/hook/wireless/stock210_abi.c -o /tmp/stock210-review.o
+          echo "Host objects compiled; no OEM runtime execution" | tee evidence/compile.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mu1005-stock210-source-port-review
+          path: evidence/
+          retention-days: 7
