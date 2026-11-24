@@ -1,0 +1,93 @@
+name: MU1005 SI target record layout native review (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-direct-upstream-bridge]
+    paths: [.github/workflows/mu1005-si-layout-native.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qnx-layout:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build target-specific read-only record access
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          cat > layout.c <<'C'
+          #include <stdint.h>
+          #include <stddef.h>
+          #include <stdio.h>
+          #include <string.h>
+          #include <assert.h>
+          #define MU_COUNT 464u
+          #define MU_ARRAY 472u
+          #define MU_LIMIT 100u
+          struct reader{void *context;int(*read)(void*,uint32_t,void*,size_t);};
+          struct record{uint32_t address,id;};
+          static int ptr(uint32_t p){return p>=0x10000u&&p<=0xfffffffbu&&!(p&3u);}
+          static int word(struct reader*r,uint32_t p,uint32_t*v){
+            unsigned char b[4];if(!ptr(p)||r->read(r->context,p,b,4)!=1)return 0;
+            *v=(uint32_t)b[0]|((uint32_t)b[1]<<8)|((uint32_t)b[2]<<16)|((uint32_t)b[3]<<24);return 1;
+          }
+          static int hdr(struct reader*r,uint32_t proxy,uint32_t*n,uint32_t*a){
+            if(!ptr(proxy)||proxy>UINT32_MAX-MU_ARRAY-4u)return 0;
+            if(!word(r,proxy+MU_COUNT,n)||!word(r,proxy+MU_ARRAY,a)||*n>MU_LIMIT)return 0;
+            return !*n||(ptr(*a)&&*a<=UINT32_MAX-4u*(*n));
+          }
+          static int scan(struct reader*r,uint32_t proxy,struct record*out,size_t cap,size_t*count){
+            struct record tmp[MU_LIMIT];uint32_t n,a,n2,a2,p,id;*count=0;
+            if(!hdr(r,proxy,&n,&a)||n>cap||(n&&!out))return -1;
+            for(uint32_t i=0;i<n;i++){
+              if(!word(r,a+4*i,&p)||!word(r,p,&id)||!id)return -1;
+              for(uint32_t j=0;j<i;j++)if(tmp[j].address==p||tmp[j].id==id)return -1;
+              tmp[i]=(struct record){p,id};
+            }
+            if(!hdr(r,proxy,&n2,&a2)||n!=n2||a!=a2)return -2;
+            for(uint32_t i=0;i<n;i++)if(!word(r,a+4*i,&p)||p!=tmp[i].address||!word(r,p,&id)||id!=tmp[i].id)return -2;
+            if(!hdr(r,proxy,&n2,&a2)||n!=n2||a!=a2)return -2;
+            if(n)memcpy(out,tmp,n*sizeof(*out));
+            *count=n;return 0;
+          }
+          #define B 0x10000u
+          static unsigned char mem[4096];
+          static unsigned hits;static int race;
+          static void put(uint32_t p,uint32_t v){for(unsigned i=0;i<4;i++)mem[p-B+i]=(unsigned char)(v>>(8*i));}
+          static int rd(void*c,uint32_t p,void*out,size_t n){(void)c;if(p<B||p-B>sizeof(mem)||n>sizeof(mem)-(p-B))return 0;
+            if(p==B+MU_COUNT&&++hits==2&&race)put(p,1);
+            memcpy(out,mem+p-B,n);return 1;}
+          static void init(void){memset(mem,0,sizeof(mem));hits=0;race=0;put(B+MU_COUNT,2);put(B+MU_ARRAY,B+1024);put(B+1024,B+1536);put(B+1028,B+1792);put(B+1536,17);put(B+1792,18);put(B+440,999);}
+          int main(void){struct reader r={0,rd};struct record v[2];size_t n;
+            init();assert(scan(&r,B,v,2,&n)==0&&n==2&&v[1].id==18);
+            init();put(B+MU_COUNT,0);put(B+MU_ARRAY,0);assert(scan(&r,B,0,0,&n)==0&&n==0);
+            init();put(B+MU_COUNT,101);assert(scan(&r,B,v,2,&n)==-1&&n==0);
+            init();put(B+MU_ARRAY,0);assert(scan(&r,B,v,2,&n)==-1);
+            init();put(B+1028,B+1536);assert(scan(&r,B,v,2,&n)==-1);
+            init();put(B+1792,17);assert(scan(&r,B,v,2,&n)==-1);
+            init();race=1;assert(scan(&r,B,v,2,&n)==-2&&n==0);
+            init();assert(scan(&r,B,v,1,&n)==-1);
+            init();assert(scan(&r,0xffffff00u,v,2,&n)==-1);
+            puts("MU1005_TARGET_RECORD_LAYOUT_NATIVE_9_CASES_NO_OEM_NO_INSTALL");return 0;}
+          C
+          gcc -std=c99 -Wall -Wextra -Werror -O2 layout.c -o host_layout
+          ./host_layout | tee evidence/host.log
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+          docker build --platform linux/amd64 --target base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee evidence/compiler.log
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=c99 -Wall -Wextra -Werror -O2 layout.c -o /src/layout_native
+          sed 's/qemu-system-arm -M virt/qemu-system-arm -nic user,restrict=on -M virt/' toolchain/tests/qemu-run.sh > toolchain/tests/qemu-run-layout.sh
+          QEMU_KEEP_LOG="$PWD/evidence/boot.log" QEMU_RUN_SECS=20 QEMU_TIMEOUT=95 bash toolchain/tests/qemu-run-layout.sh "$PWD/layout_native" 8.5 2>&1 | tee evidence/native.log
+          grep -Fq MU1005_TARGET_RECORD_LAYOUT_NATIVE_9_CASES_NO_OEM_NO_INSTALL evidence/native.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mu1005-si-layout-native-evidence
+          path: evidence/
+          retention-days: 7
