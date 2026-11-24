@@ -1,2 +1,0 @@
-# 2026-11-24 — QNX 6.5 iAP2 byte stream C type correction
-Previous run 45226144542 passed C++ link/wire ARM compilation, then failed in native C include path because size_t was not exposed by QNX 6.5 sysroot. C API now uses compiler ABI __SIZE_TYPE__ via au57x_iap2_size_t, preserving C++ ABI; no OEM header/source is modified. Corrected indentation of the QNX ELF readelf audit. Still NO_INSTALL, no OEM iAP2 link verification.

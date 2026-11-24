@@ -1,3 +1,0 @@
-R84 research source only; no OEM images; vehicle_verified=false; installable=false
-Baseline: R83 370ef04a8cc93be24715976774287613ea9d78c0
-Changes: remote-only SI->DIO pipeline, 4301 ACK gating, time-limited OEM op11 session status, STOP restore barrier
