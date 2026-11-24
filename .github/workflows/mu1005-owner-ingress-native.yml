@@ -61,6 +61,15 @@ jobs:
           git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
           git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
           git -C toolchain checkout --detach FETCH_HEAD
+          # Preserve upstream checks but avoid short-reading grep in pipefail pipelines.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("toolchain/gcc/build.sh")
+          s=p.read_text()
+          for a,b in [('grep -qx "$member"','grep -x "$member" >/dev/null'),("grep -Eq '","grep -E '"),('grep -Eq " ','grep -E " '),('grep -q "eafffffe"','grep "eafffffe" >/dev/null')]:
+              s=s.replace(a,b)
+          p.write_text(s)
+          PY
           docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee evidence/compiler.log
       - name: Compile and link native ARM owner transport and regression executable
         run: |
