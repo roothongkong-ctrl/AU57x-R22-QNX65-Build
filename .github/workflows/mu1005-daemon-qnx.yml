@@ -1,0 +1,96 @@
+name: MU1005 upstream daemon QNX cross-build (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-upstream-daemon-qnx]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  UPSTREAM: 20c94f51c0f0ae88b154c12e4f604643ba23022c
+  TOOLCHAIN: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+jobs:
+  protocol-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Fetch pinned upstream and correct stale test vector
+        run: |
+          set -euxo pipefail
+          git init upstream
+          git -C upstream remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C upstream fetch --depth 1 origin "$UPSTREAM"
+          git -C upstream checkout --detach FETCH_HEAD
+          mkdir -p evidence
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("upstream/wireless/receiver_bridge/test_identity_protocol.c")
+          s=p.read_text()
+          old="    request[5] = 8;\n    assert(mhi2q_rbr_decode_request(request, &decoded) != 0);"
+          new="""    /* Decoder normalizes the envelope; v3 authorization remains in bridge.c. */
+              for (unsigned op=8; op<=10; ++op) {
+                  request[5]=(uint8_t)op;
+                  assert(mhi2q_rbr_decode_request(request, &decoded)==0);
+                  assert(decoded.operation==op);
+              }
+              request[5]=11;
+              assert(mhi2q_rbr_decode_request(request, &decoded)!=0);
+              request[5]=255;
+              assert(mhi2q_rbr_decode_request(request, &decoded)!=0);
+              request[5]=5;
+              request[4]=3;
+              assert(mhi2q_rbr_decode_request(request, &decoded)!=0);
+              request[4]=2;
+              request[6]=1;
+              assert(mhi2q_rbr_decode_request(request, &decoded)!=0);"""
+          assert s.count(old)==1
+          p.write_text(s.replace(old,new))
+          PY
+          git -C upstream diff -- wireless/receiver_bridge/test_identity_protocol.c > evidence/test-only.patch
+      - name: Run independent bridge tests
+        run: |
+          set -uo pipefail
+          status=0
+          for test in test_identity_protocol test_semantic_delivery; do
+            (set -e; cc -std=c11 -O2 -Wall -Wextra -Werror "upstream/wireless/receiver_bridge/$test.c" -o "/tmp/$test"; "/tmp/$test") 2>&1 | tee "evidence/$test.log" || status=1
+          done
+          exit "$status"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: corrected-upstream-protocol-tests
+          path: evidence/
+          retention-days: 7
+  daemon-qnx:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Fetch pinned source and Rust QNX toolchain
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          for item in upstream toolchain; do
+            if [ "$item" = upstream ]; then remote=luka-dev/mib2q-carplay-rgi; pin="$UPSTREAM"; else remote=luka-dev/qnx65-armv7-toolchain; pin="$TOOLCHAIN"; fi
+            git init "$item"
+            git -C "$item" remote add origin "https://github.com/$remote.git"
+            git -C "$item" fetch --depth 1 origin "$pin"
+            git -C "$item" checkout --detach FETCH_HEAD
+            test "$(git -C "$item" rev-parse HEAD)" = "$pin"
+            git -C "$item" rev-parse HEAD > "evidence/$item.commit"
+          done
+          docker build --platform linux/amd64 --target with-rust --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5-rust toolchain 2>&1 | tee evidence/toolchain.log
+      - name: Build full upstream daemon for QNX ARM (no synthetic MFi feature)
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD/upstream":/src -w /src qnx65-armv7-toolchain:8.5-rust /opt/rust/qnx-cargo build --locked --manifest-path /src/wireless/daemon/Cargo.toml --bin mhi2q-wireless-daemon 2>&1 | tee evidence/daemon-build.log
+          f=$(find upstream/wireless/daemon/target -type f -name mhi2q-wireless-daemon -print -quit)
+          test -n "$f"
+          file "$f" | tee evidence/elf.txt
+          readelf -h -l -d -A "$f" | tee evidence/readelf.txt
+          grep -Eq 'Machine:.*ARM' evidence/readelf.txt
+          sha256sum "$f" > evidence/daemon.sha256
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upstream-daemon-qnx-compile-evidence-only
+          path: evidence/
+          retention-days: 7
