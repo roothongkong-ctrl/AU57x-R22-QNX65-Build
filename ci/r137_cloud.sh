@@ -29,5 +29,6 @@ R137_REVIEW_LIB="$PWD/build/qnx/libau57x_r137_preload_REVIEW.so" QEMU_RUN_SECS=2
 grep -Fq R137_PRELOAD_CONSTRUCTOR_SAME_PID_OK build/qnx/r137_runtime.log
 grep -Fq R137_QNX_READONLY_SELF_AS_OK build/qnx/r137_runtime.log
 grep -Fq AU57X_R137_PRELOAD_EXEC_ROLLBACK_OK_NO_OEM build/qnx/r137_runtime.log
+docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash /src/ci/r140_trace_target.sh 2>&1 | tee build/qnx/r132_fixed_target.log
 QEMU_RUN_SECS=20 QEMU_TIMEOUT=80 QEMU_KEEP_LOG="$PWD/build/qnx/r132_fixed_boot.log" bash "$tmp/toolchain/tests/qemu-run.sh" "$PWD/build/qnx/r132_arm_trace_smoke" 8.5 2>&1 | tee build/qnx/r132_fixed_runtime.log
 grep -Fq AU57X_R132_QNX_ARM_VARIADIC_PASSTHROUGH_OK_NO_OEM build/qnx/r132_fixed_runtime.log

@@ -8,14 +8,10 @@ RE=arm-unknown-nto-qnx6.5.0eabi-readelf
 grep -q __QNXNTO__ build/qnx/r137_macros.txt
 grep -q __arm__ build/qnx/r137_macros.txt
 set -- -std=c11 -D_QNX_SOURCE=1 -include sys/types.h -O2 -Wall -Wextra -Werror -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp
-"$CC" "$@" -fPIC -shared -Wl,--hash-style=sysv -Wl,--no-undefined preload_review/preload_probe.c -o build/qnx/libau57x_r137_preload_REVIEW.so
+"$CC" "$@" -fPIC -shared -Wl,--hash-style=sysv -Wl,--no-undefined preload_review/preload_probe.c -Wl,--no-as-needed -lc -Wl,--as-needed -o build/qnx/libau57x_r137_preload_REVIEW.so
 "$CC" "$@" preload_review/preload_test.c -o build/qnx/r137_preload_test
 "$RE" -h -d -Ws build/qnx/libau57x_r137_preload_REVIEW.so >build/qnx/r137_preload_elf.txt
 grep -Eq 'Machine:.*ARM' build/qnx/r137_preload_elf.txt
+grep -Fq 'Shared library: [libc.so.3]' build/qnx/r137_preload_elf.txt
 grep -Eq 'FUNC[[:space:]]+GLOBAL.*r137_preload_pid$' build/qnx/r137_preload_elf.txt
 sha256sum build/qnx/libau57x_r137_preload_REVIEW.so build/qnx/r137_preload_test >build/qnx/R137_TARGET_SHA256.txt
-# R132 fix: C-only forced include must never be passed to assembly.
-"$CC" -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp -c native_rf/r132_trace_thunk.S -o build/qnx/r132_trace_thunk.o
-"$CC" "$@" -Inative_rf native_rf/r131_trace_entry.c native_rf/r132_trace_bridge.c ci/r132_arm_trace_smoke.c build/qnx/r132_trace_thunk.o -o build/qnx/r132_arm_trace_smoke
-"$RE" -h -Ws build/qnx/r132_arm_trace_smoke >build/qnx/r132_readelf.txt
-if grep -E 'UND.*(__atomic_|__sync_)' build/qnx/r132_readelf.txt; then exit 2; fi
