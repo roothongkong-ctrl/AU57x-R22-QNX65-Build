@@ -375,3 +375,56 @@ jobs:
           name: mu1005-cprx-unix-source-review
           path: evidence/
           retention-days: 7
+  native-integrated-build:
+    needs: port-and-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: mu1005-cprx-unix-source-review
+          path: host-evidence
+      - name: Cross-build exact tested integrated source for QNX 6.5 ARM
+        run: |
+          set -euxo pipefail
+          mkdir evidence
+          git init upstream
+          git -C upstream remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C upstream fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C upstream checkout --detach FETCH_HEAD
+          test "$(git -C upstream rev-parse HEAD)" = 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C upstream apply --check "$PWD/host-evidence/mu1005-integrated-review.patch"
+          git -C upstream apply "$PWD/host-evidence/mu1005-integrated-review.patch"
+          sha256sum host-evidence/mu1005-integrated-review.patch | tee evidence/source-patch.sha256
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          docker build --platform linux/amd64 --target with-rust --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5-rust toolchain 2>&1 | tee evidence/compiler.log
+          docker run --rm --platform linux/amd64 -v "$PWD/upstream":/src -w /src qnx65-armv7-toolchain:8.5-rust /opt/rust/qnx-cargo build --locked --manifest-path /src/wireless/daemon/Cargo.toml --bin mhi2q-wireless-daemon 2>&1 | tee evidence/daemon-build.log
+          bin=$(find upstream/wireless/daemon/target -type f -name mhi2q-wireless-daemon -print -quit)
+          test -n "$bin"
+          readelf -h -l -dW "$bin" | tee evidence/daemon-elf.log
+          grep -Eq 'Machine:.*ARM' evidence/daemon-elf.log
+          sha256sum "$bin" | tee evidence/daemon.sha256
+          git fetch --depth 1 origin 7f595231394d97091ec0fee209677b6e45fd50dc
+          test "$(git rev-parse FETCH_HEAD)" = 7f595231394d97091ec0fee209677b6e45fd50dc
+          mkdir mu1005
+          git archive FETCH_HEAD project/source/legacy_mu1005/airplay | tar -x -C mu1005
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5-rust bash -c '
+            set -eux
+            a=mu1005/project/source/legacy_mu1005/airplay
+            C=arm-unknown-nto-qnx6.5.0eabi-gcc
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -I"$a" "$a"/{cprx_service,native_exports,semantic,mu1005_r34_ap_server}.c -lsocket -o /tmp/libmu1005_cprx.so
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW /tmp/libmu1005_cprx.so
+          ' 2>&1 | tee evidence/c-receiver-build.log
+          grep -Eq 'Machine:.*ARM' evidence/c-receiver-build.log
+          echo MU1005_TESTED_SOURCE_RUST_C_NATIVE_BUILD_OK_NO_OEM_NO_INSTALL | tee evidence/summary.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mu1005-integrated-native-build-evidence-only
+          path: evidence/
+          retention-days: 7
