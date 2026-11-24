@@ -1,0 +1,53 @@
+name: MU1005 complete upstream graft source port (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-full-upstream-graft-port]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  full-graft:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch exact mature source and adapt entire graft
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          git init upstream
+          git -C upstream remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C upstream fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C upstream checkout --detach FETCH_HEAD
+          git -C upstream rev-parse HEAD | tee evidence/upstream.commit
+          python3 integration/mu1005_full_graft/port.py upstream adapted | tee evidence/source-port.log
+      - name: Link entire ARM code with discovery and transport, activation denied
+        run: |
+          set -euxo pipefail
+          for f in graft eir deny; do
+            clang -target armv7-none-eabi -march=armv7-a -marm -O2 -ffreestanding -fno-builtin -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-stack-protector -fno-pic -DAU57X_LINK_REVIEW_ONLY -c "adapted/$f.c" -o "adapted/$f.o"
+          done
+          ld.lld -flavor gnu -m armelf -T adapted/graft.ld --no-undefined adapted/{graft,eir,deny}.o -o adapted/review.elf
+          readelf -h -SW -sW -rW adapted/review.elf | tee evidence/arm-elf.log
+          python3 - <<'PY'
+          import subprocess,re
+          s=subprocess.check_output(['readelf','-SW','adapted/review.elf'],text=True)
+          m=re.search(r'\.graft\s+PROGBITS\s+([0-9a-f]+)\s+[0-9a-f]+\s+([0-9a-f]+)',s)
+          assert m and int(m[1],16)==0x510000 and int(m[1],16)+int(m[2],16)<0x520000
+          sym=subprocess.check_output(['readelf','-sW','adapted/review.elf'],text=True)
+          for n in ['graft_init','graft_rf_callback','graft_worker','graft_hook','graft_eir_hook','eir_append_carplay_uuid','au57x_review_owner']:
+              assert re.search(r'\b'+n+r'$',sym,re.M),n
+          assert 'There are no relocations' in subprocess.check_output(['readelf','-rW','adapted/review.elf'],text=True)
+          print('FULL_GRAFT_LINKED_NO_OEM_ATTACH_NO_AUTHORIZATION')
+          PY
+      - name: Run upstream EIR insertion tests on Linux
+        run: |
+          set -euxo pipefail
+          sed 's/-dynamiclib/-shared\x27, \x27-fPIC/' upstream/wireless/graft/test_eir.py > upstream/wireless/graft/test_eir_linux.py
+          python3 upstream/wireless/graft/test_eir_linux.py | tee evidence/eir-tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-graft-port-review-logs-only
+          path: evidence/
+          retention-days: 7
