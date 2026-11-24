@@ -1,0 +1,38 @@
+name: MU1005 direct upstream daemon bridge (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-direct-upstream-bridge]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  c-rust-transport:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile existing R45 and new daemon client
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          base=project/source/legacy_mu1005/bluetooth
+          new=integration/mu1005_direct_daemon
+          cc -std=c11 -D_DEFAULT_SOURCE -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -no-pie -I"$base" -I"$new" "$base"/{mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump}.c "$new"/{daemon_client,test_client}.c -o "$RUNNER_TEMP/au57x-client" 2>&1 | tee evidence/compile.log
+      - name: Fetch mature daemon and run real cross-language socket test
+        run: |
+          set -euxo pipefail
+          git init upstream
+          git -C upstream remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C upstream fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C upstream checkout --detach FETCH_HEAD
+          git -C upstream rev-parse HEAD > evidence/upstream.commit
+          cp integration/mu1005_direct_daemon/upstream_socket_test.rs upstream/wireless/daemon/tests/au57x_direct.rs
+          AU57X_C_FIXTURE="$RUNNER_TEMP/au57x-client" cargo test --manifest-path upstream/wireless/daemon/Cargo.toml --locked --offline --test au57x_direct -- --nocapture 2>&1 | tee evidence/direct-transport.log
+          grep -Fq AU57X_DIRECT_DAEMON_MARKER_SYN_WIRED_REVOKE_OK_NO_OEM evidence/direct-transport.log
+          grep -Fq AU57X_C_TO_UPSTREAM_LINK_OK_NO_OEM evidence/direct-transport.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: direct-upstream-transport-evidence-NO-INSTALL
+          path: evidence/
+          retention-days: 7
