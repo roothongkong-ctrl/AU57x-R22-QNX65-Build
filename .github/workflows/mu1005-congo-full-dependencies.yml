@@ -1,0 +1,60 @@
+name: Congo full-stack dependency inventory (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-congo-pairing-helper-review]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dependency-inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Fetch pinned public release
+        run: |
+          set -euxo pipefail
+          git init donor
+          git -C donor remote add origin https://github.com/congobg/MHI2Q_WiFi_CarPlay.git
+          git -C donor fetch --depth 1 origin 223b42f90bf7c15fbbbef23259da36caa9bd4994
+          git -C donor checkout --detach FETCH_HEAD
+      - name: Inventory full stack and dynamic dependency candidates
+        run: |
+          set -euxo pipefail
+          mkdir evidence
+          python3 - <<'PY'
+          import tarfile,pathlib,re,hashlib,json,subprocess,tempfile
+          p=pathlib.Path("donor/MHI2QC_3638/wcp.tar.gz")
+          report={"scope":"read-only dependency inventory; strings are candidates, not proven calls","components":[],"files":[]}
+          with tarfile.open(p,"r:gz") as t:
+              for m in t:
+                  report["files"].append({"name":m.name,"size":m.size,"type":str(m.type)})
+                  if not m.isfile() or m.size>30_000_000:continue
+                  name=pathlib.PurePosixPath(m.name).name
+                  if name not in {"wcppaird","wcpd","libwcpstart.so","libbthook.so","libairplay.so","libwcpshim.so","libnvstubs.so","wcp-boot.sh","dio-up.sh","start-ap.sh"}:continue
+                  data=t.extractfile(m).read()
+                  r={"path":m.name,"sha256":hashlib.sha256(data).hexdigest()}
+                  if data.startswith(b"\x7fELF"):
+                      with tempfile.TemporaryDirectory() as d:
+                          f=pathlib.Path(d)/"input";f.write_bytes(data)
+                          s=subprocess.check_output(["strings","-a","-n","5",str(f)],text=True,errors="replace")
+                          dyn=subprocess.check_output(["readelf","-dW",str(f)],text=True)
+                          r["needed"]=re.findall(r"Shared library: \[([^\]]+)\]",dyn)
+                          r["dynamic_library_names"]=sorted(set(re.findall(r"[A-Za-z0-9_+.-]+\.so(?:\.[0-9]+)*",s)))
+                          r["environment_keys"]=sorted(set(re.findall(r"\bWCP_[A-Z0-9_]+\b",s)))
+                          r["hardware_paths"]=sorted(set(re.findall(r"/(?:dev|mnt)/[A-Za-z0-9_./-]+",s)))
+                  else:
+                      s=data.decode("utf-8","replace")
+                      r["environment_keys"]=sorted(set(re.findall(r"\bWCP_[A-Z0-9_]+\b",s)))
+                      r["hardware_paths"]=sorted(set(re.findall(r"/(?:dev|mnt)/[A-Za-z0-9_./-]+",s)))
+                  report["components"].append(r)
+          report["duplicate_airplay_paths"]=[f["name"] for f in report["files"] if f["name"].endswith("/libairplay.so")]
+          pathlib.Path("evidence/inventory.json").write_text(json.dumps(report,indent=2)+"\n")
+          print(json.dumps({"components":report["components"],"duplicate_airplay_paths":report["duplicate_airplay_paths"]},indent=2))
+          assert any(pathlib.PurePosixPath(x["path"]).name=="wcppaird" for x in report["components"])
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: congo-dependency-inventory-no-binaries
+          path: evidence/
+          retention-days: 7
