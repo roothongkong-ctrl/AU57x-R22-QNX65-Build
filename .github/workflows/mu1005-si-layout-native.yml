@@ -80,7 +80,7 @@ jobs:
           test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
           sudo apt-get update -qq
           sudo apt-get install -y -qq qemu-system-arm
-          docker build --platform linux/amd64 --target base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee evidence/compiler.log
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee evidence/compiler.log
           docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=c99 -Wall -Wextra -Werror -O2 layout.c -o /src/layout_native
           sed 's/qemu-system-arm -M virt/qemu-system-arm -nic user,restrict=on -M virt/' toolchain/tests/qemu-run.sh > toolchain/tests/qemu-run-layout.sh
           QEMU_KEEP_LOG="$PWD/evidence/boot.log" QEMU_RUN_SECS=20 QEMU_TIMEOUT=95 bash toolchain/tests/qemu-run-layout.sh "$PWD/layout_native" 8.5 2>&1 | tee evidence/native.log
