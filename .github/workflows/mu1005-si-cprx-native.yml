@@ -22,6 +22,21 @@ jobs:
           git archive FETCH_HEAD project/source/legacy_mu1005/airplay | tar -x -C r85
           cp -R r85/project/source/legacy_mu1005/airplay review/source/
           cp -R integration/mu1005_si_native review/source/si
+          # Reuse the actual upstream signer, not a replacement or software credential.
+          git init luka
+          git -C luka remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C luka fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C luka checkout --detach FETCH_HEAD
+          test "$(git -C luka rev-parse HEAD)" = 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          mkdir -p review/source/upstream-signer
+          cp luka/hook/wireless/mfi_stock.c review/source/upstream-signer/
+          git -C luka show HEAD:hook/wireless/mfi_stock.c | cmp - review/source/upstream-signer/mfi_stock.c
+          # Preserve upstream license alongside verbatim source.
+          for lic in LICENSE LICENSE.md COPYING; do
+            if test -f "luka/$lic"; then cp "luka/$lic" review/source/upstream-signer/; fi
+          done
+          test -f review/source/upstream-signer/LICENSE || test -f review/source/upstream-signer/LICENSE.md || test -f review/source/upstream-signer/COPYING
+
           git init toolchain
           git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
           git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
@@ -61,9 +76,19 @@ jobs:
             "$C" -print-file-name=libsocket.so
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$a" -I"$s" "$s"/{si_mu1005_layout,si_mu1005_registration,si_mu1005_activation,si_mu1005_snapshot,si_mu1005_owner,si_mu1005_cprx}.c "$a"/{cprx_service,native_exports,semantic,mu1005_r34_ap_server}.c -lsocket -lc -o review/payload/libmu1005_si_cprx.so
             "$R" -h -dW -sW review/payload/libmu1005_si_cprx.so > review/evidence/native-elf.log
+            # Standalone PIC object; not loaded and not linked into an OEM process.
+            # RTLD_NEXT must later resolve genuine libairplay in the same owner process.
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -c review/source/upstream-signer/mfi_stock.c -o review/payload/mfi_stock-review.o
+            "$R" -h -sW review/payload/mfi_stock-review.o > review/evidence/signer-elf.log
           ' 2>&1 | tee review/evidence/native-build.log
           grep -Eq 'Machine:.*ARM' review/evidence/native-elf.log
           grep -Eq 'Type:.*DYN' review/evidence/native-elf.log
+          grep -Eq 'Machine:.*ARM' review/evidence/signer-elf.log
+          grep -Eq 'Type:.*REL' review/evidence/signer-elf.log
+          for sym in MFiPlatform_CreateSignature MFiPlatform_CopyCertificate; do
+            awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/signer-elf.log
+          done
+          echo UPSTREAM_STOCK_MFI_ADAPTER_COMPILED_NOT_EXECUTED | tee review/evidence/signer-result.txt
           grep -Eq 'NEEDED.*libc\.so' review/evidence/native-elf.log
           grep -Eq 'NEEDED.*libsocket\.so' review/evidence/native-elf.log
           for sym in mu_si_cprx_init mu_si_cprx_tick mu_si_cprx_cleanup mu_owner_tick mu_cprx_client_begin_remote mu_cprx_client_tick; do
