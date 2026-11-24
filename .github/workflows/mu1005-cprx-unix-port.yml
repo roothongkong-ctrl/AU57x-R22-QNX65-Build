@@ -74,7 +74,7 @@ jobs:
           assert n==4,n
           for op,payload in [("OP_IAP2","Some(&frame)"),("OP_IAP2_POLL","Some(&self.semantic_output.to_le_bytes())"),("OP_NOW_PLAYING","Some(frame)")]:
               once(f"Self::exchange_payload(self.address,{op},generation,self.airplay_port,self.si,{payload})",f"self.exchange_current({op},generation,{payload})")
-          once("        if let Some(frame) = payload {",'''        Self::exchange_transport(address,operation,generation,airplay_port,si,payload,None)
+          once("    ) -> io::Result<BridgeReply> {\n        if let Some(frame) = payload {",'''    ) -> io::Result<BridgeReply> {\n        Self::exchange_transport(address,operation,generation,airplay_port,si,payload,None)
               }
               fn exchange_transport(
                   address:SocketAddrV4,operation:u8,generation:u32,airplay_port:u16,
