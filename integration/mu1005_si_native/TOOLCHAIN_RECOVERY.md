@@ -1,0 +1,5 @@
+# MU1005 SI native review – toolchain recovery (NO INSTALL)
+Previous run 45419760614 failed before compiling the SI/CPRX library: GNU GCC 8.5.0 and binutils 2.38 archives could not be downloaded (curl exit 28). Host real CPRX run 45419760413 succeeded.
+The revised workflow uses HTTPS mirror fallback, exact original SHA-256 on cache hits and downloads, and leaves the original Dockerfile hash checks intact. Only the archive delivery lines are changed. No firmware, proprietary binary or MFi changes are included.
+Upstream donor: luka-dev/mib2q-carplay-rgi at 20c94f51c0f0ae88b154c12e4f604643ba23022c, wireless/si/README.md. Reports physical wireless video on MU1316/P5087, not MU1005. Its owner queue, SI native controller and media observation are relevant, but donor addresses and object layout cannot be reused on MU1005 without exact original ELF evidence.
+Next binding input: original MU1005 smartphone_integrator, original dio_manager, original libairplay.so (or privately generated symbol/disassembly/owner evidence from exactly those versions). The public build does not contain them. Do not interpret compilation as live OEM binding.

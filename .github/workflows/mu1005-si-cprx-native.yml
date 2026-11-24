@@ -2,14 +2,14 @@ name: MU1005 SI CPRX native library (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/mu1005-si-cprx-native.yml, integration/mu1005_si_native/**]
+    paths: [.github/workflows/mu1005-si-cprx-native.yml, integration/mu1005_si_native/**, tools/ci/mu1005_gnu_mirrors.sh]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   native-library:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Fetch locked original receiver and proven ARM toolchain
@@ -27,6 +27,19 @@ jobs:
           git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
           git -C toolchain checkout --detach FETCH_HEAD
           test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+      - name: Restore checksum-pinned GNU source cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/au57x-gnu
+          key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
+      - name: Fetch and verify GNU archives from independent mirrors
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee review/evidence/gnu-sources.log
+      - name: Build locked ARM toolchain using verified local archives
+        run: |
+          set -euxo pipefail
           docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee review/evidence/compiler.log
       - name: Compile and link tested SI and actual CPRX transport on QNX ARM
         run: |
