@@ -409,6 +409,9 @@ jobs:
           readelf -h -l -dW "$bin" | tee evidence/daemon-elf.log
           grep -Eq 'Machine:.*ARM' evidence/daemon-elf.log
           sha256sum "$bin" | tee evidence/daemon.sha256
+          mkdir -p unified-review/payload unified-review/source unified-review/evidence
+          cp "$bin" unified-review/payload/mhi2q-wireless-daemon
+          cp host-evidence/mu1005-integrated-review.patch unified-review/source/
           git fetch --depth 1 origin 7f595231394d97091ec0fee209677b6e45fd50dc
           test "$(git rev-parse FETCH_HEAD)" = 7f595231394d97091ec0fee209677b6e45fd50dc
           mkdir mu1005
@@ -419,12 +422,25 @@ jobs:
             C=arm-unknown-nto-qnx6.5.0eabi-gcc
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -I"$a" "$a"/{cprx_service,native_exports,semantic,mu1005_r34_ap_server}.c -lsocket -o /tmp/libmu1005_cprx.so
             arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW /tmp/libmu1005_cprx.so
+            cp /tmp/libmu1005_cprx.so /src/unified-review/payload/
           ' 2>&1 | tee evidence/c-receiver-build.log
           grep -Eq 'Machine:.*ARM' evidence/c-receiver-build.log
           echo MU1005_TESTED_SOURCE_RUST_C_NATIVE_BUILD_OK_NO_OEM_NO_INSTALL | tee evidence/summary.log
+          cp evidence/{daemon-elf.log,c-receiver-build.log,source-patch.sha256,summary.log} unified-review/evidence/
+          cp -R mu1005/project/source/legacy_mu1005/airplay unified-review/source/
+          printf '%s\n' 'NO INSTALL / REVIEW COMPONENTS ONLY' 'Target MU1005 QNX ARM' 'OEM SI adapter, genuine authentication, Bluetooth owner attachment and physical session are NOT verified.' 'No original firmware or installation scripts included.' > unified-review/README.txt
+          (cd unified-review && find payload source evidence -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS && sha256sum -c SHA256SUMS)
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: mu1005-integrated-native-build-evidence-only
           path: evidence/
           retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: mu1005-unified-native-components-NO-INSTALL
+          path: unified-review/
+          retention-days: 30
+          if-no-files-found: error
