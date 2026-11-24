@@ -63,6 +63,13 @@ class Elf:
             raise ValueError("truncated ELF range")
         return self.data[off:off+n]
 
+    def code(self,va,n):
+        if va&3 or n<=0:
+            return None
+        matches=[self.block(off+va-base,n) for base,off,fs in self.loads
+                 if base<=va and va+n<=base+fs]
+        return matches[0] if len(matches)==1 else None
+
     def prefix(self,va):
         # ARM only. Thumb and non-file-backed entries are not mapped.
         if va&3:
@@ -70,6 +77,51 @@ class Elf:
         matches=[self.block(off+va-base,12) for base,off,fs in self.loads
                  if base<=va and va+12<=base+fs]
         return matches[0] if len(matches)==1 else None
+
+def instruction_mask(word):
+    # Only mask PC-relative immediate fields. Preserve conditions, registers,
+    # instruction classes and ordinary object-offset immediates.
+    if (word & 0x0e000000)==0x0a000000 and (word>>28)!=15:
+        return 0xff000000
+    if (word & 0x0e0f0000)==0x040f0000 and (word>>28)!=15:
+        return 0xff7ff000
+    return 0xffffffff
+
+def masked_signature(data):
+    words=struct.unpack("<"+"I"*(len(data)//4),data)
+    return [(w&instruction_mask(w),instruction_mask(w)) for w in words]
+
+def code_candidates(src,dst,va):
+    # Two disjoint 32-byte blocks; do not choose based on a short prologue.
+    code=src.code(va,64)
+    if not code:
+        return {"assessment":"insufficient_file_backed_bytes","addresses":[]}
+    sig=masked_signature(code)
+    fixed=sum(mask==0xffffffff for _,mask in sig)
+    if fixed<10:
+        return {"assessment":"insufficient_fixed_words","addresses":[],"fixed_words":fixed}
+    # Use a fixed word as an index to avoid scanning every 64-byte window.
+    indexed=[i for i,(_,m) in enumerate(sig) if m==0xffffffff]
+    idx=indexed[len(indexed)//2]
+    needle=struct.pack("<I",sig[idx][0])
+    hits=[]
+    for base,off,fs in dst.loads:
+        buf=dst.block(off,fs)
+        start=0
+        while True:
+            pos=buf.find(needle,start)
+            if pos<0:break
+            start=pos+1
+            p=pos-4*idx
+            if p<0 or p+64>len(buf) or (base+p)&3:continue
+            vals=struct.unpack_from("<16I",buf,p)
+            if all((w&m)==v for w,(v,m) in zip(vals,sig)):
+                hits.append(base+p)
+    hits=sorted(set(hits))
+    return {"assessment":"unique_masked_64byte_candidate" if len(hits)==1 else
+            "ambiguous" if hits else "not_found",
+            "fixed_words":fixed,"addresses":[hex(x) for x in hits],
+            "exact_64byte_match":[hex(x) for x in hits if dst.code(x,64)==code]}
 
 def compare(src,dst):
     rows=[]
@@ -87,10 +139,12 @@ def compare(src,dst):
         strong=[x for x in items if any(m["same_nonzero_size"] and m["same_prefix"] for m in x["matches"])]
         rows.append({"role":role,"source_va":hex(va),"source_prefix":prefix.hex() if prefix else None,
           "source_symbols":[n for n,_ in aliases],"candidates":items,
+          "instruction_candidates":code_candidates(src,dst,va),
           "assessment":"unique_named_prefix_candidate" if len(strong)==1 and len(items)==1 else
             ("no_source_symbol" if not aliases else "unresolved_or_changed")})
     return {"source_sha256":src.sha,"target_sha256":dst.sha,"points":rows,
        "mapped_candidates":sum(r["assessment"]=="unique_named_prefix_candidate" for r in rows),
+       "unique_instruction_candidates":sum(r["instruction_candidates"]["assessment"]=="unique_masked_64byte_candidate" for r in rows),
        "runtime_approved":False,"installable":False,
        "unverified":["function semantics","data structure offsets","global singleton addresses",
                      "vtable slots","call sites","hook relocation","native ownership"]}
@@ -112,7 +166,12 @@ def main():
     report["scope"]="DONOR_SELF_REVIEW_ONLY" if a.self_review else "MU1005_PRIVATE_ELF_REVIEW_ONLY"
     if a.self_review:
         assert all(r["source_prefix"] is not None for r in report["points"])
+        for row in report["points"]:
+            c=row["instruction_candidates"]
+            if c["assessment"]=="unique_masked_64byte_candidate":
+                assert c["addresses"]==[row["source_va"]],row["role"]
+        assert report["unique_instruction_candidates"]>0
     a.out.write_text(json.dumps(report,indent=2)+"\n")
-    print(report["scope"],"candidate count",report["mapped_candidates"],"/",len(POINTS),"NO INSTALL")
+    print(report["scope"],"named candidate count",report["mapped_candidates"],"/",len(POINTS),"instruction candidate count",report["unique_instruction_candidates"],"/",len(POINTS),"NO INSTALL")
 if __name__=="__main__":
     main()
