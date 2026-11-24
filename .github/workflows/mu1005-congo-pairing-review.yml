@@ -1,0 +1,67 @@
+name: Congo independent pairing helper compatibility review
+on:
+  push:
+    branches: [mu1005-congo-pairing-helper-review]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-elf-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Fetch pinned noncommercial donor for private-use compatibility review
+        run: |
+          set -euxo pipefail
+          git init donor
+          git -C donor remote add origin https://github.com/congobg/MHI2Q_WiFi_CarPlay.git
+          git -C donor fetch --depth 1 origin 223b42f90bf7c15fbbbef23259da36caa9bd4994
+          git -C donor checkout --detach FETCH_HEAD
+          test "$(git -C donor rev-parse HEAD)" = 223b42f90bf7c15fbbbef23259da36caa9bd4994
+      - name: Inspect helper ELF in memory (never execute or extract files to filesystem)
+        run: |
+          set -euxo pipefail
+          mkdir evidence
+          python3 - <<'PY'
+          import hashlib,json,tarfile,subprocess,tempfile,pathlib,struct
+          p=pathlib.Path("donor/MHI2QC_3638/wcp.tar.gz")
+          report={"scope":"static compatibility review, not permission to install or integrate", "donor_commit":"223b42f90bf7c15fbbbef23259da36caa9bd4994","archive_sha256":hashlib.sha256(p.read_bytes()).hexdigest(),"license":"PolyForm Noncommercial 1.0.0; separate review, no GPL combination","programs":[],"other_elf_libraries":[]}
+          wanted={"wcppaird","libwcpstart.so","wcpd","libbthook.so"}
+          with tarfile.open(p,"r:gz") as tar:
+              for m in tar:
+                  if not m.isfile() or m.size<52 or m.size>50_000_000:continue
+                  name=pathlib.PurePosixPath(m.name).name
+                  f=tar.extractfile(m)
+                  header=f.read(52)
+                  if header[:4]!=b"\x7fELF":continue
+                  if name not in wanted:
+                      if ".so" in name:report["other_elf_libraries"].append(name)
+                      continue
+                  data=header+f.read()
+                  with tempfile.TemporaryDirectory() as d:
+                      target=pathlib.Path(d)/"elf"
+                      target.write_bytes(data)
+                      def read(*args):
+                          r=subprocess.run(["readelf",*args,str(target)],capture_output=True,text=True,check=True)
+                          return r.stdout
+                      import re
+                      dynamic=read("-dW")
+                      phdr=read("-lW")
+                      needed=re.findall(r"Shared library: \[([^\]]+)\]",dynamic)
+                      interp=re.findall(r"Requesting program interpreter: ([^\]]+)",phdr)
+                      symbols=read("--dyn-syms","-W")
+                      imports=[l.split()[-1].split("@")[0] for l in symbols.splitlines() if " UND " in l and len(l.split())>=8]
+                      relevant=[s for s in imports if re.search("mfi|i2c|crypto|pair|sodium|sha|aes|socket|devctl|dlopen|dlsym",s,re.I)]
+                      report["programs"].append({"name":name,"sha256":hashlib.sha256(data).hexdigest(),"size":len(data),"elf_class":header[4],"little_endian":header[5]==1,"machine":struct.unpack_from("<H",header,18)[0] if header[5]==1 else None,"interpreter":interp,"needed":needed,"architecture":read("-A"),"selected_imports":relevant,"undefined_symbol_count":len(imports)})
+          report["other_elf_libraries"]=sorted(set(report["other_elf_libraries"]))
+          report["pairing_helper_found"]=any(x["name"]=="wcppaird" for x in report["programs"])
+          pathlib.Path("evidence/compatibility.json").write_text(json.dumps(report,indent=2)+"\n")
+          print(json.dumps(report,indent=2))
+          assert report["pairing_helper_found"],"No standalone helper found in published archive"
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: congo-pairing-helper-static-review-only
+          path: evidence/
+          retention-days: 7
