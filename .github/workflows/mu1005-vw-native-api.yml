@@ -1,0 +1,46 @@
+name: VW Tegra receiver video and native API interface review
+on:
+  push:
+    branches: [mu1005-vw-tegra-receiver-route]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-api:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Fetch exact reference
+        run: |
+          set -eux
+          git init donor
+          git -C donor remote add origin https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps.git
+          git -C donor fetch --depth 1 origin aec37f5b1c87a0d961d16fe4328ac3638d0a833e
+          git -C donor checkout --detach FETCH_HEAD
+      - name: Extract dynamic lookup candidates and protocol handoff file names
+        run: |
+          set -eux
+          mkdir evidence
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess,re,json,hashlib
+          base=Path("donor/standalone/SD_ROOT/carplay/payload/wireless")
+          files=[base/"common/ota/wcp_video",base/"common/ota/libbtwcp.so",base/"profiles/AID10.5-17PM/wcp_receiver"]
+          result={"scope":"static references only, no invocation, no authorization modification","components":[]}
+          for p in files:
+              lines=subprocess.check_output(["strings","-a","-n","4",str(p)],text=True,errors="replace").splitlines()
+              dyn=subprocess.check_output(["readelf","-Ws",str(p)],text=True)
+              tokens=set(x.strip() for x in lines if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{3,120}",x.strip()))
+              api=sorted(x for x in tokens if re.match(r"(?i)^(nvss|nvsc|nvvs|nvmedia|nvparser|nvaudio|kd[A-Z]|omx|egl|screen_|audio|dmdt)",x))
+              fileset=sorted(set(re.findall(r"/dev/(?:shmem/[A-Za-z0-9_.-]+|ipod[0-9]*|i2c[0-9]+)","\n".join(lines))))
+              # Names in strings are candidate dlsym names, not a verified signature.
+              result["components"].append({"name":p.name,"sha256":hashlib.sha256(p.read_bytes()).hexdigest(),"candidate_native_symbols":api,"shared_state_path_candidates":fileset,"has_dynamic_lookup":bool(re.search(r"\bdlsym\b",dyn))})
+          Path("evidence/tegra-native-api.json").write_text(json.dumps(result,indent=2)+"\n")
+          print(json.dumps(result,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vw-native-api-names-only
+          path: evidence/
+          retention-days: 7
