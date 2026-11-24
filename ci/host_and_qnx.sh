@@ -2,9 +2,11 @@
 set -Eeuo pipefail
 mkdir -p build/qnx
 sha256sum -c R125_SOURCE_SHA256.txt | tee build/qnx/source_hashes.log
-gcc -std=c11 -O2 -Wall -Wextra -Werror -fPIC -shared -Istock_transport -Iradio_stream/src stock_transport/r123_rf_transport.c stock_transport/r124_driver_iface.c stock_transport/r125_module.c radio_stream/src/wcp_wire.c -o /tmp/r125-plugin-host.so
+gcc -std=c11 -O2 -Wall -Wextra -Werror -fPIC -shared -Istock_transport -Iradio_stream/src stock_transport/r123_rf_transport.c stock_transport/r124_driver_iface.c stock_transport/r125_module.c stock_transport/r129_driver_call.c radio_stream/src/wcp_wire.c -o /tmp/r125-plugin-host.so
 gcc -std=c11 -O2 -Wall -Wextra -Werror -Istock_transport -Iradio_stream/src ci/r125_plugin_smoke.c -ldl -o /tmp/r125-smoke
 /tmp/r125-smoke /tmp/r125-plugin-host.so | tee build/qnx/host_smoke.log
+gcc -std=c11 -Wall -Wextra -Werror -rdynamic -Istock_transport -Iradio_stream/src stock_transport/r129_driver_call.c tests/test_r129_driver_call.c -ldl -o /tmp/r129-call-test
+/tmp/r129-call-test | tee build/qnx/r129_host_call.log
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 git init -q "$tmp/toolchain"
