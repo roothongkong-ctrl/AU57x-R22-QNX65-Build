@@ -1,0 +1,31 @@
+name: R132 QNX ARM trace passthrough (NO INSTALL)
+on:
+  push:
+    branches: [r132-trace-arm-review]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qnx-arm-trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 160
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate source and scripts
+        run: |
+          bash -n ci/r132_cloud.sh
+          bash -n ci/r132_target.sh
+          sha256sum -c R132_TRACE_SHA256.txt
+      - name: Install QEMU
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+      - name: Build and execute ARM variadic passthrough fixture
+        run: bash ci/r132_cloud.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R132-QNX-TRACE-REVIEW-NO-INSTALL
+          path: build/qnx/
+          if-no-files-found: warn
+          retention-days: 14

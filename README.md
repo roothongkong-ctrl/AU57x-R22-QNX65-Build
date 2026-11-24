@@ -1,1 +1,1 @@
-R129: stock driver call ABI adapter; real driver init takes interface and mutable options string; receive takes interface alone. Requires externally verified owner, mapping, authorization and teardown. QEMU is an unarmed fixture, not OEM execution. Source only, NO INSTALL.
+R132: isolated source-only ARM trace passthrough review. No OEM executable, no live hooks, no vehicle deployment. QEMU fixture tests original-style variadic call forwarding and cannot establish real btstack ownership. GPL-compatible previously authored research source. NO INSTALL.
