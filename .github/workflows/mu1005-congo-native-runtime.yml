@@ -1,0 +1,113 @@
+name: Congo isolated QNX pairing runtime (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-congo-pairing-native]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  DONOR: 223b42f90bf7c15fbbbef23259da36caa9bd4994
+  TOOLCHAIN: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+jobs:
+  pairing-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned release and QNX runtime
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence stage sdk-libs
+          for item in donor toolchain; do
+            if [ "$item" = donor ]; then remote=congobg/MHI2Q_WiFi_CarPlay; pin="$DONOR"; else remote=luka-dev/qnx65-armv7-toolchain; pin="$TOOLCHAIN"; fi
+            git init "$item"
+            git -C "$item" remote add origin "https://github.com/$remote.git"
+            git -C "$item" fetch --depth 1 origin "$pin"
+            git -C "$item" checkout --detach FETCH_HEAD
+            test "$(git -C "$item" rev-parse HEAD)" = "$pin"
+          done
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee evidence/toolchain.log
+      - name: Stage only donor pairing helper and private dependencies
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          import tarfile,pathlib,hashlib
+          stage=pathlib.Path("stage")
+          wanted={"wcppaird","libairplay.so"}
+          report=[]
+          with tarfile.open("donor/MHI2QC_3638/wcp.tar.gz","r:gz") as t:
+              for m in t:
+                  if not m.isfile() or m.size>30_000_000:continue
+                  p=pathlib.PurePosixPath(m.name)
+                  if str(p)=="mnt/ota/wcp/wcppaird" or (str(p).startswith("mnt/ota/wcp/nv/") and ".so" in p.name):
+                      if p.name=="libnvstubs.so":continue
+                      b=t.extractfile(m).read()
+                      if b[:4]!=b"\x7fELF":continue
+                      dest=stage/p.name
+                      if dest.exists():raise ValueError("duplicate "+p.name)
+                      dest.write_bytes(b);dest.chmod(0o755)
+                      report.append(p.name+" "+hashlib.sha256(b).hexdigest())
+          assert wanted<={p.name for p in stage.iterdir()}
+          pathlib.Path("evidence/donor-hashes.txt").write_text("\n".join(sorted(report))+"\n")
+          PY
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            set -e
+            arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror integration/mu1005_congo_native/pair_runtime_probe.c -o /src/pair_runtime_probe
+            T=/opt/qnx650/target/qnx6/armle-v7
+            for dir in "$T/lib" "$T/usr/lib"; do
+              for f in "$dir"/*.so*; do
+                [ -f "$f" ] || continue
+                cp -L "$f" "/src/sdk-libs/$(basename "$f")"
+              done
+            done
+          '
+          python3 - <<'PY'
+          import pathlib,re,subprocess,shutil,json
+          stage=pathlib.Path("stage"); sdk=pathlib.Path("sdk-libs")
+          base={"libc.so.3","libm.so.2","libsocket.so.3"}
+          pending=list(stage.iterdir()); visited=set(); missing=set()
+          while pending:
+              p=pending.pop()
+              if p.name in visited:continue
+              visited.add(p.name)
+              s=subprocess.check_output(["readelf","-dW",str(p)],text=True)
+              for dep in re.findall(r"Shared library: \[([^\]]+)\]",s):
+                  if dep in base:continue
+                  dest=stage/dep
+                  if dest.is_file():pending.append(dest);continue
+                  if (sdk/dep).is_file():
+                      shutil.copy2(sdk/dep,dest);pending.append(dest)
+                  else:missing.add(dep)
+          report={"staged":sorted(visited),"unresolved":sorted(missing),"authentication_stubs":False,"vehicle_access":False}
+          pathlib.Path("evidence/native-dependency-closure.json").write_text(json.dumps(report,indent=2)+"\n")
+          print(json.dumps(report,indent=2))
+          PY
+      - name: Run isolated QNX library and helper startup
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("toolchain/tests/qemu-run.sh")
+          s=p.read_text()
+          a='cp "$BIN" "$WORK/$NAME"\n'
+          b=a+'cp "$DONOR_STAGE"/* "$WORK/"\n'
+          assert s.count(a)==1;s=s.replace(a,b,1)
+          a='$NAME\nEOF\n'
+          b=a+'for f in "$DONOR_STAGE"/*; do basename "$f" >> "$WORK/test.build"; done\n'
+          assert s.count(a)==1;s=s.replace(a,b,1)
+          a='qemu-system-arm -M virt'
+          assert s.count(a)==1;s=s.replace(a,'qemu-system-arm -net none -M virt',1)
+          p.with_name("qemu-run-congo.sh").write_text(s)
+          PY
+          DONOR_STAGE="$PWD/stage" QEMU_KEEP_LOG="$PWD/evidence/qemu-boot.log" QEMU_RUN_SECS=15 QEMU_TIMEOUT=80 bash toolchain/tests/qemu-run-congo.sh "$PWD/pair_runtime_probe" 8.5 2>&1 | tee evidence/native-pair-runtime.log
+          grep -Fq DONOR_PAIR_LIBRARY_LOAD_OK evidence/native-pair-runtime.log
+          grep -Fq DONOR_HELPER_SPAWN_OK evidence/native-pair-runtime.log
+          grep -Fq DONOR_HELPER_SURVIVED_3S evidence/native-pair-runtime.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: congo-native-pairing-review-logs-only
+          path: evidence/
+          retention-days: 7
