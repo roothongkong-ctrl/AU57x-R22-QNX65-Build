@@ -76,7 +76,7 @@ jobs:
               missing=deps-allowed-staged
               if missing: raise SystemExit(f"{p.name}: missing genuine dependencies {sorted(missing)}")
           PY
-      - name: Execute isolated native loader with no network or authentication device
+      - name: Execute isolated native loader with isolated boot networking and no authentication device
         run: |
           set -euxo pipefail
           python3 - <<'PY'
@@ -89,7 +89,7 @@ jobs:
               s=s.replace(a,b,1)
           once('cp "$BIN" "$WORK/$NAME"\n','cp "$BIN" "$WORK/$NAME"\ncp "$PAIR_STAGE"/* "$WORK/"\n')
           once('$NAME\nEOF\n','$NAME\n[data=copy] libCarPlayPairingCore.so\n[data=copy] libbacktrace.so.1\nEOF\n')
-          once('qemu-system-arm -M virt','qemu-system-arm -nic none -M virt')
+          once('qemu-system-arm -M virt','qemu-system-arm -nic user,restrict=on -M virt')
           p.with_name("qemu-run-pair-core.sh").write_text(s)
           PY
           PAIR_STAGE="$PWD/stage" QEMU_KEEP_LOG="$PWD/evidence/core-qnx-boot.log" QEMU_RUN_SECS=20 QEMU_TIMEOUT=90 bash toolchain/tests/qemu-run-pair-core.sh "$PWD/pair_core_probe" 8.5 2>&1 | tee evidence/core-runtime.log
