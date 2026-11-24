@@ -28,7 +28,8 @@ jobs:
           git -C toolchain checkout --detach FETCH_HEAD
           test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
       - name: Restore checksum-pinned GNU source cache
-        uses: actions/cache@v4
+        id: gnu-cache
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cache/au57x-gnu
           key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
@@ -37,6 +38,12 @@ jobs:
         run: |
           set -euo pipefail
           bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee review/evidence/gnu-sources.log
+      - name: Save verified archives before building
+        if: steps.gnu-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/au57x-gnu
+          key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
       - name: Build locked ARM toolchain using verified local archives
         run: |
           set -euxo pipefail
@@ -50,11 +57,15 @@ jobs:
             s=review/source/si
             C=arm-unknown-nto-qnx6.5.0eabi-gcc
             R=arm-unknown-nto-qnx6.5.0eabi-readelf
-            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$a" -I"$s" "$s"/{si_mu1005_layout,si_mu1005_registration,si_mu1005_activation,si_mu1005_snapshot,si_mu1005_owner,si_mu1005_cprx}.c "$a"/{cprx_service,native_exports,semantic,mu1005_r34_ap_server}.c -lsocket -o review/payload/libmu1005_si_cprx.so
+            "$C" -print-file-name=libc.so
+            "$C" -print-file-name=libsocket.so
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$a" -I"$s" "$s"/{si_mu1005_layout,si_mu1005_registration,si_mu1005_activation,si_mu1005_snapshot,si_mu1005_owner,si_mu1005_cprx}.c "$a"/{cprx_service,native_exports,semantic,mu1005_r34_ap_server}.c -lsocket -lc -o review/payload/libmu1005_si_cprx.so
             "$R" -h -dW -sW review/payload/libmu1005_si_cprx.so > review/evidence/native-elf.log
           ' 2>&1 | tee review/evidence/native-build.log
           grep -Eq 'Machine:.*ARM' review/evidence/native-elf.log
           grep -Eq 'Type:.*DYN' review/evidence/native-elf.log
+          grep -Eq 'NEEDED.*libc\.so' review/evidence/native-elf.log
+          grep -Eq 'NEEDED.*libsocket\.so' review/evidence/native-elf.log
           for sym in mu_si_cprx_init mu_si_cprx_tick mu_si_cprx_cleanup mu_owner_tick mu_cprx_client_begin_remote mu_cprx_client_tick; do
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/native-elf.log
           done
