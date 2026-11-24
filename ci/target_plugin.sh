@@ -30,13 +30,3 @@ grep -Fq 'Shared library: [libsocket.so.3]' build/qnx/plugin_readelf.txt
 "$RE" -h -d build/qnx/r127_pulse_smoke > build/qnx/pulse_readelf.txt
 sha256sum build/qnx/ipod-transport-au57xbt-REVIEW.so build/qnx/r125_plugin_smoke build/qnx/r127_pulse_smoke > build/qnx/TARGET_SHA256SUMS.txt
 echo AU57X_R125_QNX_ARM_PLUGIN_LINKED_REVIEW_ONLY
- build/qnx/plugin_readelf.txt
-grep -Eq '36[[:space:]]+OBJECT[[:space:]]+GLOBAL.*ipod_module$' build/qnx/plugin_readelf.txt
-grep -Fq 'Shared library: [libc.so.3]' build/qnx/plugin_readelf.txt
-grep -Fq 'Shared library: [libsocket.so.3]' build/qnx/plugin_readelf.txt
-"$CC" "${flags[@]}" ci/r125_plugin_smoke.c -o build/qnx/r125_plugin_smoke
-"$RE" -h -d build/qnx/r125_plugin_smoke > build/qnx/smoke_readelf.txt
-"$CC" "${flags[@]}" ci/r127_pulse_smoke.c -o build/qnx/r127_pulse_smoke
-"$RE" -h -d build/qnx/r127_pulse_smoke > build/qnx/pulse_readelf.txt
-sha256sum build/qnx/ipod-transport-au57xbt-REVIEW.so build/qnx/r125_plugin_smoke build/qnx/r127_pulse_smoke > build/qnx/TARGET_SHA256SUMS.txt
-echo AU57X_R125_QNX_ARM_PLUGIN_LINKED_REVIEW_ONLY
