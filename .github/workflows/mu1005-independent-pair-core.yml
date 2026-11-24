@@ -1,0 +1,102 @@
+name: MU1005 independent pairing core isolated loader (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-vw-tegra-receiver-route]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pairing-core-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned donor and QNX compiler
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence stage
+          git init donor
+          git -C donor remote add origin https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps.git
+          git -C donor fetch --depth 1 origin aec37f5b1c87a0d961d16fe4328ac3638d0a833e
+          git -C donor checkout --detach FETCH_HEAD
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee evidence/toolchain.log
+      - name: Validate exact pairing core and native dependencies
+        run: |
+          set -euxo pipefail
+          root=donor/standalone/SD_ROOT/carplay/payload/common
+          cp "$root/libCarPlayPairingCore.so" stage/
+          echo '90c348f99abcc54b5a486c8394d9a5cf0f484a4b68d91b222ffa6e96cc6e3b0d  stage/libCarPlayPairingCore.so' | sha256sum -c
+          readelf -h -dW stage/libCarPlayPairingCore.so | tee evidence/core-elf.log
+          readelf --dyn-syms -W stage/libCarPlayPairingCore.so > evidence/core-symbols.log
+          cat > probe.c <<'C'
+          #include <stdio.h>
+          #include <unistd.h>
+          #include <dlfcn.h>
+          int main(void) {
+              if (access("/dev/i2c8", F_OK)==0) return 9;
+              setvbuf(stdout, NULL, _IONBF, 0);
+              void *h=dlopen("/proc/boot/libCarPlayPairingCore.so",RTLD_NOW|RTLD_LOCAL);
+              if(!h){printf("CORE_DLOPEN_ERROR %s\n",dlerror());return 2;}
+              const char *names[]={"PairingSessionCreate","PairingSessionExchange",
+                  "PairingSessionDeriveKey","PairingSessionSetIdentifier",
+                  "PairingSessionSetSetupCode","CFRelease",NULL};
+              for(int i=0;names[i];i++){
+                  dlerror(); void *p=dlsym(h,names[i]); const char *e=dlerror();
+                  printf("CORE_EXPORT %s %s\n",names[i],p&&!e?"present":"missing");
+                  if(!p||e){dlclose(h);return 3;}
+              }
+              /* No pairing call, key generation, signing, or authentication simulation. */
+              if(dlclose(h))return 4;
+              puts("INDEPENDENT_PAIRING_CORE_LOAD_EXPORTS_OK_NO_HARDWARE_NO_AUTH");
+              return 0;
+          }
+          C
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            set -eu
+            arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 probe.c -o /src/pair_core_probe
+            T=/opt/qnx650/target/qnx6/armle-v7
+            for dir in "$T/lib" "$T/usr/lib"; do
+              if [ -f "$dir/libbacktrace.so.1" ]; then cp -L "$dir/libbacktrace.so.1" stage/; break; fi
+            done
+            test -f stage/libbacktrace.so.1
+          '
+          readelf -dW stage/libbacktrace.so.1 | tee evidence/backtrace-needed.log
+          python3 - <<'PY'
+          import re, pathlib, subprocess
+          allowed={"libc.so.3","libm.so.2","libsocket.so.3"}
+          staged={p.name for p in pathlib.Path("stage").iterdir()}
+          for p in pathlib.Path("stage").iterdir():
+              deps=set(re.findall(r"Shared library: \[([^\]]+)\]",subprocess.check_output(["readelf","-dW",str(p)],text=True)))
+              missing=deps-allowed-staged
+              if missing: raise SystemExit(f"{p.name}: missing genuine dependencies {sorted(missing)}")
+          PY
+      - name: Execute isolated native loader with no network or authentication device
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("toolchain/tests/qemu-run.sh")
+          s=p.read_text()
+          def once(a,b):
+              global s
+              assert s.count(a)==1,a
+              s=s.replace(a,b,1)
+          once('cp "$BIN" "$WORK/$NAME"\n','cp "$BIN" "$WORK/$NAME"\ncp "$PAIR_STAGE"/* "$WORK/"\n')
+          once('$NAME\nEOF\n','$NAME\n[data=copy] libCarPlayPairingCore.so\n[data=copy] libbacktrace.so.1\nEOF\n')
+          once('qemu-system-arm -M virt','qemu-system-arm -nic none -M virt')
+          p.with_name("qemu-run-pair-core.sh").write_text(s)
+          PY
+          PAIR_STAGE="$PWD/stage" QEMU_KEEP_LOG="$PWD/evidence/core-qnx-boot.log" QEMU_RUN_SECS=20 QEMU_TIMEOUT=90 bash toolchain/tests/qemu-run-pair-core.sh "$PWD/pair_core_probe" 8.5 2>&1 | tee evidence/core-runtime.log
+          grep -Fq INDEPENDENT_PAIRING_CORE_LOAD_EXPORTS_OK_NO_HARDWARE_NO_AUTH evidence/core-runtime.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: independent-pairing-core-loader-logs-only
+          path: evidence/
+          retention-days: 7
