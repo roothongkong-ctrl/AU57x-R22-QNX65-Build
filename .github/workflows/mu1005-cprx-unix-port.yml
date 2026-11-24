@@ -450,12 +450,14 @@ jobs:
           a=integration/mu1005_si_native
           gcc -std=c99 -Wall -Wextra -Werror -fsanitize=address,undefined -g -no-pie -I"$a" "$a"/{si_mu1005_layout,si_mu1005_registration,test_registration}.c -o "$RUNNER_TEMP/si-registration"
           "$RUNNER_TEMP/si-registration" | tee unified-review/evidence/si-registration-host.log
+          gcc -std=c99 -Wall -Wextra -Werror -fsanitize=address,undefined -g -no-pie -I"$a" "$a"/{si_mu1005_snapshot,test_snapshot}.c -o "$RUNNER_TEMP/si-snapshot"
+          "$RUNNER_TEMP/si-snapshot" | tee unified-review/evidence/si-snapshot-host.log
           cp -R "$a" unified-review/source/si
           docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5-rust bash -c '
             set -eux
             a=unified-review/source/si
             C=arm-unknown-nto-qnx6.5.0eabi-gcc
-            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -I"$a" "$a"/{si_mu1005_layout,si_mu1005_registration}.c -o unified-review/payload/libmu1005_si_registration.so
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -I"$a" "$a"/{si_mu1005_layout,si_mu1005_registration,si_mu1005_activation,si_mu1005_snapshot}.c -o unified-review/payload/libmu1005_si_registration.so
             arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW unified-review/payload/libmu1005_si_registration.so
           ' 2>&1 | tee unified-review/evidence/si-registration-elf.log
           grep -Eq 'Machine:.*ARM' unified-review/evidence/si-registration-elf.log
