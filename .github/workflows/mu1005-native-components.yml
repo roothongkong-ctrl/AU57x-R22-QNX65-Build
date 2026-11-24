@@ -1,0 +1,75 @@
+name: MU1005 combined native components (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-stock210-source-port]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  UPSTREAM: 20c94f51c0f0ae88b154c12e4f604643ba23022c
+  TOOLCHAIN: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+  C_BRIDGE: ee79b402a78d453ba9fb2a2147ef0497f8352f31
+jobs:
+  arm-native-components:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned inputs and generate receiver patch
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence Patches
+          git init Patches/mhi2-carplay
+          git -C Patches/mhi2-carplay remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C Patches/mhi2-carplay fetch --depth 1 origin "$UPSTREAM"
+          git -C Patches/mhi2-carplay checkout --detach FETCH_HEAD
+          python3 integration/mu1005_stock210/apply_profile.py Patches/mhi2-carplay
+          git -C Patches/mhi2-carplay diff > evidence/receiver-profile.patch
+          git fetch --depth 1 origin "$C_BRIDGE"
+          git archive "$C_BRIDGE" integration/mu1005_direct_daemon project/source/legacy_mu1005/bluetooth | tar -xf -
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin "$TOOLCHAIN"
+          git -C toolchain checkout --detach FETCH_HEAD
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee evidence/toolchain.log
+      - name: Compile adapted receiver and Bluetooth transport for actual QNX target
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            set -eux
+            CC=arm-unknown-nto-qnx6.5.0eabi-gcc
+            RE=arm-unknown-nto-qnx6.5.0eabi-readelf
+            base=project/source/legacy_mu1005/bluetooth
+            new=integration/mu1005_direct_daemon
+            src=Patches/mhi2-carplay/hook/wireless/stock210_abi.c
+            mkdir -p evidence
+            "$CC" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -c "$src" -o /tmp/stock210-disabled.o
+            "$CC" -std=gnu99 -D_QNX_SOURCE -DAU57X_MU1005_OFFLINE_REVIEW=1 -O2 -Wall -Wextra -Werror -fPIC -c "$src" -o /tmp/stock210-review.o
+            "$CC" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -I"$base" -I"$new" -shared "$base"/{mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump}.c "$new"/daemon_client.c -lsocket -o /tmp/au57x-bridge-review.so
+            for f in /tmp/stock210-disabled.o /tmp/stock210-review.o /tmp/au57x-bridge-review.so; do
+              "$RE" -h -A "$f"
+              "$RE" -h "$f" | grep -q ARM
+            done
+            "$RE" -d /tmp/au57x-bridge-review.so
+          ' 2>&1 | tee evidence/arm-components.log
+      - name: Report complete Hook missing external inputs without bypassing authentication
+        if: always()
+        run: |
+          mkdir -p evidence
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          sdk=Path("Refferences/Carplay/AccessorySDK")
+          shim=Path("Patches/dio_asm_to_c/_legacy_attempt/libairplay-mhi2q/vendor/shims")
+          required=[sdk/"Support"/n for n in ("AESUtils.c","PairingUtils.c","ChaCha20Poly1305.c","SRPUtils.c","CFLite.c")]
+          required.append(shim)
+          result={"scope":"review only","missing_external_inputs":[str(p) for p in required if not p.exists()],"full_hook_built":False,"runtime_approved":False,"mfi_bypass":False}
+          Path("evidence/external-inputs.json").write_text(json.dumps(result,indent=2)+"\n")
+          print(json.dumps(result,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: MU1005-native-component-review-logs-only
+          path: evidence/
+          retention-days: 7
