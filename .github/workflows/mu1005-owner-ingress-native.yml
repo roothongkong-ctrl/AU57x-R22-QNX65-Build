@@ -78,11 +78,19 @@ jobs:
             set -eux
             C=arm-unknown-nto-qnx6.5.0eabi-gcc
             "$C" -std=gnu99 -include stddef.h -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Isrc src/{outbound_session,callback_handoff,mu1005_rf_ingress,owner_bridge,mu1005_ipc_stream,mu1005_socket_pump,daemon_client}.c -lsocket -o /tmp/libowner_transport.so
-            "$C" -std=gnu99 -include stddef.h -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -Isrc src/{outbound_session,callback_handoff,mu1005_rf_ingress,owner_bridge,test_bridge}.c -o /tmp/test_owner
+            "$C" -std=gnu99 -include stddef.h -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -Isrc src/{outbound_session,callback_handoff,mu1005_rf_ingress,owner_bridge,test_bridge}.c -o /src/test_owner
             arm-unknown-nto-qnx6.5.0eabi-readelf -h -d -W /tmp/libowner_transport.so
-            arm-unknown-nto-qnx6.5.0eabi-readelf -h -l -W /tmp/test_owner
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h -l -W /src/test_owner
           ' 2>&1 | tee evidence/native-compile.log
           grep -q ARM evidence/native-compile.log
+      - name: Execute native owner regression under isolated QNX 6.5
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+          # No OEM processes, radio hardware or authentication stubs in this fixture.
+          sed 's/qemu-system-arm -M virt/qemu-system-arm -nic user,restrict=on -M virt/' toolchain/tests/qemu-run.sh > toolchain/tests/qemu-run-owner.sh
+          QEMU_KEEP_LOG="$PWD/evidence/owner-qnx-boot.log" QEMU_RUN_SECS=20 QEMU_TIMEOUT=90 bash toolchain/tests/qemu-run-owner.sh "$PWD/test_owner" 8.5 2>&1 | tee evidence/owner-qnx-runtime.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
