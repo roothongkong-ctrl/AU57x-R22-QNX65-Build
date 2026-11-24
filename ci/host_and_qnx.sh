@@ -28,3 +28,5 @@ PY
 chmod +x "$tmp/toolchain/tests/qemu-run-r125.sh"
 QNX_R125_REVIEW_SO="$PWD/build/qnx/ipod-transport-au57xbt-REVIEW.so" QEMU_RUN_SECS=20 QEMU_TIMEOUT=80 QEMU_KEEP_LOG="$PWD/build/qnx/boot_console.log" "$tmp/toolchain/tests/qemu-run-r125.sh" "$PWD/build/qnx/r125_plugin_smoke" 8.5 2>&1 | tee build/qnx/runtime_smoke.log
 grep -Fq AU57X_R125_QNX_PLUGIN_DLOPEN_OK_NO_OEM build/qnx/runtime_smoke.log
+QNX_R125_REVIEW_SO="$PWD/build/qnx/ipod-transport-au57xbt-REVIEW.so" QEMU_RUN_SECS=20 QEMU_TIMEOUT=80 QEMU_KEEP_LOG="$PWD/build/qnx/pulse_boot_console.log" "$tmp/toolchain/tests/qemu-run-r125.sh" "$PWD/build/qnx/r127_pulse_smoke" 8.5 2>&1 | tee build/qnx/pulse_runtime.log
+grep -Fq AU57X_R127_QNX_PULSE_DEFERRED_LOADER_OK_NO_OEM build/qnx/pulse_runtime.log

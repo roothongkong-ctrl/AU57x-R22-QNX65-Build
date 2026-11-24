@@ -9,7 +9,11 @@ static int proof(void *p,void *device,uint32_t gen){(void)p;return device==s.dev
 static void revoke(void){if(s.inner)r124_driver_revoke();else if(s.transport)r123_transport_revoke(s.transport);s.state=R125_STOP_REQUIRED;}
 static int available(void){if(s.state!=R125_STARTING&&s.state!=R125_RUNNING)return 0;if(!authorized()){revoke();return 0;}return 1;}
 static int init(R124Iface*i,const char*path,const char*opts){
- if(i!=&iface||s.state!=R125_ARMED||!i->owner)return EINVAL;
+ if(i!=&iface||!i->owner)return EINVAL;
+ /* Stock loader invokes init BEFORE its dispatch pool starts. The explicit
+  * review option allows inert init, never starts the driver or trusts peer IPC. */
+ if(s.state==R125_EMPTY&&path&&opts&&!strcmp(path,"/dev/ipod")&&!strcmp(opts,"review-deferred")){s.device=i->owner;s.state=R127_WAITING;return 0;}
+ if(s.state!=R125_ARMED)return EINVAL;
  s.device=i->owner;if(!authorized()){revoke();return EACCES;}
  R124Proof p={NULL,proof};
  if(r124_driver_prepare(s.transport,s.device,&p,&s.inner)||s.inner->init(s.inner,path,opts)){revoke();return EIO;}
@@ -23,9 +27,20 @@ static int tx(void*d,const void*p,unsigned n){if(d!=s.device||!available()){errn
 static int rx(void*d,void*p,unsigned n,int ms,void*o){if(d!=s.device||!available()){errno=EACCES;return -1;}return s.inner->recv(d,p,n,ms,o);}
 static R124Iface iface={.name="ipod_transport",.init=init,.link=link,.type=type,.caps=caps,.audio=audio,.send=tx,.recv=rx};
 R125Module ipod_module={.name="transport_au57xbt",.version=0x200,.interfaces=&iface};
+static int valid_offer(R123Transport*t,const R125Owner*o){
+ return t&&t->opened&&t->active&&!t->failed&&o&&o->owner_context&&o->authorized&&o->start_driver&&o->input_ready&&o->stop_driver;
+}
 int r125_arm(R123Transport*t,const R125Owner*o){
- if(s.state!=R125_EMPTY||!t||!t->opened||!t->active||t->failed||!o||!o->owner_context||!o->authorized||!o->start_driver||!o->input_ready||!o->stop_driver)return -1;
+ if(s.state!=R125_EMPTY||!valid_offer(t,o))return -1;
  s.transport=t;s.owner=*o;s.state=R125_ARMED;return 0;
+}
+int r127_bind_waiting(R123Transport*t,const R125Owner*o){
+ /* All calls, including callbacks, MUST be serialized by the actual native
+  * owner. This function is not an authorization provider. */
+ if(s.state!=R127_WAITING||s.dispatching||!valid_offer(t,o)||!s.device||iface.owner!=s.device)return -1;
+ if(o->owner_context(o->context,s.device)!=1||o->authorized(o->context,s.device,t->generation)!=1)return -1;
+ s.transport=t;s.owner=*o;s.state=R125_ARMED;
+ return init(&iface,"/dev/ipod","")? -1:0;
 }
 int r125_state(void){return s.state;}
 int r125_stop(void){

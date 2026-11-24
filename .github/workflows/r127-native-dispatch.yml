@@ -1,0 +1,27 @@
+name: R127 QNX deferred loader and pulse verification (NO INSTALL)
+on:
+  push:
+    branches: [r127-native-dispatch-review]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qnx-native-plugin:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 160
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install QEMU
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+      - name: Verify R125 source hashes, compile QNX ARM plugin and load in QEMU
+        run: bash ci/host_and_qnx.sh
+      - name: Upload actual target evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: R127-QNX-PULSE-REVIEW-NO-INSTALL
+          path: build/qnx/
+          if-no-files-found: warn
+          retention-days: 14

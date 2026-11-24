@@ -18,8 +18,11 @@ typedef struct {
  void (*input_ready)(void *,void *device); /* owner-bound original driver +0x20 */
  int (*stop_driver)(void *,void *device); /* independently proven teardown; 0 success */
 } R125Owner;
-enum {R125_EMPTY,R125_ARMED,R125_BOUND,R125_STARTING,R125_RUNNING,R125_STOP_REQUIRED,R125_RETIRED,R125_DIRTY};
+enum {R125_EMPTY,R125_ARMED,R125_BOUND,R125_STARTING,R125_RUNNING,R125_STOP_REQUIRED,R125_RETIRED,R125_DIRTY,R127_WAITING};
 int r125_arm(R123Transport *,const R125Owner *);
+/* R127 opt-in review-only loader bootstrap: call only in certified serialized
+ * dispatch context, with fresh native authorization. No default activation. */
+int r127_bind_waiting(R123Transport *,const R125Owner *);
 int r125_dispatch(void);
 int r125_stop(void);
 int r125_state(void);
