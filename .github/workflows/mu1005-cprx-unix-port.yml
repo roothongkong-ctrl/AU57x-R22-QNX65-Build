@@ -1,0 +1,190 @@
+name: MU1005 CPRX Unix transport source port (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-direct-upstream-bridge]
+    paths: [.github/workflows/mu1005-cprx-unix-port.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  port-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch exact upstream source
+        run: |
+          set -euxo pipefail
+          mkdir evidence
+          git init upstream
+          git -C upstream remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C upstream fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C upstream checkout --detach FETCH_HEAD
+          test "$(git -C upstream rev-parse HEAD)" = 20c94f51c0f0ae88b154c12e4f604643ba23022c
+      - name: Adapt original CPRX codec to an explicitly verified Unix endpoint
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("upstream/wireless/daemon/src/receiver_control.rs")
+          s=p.read_text()
+          def once(a,b):
+              global s
+              assert s.count(a)==1, a
+              s=s.replace(a,b,1)
+          once("use std::io::{self, Read, Write};","use std::io::{self, Read, Write};\nuse std::os::unix::net::UnixStream;\nuse std::path::Path;")
+          once("#[derive(Clone, Copy)]\npub struct LoopbackReceiverControl {",'''// Source-review candidate. Production owner attester is deliberately absent.
+          type Mu1005Attester = fn(&UnixStream,u32,u64,u32)->io::Result<()>;
+          #[derive(Clone, Copy)]
+          struct Mu1005Endpoint {
+              path: &'static Path,
+              attest: Mu1005Attester,
+          }
+          trait ReviewStream: Read+Write {}
+          impl<T:Read+Write> ReviewStream for T {}
+          #[derive(Clone, Copy)]
+          pub struct LoopbackReceiverControl {''')
+          once("    semantic_child: u32,\n}","    semantic_child: u32,\n    mu1005_endpoint: Option<Mu1005Endpoint>,\n}")
+          once("            semantic_input:0,semantic_output:0,semantic_child:0,","            semantic_input:0,semantic_output:0,semantic_child:0,\n            mu1005_endpoint:None,")
+          once("    pub fn bind_si(&mut self, epoch: u64, session: u32) {",'''    // Review-only API: a trusted caller must independently verify the connected
+              // DIO process and current owner tuple, not just the pathname or UID.
+              // No vehicle caller is supplied here. Never fall back to TCP in this mode.
+              pub fn bind_mu1005_review(&mut self,path:&'static Path,attest:Mu1005Attester)->io::Result<()> {
+                  if !path.is_absolute() || path.as_os_str().len()>100 {
+                      return Err(io::Error::new(io::ErrorKind::InvalidInput,"invalid MU1005 private endpoint"));
+                  }
+                  self.mu1005_endpoint=Some(Mu1005Endpoint{path,attest});
+                  Ok(())
+              }
+              fn exchange_current(&self, operation:u8,generation:u32,payload:Option<&[u8]>)->io::Result<BridgeReply>{
+                  Self::exchange_transport(self.address,operation,generation,self.airplay_port,self.si,payload,self.mu1005_endpoint)
+              }
+              pub fn bind_si(&mut self, epoch: u64, session: u32) {''')
+          old='''Self::exchange_bound(
+                      self.address,
+                      operation,
+                      generation,
+                      self.airplay_port,
+                      self.si,
+                  )'''
+          # Match source indentation exactly, independent of the YAML indentation.
+          import re
+          pat=r"Self::exchange_bound\(\s*self\.address,\s*(operation|OP_STATUS|OP_HEALTH|OP_IDENTITY),\s*generation,\s*self\.airplay_port,\s*self\.si,\s*\)"
+          s,n=re.subn(pat,lambda m:f"self.exchange_current({m[1]},generation,None)",s)
+          assert n==4,n
+          for op,payload in [("OP_IAP2","Some(&frame)"),("OP_IAP2_POLL","Some(&self.semantic_output.to_le_bytes())"),("OP_NOW_PLAYING","Some(frame)")]:
+              once(f"Self::exchange_payload(self.address,{op},generation,self.airplay_port,self.si,{payload})",f"self.exchange_current({op},generation,{payload})")
+          once("        if let Some(frame) = payload {",'''        Self::exchange_transport(address,operation,generation,airplay_port,si,payload,None)
+              }
+              fn exchange_transport(
+                  address:SocketAddrV4,operation:u8,generation:u32,airplay_port:u16,
+                  si:Option<(u64,u32)>,payload:Option<&[u8]>,endpoint:Option<Mu1005Endpoint>
+              )->io::Result<BridgeReply>{
+                  if let Some(frame) = payload {''')
+          once('''        let mut stream = TcpStream::connect_timeout(&address.into(), timeout)?;
+                  stream.set_read_timeout(Some(timeout))?;
+                  stream.set_write_timeout(Some(timeout))?;'''.replace("\n                  ","\n        "),'''        let mut stream:Box<dyn ReviewStream>=if let Some(ep)=endpoint {
+                      let (epoch,session)=si.filter(|(e,s)|*e!=0&&*s!=0)
+                          .ok_or_else(||io::Error::new(io::ErrorKind::PermissionDenied,"MU1005 requires SI binding"))?;
+                      if generation==0{return Err(io::Error::new(io::ErrorKind::PermissionDenied,"zero generation"));}
+                      // Unix connect itself still needs a target-specific bounded-connect review.
+                      let sock=UnixStream::connect(ep.path)?;
+                      sock.set_read_timeout(Some(timeout))?;
+                      sock.set_write_timeout(Some(timeout))?;
+                      (ep.attest)(&sock,generation,epoch,session)?;
+                      Box::new(sock)
+                  }else{
+                      let sock=TcpStream::connect_timeout(&address.into(),timeout)?;
+                      sock.set_read_timeout(Some(timeout))?;
+                      sock.set_write_timeout(Some(timeout))?;
+                      Box::new(sock)
+                  };''')
+          p.write_text(s)
+          with p.open("a") as f:
+              f.write(r'''
+          #[cfg(test)]
+          mod mu1005_unix_review {
+              use super::*;
+              use std::os::unix::net::UnixListener;
+              use std::os::unix::fs::PermissionsExt;
+              fn fixture_path(label:&str)->(&'static Path,std::path::PathBuf){
+                  let dir=std::env::temp_dir().join(format!("au57x-{}-{}",std::process::id(),label));
+                  std::fs::create_dir(&dir).unwrap();
+                  std::fs::set_permissions(&dir,std::fs::Permissions::from_mode(0o700)).unwrap();
+                  let path=Box::leak(dir.join("cprx.sock").into_boxed_path());
+                  (path,dir)
+              }
+              // TEST FIXTURE ONLY: validates the tuple, not a genuine OEM owner.
+              fn fixture_attest(_: &UnixStream,g:u32,e:u64,s:u32)->io::Result<()>{
+                  if (g,e,s)==(3,42,7){Ok(())}else{Err(io::Error::from(io::ErrorKind::PermissionDenied))}
+              }
+              #[test]
+              fn mu1005_unix_review_start_identity_status_stop(){
+                  let (path,dir)=fixture_path("positive");
+                  let listener=UnixListener::bind(path).unwrap();
+                  let server=std::thread::spawn(move||{
+                      for op in [1u8,5,6,2]{
+                          let (mut s,_)=listener.accept().unwrap();
+                          let mut b=[0;32];s.read_exact(&mut b).unwrap();
+                          assert_eq!(&b[..6],&[b'C',b'P',b'R',b'X',3,op]);
+                          assert_eq!(&b[8..12],&3u32.to_le_bytes());
+                          assert_eq!(&b[16..24],&42u64.to_le_bytes());
+                          assert_eq!(&b[24..28],&7u32.to_le_bytes());
+                          s.write_all(b"CPRA\x02\0\0\0").unwrap();
+                          if op==5{s.write_all(b"\x06\0id-123").unwrap();}
+                          if op==6{s.write_all(&[7,0,0,0]).unwrap();}
+                      }
+                  });
+                  let mut c=LoopbackReceiverControl::new(5000).unwrap();
+                  c.bind_mu1005_review(path,fixture_attest).unwrap();
+                  assert_eq!(c.start(3).unwrap_err().kind(),io::ErrorKind::PermissionDenied);
+                  c.bind_si(42,7);
+                  c.start(3).unwrap();
+                  assert_eq!(c.pairing_identity(3).unwrap(),"id-123");
+                  assert_eq!(c.observe(3).unwrap(),ReceiverPhase::Streaming);
+                  c.stop(3).unwrap();
+                  server.join().unwrap();
+                  std::fs::remove_dir_all(dir).unwrap();
+              }
+              #[test]
+              fn mu1005_unix_review_rejects_unverified_peer_before_request(){
+                  let (path,dir)=fixture_path("denied");
+                  let listener=UnixListener::bind(path).unwrap();
+                  let server=std::thread::spawn(move||{
+                      let (mut s,_)=listener.accept().unwrap();
+                      s.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+                      let mut b=[0;1];assert_eq!(s.read(&mut b).unwrap(),0);
+                  });
+                  let mut c=LoopbackReceiverControl::new(5000).unwrap();
+                  c.bind_mu1005_review(path,fixture_attest).unwrap();
+                  c.bind_si(43,7);
+                  assert_eq!(c.start(3).unwrap_err().kind(),io::ErrorKind::PermissionDenied);
+                  server.join().unwrap();
+                  std::fs::remove_dir_all(dir).unwrap();
+              }
+              #[test]
+              fn mu1005_unix_review_missing_socket_no_tcp_fallback(){
+                  let (path,dir)=fixture_path("missing");
+                  let mut c=LoopbackReceiverControl::new(5000).unwrap();
+                  c.bind_si(42,7);
+                  c.bind_mu1005_review(path,fixture_attest).unwrap();
+                  assert_eq!(c.start(3).unwrap_err().kind(),io::ErrorKind::NotFound);
+                  std::fs::remove_dir_all(dir).unwrap();
+              }
+          }
+          ''')
+          PY
+          git -C upstream diff -- wireless/daemon/src/receiver_control.rs > evidence/mu1005-cprx-unix.patch
+      - name: Run real Unix socket transport and all original receiver regressions
+        run: |
+          set -euxo pipefail
+          cargo test --manifest-path upstream/wireless/daemon/Cargo.toml --locked --offline --lib receiver_control -- --nocapture 2>&1 | tee evidence/receiver-tests.log
+          grep -F 'mu1005_unix_review_start_identity_status_stop ... ok' evidence/receiver-tests.log
+          grep -F 'mu1005_unix_review_rejects_unverified_peer_before_request ... ok' evidence/receiver-tests.log
+          grep -F 'mu1005_unix_review_missing_socket_no_tcp_fallback ... ok' evidence/receiver-tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mu1005-cprx-unix-source-review
+          path: evidence/
+          retention-days: 7
