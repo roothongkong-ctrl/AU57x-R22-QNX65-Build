@@ -51,9 +51,13 @@ jobs:
           assert s.count(a)==1
           s=s.replace(a,b,1)
           a='$NAME\nEOF\n'
-          b='$NAME\nmhi2q-wireless-daemon\n[perms=+r,-x]\ndio_manager.json\nEOF\n'
+          b='$NAME\n[data=copy] mhi2q-wireless-daemon\n[perms=+r,-x]\ndio_manager.json\nEOF\n'
           assert s.count(a)==1
           s=s.replace(a,b,1)
+          # Keep runtime test isolated; QNX RAM IFS defaults to run-once data.
+          a="qemu-system-arm -M virt"
+          assert s.count(a)==1
+          s=s.replace(a,"qemu-system-arm -nic user,restrict=on -M virt",1)
           p.with_name("qemu-run-mu1005-daemon.sh").write_text(s)
           PY
           DAEMON_FIXTURE="$PWD/evidence/mhi2q-wireless-daemon" DIO_FIXTURE="$PWD/evidence/dio_manager.json" QEMU_KEEP_LOG="$PWD/evidence/qemu-boot.log" QEMU_RUN_SECS=25 QEMU_TIMEOUT=95 bash toolchain/tests/qemu-run-mu1005-daemon.sh "$PWD/evidence/config_runtime" 8.5-rust 2>&1 | tee evidence/native-runtime.log
