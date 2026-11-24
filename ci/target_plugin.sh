@@ -20,7 +20,8 @@ done
 grep -Eq 'Class:.*ELF32' build/qnx/plugin_readelf.txt
 grep -Eq 'Machine:.*ARM' build/qnx/plugin_readelf.txt
 grep -Eq 'Type:.*DYN' build/qnx/plugin_readelf.txt
-grep -Eq 'FUNC[[:space:]]+GLOBAL.*r129_driver_bind[[:space:]]+GLOBAL.*ipod_module$' build/qnx/plugin_readelf.txt
+grep -Eq 'FUNC[[:space:]]+GLOBAL.*r129_driver_bind$' build/qnx/plugin_readelf.txt
+grep -Eq '36[[:space:]]+OBJECT[[:space:]]+GLOBAL.*ipod_module$' build/qnx/plugin_readelf.txt
 grep -Fq 'Shared library: [libc.so.3]' build/qnx/plugin_readelf.txt
 grep -Fq 'Shared library: [libsocket.so.3]' build/qnx/plugin_readelf.txt
 "$CC" "${flags[@]}" ci/r125_plugin_smoke.c -o build/qnx/r125_plugin_smoke
