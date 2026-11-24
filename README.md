@@ -1,1 +1,1 @@
-R132: isolated source-only ARM trace passthrough review. No OEM executable, no live hooks, no vehicle deployment. QEMU fixture tests original-style variadic call forwarding and cannot establish real btstack ownership. GPL-compatible previously authored research source. NO INSTALL.
+R137: isolated LD_PRELOAD constructor / same-PID / read-only self address-space proof, baseline-preload-baseline via exec. R132 assembly flags corrected. No OEM binaries or live hooks; no Bluetooth registration or owner authorization. NO INSTALL.

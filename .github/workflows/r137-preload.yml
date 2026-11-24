@@ -1,0 +1,31 @@
+name: R137 QNX preload execution review (NO INSTALL)
+on:
+  push:
+    branches: [r137-preload-review]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preload:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate source and scripts
+        run: |
+          bash -n ci/r137_cloud.sh
+          bash -n ci/r137_target.sh
+          sha256sum -c R137_PRELOAD_SHA256.txt
+      - name: Install QEMU
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+      - name: Build and execute QNX preload proof
+        run: bash ci/r137_cloud.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R137-QNX-PRELOAD-REVIEW-NO-INSTALL
+          path: build/qnx/
+          if-no-files-found: warn
+          retention-days: 14
