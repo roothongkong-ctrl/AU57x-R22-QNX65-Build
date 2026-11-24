@@ -41,7 +41,7 @@ jobs:
               for m in t:
                   if not m.isfile() or m.size>30_000_000:continue
                   p=pathlib.PurePosixPath(m.name)
-                  if str(p)=="mnt/ota/wcp/wcppaird" or (str(p).startswith("mnt/ota/wcp/nv/") and ".so" in p.name):
+                  if str(p)=="mnt/ota/wcp/wcppaird" or (str(p).startswith("mnt/ota/wcp/nv/") and ".so" in p.name) or p.name in {"libcpp-ne.so.5","libdisplayinit.so","libdns_sd.so.1"}:
                       if p.name=="libnvstubs.so":continue
                       b=t.extractfile(m).read()
                       if b[:4]!=b"\x7fELF":continue
@@ -83,6 +83,7 @@ jobs:
           report={"staged":sorted(visited),"unresolved":sorted(missing),"authentication_stubs":False,"vehicle_access":False}
           pathlib.Path("evidence/native-dependency-closure.json").write_text(json.dumps(report,indent=2)+"\n")
           print(json.dumps(report,indent=2))
+          if missing: raise SystemExit("Unresolved genuine dependencies: "+", ".join(sorted(missing)))
           PY
       - name: Run isolated QNX library and helper startup
         run: |
@@ -98,7 +99,7 @@ jobs:
           b=a+'for f in "$DONOR_STAGE"/*; do basename "$f" >> "$WORK/test.build"; done\n'
           assert s.count(a)==1;s=s.replace(a,b,1)
           a='qemu-system-arm -M virt'
-          assert s.count(a)==1;s=s.replace(a,'qemu-system-arm -net none -M virt',1)
+          assert s.count(a)==1;s=s.replace(a,'qemu-system-arm -nic user,restrict=on -M virt',1)
           p.with_name("qemu-run-congo.sh").write_text(s)
           PY
           DONOR_STAGE="$PWD/stage" QEMU_KEEP_LOG="$PWD/evidence/qemu-boot.log" QEMU_RUN_SECS=15 QEMU_TIMEOUT=80 bash toolchain/tests/qemu-run-congo.sh "$PWD/pair_runtime_probe" 8.5 2>&1 | tee evidence/native-pair-runtime.log
