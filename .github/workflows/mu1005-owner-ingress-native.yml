@@ -1,0 +1,82 @@
+name: MU1005 owner callback integration native build (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-owner-ingress-native]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-transport:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact local source and compile regression fixtures
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence src
+          base=integration/mu1005_owner_ingress
+          base64 -d "$base/source.zip.b64" > "$RUNNER_TEMP/source.zip"
+          echo "06ec91615807315a9f6f3df7d3fb5ce59125b2217962491a4562709b16170040  $RUNNER_TEMP/source.zip" | sha256sum -c
+          unzip -q "$RUNNER_TEMP/source.zip" -d src
+          sha256sum src/* | tee evidence/source.sha256
+          cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -g -no-pie src/{outbound_session,callback_handoff,mu1005_rf_ingress,owner_bridge,test_bridge}.c -o "$RUNNER_TEMP/test_bridge"
+          "$RUNNER_TEMP/test_bridge" | tee evidence/owner-regression.log
+          old=project/source/legacy_mu1005/bluetooth
+          d=integration/mu1005_direct_daemon
+          cp "$old"/mu1005_ipc_stream.{c,h} "$old"/mu1005_socket_pump.{c,h} "$d"/daemon_client.{c,h} src/
+          cc -std=c11 -D_DEFAULT_SOURCE -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -g -no-pie -Isrc src/{outbound_session,callback_handoff,mu1005_rf_ingress,owner_bridge,mu1005_ipc_stream,mu1005_socket_pump,daemon_client}.c "$base/test_owner_socket.c" -o "$RUNNER_TEMP/au57x-client"
+      - name: Execute actual upstream Rust transport with owner callback fixture
+        run: |
+          set -euxo pipefail
+          git init upstream
+          git -C upstream remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C upstream fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C upstream checkout --detach FETCH_HEAD
+          cp integration/mu1005_direct_daemon/upstream_socket_test.rs upstream/wireless/daemon/tests/au57x_direct.rs
+          AU57X_C_FIXTURE="$RUNNER_TEMP/au57x-client" cargo test --manifest-path upstream/wireless/daemon/Cargo.toml --locked --offline --test au57x_direct -- --nocapture 2>&1 | tee evidence/owner-socket.log
+          grep -Fq AU57X_OWNER_CALLBACK_RUST_SOCKET_MARKER_SYN_REVOKE_OK_NO_OEM evidence/owner-socket.log
+          grep -Fq AU57X_C_TO_UPSTREAM_LINK_OK_NO_OEM evidence/owner-socket.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owner-host-transport-logs-only
+          path: evidence/
+          retention-days: 7
+  native-arm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage exact sources and pinned toolchain
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence src
+          base64 -d integration/mu1005_owner_ingress/source.zip.b64 > "$RUNNER_TEMP/source.zip"
+          echo "06ec91615807315a9f6f3df7d3fb5ce59125b2217962491a4562709b16170040  $RUNNER_TEMP/source.zip" | sha256sum -c
+          unzip -q "$RUNNER_TEMP/source.zip" -d src
+          old=project/source/legacy_mu1005/bluetooth
+          cp "$old"/mu1005_ipc_stream.{c,h} "$old"/mu1005_socket_pump.{c,h} integration/mu1005_direct_daemon/daemon_client.{c,h} src/
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee evidence/compiler.log
+      - name: Compile and link native ARM owner transport and regression executable
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            set -eux
+            C=arm-unknown-nto-qnx6.5.0eabi-gcc
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Isrc src/{outbound_session,callback_handoff,mu1005_rf_ingress,owner_bridge,mu1005_ipc_stream,mu1005_socket_pump,daemon_client}.c -lsocket -o /tmp/libowner_transport.so
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -Isrc src/{outbound_session,callback_handoff,mu1005_rf_ingress,owner_bridge,test_bridge}.c -o /tmp/test_owner
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h -d -W /tmp/libowner_transport.so
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h -l -W /tmp/test_owner
+          ' 2>&1 | tee evidence/native-compile.log
+          grep -q ARM evidence/native-compile.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owner-arm-build-logs-only
+          path: evidence/
+          retention-days: 7
