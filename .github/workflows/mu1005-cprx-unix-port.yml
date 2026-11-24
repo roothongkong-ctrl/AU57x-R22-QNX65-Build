@@ -182,6 +182,110 @@ jobs:
           grep -F 'mu1005_unix_review_start_identity_status_stop ... ok' evidence/receiver-tests.log
           grep -F 'mu1005_unix_review_rejects_unverified_peer_before_request ... ok' evidence/receiver-tests.log
           grep -F 'mu1005_unix_review_missing_socket_no_tcp_fallback ... ok' evidence/receiver-tests.log
+      - name: Connect adapted Rust client to actual MU1005 C receiver service
+        run: |
+          set -euxo pipefail
+          # Pin the existing MU1005 service rather than inventing a new server.
+          git fetch --depth 1 origin 7f595231394d97091ec0fee209677b6e45fd50dc
+          test "$(git rev-parse FETCH_HEAD)" = 7f595231394d97091ec0fee209677b6e45fd50dc
+          mkdir mu1005
+          git archive FETCH_HEAD project/source/legacy_mu1005/airplay | tar -x -C mu1005
+          a=mu1005/project/source/legacy_mu1005/airplay
+          cat > receiver_fixture.c <<'C'
+          /* Host-only behavioral fixture. The CPRX service is production
+             source; OEM calls below are test doubles, not native owner proof. */
+          #define _GNU_SOURCE
+          #include "cprx_service.h"
+          #include <sys/socket.h>
+          #include <unistd.h>
+          #include <time.h>
+          #include <stdlib.h>
+          #include <string.h>
+          #include <stdio.h>
+          #include <assert.h>
+          struct Fixture { int starts, polls, restores, samples; pid_t parent; };
+          static int admission(void *p,uint32_t g){return p&&g==3;}
+          static int si(void *p,uint32_t g,uint64_t e,uint32_t s){return p&&g==3&&e==42&&s==7;}
+          static int peer(void *p,int fd,uint32_t g,uint64_t e,uint32_t s){
+              struct Fixture *f=p; struct ucred c; socklen_t n=sizeof c;
+              return si(p,g,e,s)&&getsockopt(fd,SOL_SOCKET,SO_PEERCRED,&c,&n)==0
+                  &&n==sizeof c&&c.pid==f->parent&&c.uid==geteuid()&&c.gid==getegid();
+          }
+          static int identity(void *p,char *out,size_t cap){
+              if(!p||cap<7)return -1;
+              memcpy(out,"id-123",6);return 6;
+          }
+          static int media(void *p){struct Fixture *f=p;return ++f->samples<=2?7:0;}
+          static int start(void *p,unsigned port){
+              struct Fixture *f=p; if(port!=5000||++f->starts!=1)return -1;return 1;
+          }
+          static int poll_backend(void *p){struct Fixture *f=p;f->polls++;return 2;}
+          static int restore(void *p){struct Fixture *f=p;return ++f->restores==1?1:0;}
+          static uint64_t now(void){struct timespec t;assert(!clock_gettime(CLOCK_MONOTONIC,&t));
+              return (uint64_t)t.tv_sec*1000+(uint64_t)t.tv_nsec/1000000;}
+          int main(int argc,char **argv){
+              if(argc!=3)return 9;
+              struct Fixture f={.parent=(pid_t)strtol(argv[2],0,10)};
+              MuReceiverBackend b={&f,3,start,poll_backend,restore};
+              MuCprxEvidence e={.opaque=&f,.admitted=admission,.identity=identity,
+                  .media=media,.si_admitted=si,.si_client_verified=peer};
+              MuCprxService service={0};
+              if(mu_cprx_open_backend_si_unix(&service,&b,&e,5000,42,7,argv[1],geteuid(),getegid()))return 2;
+              uint64_t deadline=now()+15000;struct timespec delay={0,1000000};
+              while(now()<deadline){
+                  int rc=mu_cprx_tick(&service,now());
+                  if(rc==1){
+                      if(f.starts!=1||f.polls<1||f.restores!=2||f.samples!=3)return 4;
+                      puts("ACTUAL_MU1005_CPRX_C_SERVER_RESTORE_CONFIRMED_HOST_FIXTURE");
+                      return 0;
+                  }
+                  if(rc<0){mu_cprx_shutdown(&service);return 5;}
+                  nanosleep(&delay,0);
+              }
+              mu_cprx_shutdown(&service);return 6;
+          }
+          C
+          cc -std=c99 -O2 -Wall -Wextra -Werror -I"$a" receiver_fixture.c "$a"/{cprx_service,native_exports,semantic,mu1005_r34_ap_server}.c -ldl -o "$RUNNER_TEMP/receiver_fixture"
+          cat >> upstream/wireless/daemon/src/receiver_control.rs <<'RS'
+          #[cfg(test)]
+          mod mu1005_real_c_service_review {
+              use super::*;
+              use std::os::unix::fs::PermissionsExt;
+              fn test_tuple(_: &UnixStream,g:u32,e:u64,s:u32)->io::Result<()>{
+                  // A test-only attester. Production requires actual DIO owner proof.
+                  if (g,e,s)==(3,42,7){Ok(())}else{Err(io::Error::from(io::ErrorKind::PermissionDenied))}
+              }
+              #[test]
+              fn mu1005_actual_c_service_interop(){
+                  let exe=std::env::var("AU57X_CPRX_FIXTURE").unwrap();
+                  let dir=std::env::temp_dir().join(format!("au57x-c-{}",std::process::id()));
+                  std::fs::create_dir(&dir).unwrap();
+                  std::fs::set_permissions(&dir,std::fs::Permissions::from_mode(0o700)).unwrap();
+                  let path:&'static Path=Box::leak(dir.join("cprx.sock").into_boxed_path());
+                  let child=std::process::Command::new(exe).arg(&dir)
+                      .arg(std::process::id().to_string()).stdout(std::process::Stdio::piped()).spawn().unwrap();
+                  let deadline=std::time::Instant::now()+Duration::from_secs(3);
+                  while !path.exists()&&std::time::Instant::now()<deadline{
+                      std::thread::sleep(Duration::from_millis(10));
+                  }
+                  let mut c=LoopbackReceiverControl::new(5000).unwrap();
+                  c.bind_si(42,7);c.bind_mu1005_review(path,test_tuple).unwrap();
+                  c.start(3).unwrap();assert_eq!(c.pairing_identity(3).unwrap(),"id-123");
+                  assert_eq!(c.observe(3).unwrap(),ReceiverPhase::Streaming);
+                  assert_eq!(c.stop(3).unwrap_err().kind(),io::ErrorKind::WouldBlock);
+                  c.stop(3).unwrap();
+                  let out=child.wait_with_output().unwrap();
+                  assert!(out.status.success(),"{:?}",out.status);
+                  let stdout=String::from_utf8(out.stdout).unwrap();
+                  assert!(stdout.contains("ACTUAL_MU1005_CPRX_C_SERVER_RESTORE_CONFIRMED_HOST_FIXTURE"));
+                  assert!(!path.exists());
+                  std::fs::remove_dir_all(dir).unwrap();
+                  println!("RUST_TO_ACTUAL_MU1005_CPRX_C_SERVICE_BUSY_STOP_RESTORE_OK_NO_OEM");
+              }
+          }
+          RS
+          AU57X_CPRX_FIXTURE="$RUNNER_TEMP/receiver_fixture" cargo test --manifest-path upstream/wireless/daemon/Cargo.toml --locked --offline --lib mu1005_actual_c_service_interop -- --nocapture 2>&1 | tee evidence/c-rust-service.log
+          grep -F RUST_TO_ACTUAL_MU1005_CPRX_C_SERVICE_BUSY_STOP_RESTORE_OK_NO_OEM evidence/c-rust-service.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
