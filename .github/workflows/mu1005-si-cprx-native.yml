@@ -1,0 +1,64 @@
+name: MU1005 SI CPRX native library (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/mu1005-si-cprx-native.yml, integration/mu1005_si_native/**]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-library:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch locked original receiver and proven ARM toolchain
+        run: |
+          set -euxo pipefail
+          mkdir -p review/{payload,source,evidence}
+          git fetch --depth 1 origin 7f595231394d97091ec0fee209677b6e45fd50dc
+          test "$(git rev-parse FETCH_HEAD)" = 7f595231394d97091ec0fee209677b6e45fd50dc
+          mkdir r85
+          git archive FETCH_HEAD project/source/legacy_mu1005/airplay | tar -x -C r85
+          cp -R r85/project/source/legacy_mu1005/airplay review/source/
+          cp -R integration/mu1005_si_native review/source/si
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee review/evidence/compiler.log
+      - name: Compile and link tested SI and actual CPRX transport on QNX ARM
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            set -eux
+            a=review/source/airplay
+            s=review/source/si
+            C=arm-unknown-nto-qnx6.5.0eabi-gcc
+            R=arm-unknown-nto-qnx6.5.0eabi-readelf
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$a" -I"$s" "$s"/{si_mu1005_layout,si_mu1005_registration,si_mu1005_activation,si_mu1005_snapshot,si_mu1005_owner,si_mu1005_cprx}.c "$a"/{cprx_service,native_exports,semantic,mu1005_r34_ap_server}.c -lsocket -o review/payload/libmu1005_si_cprx.so
+            "$R" -h -dW -sW review/payload/libmu1005_si_cprx.so > review/evidence/native-elf.log
+          ' 2>&1 | tee review/evidence/native-build.log
+          grep -Eq 'Machine:.*ARM' review/evidence/native-elf.log
+          grep -Eq 'Type:.*DYN' review/evidence/native-elf.log
+          for sym in mu_si_cprx_init mu_si_cprx_tick mu_si_cprx_cleanup mu_owner_tick mu_cprx_client_begin_remote mu_cprx_client_tick; do
+            awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/native-elf.log
+          done
+          printf '%s\n' "source=$(git rev-parse HEAD)" "receiver=7f595231394d97091ec0fee209677b6e45fd50dc" "toolchain=baa45224f18ae6b13c2e9c77c6663bb8181eb6a1" > review/evidence/revisions.txt
+          printf '%s\n' 'NO INSTALL: native cross-compiled review library only' 'Original owner attachment, MFi authentication, real Wi-Fi and physical media not verified.' 'No firmware or installation instructions.' > review/README.txt
+          echo QNX_ARM_SI_CPRX_LINK_AND_EXPORT_CHECK_OK_NO_OEM_NO_INSTALL | tee review/evidence/result.txt
+          (cd review && find source payload evidence -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: si-cprx-native-build-evidence
+          path: review/evidence
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: mu1005-si-cprx-arm-NO-INSTALL
+          path: review/
+          retention-days: 30
+          if-no-files-found: error
