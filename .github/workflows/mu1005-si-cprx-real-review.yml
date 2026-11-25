@@ -57,6 +57,12 @@ jobs:
           b=project/source/legacy_mu1005/bluetooth
           cc -std=c99 -O2 -Wall -Wextra -Werror -I"$b" "$b/bt_owner_identity.c" tests/test_bt_owner_identity.c -o "$RUNNER_TEMP/bt-owner-identity"
           "$RUNNER_TEMP/bt-owner-identity" | tee evidence/bt-owner-identity.log
+      - name: Verify original-first notify callback bridge
+        run: |
+          set -euxo pipefail
+          b=project/source/legacy_mu1005/bluetooth
+          cc -std=c99 -O2 -Wall -Wextra -Werror -I"$b" "$b/bt_notify_bridge.c" tests/test_bt_notify_bridge.c -o "$RUNNER_TEMP/bt-notify"
+          "$RUNNER_TEMP/bt-notify" | tee evidence/bt-notify.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
