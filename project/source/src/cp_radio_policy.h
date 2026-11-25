@@ -19,7 +19,7 @@ struct cp_radio_policy {
  unsigned tried24:1, tried5:1;
  unsigned wired:1, owner_lost:1;
  enum cp_radio_phase phase;
- enum cp_radio_band selected;
+ enum cp_radio_band selected,preferred;
 };
 /* cap24/cap5 MUST be positively proven on actual radio, never inferred from
  * configured SSID, iAP2 Wi-Fi strings, or marketing claims.
@@ -28,6 +28,11 @@ void cp_radio_init(struct cp_radio_policy *p);
 int cp_radio_begin(struct cp_radio_policy *p, uint32_t epoch,
                    int cap24_confirmed, int cap5_confirmed,
                    int owner_confirmed, int wired_confirmed_idle);
+/* Explicit first-connect preference. Legacy begin defaults to 5 GHz. */
+int cp_radio_begin_preferred(struct cp_radio_policy *p,uint32_t epoch,
+ int cap24,int cap5,int owner,int wired_idle,enum cp_radio_band preferred);
+/* Classify configured 2.4/5 GHz channel; not a regulatory/channel capability check. */
+enum cp_radio_band cp_radio_channel_band(unsigned channel);
 int cp_radio_select(struct cp_radio_policy *p,uint32_t epoch,
                     int owner_confirmed,enum cp_radio_band *band);
 int cp_radio_connect_requested(struct cp_radio_policy *p,uint32_t epoch,

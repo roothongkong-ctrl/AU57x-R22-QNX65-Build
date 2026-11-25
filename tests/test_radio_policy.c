@@ -60,5 +60,20 @@ static void reject(void){
  assert(cp_radio_association_result(&r,7,1,1,CP_RADIO_5,0)==CP_RADIO_OK);
  assert(cp_radio_new_epoch_ready(&r,7,1)==CP_RADIO_BAD_STATE);
 }
-int main(void){dual();only24();only5();reject();
+static void first24(void){
+ struct cp_radio_policy r;enum cp_radio_band b=CP_RADIO_NONE;
+ cp_radio_init(&r);
+ assert(cp_radio_channel_band(6)==CP_RADIO_24);
+ assert(cp_radio_channel_band(36)==CP_RADIO_5);
+ assert(cp_radio_channel_band(0)==CP_RADIO_NONE);
+ assert(cp_radio_begin_preferred(&r,20,1,1,1,1,CP_RADIO_24)==CP_RADIO_OK);
+ assert(cp_radio_select(&r,20,1,&b)==CP_RADIO_OK&&b==CP_RADIO_24);
+ assert(cp_radio_connect_requested(&r,20,1)==CP_RADIO_OK);
+ assert(cp_radio_association_result(&r,20,1,0,CP_RADIO_24,0)==CP_RADIO_PENDING);
+ assert(cp_radio_select(&r,20,1,&b)==CP_RADIO_BAD_STATE);
+ assert(cp_radio_association_result(&r,20,1,0,CP_RADIO_24,1)==CP_RADIO_PENDING);
+ assert(cp_radio_select(&r,20,1,&b)==CP_RADIO_OK&&b==CP_RADIO_5);
+ puts("PASS first-connect 2.4 GHz preference, verified fallback to 5 GHz");
+}
+int main(void){dual();only24();only5();reject();first24();
  puts("AU57X_R36_DUAL_BAND_POLICY_MODEL_PASS");return 0;}

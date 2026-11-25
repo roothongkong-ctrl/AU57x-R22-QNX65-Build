@@ -207,6 +207,9 @@ static void no_cert_no_radio(void){
  assert(cp_cloud_wired_preempt(&s)==CP_CLOUD_OK);
  assert(cp_cloud_end(&s)==CP_CLOUD_OK);
 }
+static int ap_config_fixture(void *ctx,uint32_t epoch,enum cp_radio_band band,const struct cp_session *cfg){
+ return ctx!=NULL&&*(int*)ctx==1&&epoch==8&&band==CP_RADIO_5&&cfg->wifi.channel==36;
+}
 static void radio_to_airplay_proof(void){
  struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
  struct cp_oem_assertions proof={0};Mu34ApServer real_ap;
@@ -235,9 +238,23 @@ static void radio_to_airplay_proof(void){
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
  assert(!proof.live_hotspot&&!proof.network_airplay_ready);
  assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
- assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK&&p.band==CP_RADIO_24);
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
  assert(proof.verified_mfi&&proof.live_hotspot&&!proof.network_airplay_ready);
+ /* First attempt failed; verify actual disconnect before selecting 5 GHz. */
+ assert(cp_cloud_radio_result(&p,0,0)==CP_CLOUD_RETRY);
+ assert(cp_cloud_radio_result(&p,0,1)==CP_CLOUD_RETRY);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK&&p.band==CP_RADIO_5);
+ assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1&&!proof.live_hotspot);
+ struct cp_session updated=config;updated.wifi.channel=36;int verify=0;
+ assert(cp_cloud_refresh_ap_config(&p,&updated,ap_config_fixture,&verify)==CP_CLOUD_PROOF);
+ verify=1;b.wireless_pending=1;
+ assert(cp_cloud_refresh_ap_config(&p,&updated,ap_config_fixture,&verify)==CP_CLOUD_RETRY);
+ b.wireless_pending=0;
+ assert(cp_cloud_refresh_ap_config(&p,&updated,ap_config_fixture,&verify)==CP_CLOUD_OK);
+ assert(b.wireless.session==&updated);
+ assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1&&proof.live_hotspot);
+ puts("PASS band switch refreshes AP snapshot before Wi-Fi message");
  ap=0;
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1&&!proof.live_hotspot);
  ap=1;

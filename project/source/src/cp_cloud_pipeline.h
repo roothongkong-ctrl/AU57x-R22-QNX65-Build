@@ -134,6 +134,10 @@ int cp_cloud_bind_bootstrap(struct cp_cloud_pipeline *,
   const struct cp_identification *);
 int cp_cloud_confirm_bootstrap_auth(struct cp_cloud_pipeline *);
 int cp_cloud_radio_start(struct cp_cloud_pipeline *);
+/* Rebind a caller-owned immutable AP snapshot after a verified band
+ * change, before association/start. No credential generation or radio I/O. */
+int cp_cloud_refresh_ap_config(struct cp_cloud_pipeline *,const struct cp_session *,
+ int (*verify)(void *,uint32_t,enum cp_radio_band,const struct cp_session *),void *);
 int cp_cloud_radio_result(struct cp_cloud_pipeline *,int association_succeeded,
                           int physical_disconnect_verified);
 /* Drive the ACTUAL already-bound OEM AirPlay server on the original owner

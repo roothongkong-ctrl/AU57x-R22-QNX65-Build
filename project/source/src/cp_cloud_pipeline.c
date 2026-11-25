@@ -39,7 +39,11 @@ static int actual_wireless_proof(void *opaque,uint32_t epoch,uint32_t generation
  out->verified_control_session=out->verified_mfi;
  out->sole_dio_owner=p->owner.si_single_owner(p->owner.ctx,epoch)==1;
  out->wired_active=0;
- out->live_hotspot=(p->radio.epoch==epoch&&p->band!=CP_RADIO_NONE&&
+ /* A live AP in a different band must not cause 5703/4301 to
+  * advertise the stale channel in the previously bound configuration. */
+ out->live_hotspot=(p->bootstrap->wireless.session&&
+     cp_radio_channel_band(p->bootstrap->wireless.session->wifi.channel)==p->band&&
+     p->radio.epoch==epoch&&p->band!=CP_RADIO_NONE&&
      p->radio.selected==p->band&&
      (p->radio.phase==CP_RADIO_CONNECTING||
       p->radio.phase==CP_RADIO_ASSOCIATED)&&
@@ -353,6 +357,7 @@ static int native_failure(struct cp_cloud_pipeline *s){
 }
 int cp_cloud_confirm_bootstrap_auth(struct cp_cloud_pipeline *s){
  int cap24,cap5;
+ enum cp_radio_band preferred=CP_RADIO_5;
  if(!eligible(s,1))return stop(s);
  if(s->handoff.phase!=CP_HO_BT_LINK)return CP_CLOUD_ORDER;
  if(!s->bootstrap||s->bootstrap->epoch!=s->epoch||
@@ -360,7 +365,13 @@ int cp_cloud_confirm_bootstrap_auth(struct cp_cloud_pipeline *s){
     !cp_s4_authenticated(s->bootstrap))return CP_CLOUD_PROOF;
  cap24=s->owner.radio_capability(s->owner.ctx,CP_RADIO_24)==1;
  cap5=s->owner.radio_capability(s->owner.ctx,CP_RADIO_5)==1;
- if(cp_radio_begin(&s->radio,s->epoch,cap24,cap5,1,1)!=CP_RADIO_OK)
+ /* A bound first-connect AP configuration chooses the preferred band.
+  * Unbound legacy radio policy keeps its original 5 GHz default. */
+ if(s->bootstrap->wireless_bound&&s->bootstrap->wireless.session){
+  preferred=cp_radio_channel_band(s->bootstrap->wireless.session->wifi.channel);
+  if(preferred==CP_RADIO_NONE)return CP_CLOUD_PROOF;
+ }
+ if(cp_radio_begin_preferred(&s->radio,s->epoch,cap24,cap5,1,1,preferred)!=CP_RADIO_OK)
   return CP_CLOUD_PROOF;
  if(cp_ho_signal(&s->handoff,s->epoch,
     CP_HO_EV_BOOTSTRAP_MFI_AUTHENTICATED,1)!=CP_HO_OK)return stop(s);
@@ -375,6 +386,36 @@ int cp_cloud_radio_start(struct cp_cloud_pipeline *s){
  if(s->owner.ap_prepare(s->owner.ctx,s->epoch,band)!=1)return stop(s);
  if(cp_radio_connect_requested(&s->radio,s->epoch,1)!=CP_RADIO_OK)return stop(s);
  s->band=band;
+ return CP_CLOUD_OK;
+}
+/* Called only by original owner with current AP config after band switch.
+ * Caller owns the immutable snapshot for the remaining session lifetime.
+ * verify must independently match live channel/SSID/security/credentials,
+ * not simply return true based on the requested band. */
+int cp_cloud_refresh_ap_config(struct cp_cloud_pipeline *s,const struct cp_session *cfg,
+ int (*verify)(void *,uint32_t,enum cp_radio_band,const struct cp_session *),void *ctx){
+ uint8_t bytes[CP_LK_FRAME_MAX-10u];size_t n=0;
+ struct cp_step04_session *b;
+ if(!s||!cfg||!verify||!eligible(s,1))return CP_CLOUD_BAD;
+ b=s->bootstrap;
+ if(!b||!b->wireless_bound||b->wireless_ctx!=s||
+    b->wireless_proof!=actual_wireless_proof||!cp_s4_authenticated(b)||
+    !b->identity||!b->identity->wireless_ssid||!cfg->wifi.ssid||
+    strcmp(b->identity->wireless_ssid,cfg->wifi.ssid)||
+    b->wireless.start_sent||
+    s->handoff.phase!=CP_HO_BOOTSTRAP_AUTH||
+    s->radio.phase!=CP_RADIO_CONNECTING||
+    s->radio.selected!=s->band||
+    cp_radio_channel_band(cfg->wifi.channel)!=s->band||
+    cfg->airplay_port!=CP_CLOUD_PORT)return CP_CLOUD_PROOF;
+ if(b->wireless_pending||b->link.outbound_pending)return CP_CLOUD_RETRY;
+ if(s->owner.ap_hotspot_verified(s->owner.ctx,s->epoch,s->band)!=1||
+    verify(ctx,s->epoch,s->band,cfg)!=1||
+    cp_encode_wifi_5703(&cfg->wifi,bytes,sizeof bytes,&n)!=CP_OK||
+    cp_encode_start_4301(cfg,bytes,sizeof bytes,&n)!=CP_OK)return CP_CLOUD_PROOF;
+ /* Preserve the request/availability state. Only update the source of
+  * credentials; phone may request config again after the physical switch. */
+ b->wireless.session=cfg;
  return CP_CLOUD_OK;
 }
 int cp_cloud_radio_result(struct cp_cloud_pipeline *s,int success,int disconnected){
