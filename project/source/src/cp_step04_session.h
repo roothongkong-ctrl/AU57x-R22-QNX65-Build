@@ -30,6 +30,8 @@ struct cp_step04_session {
  uint32_t epoch,acked_token,wireless_seq,wireless_token;
  uint64_t now;
  int auth_ready, ack_in_progress,wireless_pending,wireless_bound;
+ /* Coalesced, authenticated 5702 request awaiting live hotspot and TX slot. */
+ int wifi_request_pending;
 };
 int cp_s4_init(struct cp_step04_session *,struct cp_stock_mfi *,
                uint32_t epoch,const struct cp_s4_external *);

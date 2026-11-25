@@ -80,6 +80,15 @@ static int link_control(void *opaque,const uint8_t *frame,size_t n){
    if(cp_decode_event(frame,n,&event)!=0)return -1;
    if(event.type!=CP_EVENT_OTHER){
     if(s->identity&&!s->identity_accepted)return 0;
+    /* Only the genuine decoded 5702 received on the authenticated
+     * current control link can create a deferred Wi-Fi reply.
+     * A request contains no response configuration of its own. */
+    if(event.type==CP_EVENT_WIFI_REQUEST){
+     if(!cp_s4_authenticated(s))return 0;
+     s->wifi_request_pending=1;
+     wr=cp_s4_wireless_pump(s);
+     return wr==CP_WL_BAD_FRAME?-1:0;
+    }
     if(s->wireless_proof(s->wireless_ctx,s->epoch,
                          s->link.generation,&proof)!=1)return 0;
     wr=cp_step04_dispatch(&s->auth,&s->wireless,&proof,frame,n);
@@ -177,13 +186,24 @@ int cp_s4_bind_wireless(struct cp_step04_session *s,const struct cp_session *con
 int cp_s4_wireless_pump(struct cp_step04_session *s){
  struct cp_oem_assertions p={0};
  if(!s||!s->wireless_bound||s->wireless_pending||
-    s->wireless.start_sent||!s->wireless.availability_seen||
+    s->link.outbound_pending||
     (s->identity&&!s->identity_accepted)||
     !cp_s4_authenticated(s))return CP_WL_NOT_READY;
+ if(!s->wifi_request_pending&&
+    (s->wireless.start_sent||!s->wireless.availability_seen))return CP_WL_NOT_READY;
  if(s->wireless_proof(s->wireless_ctx,s->epoch,s->link.generation,&p)!=1||
     p.wired_active||!p.sole_dio_owner||
-    !p.verified_control_session||!p.live_hotspot||
-    !p.network_airplay_ready)return CP_WL_NOT_READY;
+    !p.verified_control_session||!p.live_hotspot)return CP_WL_NOT_READY;
+ if(s->wifi_request_pending){
+  /* This is an internal replay of a previously decoded 5702 trigger,
+   * not an invented phone message or authentication event. No raw
+   * credential bytes are cached: encode the current live AP config. */
+  static const uint8_t request[]={0x40,0x40,0,6,0x57,0x02};
+  int r=cp_step04_dispatch(&s->auth,&s->wireless,&p,request,sizeof request);
+  if(r==CP_WL_OK||r==CP_WL_LIMIT_REACHED)s->wifi_request_pending=0;
+  return r;
+ }
+ if(!p.network_airplay_ready)return CP_WL_NOT_READY;
  s->wireless.authenticated=1;
  s->wireless.hotspot_ready=1;
  s->wireless.airplay_ready=1;
@@ -207,6 +227,6 @@ void cp_s4_revoke(struct cp_step04_session *s){
  if(s->auth_ready)cp_auth_revoke(&s->auth);
  s->ack_in_progress=0;s->acked_token=0;
  s->wireless_pending=0;s->wireless_token=0;
- s->wireless_bound=0;
+ s->wireless_bound=0;s->wifi_request_pending=0;
  s->identity_pending=0;s->identity_token=0;s->identity_accepted=0;
 }

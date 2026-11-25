@@ -157,10 +157,18 @@ int main(void){
  /* A real Bluetooth CONTROL packet 5702 must receive Wi-Fi 5703, then
   * its iAP2 ACK must NOT re-enter the MFi AA01/AA03 acknowledgement FSM. */
  /* Wi-Fi control is now routed directly, without a hand-written OEM callback. */
+ proof.live_hotspot=0;
  control_msg(message,0x5702,NULL,0);
  n=frame(b,0x40,48,102,10,message,6);
  feed(b,n,12);
+ assert(s.wifi_request_pending&&!s.wireless.wifi_pre_sent&&!s.wireless_pending);
+ assert(cp_s4_tick(&s,12)==CP_LK_OK&&s.wifi_request_pending);
+ /* No new phone packet: original owner tick observes the live AP. */
+ proof.live_hotspot=1;
+ assert(cp_s4_tick(&s,12)==CP_LK_OK);
+ assert(!s.wifi_request_pending);
  assert(s.wireless.wifi_pre_sent==1&&s.wireless_pending&&s.link.outbound_pending);
+ puts("PASS deferred authenticated 5702 -> live hotspot -> 5703 without phone retry");
  assert(s.link.outbound_seq==103);
  flush();
  /* Phone's 4300 offer can arrive BEFORE Wi-Fi 5703 is ACKed. */
@@ -192,9 +200,15 @@ int main(void){
  feed(b,n,18);flush();
  assert(unrelated_count>0);
  /* A new generation cannot inherit old auth, and hard owner loss is final. */
+ proof.live_hotspot=0;
+ control_msg(message,0x5702,NULL,0);
+ n=frame(b,0x40,51,104,10,message,6);
+ feed(b,n,19);flush();
+ assert(s.wifi_request_pending&&!s.wireless_pending);
  up=0;
  assert(cp_s4_tick(&s,200)==CP_LK_OWNER);
- assert(!cp_s4_authenticated(&s));
+ assert(!cp_s4_authenticated(&s)&&!s.wifi_request_pending);
+ puts("PASS owner revocation drops deferred Wi-Fi request");
  up=1;assert(!cp_s4_authenticated(&s));
  assert(tx_frames>=4);
  dlclose(lib);

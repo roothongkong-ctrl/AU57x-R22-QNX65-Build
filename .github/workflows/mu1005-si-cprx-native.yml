@@ -185,7 +185,11 @@ jobs:
                 bash integration/mu1005_si_native/r29_tcp/test.sh "${RUNNER_TEMP}/r29-full"
                 ;;
               stock-config) bash ci/host_r99_stock_iap2.sh ;;
-              authentication) bash ci/host_step04_stock_mfi.sh ;;
+              authentication)
+                bash ci/host_step04_stock_mfi.sh
+                bash ci/host_step04_session.sh
+                bash ci/host_cloud_pipeline.sh
+                ;;
               radio) bash ci/host_radio_policy.sh ;;
               media) bash ci/host_cloud_media.sh ;;
               recovery) bash ci/host_sd_txn.sh ;;
