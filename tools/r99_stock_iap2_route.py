@@ -146,9 +146,9 @@ def stage_iap2_ini(raw: bytes) -> tuple[bytes, dict]:
         old_line = lines[index]
         line_no_eol = old_line.rstrip('\r\n')
         indent = line_no_eol[:len(line_no_eol)-len(line_no_eol.lstrip())]
-        lines[index] = indent + 'enable = yes' + (eol if old_line.endswith('\n') else '')
+        lines[index] = indent + 'enable = 1' + (eol if old_line.endswith('\n') else '')
         return ''.join(lines).encode('utf8'), {
-            'style': 'existing active section', 'before': value, 'after': 'yes'
+            'style': 'existing active section', 'before': value, 'after': '1'
         }
     if len(commented_sections) != 1:
         raise ValueError('no unique Bluetooth section/template; cannot enable safely')
