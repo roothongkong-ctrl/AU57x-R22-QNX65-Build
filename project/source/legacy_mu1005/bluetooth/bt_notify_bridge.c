@@ -92,6 +92,10 @@ static int bind_common(const MuBtNotifyBinding*b,int queue_only){
 }
 int mu_bt_notify_bind(const MuBtNotifyBinding*b){return bind_common(b,0);}
 int mu_bt_notify_bind_queue_only(const MuBtNotifyBinding*b){return bind_common(b,1);}
+int mu_bt_notify_discovery_allowed(void){
+ return enabled(NULL)&&on_owner(NULL)&&safe(&n.b)&&
+  n.b.handoff->state==AU98_PUBLISHED&&n.b.policy.wired_idle(n.b.policy.opaque)==1;
+}
 int mu_bt_notify_periodic_dispatch(void){
  if(!enabled(NULL)||!on_owner(NULL)||n.gate.inside||!safe(&n.b)||
     !mu_bt_osapi_identity_matches(&n.thread,tid(),n.b.owner.read_live,n.b.owner.opaque))return -1;
@@ -109,6 +113,7 @@ int mu_bt_notify_unbind(void){
 #else
 int mu_bt_notify_bind(const MuBtNotifyBinding*b){(void)b;return -1;}
 int mu_bt_notify_bind_queue_only(const MuBtNotifyBinding*b){(void)b;return -1;}
+int mu_bt_notify_discovery_allowed(void){return 0;}
 int mu_bt_notify_periodic_dispatch(void){return -1;}
 int mu_bt_notify_unbind(void){return -1;}
 #endif

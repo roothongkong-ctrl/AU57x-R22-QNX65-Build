@@ -44,4 +44,25 @@ static void full_is_unchanged(void){
  memcpy(before,b,240);
  assert(au102_eir_append_if_ready(b,235,240,&yes,&n)==0 && n==235 && !memcmp(before,b,240));
 }
-int main(void){negative_gates();add_and_duplicate();extend_existing_uuid_field();malformed_is_unchanged();full_is_unchanged();puts("R102 imported GPL upstream EIR + AU57x gate: PASS");return 0;}
+static void whole_buffer(void){
+ uint8_t b[240]={17,7},before[240];size_t n=0;
+ b[18]=17;b[19]=7;memcpy(b+20,uuid,16);memcpy(before,b,240);
+ assert(au102_eir_append_if_ready(b,36,240,&yes,&n)==0&&n==36&&!memcmp(before,b,240));
+ b[18]=30;memcpy(before,b,240);
+ assert(au102_eir_append_if_ready(b,36,240,&yes,&n)==0&&!memcmp(before,b,240));
+ b[0]=17;b[1]=6;memcpy(before,b,240);
+ assert(au102_eir_append_if_ready(b,18,240,&yes,&n)==0&&!memcmp(before,b,240));
+}
+static unsigned calls;
+static unsigned original(uint8_t*b,unsigned cap){
+ ++calls;assert(cap==240);memset(b,0,240);b[0]=2;b[1]=1;b[2]=6;return 3;
+}
+static int allow(void*p,const uint8_t*b){unsigned*n=p;assert(b[0]==2);return (*n)++==0;}
+static int always(void*p,const uint8_t*b){(void)p;(void)b;return 1;}
+static void builder_cases(void){
+ uint8_t b[240];unsigned checks=0;
+ calls=0;assert(au102_eir_build_original_first(b,240,original,allow,&checks)==3&&calls==1&&checks==2&&b[3]==0);
+ assert(au102_eir_build_original_first(b,240,original,always,NULL)==21&&calls==2&&!memcmp(b+5,uuid,16));
+ puts("PASS original EIR builder first, full validation and atomic augmentation");
+}
+int main(void){whole_buffer();builder_cases();negative_gates();add_and_duplicate();extend_existing_uuid_field();malformed_is_unchanged();full_is_unchanged();puts("R102 imported GPL upstream EIR + AU57x gate: PASS");return 0;}

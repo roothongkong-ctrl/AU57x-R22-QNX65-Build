@@ -28,6 +28,10 @@ typedef struct {
 int mu_bt_native_attach(const MuBtOwner *,int fd);
 int mu_bt_native_tick(void);
 int mu_bt_native_discovery_ready(void);
+int mu_bt_native_eir_buffer_matches(const uint8_t*);
+/* Review-only replacement for exact original BL at 0x12a694.
+ * Never install or call outside the authenticated stock call site. */
+unsigned mu_bt_native_eir_builder_review(uint8_t*,unsigned);
 /* Queue original EIR refresh on certified SDK owner. Not a controller ACK. */
 int mu_bt_native_refresh_eir(void);
 /* Serialized original owner only; no hook installed by this API. */

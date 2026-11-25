@@ -91,6 +91,11 @@ int mu_bt_native_attach(const MuBtOwner *o,int fd){
  return rc;
 }
 int mu_bt_native_discovery_ready(void){return ir5_discovery_ready(&res.bridge);}
+int mu_bt_native_eir_buffer_matches(const uint8_t*b){
+ return cert(&res)&&res.owner.services_address<=UINT32_MAX-0x40cu&&
+  (uintptr_t)b==(uintptr_t)(res.owner.services_address+0x31cu)&&
+  ir5_discovery_ready(&res.bridge)==1;
+}
 int mu_bt_native_tick(void){return ready(&res)&&res.bridge.initialized?ir5_tick(&res.bridge):-1;}
 int mu_bt_native_withdraw(int (*barrier)(void*,const Inbound*),void *p){
  if(!cert(&res)||!res.bridge.initialized||!barrier)return -1;
@@ -114,6 +119,7 @@ int mu_bt_native_reclaim(int (*reclaimed)(void*,const Inbound*),void*p){
 #else
 int mu_bt_native_attach(const MuBtOwner *o,int fd){(void)o;(void)fd;return -1;}
 int mu_bt_native_discovery_ready(void){return 0;}
+int mu_bt_native_eir_buffer_matches(const uint8_t*b){(void)b;return 0;}
 int mu_bt_native_refresh_eir(void){return -1;}
 int mu_bt_native_tick(void){return -1;}
 int mu_bt_native_withdraw(int (*barrier)(void*,const Inbound*),void *p){(void)barrier;(void)p;return -1;}

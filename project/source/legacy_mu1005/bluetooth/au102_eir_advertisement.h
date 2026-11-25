@@ -18,4 +18,6 @@ typedef struct Au102EirGate {
  */
 int au102_eir_append_if_ready(uint8_t *eir, size_t length, size_t capacity,
                                const Au102EirGate *gate, size_t *out_length);
+unsigned au102_eir_build_original_first(uint8_t*,unsigned,
+ unsigned(*)(uint8_t*,unsigned),int(*)(void*,const uint8_t*),void*);
 #endif

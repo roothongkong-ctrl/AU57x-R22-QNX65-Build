@@ -1,0 +1,4 @@
+# 原厂广播生成接入候选（NO INSTALL）
+本轮直接反汇编原始 btstack(1) 的 0x12a688..0x12a6a8：r7=this+796, r1=240, r0=r7, 0x12a694 BL 0x1ddfb4 (eb02ce46), 0x12a698 MOV r1,r7, 0x12a69c MOV r2,r0, 0x12a6a0 STRB r0,[r6,#0x40c], 0x12a6a8 BL 0x1dd060。原厂 builder 0x1ddfb4 调 0x1ddd48，成功返回字节数，失败0；下层 0x1ddd48 调 0x207354 生成 SDP 相关数据，不能仅凭静态指令认定 CarPlay UUID 已在 EIR。保留整个原厂后续长度保存和提交过程。
+新增 AAPCS review-only builder 入口，调用真实原厂 builder 一次，只有认证 owner、已发布服务、wired idle、准确 this+0x31c 缓冲区、有效原厂长度才可扩展。复用固定 blob 的 LuKa EIR helper，补充全 AD 字段预检、重复 UUID、后续损坏字段、不完整 UUID 列表保留原样、临时缓冲区以及第二次 readiness 检查。原始 builder 返回0不尝试生成空广播。
+未安装或写入原厂指令。仍缺真实调用点绑定与原厂锁/线程上下文确认；如果原厂 builder 调用不在已确认 owner，则仅保留原始数据，不会添加 UUID。无实际 HCI 广播或手机发现证明。新增主机回归与 ARM 导出验收；待云端执行。
