@@ -1,0 +1,100 @@
+name: MU1005 complete upstream daemon reuse (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/mu1005-donor-daemon.yml, integration/mu1005_donor_daemon/**]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  DONOR: 20c94f51c0f0ae88b154c12e4f604643ba23022c
+  TOOLCHAIN: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+jobs:
+  actual-host-daemon:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch exact upstream daemon source
+        run: |
+          set -euxo pipefail
+          git init donor
+          git -C donor remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C donor fetch --depth 1 origin "$DONOR"
+          git -C donor checkout --detach FETCH_HEAD
+          test "$(git -C donor rev-parse HEAD)" = "$DONOR"
+          mkdir -p donor-host-evidence
+          rustup toolchain install nightly-2026-07-21 --profile minimal
+      - name: Compile and test upstream as-is, no software MFi feature
+        run: |
+          set -euxo pipefail
+          cargo +nightly-2026-07-21 test --offline --locked --workspace --manifest-path donor/wireless/daemon/Cargo.toml 2>&1 | tee donor-host-evidence/upstream-tests.log
+          cargo +nightly-2026-07-21 build --offline --locked --bin mhi2q-wireless-daemon --manifest-path donor/wireless/daemon/Cargo.toml 2>&1 | tee donor-host-evidence/upstream-build.log
+      - name: Join real donor executable to current MU1005 C transport and run rollback regression
+        run: bash integration/mu1005_donor_daemon/run_host.sh donor donor-host-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mu1005-donor-host-NO-INSTALL
+          path: donor-host-evidence/
+          retention-days: 30
+  qnx-arm-daemon:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch locked daemon and Rust-capable QNX compiler
+        run: |
+          set -euxo pipefail
+          mkdir -p donor-arm-evidence
+          git init donor
+          git -C donor remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C donor fetch --depth 1 origin "$DONOR"
+          git -C donor checkout --detach FETCH_HEAD
+          test "$(git -C donor rev-parse HEAD)" = "$DONOR"
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin "$TOOLCHAIN"
+          git -C toolchain checkout --detach FETCH_HEAD
+          test "$(git -C toolchain rev-parse HEAD)" = "$TOOLCHAIN"
+      - uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/au57x-gnu
+          key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
+      - name: Verify GNU sources
+        run: bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: toolchain
+          platforms: linux/amd64
+          target: with-rust
+          build-args: BASE=base-8.5
+          tags: mu1005-qnx65-rust:review
+          load: true
+          push: false
+          cache-from: |
+            type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1
+            type=gha,scope=mu1005-qnx65-baa45224-rust-v1
+          cache-to: type=gha,scope=mu1005-qnx65-baa45224-rust-v1,mode=min,ignore-error=true
+      - name: Build full upstream QNX daemon (default feature set)
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src/donor mu1005-qnx65-rust:review \
+            /opt/rust/qnx-cargo build --locked --manifest-path /src/donor/wireless/daemon/Cargo.toml --bin mhi2q-wireless-daemon 2>&1 | tee donor-arm-evidence/build.log
+          bin=donor/wireless/daemon/target/armv7-unknown-nto-qnx650/release/mhi2q-wireless-daemon
+          test -s "$bin"
+          readelf -h -dW -AW "$bin" | tee donor-arm-evidence/elf.log
+          grep -Eq 'Machine:.*ARM' donor-arm-evidence/elf.log
+          grep -Eq 'Class:.*ELF32' donor-arm-evidence/elf.log
+          sha256sum "$bin" | tee donor-arm-evidence/daemon.sha256
+          # Explicitly non-installable research payload, not named like stock binary.
+          cp "$bin" donor-arm-evidence/donor-daemon-MU1316-REVIEW-ONLY.bin
+          for f in LICENSE LICENSE.md COPYING; do if test -f "donor/$f"; then cp "donor/$f" donor-arm-evidence/; fi; done
+          printf '%s\n' 'NO INSTALL: unmodified donor; MU1005 runtime ABI, MFi owner, receiver and dual band not accepted' "donor=$DONOR" "toolchain=$TOOLCHAIN" "source=$GITHUB_SHA" > donor-arm-evidence/STATUS.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mu1005-full-donor-arm-NO-INSTALL
+          path: donor-arm-evidence/
+          retention-days: 30
