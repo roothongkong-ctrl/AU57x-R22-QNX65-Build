@@ -97,9 +97,10 @@ jobs:
           PY
           chmod +x "$RUNNER_TEMP/toolchain/tests/qemu-run-r143.sh"
           REVIEW_LIB="$PWD/r143/build/qnx/libau57x_r143_preload_REVIEW.so" \
-          QEMU_KEEP_LOG="$PWD/r143/build/qnx/qnx_boot.log" \
+          QEMU_KEEP_LOG="$RUNNER_TEMP/r143_qnx_boot.log" \
           QEMU_RUN_SECS=18 QEMU_TIMEOUT=80 \
           bash "$RUNNER_TEMP/toolchain/tests/qemu-run-r143.sh" "$PWD/r143/build/qnx/btstack" 8.5 2>&1 | tee r143/qnx_runtime.log
+          if [ -f "$RUNNER_TEMP/r143_qnx_boot.log" ]; then cp "$RUNNER_TEMP/r143_qnx_boot.log" r143/qnx_boot.log; fi
           grep -Fq R143_QNX_PROCESS_SHA_PIN_PASS r143/qnx_runtime.log
           grep -Fq R143_QNX_PTHREAD_CREATE_TRANSPARENT_FORWARD_PASS r143/qnx_runtime.log
           grep -Fq R143_QNX_STOCK_ORIGIN_TRACKER_PASS_SYNTHETIC_CALLSITE r143/qnx_runtime.log
