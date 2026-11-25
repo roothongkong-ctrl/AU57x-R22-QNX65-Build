@@ -1,0 +1,4 @@
+# 原厂事件分发后的集中生命周期（NO INSTALL）
+原始 btstack SHA256 51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566，本轮在实际文件复核 0x278448 (B 0x1e47cc, eafdb0df)、0x1e47e0 (BL 0x27a12c)、0x1e47e4 (BL 0x27a450)、0x1e4b60 (BL 0x27a4dc, eb02565d)、0x1e4b64 (BL 0x27a0a0, eb02554d)、0x1e4b68 (ADD SP,#20, e28dd014)、0x1e4b6c (POP ...PC, e8bd8ff0)。两把尾部锁依次释放，正常返回候选 0x1e4b68；扫描 ARM .text 无直接分支到此尾部，函数 0x1e47cc 唯一直接 B 引用 0x278448。原厂 0x14d4ec 间接虚调用 notify；原 RFCOMM 回调分发 0x203ccc 的 0x203d50/0x203d94/0x203ebc 从 channel+8 调用。不能据此认定所有回调线程、嵌套锁或实际周期性调度。
+新增 au98_drive / au98_drive_stock_native：将已有已准备的非阻塞 fd adoption、tick、wired 优先停转发、drain/withdraw、独立 reclaim、fresh fd 再发布串联。一个 dispatch 最多一次状态转换；poison 不重试；-1 保留未转移 fd，-2 歧义 attach 不释放 fd。真实 owner 及安全 dispatch witness 仍需提供；不在锁内网络等待。不安装 hook，不自动修改二进制。
+主机新增两次真实 loopback TCP 生命周期测试，SDK/回收 witness 是 fixture；覆盖错误线程、wired 抢占、未回收禁止再注册、成功第二代及 transport revoke。需云端验收。此接口不是最终自动连接程序；仍缺真实调度调用方、原厂 callback lock 验证、MFi/媒体实车证据。

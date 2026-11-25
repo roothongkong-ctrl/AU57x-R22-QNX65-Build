@@ -170,6 +170,32 @@ int au98_withdraw(Au98Handoff*s,int(*barrier)(void*,const Inbound*),void*ctx){
  s->fd=-1;s->state=AU98_RETIRED;return 0;
 }
 
+int au98_drive(Au98Handoff*s,int*fd,const Au98DispatchPolicy*p,Au98AdoptStep adopt,void*ctx,Au98ReclaimStep reclaim){
+ if(!s||!fd||!p||!p->safe_dispatch||!p->wired_idle||
+    !p->withdraw_barrier||!p->reclaimed||!adopt||!reclaim||
+    p->safe_dispatch(p->opaque)!=1)return -1;
+ if(s->state!=AU98_EMPTY&&s->state!=AU98_POISONED&&
+    (!s->hooks.on_original_iap2_owner||
+     s->hooks.on_original_iap2_owner(s->hooks.opaque)!=1))return -1;
+ switch(s->state){
+ case AU98_EMPTY:
+  if(*fd<0||p->wired_idle(p->opaque)!=1)return 0;
+  {int rc=adopt(ctx,s,*fd);
+   if(rc==0||rc==-2)*fd=-1;
+   return rc;}
+ case AU98_PUBLISHED:
+  if(p->wired_idle(p->opaque)!=1){s->state=AU98_DRAINING;return 0;}
+  return au98_tick(s)==0?0:-1;
+ case AU98_DRAINING:
+  return au98_withdraw(s,p->withdraw_barrier,p->opaque);
+ case AU98_RETIRED:
+  return reclaim(s,p->reclaimed,p->opaque);
+ case AU98_POISONED:
+  return -2;
+ default:return -1;
+ }
+}
+
 /* Native execution path of the R98 -> R45 bridge. Coded as real calls to
  * native_binding.c, not a function-pointer-only host placeholder.
  * Strictly unavailable outside the pinned QNX ARM32 target. */
@@ -214,10 +240,29 @@ int au98_rearm_stock_native(Au98Handoff*s,int(*reclaimed)(void*,const Inbound*),
  memset(s,0,sizeof *s);s->generations=generations;s->fd=-1;
  return 0;
 }
+typedef struct {
+ const Au98OwnerProof *proof;const MuBtOwner *owner;
+ int (*verified)(void*,int);void *opaque;
+} NativeDispatch;
+static int adopt_dispatch(void*ctx,Au98Handoff*s,int fd){
+ NativeDispatch*d=ctx;
+ return au98_adopt_stock_native(s,d->proof,d->owner,fd,d->verified,d->opaque);
+}
+int au98_drive_stock_native(Au98Handoff*s,int*fd,const Au98DispatchPolicy*p,const Au98OwnerProof*proof,const MuBtOwner*o,int(*verified)(void*,int),void*ctx){
+ NativeDispatch d={proof,o,verified,ctx};
+ if(!proof||!o||!verified)return -1;
+ return au98_drive(s,fd,p,adopt_dispatch,&d,au98_rearm_stock_native);
+}
 #else
 int au98_bind_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*o){
  (void)s;(void)p;(void)o;return -1;
 }
 int au98_adopt_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*o,int fd,int(*v)(void*,int),void*ctx){(void)s;(void)p;(void)o;(void)fd;(void)v;(void)ctx;return -1;}
 int au98_rearm_stock_native(Au98Handoff*s,int(*reclaimed)(void*,const Inbound*),void*ctx){(void)s;(void)reclaimed;(void)ctx;return -1;}
+#endif
+
+#if !defined(__QNXNTO__) || !defined(__arm__) || UINTPTR_MAX != UINT32_MAX
+int au98_drive_stock_native(Au98Handoff*s,int*fd,const Au98DispatchPolicy*p,const Au98OwnerProof*proof,const MuBtOwner*o,int(*v)(void*,int),void*ctx){
+ (void)s;(void)fd;(void)p;(void)proof;(void)o;(void)v;(void)ctx;return -1;
+}
 #endif

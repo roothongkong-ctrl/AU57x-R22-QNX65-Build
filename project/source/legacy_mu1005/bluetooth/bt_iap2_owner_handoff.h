@@ -61,4 +61,18 @@ int au98_adopt_stock_native(Au98Handoff*,const Au98OwnerProof*,const MuBtOwner*,
  * run, release storage for a fresh publication. No automatic retry. */
 int au98_rearm_stock_native(Au98Handoff*,int(*reclaimed)(void*,const Inbound*),void*);
 
+/* Owner-only nonblocking lifecycle. The worker transfers an exclusive fd
+ * before dispatch. Independent safe_dispatch must establish lock context.
+ * One state transition per dispatch; no reclaim and publish together. */
+typedef struct {
+ void *opaque;
+ int (*safe_dispatch)(void*);
+ int (*wired_idle)(void*);
+ int (*withdraw_barrier)(void*,const Inbound*);
+ int (*reclaimed)(void*,const Inbound*);
+} Au98DispatchPolicy;
+typedef int (*Au98AdoptStep)(void*,Au98Handoff*,int);
+typedef int (*Au98ReclaimStep)(Au98Handoff*,int(*)(void*,const Inbound*),void*);
+int au98_drive(Au98Handoff*,int*,const Au98DispatchPolicy*,Au98AdoptStep,void*,Au98ReclaimStep);
+int au98_drive_stock_native(Au98Handoff*,int*,const Au98DispatchPolicy*,const Au98OwnerProof*,const MuBtOwner*,int(*)(void*,int),void*);
 #endif

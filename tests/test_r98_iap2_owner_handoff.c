@@ -77,7 +77,56 @@ static void adopt_cases(void){
  assert(au98_withdraw(&h,barrier,&ok)==0&&h.fd==-1);close(peer);close(l);
  puts("PASS prepared daemon fd adoption: no blocking connect and exact attestation");
 }
+typedef struct {int safe,wired,reclaim;unsigned port;Au98Hooks k;MuBtOwner o;Witness v;} DriveFixture;
+static int safe_step(void*p){return ((DriveFixture*)p)->safe;}
+static int wired_step(void*p){return ((DriveFixture*)p)->wired;}
+static int barrier_step(void*p,const Inbound*i){(void)p;(void)i;return 1;}
+static int reclaimed_step(void*p,const Inbound*i){(void)i;return ((DriveFixture*)p)->reclaim;}
+static int adopt_step(void*p,Au98Handoff*s,int fd){
+ DriveFixture*d=p;return au98_adopt(s,&d->k,&d->o,fd,d->port,witness,&d->v);
+}
+/* Only a fixture backend; native reclaim is not being simulated as proof. */
+static int reclaim_step(Au98Handoff*s,int(*r)(void*,const Inbound*),void*p){
+ if(s->state!=AU98_RETIRED||s->fd!=-1||r(p,NULL)!=1)return -1;
+ uint32_t gen=s->generations;memset(s,0,sizeof *s);s->generations=gen;s->fd=-1;return 0;
+}
+static int make_prepared(unsigned port){
+ int fd=socket(AF_INET,SOCK_STREAM,0);struct sockaddr_in a={0};
+ assert(fd>=0);a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);a.sin_port=htons((uint16_t)port);
+ assert(!connect(fd,(struct sockaddr*)&a,sizeof a));
+ assert(!fcntl(fd,F_SETFL,fcntl(fd,F_GETFL,0)|O_NONBLOCK));assert(!fcntl(fd,F_SETFD,FD_CLOEXEC));return fd;
+}
+static void drive_cases(void){
+ Fixture f={.original=1,.thread=1,.service=1,.owner=1,.transport=1,.profile=1,.got_fd=-1};
+ DriveFixture d={.safe=1,.wired=1,.k=hooks(&f),.o=owner(&f)};
+ Au98DispatchPolicy p={&d,safe_step,wired_step,barrier_step,reclaimed_step};
+ Au98Handoff s={0};int listener=server(&d.port);
+ int fd=make_prepared(d.port),peer=accept(listener,NULL,NULL);assert(peer>=0);
+ d.v=(Witness){fd,1,0,0};
+ #define STEP() au98_drive(&s,&fd,&p,adopt_step,&d,reclaim_step)
+ d.safe=0;assert(STEP()==-1&&s.state==AU98_EMPTY&&fd>=0&&!f.calls);
+ d.safe=1;d.wired=0;assert(STEP()==0&&fd>=0&&s.state==AU98_EMPTY&&!f.calls);
+ d.wired=1;assert(STEP()==0&&fd==-1&&s.state==AU98_PUBLISHED&&s.generations==1);
+ assert(STEP()==0);unsigned n=f.calls;
+ d.wired=0;f.thread=0;assert(STEP()==-1&&s.state==AU98_PUBLISHED&&f.calls==n);
+ f.thread=1;assert(STEP()==0&&s.state==AU98_DRAINING&&f.calls==n);
+ f.withdraw=-1;assert(STEP()==-1&&s.fd>=0);
+ f.withdraw=0;assert(STEP()==0&&s.state==AU98_RETIRED&&s.fd==-1);
+ {unsigned char b;assert(recv(peer,&b,1,0)==0);}close(peer);
+ fd=make_prepared(d.port);peer=accept(listener,NULL,NULL);assert(peer>=0);
+ d.v=(Witness){fd,1,0,0};d.wired=1;n=f.calls;
+ assert(STEP()==-1&&s.state==AU98_RETIRED&&fd>=0&&f.calls==n);
+ d.reclaim=1;assert(STEP()==0&&s.state==AU98_EMPTY&&fd>=0&&f.calls==n);
+ assert(STEP()==0&&s.state==AU98_PUBLISHED&&fd==-1&&s.generations==2);
+ f.transport=0;n=f.calls;assert(STEP()==-1&&s.state==AU98_DRAINING&&f.calls==n);
+ assert(STEP()==0&&s.state==AU98_RETIRED&&s.fd==-1);
+ {unsigned char b;assert(recv(peer,&b,1,0)==0);}close(peer);
+ close(listener);
+ #undef STEP
+ puts("PASS unified owner lifecycle: wired preemption, verified retirement and second socket generation");
+}
 int main(void){
+ drive_cases();
  adopt_cases();
  Fixture f={.original=1,.thread=1,.service=1,.owner=1,.transport=1,.profile=1,.got_fd=-1};Au98Handoff h={0};
  Au98Hooks k=hooks(&f);MuBtOwner o=owner(&f);
