@@ -208,16 +208,19 @@ static void no_cert_no_radio(void){
  assert(cp_cloud_end(&s)==CP_CLOUD_OK);
 }
 static int ap_config_fixture(void *ctx,uint32_t epoch,enum cp_radio_band band,const struct cp_session *cfg){
- return ctx!=NULL&&*(int*)ctx==1&&epoch==8&&band==CP_RADIO_5&&cfg->wifi.channel==36;
+ return ctx!=NULL&&*(int*)ctx==1&&epoch==8&&
+  ((band==CP_RADIO_5&&cfg->wifi.channel==36)||
+   (band==CP_RADIO_24&&cfg->wifi.channel==6));
 }
-static void radio_to_airplay_proof(void){
+static void radio_to_airplay_direction(enum cp_radio_band first){
+ enum cp_radio_band next=first==CP_RADIO_5?CP_RADIO_24:CP_RADIO_5;
  struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
  struct cp_oem_assertions proof={0};Mu34ApServer real_ap;
  static const uint8_t mac[6]={1,2,3,4,5,6};
  static const uint16_t sent[]={0xaa01,0xaa03,0x5703,0x4301};
  static const uint16_t recv[]={0xaa00,0xaa02,0xaa05,0x5702,0x4300};
  static const char *const ip[]={"10.0.0.1"};
- static const struct cp_session config={
+ struct cp_session config={
   .wifi={.ssid="AUDI_REVIEW",.passphrase="review-only",.security=2,.channel=6},
   .ip_addresses=ip,.ip_address_count=1,.airplay_port=5000,
   .public_key="review-only",.source_version="review-only"
@@ -229,6 +232,7 @@ static void radio_to_airplay_proof(void){
   .bluetooth_mac6=mac,.accessory_messages=sent,.phone_messages=recv,
   .accessory_message_count=4,.phone_message_count=5
  };
+ config.wifi.channel=first==CP_RADIO_5?36:6;
  reset_fixture();mocked_oem(&b,&stock,1);cp_cloud_init(&p);
  b.link.phase=CP_LK_IDLE;
  assert(cp_cloud_bind_bootstrap(&p,&b,&config,&identity)==CP_CLOUD_OK);
@@ -238,15 +242,18 @@ static void radio_to_airplay_proof(void){
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
  assert(!proof.live_hotspot&&!proof.network_airplay_ready);
  assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
- assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK&&p.band==CP_RADIO_24);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK&&p.band==first);
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
  assert(proof.verified_mfi&&proof.live_hotspot&&!proof.network_airplay_ready);
- /* First attempt failed; verify actual disconnect before selecting 5 GHz. */
+ /* First attempt failed; verify actual disconnect before switching bands. */
  assert(cp_cloud_radio_result(&p,0,0)==CP_CLOUD_RETRY);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_ORDER);
  assert(cp_cloud_radio_result(&p,0,1)==CP_CLOUD_RETRY);
- assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK&&p.band==CP_RADIO_5);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK&&p.band==next);
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1&&!proof.live_hotspot);
- struct cp_session updated=config;updated.wifi.channel=36;int verify=0;
+ assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_PROOF);
+ assert(p.radio.phase==CP_RADIO_CONNECTING&&p.handoff.phase==CP_HO_BOOTSTRAP_AUTH);
+ struct cp_session updated=config;updated.wifi.channel=next==CP_RADIO_5?36:6;int verify=0;
  assert(cp_cloud_refresh_ap_config(&p,&updated,ap_config_fixture,&verify)==CP_CLOUD_PROOF);
  verify=1;b.wireless_pending=1;
  assert(cp_cloud_refresh_ap_config(&p,&updated,ap_config_fixture,&verify)==CP_CLOUD_RETRY);
@@ -254,9 +261,11 @@ static void radio_to_airplay_proof(void){
  assert(cp_cloud_refresh_ap_config(&p,&updated,ap_config_fixture,&verify)==CP_CLOUD_OK);
  assert(b.wireless.session==&updated);
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1&&proof.live_hotspot);
- puts("PASS band switch refreshes AP snapshot before Wi-Fi message");
+ puts(first==CP_RADIO_5?"PASS 5_TO_24_REFRESH_BEFORE_ASSOCIATION_NO_OEM":"PASS 24_TO_5_REFRESH_BEFORE_ASSOCIATION_NO_OEM");
  ap=0;
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1&&!proof.live_hotspot);
+ assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_PROOF);
+ assert(p.radio.phase==CP_RADIO_CONNECTING);
  ap=1;
  assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_OK);
  native_airplay(&real_ap);
@@ -272,6 +281,10 @@ static void radio_to_airplay_proof(void){
  assert(cp_cloud_wired_preempt(&p)==CP_CLOUD_OK);
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==0);
  assert(cp_cloud_end(&p)==CP_CLOUD_OK);
+}
+static void radio_to_airplay_proof(void){
+ radio_to_airplay_direction(CP_RADIO_5);
+ radio_to_airplay_direction(CP_RADIO_24);
 }
 static void automatic_native_carplay_start(void){
  struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;

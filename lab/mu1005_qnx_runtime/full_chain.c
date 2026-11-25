@@ -210,6 +210,8 @@ void chain_after_start_ack(struct cp_step04_session *b){
 }
 int main(void){
  setvbuf(stdout,NULL,_IONBF,0);
+ /* Run the same production-path AP snapshot tests on host and QNX. */
+ radio_to_airplay_proof();
  chain_auto_first();
  return chain_bootstrap_fixture();
 }

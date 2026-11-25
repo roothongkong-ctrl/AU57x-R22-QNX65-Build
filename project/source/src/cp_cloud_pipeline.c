@@ -427,6 +427,18 @@ int cp_cloud_radio_result(struct cp_cloud_pipeline *s,int success,int disconnect
  if(success){
   if(disconnected!=0||s->owner.ap_association(s->owner.ctx,s->epoch,s->band)!=1)
     return CP_CLOUD_PROOF;
+  /* The canonical bootstrap must publish a current AP snapshot before
+   * leaving CONNECTING: refresh is deliberately impossible after that
+   * transition. A phone association alone cannot authorize stale 5703
+   * credentials or a receiver start on the old band. */
+  if(s->bootstrap&&s->bootstrap->wireless_bound&&
+     s->bootstrap->wireless_ctx==s&&
+     s->bootstrap->wireless_proof==actual_wireless_proof){
+   struct cp_oem_assertions proof;
+   if(actual_wireless_proof(s,s->epoch,s->bt_generation,&proof)!=1||
+      !proof.verified_mfi||!proof.sole_dio_owner||!proof.live_hotspot)
+    return CP_CLOUD_PROOF;
+  }
   r=cp_radio_association_result(&s->radio,s->epoch,1,1,s->band,0);
   if(r!=CP_RADIO_OK)return stop(s);
   if(cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_WIFI_AP_AND_PHONE_CONFIRMED,1)!=CP_HO_OK)
