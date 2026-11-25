@@ -1,0 +1,37 @@
+name: MU1005 stage 1 direct donor discovery (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/mu1005-discovery-stage1.yml, integration/mu1005_discovery_stage1/**, tools/mu1005_discovery_candidate.py]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  direct-donor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned upstream and compile actual discovery registration
+        run: |
+          set -euxo pipefail
+          git init donor
+          git -C donor remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C donor fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C donor checkout --detach FETCH_HEAD
+          mkdir evidence
+          r=integration/mu1005_discovery_stage1
+          python3 "$r/port_discovery.py" donor evidence/ported
+          for f in discovery eir; do
+            clang -target armv7-none-eabi -march=armv7-a -marm -mfloat-abi=soft -O2 -ffreestanding -fno-builtin -fno-pic -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -c "evidence/ported/$f.c" -o "evidence/$f.o"
+          done
+          clang -target armv7-none-eabi -march=armv7-a -marm -c "$r/entry.S" -o evidence/entry.o
+          ld.lld -flavor gnu -m armelf -T "$r/phase1.ld" --no-undefined evidence/{entry,discovery,eir}.o -o evidence/discovery-NO-INSTALL.elf
+          readelf -h -lW -SW -sW -rW evidence/discovery-NO-INSTALL.elf | tee evidence/elf.log
+          python3 -c 'import sys;from pathlib import Path;sys.path.insert(0,"tools");from mu1005_discovery_candidate import read_graft;code,symbols=read_graft(Path("evidence/discovery-NO-INSTALL.elf"));print(len(code),symbols)'
+          printf '%s\n' 'DISCOVERY ONLY; RFCOMM denied; no OEM runtime; NO INSTALL' "source=$GITHUB_SHA" > evidence/STATUS.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mu1005-stage1-direct-donor-NO-INSTALL
+          path: evidence/

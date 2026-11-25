@@ -1,0 +1,4 @@
+# 第1阶段：直接复用上游注册，不再扩展后续模块（NO INSTALL）
+前版 d22171cd 云端 45572008050 与 45572007946 均成功，追加 PHDR 布局已在非原厂 QNX 实际程序测试通过。原厂私有 btstack SHA 51ecbd44...；本轮再次扫描原始 .text 仅找到两处直接 BL RF_REGISTER(0x277a18)：0x2464b0 前 0x2464a0 e3a02007、0x24dcac 前 0x24dca8 e3a02004。原厂存在初始额度 7 和 4；**4 是本轮阶段1候选选择，不是已经证明 iAP2 profile**。
+直接从 pinned LuKa graft.c 复用 RFCOMM/双 SDP record 构造、EIR helper，必要地址适配，删除无限 socket worker，只拒绝 incoming RFCOMM；原始 started flag 后接注册，公共 cleanup 入口接注销，原厂 EIR builder 后接 UUID 扩展。保持原指令/寄存器/条件标志。单次尝试；记录资源掩码和清理错误；不影响有线 CarPlay 配置。不伪造认证。此独立阶段候选只用于发现，不接受任何连接。暂不与先前 native queue 方案同时加载。
+原始 ELF 由私有工具合并；云端只编译 donor 源和链接验证，不传用户 OEM 文件。真实 OEM 启动/关闭的线程互斥、SDK profile、SDK 实际注册及手机发现均未验证；即使编译通过不能安装。不得把 discovery-only ELF 当成完整无线方案。后续需真实原厂运行环境或一次受控车机验收，不能靠增加模拟测试声称第1阶段通过。
