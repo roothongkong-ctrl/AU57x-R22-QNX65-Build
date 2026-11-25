@@ -12,9 +12,8 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <string.h>
-#include <sys/select.h>
+#include <poll.h>
 #include <sys/socket.h>
-#include <sys/time.h>
 #include <unistd.h>
 
 static int oem_ok(const Au98Handoff *s){
@@ -27,8 +26,7 @@ static int oem_ok(const Au98Handoff *s){
 static int connected(unsigned port){
  struct sockaddr_in peer,actual;
  socklen_t len;
- fd_set wfds;
- struct timeval deadline;
+ struct pollfd waitfd;
  int fd,fl,rc,soerr=0;
  if(port<1 || port>65535)return -1;
  fd=socket(AF_INET,SOCK_STREAM,0);if(fd<0)return -1;
@@ -39,8 +37,9 @@ static int connected(unsigned port){
  rc=connect(fd,(struct sockaddr *)&peer,sizeof peer);
  if(rc<0 && errno!=EINPROGRESS)goto error;
  if(rc<0){
-  FD_ZERO(&wfds);FD_SET(fd,&wfds);deadline.tv_sec=1;deadline.tv_usec=0;
-  if(select(fd+1,NULL,&wfds,NULL,&deadline)!=1)goto error;
+  waitfd.fd=fd;waitfd.events=POLLOUT;waitfd.revents=0;
+  if(poll(&waitfd,1,1000)!=1 || !(waitfd.revents&POLLOUT) ||
+     (waitfd.revents&(POLLERR|POLLHUP|POLLNVAL)))goto error;
   len=sizeof soerr;
   if(getsockopt(fd,SOL_SOCKET,SO_ERROR,&soerr,&len)||len!=sizeof soerr||soerr)goto error;
  }
@@ -73,6 +72,16 @@ int au98_publish(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*owner,unsigned 
     owner->transport_ready(owner->opaque)!=1||
     mu_rf_arg_choose(owner->iap2_profile_proven,owner->opaque,&candidate_scn)!=MU_RF_ARG_VERIFIED)return -1;
  fd=connected(port);if(fd<0)return -1;
+ /* connect can block for up to one second. Recheck every owner claim
+  * immediately before first native attach, not just before opening TCP.
+  * A revoked transport/owner must never publish a callback to BlueSDK. */
+ if(h->original_image_verified(h->opaque)!=1 ||
+    h->on_original_iap2_owner(h->opaque)!=1 ||
+    h->original_iap2_service_verified(h->opaque)!=1 ||
+    owner->owner_ready(owner->opaque)!=1 ||
+    owner->transport_ready(owner->opaque)!=1){
+  (void)close(fd);return -1;
+ }
  /* No callback/owner claim may be reused after this point, even after
   * failure. The native SDK may have published partial RF/SDP storage. */
  s->state=AU98_POISONED;s->fd=fd;s->hooks=*h;s->native_owner=*owner;

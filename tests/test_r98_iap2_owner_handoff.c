@@ -12,12 +12,12 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-typedef struct {int original,thread,service,owner,transport,profile,attach,withdraw,tick;int got_fd;unsigned calls;} Fixture;
+typedef struct {int original,thread,service,owner,transport,profile,attach,withdraw,tick;int got_fd;unsigned calls;unsigned transport_checks;int revoke_after_check;} Fixture;
 static int yes_original(void*p){return ((Fixture*)p)->original;}
 static int yes_thread(void*p){return ((Fixture*)p)->thread;}
 static int yes_service(void*p){return ((Fixture*)p)->service;}
 static int yes_owner(void*p){return ((Fixture*)p)->owner;}
-static int yes_transport(void*p){return ((Fixture*)p)->transport;}
+static int yes_transport(void*p){Fixture*f=p; ++f->transport_checks;return f->transport && !(f->revoke_after_check && f->transport_checks>1);}
 /* Fixture mode 1 supplies a fake but valid SCN. 2/3 deliberately return
  * invalid 0/31 despite reporting "proven" and must never open the socket. */
 static int yes_profile(void*p,uint8_t *v){
@@ -55,7 +55,7 @@ static int server(unsigned*port){int fd,yes=1;struct sockaddr_in sa;socklen_t n=
  assert(getsockname(fd,(struct sockaddr*)&sa,&n)==0);*port=ntohs(sa.sin_port);return fd;
 }
 int main(void){
- Fixture f={1,1,1,1,1,1,0,0,0,-1,0};Au98Handoff h={0};
+ Fixture f={.original=1,.thread=1,.service=1,.owner=1,.transport=1,.profile=1,.got_fd=-1};Au98Handoff h={0};
  Au98Hooks k=hooks(&f);MuBtOwner o=owner(&f);
  unsigned port=0;int listen_fd=server(&port),accepted,ok=1;
  assert(au98_publish(NULL,&k,&o,port)<0);
@@ -71,6 +71,14 @@ int main(void){
  assert(au98_publish(&h,&k,&o,0)<0&&h.state==AU98_EMPTY);
  /* No original SDK call was used before every independent authority existed. */
  assert(f.calls==0);
+ /* Revoke after the first check; actual TCP connection must be closed
+  * without attaching, and a fresh verified owner can retry. */
+ f.transport_checks=0;f.revoke_after_check=1;
+ assert(au98_publish(&h,&k,&o,port)<0 && h.state==AU98_EMPTY && f.calls==0);
+ accepted=accept(listen_fd,NULL,NULL);assert(accepted>=0);
+ {unsigned char byte;assert(recv(accepted,&byte,1,0)==0);}
+ close(accepted);f.revoke_after_check=0;f.transport_checks=0;
+ puts("PASS owner revoked during TCP connection: no native attach");
  assert(au98_publish(&h,&k,&o,port)==0);
  accepted=accept(listen_fd,NULL,NULL);assert(accepted>=0);
  assert(h.state==AU98_PUBLISHED&&h.generations==1&&f.calls==1&&f.got_fd==h.fd);

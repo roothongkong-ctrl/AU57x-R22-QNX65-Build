@@ -22,6 +22,7 @@ jobs:
           git archive FETCH_HEAD project/source/legacy_mu1005/airplay | tar -x -C r85
           cp -R r85/project/source/legacy_mu1005/airplay review/source/
           cp -R integration/mu1005_si_native review/source/si
+          cp -R project/source/legacy_mu1005/bluetooth review/source/bluetooth
           # Reuse the actual upstream signer, not a replacement or software credential.
           git init luka
           git -C luka remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
@@ -82,6 +83,8 @@ jobs:
             "$R" -h -sW review/payload/mfi_stock-review.o > review/evidence/signer-elf.log
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -DWCP_QNX_LAB_ONLY -DWCP_LAB_BT_TYPE_CANDIDATE=3 -c "$s/r29_profile/wcp_bt_link_profile.c" -o review/payload/r29-bt-profile-review.o
             "$R" -h -sW review/payload/r29-bt-profile-review.o > review/evidence/r29-profile-elf.log
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -Ireview/source/bluetooth -c review/source/bluetooth/bt_iap2_owner_handoff.c -o review/payload/r98-owner-handoff-review.o
+            "$R" -h -sW review/payload/r98-owner-handoff-review.o > review/evidence/r98-owner-elf.log
           ' 2>&1 | tee review/evidence/native-build.log
           grep -Eq 'Machine:.*ARM' review/evidence/native-elf.log
           grep -Eq 'Type:.*DYN' review/evidence/native-elf.log
@@ -93,6 +96,12 @@ jobs:
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/r29-profile-elf.log
           done
           echo R29_NATIVE_TYPE3_PROFILE_COMPILED_NOT_FULL_PLUGIN | tee review/evidence/r29-result.txt
+          grep -Eq 'Machine:.*ARM' review/evidence/r98-owner-elf.log
+          grep -Eq 'Type:.*REL' review/evidence/r98-owner-elf.log
+          for sym in au98_publish au98_tick au98_withdraw au98_bind_stock_native; do
+            awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/r98-owner-elf.log
+          done
+          echo R98_OWNER_HANDOFF_NATIVE_OBJECT_ONLY_NO_OEM_ATTACH | tee review/evidence/r98-result.txt
           for sym in MFiPlatform_CreateSignature MFiPlatform_CopyCertificate; do
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/signer-elf.log
           done
@@ -180,6 +189,11 @@ jobs:
           for f in graft eir deny; do
             clang -target armv7-none-eabi -march=armv7-a -marm -O2 -ffreestanding -fno-builtin -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-stack-protector -fno-pic -DAU57X_LINK_REVIEW_ONLY -c "adapted/$f.c" -o "adapted/$f.o"
           done
+          if ! command -v ld.lld >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq lld
+          fi
+          ld.lld --version | tee graft-evidence/linker-version.txt
           ld.lld -flavor gnu -m armelf -T adapted/graft.ld --no-undefined adapted/{graft,eir,deny}.o -o adapted/review.elf
           readelf -h -SW -sW -rW adapted/review.elf | tee graft-evidence/elf.log
           grep -Eq 'Machine:.*ARM' graft-evidence/elf.log
