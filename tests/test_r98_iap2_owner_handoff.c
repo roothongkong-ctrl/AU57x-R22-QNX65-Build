@@ -54,7 +54,31 @@ static int server(unsigned*port){int fd,yes=1;struct sockaddr_in sa;socklen_t n=
  assert(bind(fd,(struct sockaddr*)&sa,sizeof sa)==0);assert(listen(fd,4)==0);
  assert(getsockname(fd,(struct sockaddr*)&sa,&n)==0);*port=ntohs(sa.sin_port);return fd;
 }
+typedef struct{int fd,allowed;unsigned calls,deny_at;} Witness;
+static int witness(void*p,int fd){Witness*w=p;++w->calls;return w->allowed&&fd==w->fd&&w->calls!=w->deny_at;}
+static void adopt_cases(void){
+ Fixture f={.original=1,.thread=1,.service=1,.owner=1,.transport=1,.profile=1,.got_fd=-1};
+ Au98Hooks k=hooks(&f);MuBtOwner o=owner(&f);Au98Handoff h={0};unsigned port=0;
+ int l=server(&port),fd=socket(AF_INET,SOCK_STREAM,0),ok=1;struct sockaddr_in a={0};
+ assert(fd>=0);a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);a.sin_port=htons((uint16_t)port);
+ assert(!connect(fd,(struct sockaddr*)&a,sizeof a));
+ int peer=accept(l,NULL,NULL);assert(peer>=0);
+ Witness v={fd,0,0,0};
+ assert(au98_adopt(&h,&k,&o,fd,port,witness,&v)==-1&&!v.calls);
+ assert(!fcntl(fd,F_SETFL,fcntl(fd,F_GETFL,0)|O_NONBLOCK));
+ assert(!fcntl(fd,F_SETFD,FD_CLOEXEC));
+ assert(au98_adopt(&h,&k,&o,fd,port,witness,&v)==-1&&!f.calls&&fcntl(fd,F_GETFD)>=0);
+ v.allowed=1;v.calls=0;v.deny_at=2;
+ assert(au98_adopt(&h,&k,&o,fd,port,witness,&v)==-1&&!f.calls&&h.state==AU98_EMPTY);
+ v.deny_at=0;v.calls=0;
+ assert(au98_adopt(&h,&k,&o,fd,port==65535?port-1:port+1,witness,&v)==-1&&!v.calls);
+ f.thread=0;assert(au98_adopt(&h,&k,&o,fd,port,witness,&v)==-1&&!f.calls);f.thread=1;
+ assert(au98_adopt(&h,&k,&o,fd,port,witness,&v)==0&&h.fd==fd&&f.calls==1);
+ assert(au98_withdraw(&h,barrier,&ok)==0&&h.fd==-1);close(peer);close(l);
+ puts("PASS prepared daemon fd adoption: no blocking connect and exact attestation");
+}
 int main(void){
+ adopt_cases();
  Fixture f={.original=1,.thread=1,.service=1,.owner=1,.transport=1,.profile=1,.got_fd=-1};Au98Handoff h={0};
  Au98Hooks k=hooks(&f);MuBtOwner o=owner(&f);
  unsigned port=0;int listen_fd=server(&port),accepted,ok=1;

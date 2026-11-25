@@ -94,6 +94,52 @@ int au98_publish(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*owner,unsigned 
  /* Never close/free callback-backed SDK storage on an ambiguous attach. */
  return -2;
 }
+/* Prepared socket handoff: no connect or blocking poll on OEM owner.
+ * Caller retains fd on -1; on 0/-2 ownership transfers to handoff. */
+static int socket_ready(int fd,unsigned port){
+ struct sockaddr_in a; socklen_t len=sizeof a;int fl,err=0;
+ struct pollfd p={fd,POLLIN,0};
+ if(fd<0||!port||port>65535)return 0;
+ fl=fcntl(fd,F_GETFL,0);if(fl<0||!(fl&O_NONBLOCK))return 0;
+ fl=fcntl(fd,F_GETFD);if(fl<0||!(fl&FD_CLOEXEC))return 0;
+ if(getpeername(fd,(struct sockaddr*)&a,&len)||len!=sizeof a||
+    a.sin_family!=AF_INET||a.sin_addr.s_addr!=htonl(INADDR_LOOPBACK)||
+    a.sin_port!=htons((uint16_t)port))return 0;
+ len=sizeof a;
+ if(getsockname(fd,(struct sockaddr*)&a,&len)||len!=sizeof a||
+    a.sin_family!=AF_INET||a.sin_addr.s_addr!=htonl(INADDR_LOOPBACK))return 0;
+ len=sizeof err;
+ if(getsockopt(fd,SOL_SOCKET,SO_ERROR,&err,&len)||len!=sizeof err||err)return 0;
+ if(poll(&p,1,0)<0||(p.revents&(POLLERR|POLLHUP|POLLNVAL)))return 0;
+ if(p.revents&POLLIN){
+  unsigned char v;ssize_t r=recv(fd,&v,1,MSG_PEEK);
+  if(r==0||(r<0&&errno!=EAGAIN&&errno!=EWOULDBLOCK))return 0;
+ }
+ return 1;
+}
+int au98_adopt(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*o,
+               int fd,unsigned port,int(*verified)(void*,int),void*ctx){
+ uint8_t arg=0;
+ if(!s||!h||!o||s->state!=AU98_EMPTY||s->generations==UINT32_MAX||
+    !h->original_image_verified||!h->on_original_iap2_owner||
+    !h->original_iap2_service_verified||!h->attach||!h->tick||!h->withdraw||
+    !o->owner_ready||!o->transport_ready||!o->read_live||
+    !o->paired_authorized||!o->iap2_profile_proven||!verified)return -1;
+#if !defined(AU57X_R98_HOST_TEST) || AU57X_R98_HOST_TEST!=1
+ if(port!=57342u)return -1;
+#endif
+ if(h->on_original_iap2_owner(h->opaque)!=1||h->original_image_verified(h->opaque)!=1||
+    h->original_iap2_service_verified(h->opaque)!=1||o->owner_ready(o->opaque)!=1||
+    o->transport_ready(o->opaque)!=1||!socket_ready(fd,port)||verified(ctx,fd)!=1||
+    mu_rf_arg_choose(o->iap2_profile_proven,o->opaque,&arg)!=MU_RF_ARG_VERIFIED)return -1;
+ if(!socket_ready(fd,port)||verified(ctx,fd)!=1||h->on_original_iap2_owner(h->opaque)!=1||
+    h->original_image_verified(h->opaque)!=1||h->original_iap2_service_verified(h->opaque)!=1||
+    o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
+ s->state=AU98_POISONED;s->fd=fd;s->hooks=*h;s->native_owner=*o;
+ s->native_owner.rf_arg3_snapshot=arg;s->native_owner.rf_arg3_snapshot_valid=1u;
+ if(h->attach(h->opaque,&s->native_owner,fd)!=0)return -2;
+ ++s->generations;s->state=AU98_PUBLISHED;return 0;
+}
 int au98_tick(Au98Handoff*s){
  if(!s||s->state!=AU98_PUBLISHED)return -1;
  /* A call from the wrong thread cannot mutate the serialized owner
@@ -150,6 +196,16 @@ int au98_bind_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*
  h.withdraw=native_withdraw_adapter;
  return au98_publish(s,&h,o,57342);
 }
+int au98_adopt_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*o,int fd,int(*verified)(void*,int),void*ctx){
+ Au98Hooks h;
+ if(!p||au100_route_select(p->route_evidence)!=AU100_GRAFT_RFCOMM_ROUTE)return -1;
+ memset(&h,0,sizeof h);
+ h.opaque=p->opaque;h.original_image_verified=p->original_image_verified;
+ h.on_original_iap2_owner=p->on_original_iap2_owner;
+ h.original_iap2_service_verified=p->original_iap2_service_verified;
+ h.attach=native_attach_adapter;h.tick=native_tick_adapter;h.withdraw=native_withdraw_adapter;
+ return au98_adopt(s,&h,o,fd,57342,verified,ctx);
+}
 int au98_rearm_stock_native(Au98Handoff*s,int(*reclaimed)(void*,const Inbound*),void*ctx){
  if(!s||s->state!=AU98_RETIRED||s->fd!=-1||s->generations==UINT32_MAX||
     !reclaimed||!oem_ok(s))return -1;
@@ -162,5 +218,6 @@ int au98_rearm_stock_native(Au98Handoff*s,int(*reclaimed)(void*,const Inbound*),
 int au98_bind_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*o){
  (void)s;(void)p;(void)o;return -1;
 }
+int au98_adopt_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*o,int fd,int(*v)(void*,int),void*ctx){(void)s;(void)p;(void)o;(void)fd;(void)v;(void)ctx;return -1;}
 int au98_rearm_stock_native(Au98Handoff*s,int(*reclaimed)(void*,const Inbound*),void*ctx){(void)s;(void)reclaimed;(void)ctx;return -1;}
 #endif

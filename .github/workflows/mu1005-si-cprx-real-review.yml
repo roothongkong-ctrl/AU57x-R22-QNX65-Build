@@ -31,6 +31,7 @@ jobs:
           mkdir -p evidence
           bash ci/host_r98_iap2_handoff.sh | tee evidence/bt-owner-handoff.log
           grep -F 'PASS owner/transport lease revoked before or during tick; no stale resume' evidence/bt-owner-handoff.log
+          grep -F 'PASS prepared daemon fd adoption' evidence/bt-owner-handoff.log
           bash ci/host_wcp_autoconnect.sh | tee evidence/bt-autoconnect.log
       - name: Test offline Bluetooth trace reference locator
         run: python3 -m unittest discover -s tests -p test_mu1005_bt_trace_entry.py -v

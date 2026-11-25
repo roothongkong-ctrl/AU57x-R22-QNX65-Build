@@ -35,6 +35,9 @@ typedef struct {
 /* port is ALWAYS 57342 for deployment. An ephemeral port override exists
  * only in a host fixture built with AU57X_R98_HOST_TEST. */
 int au98_publish(Au98Handoff*,const Au98Hooks*,const MuBtOwner*,unsigned port);
+/* Worker transfers exclusive prepared nonblocking fd; -1 caller owns,
+ * 0/-2 handoff owns. Exact daemon attestation must be nonblocking. */
+int au98_adopt(Au98Handoff*,const Au98Hooks*,const MuBtOwner*,int,unsigned,int(*)(void*,int),void*);
 /* Serialized original owner only. Any lost owner/transport proof on that
  * thread enters DRAINING; recovering proof permits withdrawal, not tick.
  * Wrong-thread calls are rejected without mutating the owner state. */
@@ -51,7 +54,9 @@ typedef struct {
  /* R100 explicit software-graft evidence; no endpoint/owner inference from HFP. */
  const Au100Evidence *route_evidence;
 } Au98OwnerProof;
+/* Legacy connect path may wait; never call from SDK event dispatch. */
 int au98_bind_stock_native(Au98Handoff*,const Au98OwnerProof*,const MuBtOwner*);
+int au98_adopt_stock_native(Au98Handoff*,const Au98OwnerProof*,const MuBtOwner*,int,int(*)(void*,int),void*);
 /* After clean withdrawal and independent proof no old SDK callbacks can
  * run, release storage for a fresh publication. No automatic retry. */
 int au98_rearm_stock_native(Au98Handoff*,int(*reclaimed)(void*,const Inbound*),void*);
