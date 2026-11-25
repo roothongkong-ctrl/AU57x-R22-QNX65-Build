@@ -1,0 +1,3 @@
+# 云端运行失败点和修正
+已核对 GitHub run 45547943836 job 138981942498：ARM probe 编译通过、QNX 系统启动，但串口显示 Unable to access "/dev/socket" (2)，socketpair 返回 Address family not supported by protocol family，退出2。没有进入真实数据收发或手机握手。最新 run 45548819225 的连续字节级 host 场景步骤通过，QNX 尚未返回。
+依据 QNX 6.5 io-pkt 官方说明和 LuKa pinned 20c94f51 的 qemu_capture.py 中 v4-hc 方案，改用 SDK io-pkt-v4-hc、绝对启动路径、-v -ptcpip、原厂 slogger/random 服务、pidin/sloginfo/ifconfig 诊断、原样页对齐 IFS 程序及依赖。无真实网卡也应支持本地 socket，仍以实际结果为准。不是把 AF_UNIX 换为假接口，也不修改生产代码或 MFi。完整 QNX 运行尚待重新测试。参考 https://www.qnx.com/developers/docs/6.5.0SP1/neutrino/utilities/i/io-pkt.html 。

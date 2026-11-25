@@ -8,13 +8,13 @@ def replace(a,b):
     if s.count(a)!=1: raise SystemExit("unexpected upstream anchor: "+a)
     s=s.replace(a,b)
 replace('cp "$BIN" "$WORK/$NAME"', 'cp "$BIN" "$WORK/$NAME"\ncp "${QNX_TEST_INNER_LIB:?missing library}" "$WORK/libmu1005_inner_iap2_review.so"')
-replace('    display_msg "@@QNXRUN-START@@"','    io-pkt-v4 &\n    waitfor /dev/socket 12\n    display_msg "@@QNXRUN-START@@"')
-replace('devc-serdebug\n$NAME\nEOF','devc-serdebug\nio-pkt-v4\n[+raw +page_align perms=0555] libmu1005_inner_iap2_review.so\n$NAME\nEOF')
+replace('    display_msg "@@QNXRUN-START@@"','    /proc/boot/slogger &\n    waitfor /dev/slog 5\n    /proc/boot/random -t &\n    waitfor /dev/random 5\n    /proc/boot/io-pkt-v4-hc -v -ptcpip &\n    waitfor /dev/socket 15\n    /proc/boot/pidin ar\n    /proc/boot/sloginfo\n    /proc/boot/ifconfig lo0\n    display_msg "@@QNXRUN-START@@"')
+replace('devc-serdebug\n$NAME\nEOF','devc-serdebug\n[+raw +page_align perms=0555] slogger\n[+raw +page_align perms=0555] random\n[+raw +page_align perms=0555] io-pkt-v4-hc\n[+raw +page_align perms=0555] pidin\n[+raw +page_align perms=0555] sloginfo\n[+raw +page_align perms=0555] ifconfig\n[+raw +page_align perms=0555] libmu1005_inner_iap2_review.so\n$NAME\n[type=dir] /tmp\n[type=dir] /var\n[type=dir] /var/run\nEOF')
 replace('export MKIFS_PATH=/w:$T/boot/sys:$T/bin:$T/lib:$T/usr/lib','''
 # Resolve real SDK network manager dependencies, never stub them.
 P=arm-unknown-nto-qnx6.5.0eabi
-cp "$T/sbin/io-pkt-v4" /w/
-pending="io-pkt-v4"
+cp "$T/sbin/io-pkt-v4-hc" "$T/sbin/ifconfig" "$T/usr/sbin/slogger" "$T/usr/sbin/random" "$T/bin/pidin" "$T/bin/sloginfo" /w/
+pending="io-pkt-v4-hc ifconfig slogger random pidin sloginfo"
 seen=" libc.so.3 libm.so.2 libsocket.so.3 "
 while [ -n "$pending" ]; do
     next=""
@@ -23,7 +23,7 @@ while [ -n "$pending" ]; do
             case "$seen" in *" $lib "*) continue;; esac
             case "$lib" in */*|..*) exit 1;; esac
             cp "$T/lib/$lib" "/w/$lib" 2>/dev/null || cp "$T/usr/lib/$lib" "/w/$lib" || exit 1
-            echo "$lib" >> /w/test.build
+            echo "[+raw +page_align perms=0555] $lib" >> /w/test.build
             seen="$seen$lib "
             next="$next $lib"
         done
