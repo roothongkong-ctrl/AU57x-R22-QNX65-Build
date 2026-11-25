@@ -6,9 +6,10 @@ Exact original upstream source objects:
   tests/engine.rs 2808827cef6545716bbd37b52ed6bf311da46ef2
 Host C strict compiler 45/45 passed
 Host RFCOMM C wire test passed
-Rust iAP2 source and adapter tests: PENDING GITHUB CI
+Rust iAP2 source and adapter host tests: PASS (GitHub Actions 45634439847; upstream 7/7, bridge 2/2, TCP lab 13/13)
 Original MU1005 live RF registration: NOT VERIFIED
-QNX ARM Rust executable: NOT BUILT
+QNX ARM Rust executable: NOT BUILT (separate from the C QNX build)
 Wireless CarPlay: NOT VERIFIED
 Not installable, no vehicle test.
 Host Rust real-loopback socket integration added; no QNX process hook.
+QNX C research build: PASS (GitHub Actions 45634440000; GCC 8.5, ARM EABI5 shared objects, strict ELF gate, QEMU dlopen smoke; no OEM calls).
