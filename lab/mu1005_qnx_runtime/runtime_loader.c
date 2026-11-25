@@ -29,9 +29,16 @@ static int verify_file(const char *path) {
     while (off < sizeof native_blob) {
         ssize_t n = read(fd, b, sizeof b);
         if (n < 0 && errno == EINTR) continue;
-        if (n <= 0 || (size_t)n > sizeof native_blob - off ||
-            memcmp(b, native_blob + off, (size_t)n)) {
-            close(fd); errno = EIO; return fail("IFS bytes mismatch or short read");
+        if (n <= 0 || (size_t)n > sizeof native_blob - off) {
+            fprintf(stderr, "MU1005_READ_FAIL offset=%lu got=%ld expected_total=%lu errno=%d\n",
+                    (unsigned long)off, (long)n, (unsigned long)sizeof native_blob, errno);
+            close(fd); errno = EIO; return fail("IFS short read");
+        }
+        if (memcmp(b, native_blob + off, (size_t)n)) {
+            size_t i=0;while(i<(size_t)n && b[i]==native_blob[off+i]) ++i;
+            fprintf(stderr, "MU1005_MISMATCH offset=%lu expected=%02x actual=%02x\n",
+                    (unsigned long)(off+i), (unsigned)native_blob[off+i], (unsigned)b[i]);
+            close(fd); errno = EIO; return fail("IFS bytes mismatch");
         }
         off += (size_t)n;
     }
