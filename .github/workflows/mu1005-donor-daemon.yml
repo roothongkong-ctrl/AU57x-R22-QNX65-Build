@@ -37,11 +37,13 @@ jobs:
           set -euxo pipefail
           python3 integration/mu1005_donor_daemon/adapt_live_ap.py donor | tee donor-host-evidence/ap-port.log
           python3 integration/mu1005_donor_daemon/adapt_receiver_unix.py donor | tee donor-host-evidence/unix-port.log
+          python3 integration/mu1005_donor_daemon/adapt_mfi_sequence.py donor | tee donor-host-evidence/mfi-port.log
           git -C donor diff -- wireless/daemon > donor-host-evidence/ap-port.diff
           cargo +nightly-2026-07-21 test --offline --locked --workspace --manifest-path donor/wireless/daemon/Cargo.toml 2>&1 | tee donor-host-evidence/adapted-tests.log
           cargo +nightly-2026-07-21 build --offline --locked --bin mhi2q-wireless-daemon --manifest-path donor/wireless/daemon/Cargo.toml 2>&1 | tee donor-host-evidence/adapted-build.log
           grep -F 'mu1005_live_ap_both_bands_reach_real_donor_wire ... ok' donor-host-evidence/adapted-tests.log
           grep -F 'private_socket_real_exchange_and_denial ... ok' donor-host-evidence/adapted-tests.log
+          grep -F 'mu1005_mfi_requires_current_real_provider_exchange ... ok' donor-host-evidence/adapted-tests.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -92,6 +94,7 @@ jobs:
           set -euxo pipefail
           python3 integration/mu1005_donor_daemon/adapt_live_ap.py donor | tee donor-arm-evidence/ap-port.log
           python3 integration/mu1005_donor_daemon/adapt_receiver_unix.py donor | tee donor-arm-evidence/unix-port.log
+          python3 integration/mu1005_donor_daemon/adapt_mfi_sequence.py donor | tee donor-arm-evidence/mfi-port.log
           git -C donor diff -- wireless/daemon > donor-arm-evidence/ap-port.diff
       - name: Build adapted full QNX daemon (default feature set)
         run: |

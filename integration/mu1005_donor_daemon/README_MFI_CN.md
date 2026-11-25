@@ -1,0 +1,5 @@
+# 完整上游 daemon：原厂 MFi 路线确认与本代认证（NO INSTALL）
+上轮 c17a3f65 的 Actions 45568032732 与 45568032715 全部 success，之前双频 40b203c3 的 45567577767 也 success。
+重新检索用户历史原始审计 R36_SOURCE_DIFF.patch（R36_STOCK_AIRPLAY_MFI_API.md）：MU1005 原厂 libairplay.so SHA256 193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b5；CopyCertificate 0x6d1d0、CreateSignature 0x6d4a8；20-byte challenge；原厂二进制内 /dev/i2c8 与十进制17 地址，check_auth_chip.sh 的诊断配置及 usblauncher_otg.lua 一致。上述是历史静态审计，不是本轮硬件执行。50kHz 是 mm-ipod 配置，不能当成原厂库实际总线固定速率。
+因此 donor 原始硬件 signer 的设备地址有同平台静态证据；不再假定其路径未知。保留现有真实 I2C 后端、明确拒绝错误硬件路径/地址。没有第二份 OEM dlopen，没有 fake MFi、没有新签名服务。此次只做源码适配，不能声称独占租约或原厂实际认证已经完成。优先真实 OEM owner/wired 仲裁，不能直接从候选独立进程抢用原厂芯片。
+原始 donor ControlMachine 无前置证书/签名调用成功也会处理 AA05 为完成；修正本次 ControlMachine 内的证书/签名产生顺序、失败终止、重新取证书使旧签名失效、错误AA05拒绝；实际 send_control 仍走原 donor iAP2 LinkEngine。这里只验证 provider 返回和手机消息，未追踪实际 RF TX completion/ACK，不能作为真实原厂认证证明。原厂认证本身不改变。新增实际 donor 单元回归（TestAuth/UnavailableAuth 仅主机测试），保留所有合法认证/Identify 交错测试。真实 iPhone、SDK、wired 生命周期 lease 和 SI 真实控制服务器仍缺。不可安装。
