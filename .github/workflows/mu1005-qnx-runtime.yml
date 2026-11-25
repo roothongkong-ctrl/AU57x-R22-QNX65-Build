@@ -66,7 +66,19 @@ jobs:
             arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 lab/mu1005_qnx_runtime/runtime_loader.c -lc -o qnx-runtime-evidence/mu1005-loader-probe
             arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW qnx-runtime-evidence/mu1005-loader-probe
           ' 2>&1 | tee qnx-runtime-evidence/probe-build.log
-          QEMU_KEEP_LOG="$PWD/qnx-runtime-evidence/qemu-serial.log" QEMU_TIMEOUT=100 QEMU_RUN_SECS=35 sh toolchain/tests/qemu-run.sh "$PWD/qnx-runtime-evidence/mu1005-loader-probe" 8.5 2>&1 | tee qnx-runtime-evidence/runtime.log
+          # Add the exact, hash-verified library to the upstream IFS instead of
+          # relying on a writable /dev/shmem in the minimal QNX guest.
+          python3 lab/mu1005_qnx_runtime/prepare_ifs.py toolchain/tests/qemu-run.sh
+          export QNX_TEST_NATIVE_LIB="$PWD/previous-native/payload/libmu1005_bt_native_review.so"
+          set +e
+          QEMU_KEEP_LOG="$PWD/qnx-runtime-evidence/qemu-serial.log" QEMU_TIMEOUT=65 QEMU_RUN_SECS=20 sh toolchain/tests/qemu-run.sh "$PWD/qnx-runtime-evidence/mu1005-loader-probe" 8.5 2>&1 | tee qnx-runtime-evidence/runtime.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          if test -f qnx-runtime-evidence/qemu-serial.log; then
+            tail -100 qnx-runtime-evidence/qemu-serial.log
+          fi
+          test "$rc" -eq 0
+          grep -F 'MU1005_IFS_EXACT_BYTES_OK' qnx-runtime-evidence/runtime.log
           grep -F 'MU1005_QNX65_NATIVE_DLOPEN_OK_NO_OEM_ATTACH' qnx-runtime-evidence/runtime.log
           grep -F '@@QNXRUN-END@@' qnx-runtime-evidence/qemu-serial.log
           grep -E 'Process [0-9]+ \(mu1005-loader-probe\) exited status=0' qnx-runtime-evidence/qemu-serial.log

@@ -1,2 +1,2 @@
-# QNX 6.5 实际加载验证（NO INSTALL）
-停止新增被动启动入口。直接复用 LuKa 锁定版本 baa45224f18ae6b13c2e9c77c6663bb8181eb6a1 的 tests/qemu-run.sh、startup-virt、libstartup、devc-serdebug 和 U-Boot，在独立 GitHub job 启动真实 QNX 内核。下载 45536789512 已完成任务的原始 libmu1005_bt_native_review.so，验证 SHA256SUMS 与 revision，编译 guest probe 将 exact bytes 写入 /dev/shmem 后回读逐字节比较；在真正的 QNX 6.5 上执行 RTLD_NOW dlopen + dlsym + dlclose。验收需真实内核标志、库加载成功 marker、guest 退出码0。不会调用任何原厂地址，不上传私有 OEM 文件，不使用模拟 MFi，不接触车辆。测试通过只证明此前 native library 的 QNX 用户态动态加载能力，不能证明 V2 原厂 btstack 加载、初始化位置被执行、原厂 owner、真实蓝牙或 MFi。完整原厂验证还需要私有 QNX mesh/本地原厂库环境。禁止安装。
+# QNX 6.5 IFS 动态加载验证（NO INSTALL）
+前一任务 45538566382 实际执行 mu1005-loader-probe，退出 1，无成功标志。修订采用原始已校验库直接嵌入只读 IFS，guest 逐字节核对后 RTLD_NOW/dlsym/dlclose，分阶段输出诊断，失败仍保留原始串口日志。仅测试绑定库，不调用原厂地址，不启用蓝牙、不接触 MFi、不安装。uname 若因最小系统缺少服务失败，单独记录，仍要求锁定 QNX 启动组件、实际 guest 进程退出 0、精确字节及加载标志。尚未运行通过。
