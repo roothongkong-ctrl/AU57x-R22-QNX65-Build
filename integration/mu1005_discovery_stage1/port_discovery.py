@@ -18,7 +18,7 @@ for name,(old,new) in mapping.items():
 assert prefix.count("#define STATE_ADDR 0x510000u")==1
 prefix=prefix.replace("#define STATE_ADDR 0x510000u","#define STATE_ADDR 0x520000u")
 assert prefix.count("u8 peer_address[6], peer_valid;")==1
-prefix=prefix.replace("u8 peer_address[6], peer_valid;","u8 peer_address[6], peer_valid;\n    u32 resource_mask, cleanup_status, services;")
+prefix=prefix.replace("u8 peer_address[6], peer_valid;","u8 peer_address[6], peer_valid;\n    u32 resource_mask, cleanup_status, services, sdp_remove_error;")
 # Reuse donor's record construction verbatim; no alternate iAP2 implementation.
 body=s.split("void graft_init(void) {",1)[1].split("    if (PTHREAD_CREATE",1)[0]
 assert body.count("RF_REGISTER(&s->channel, &s->granted_channel, 0)")==1
@@ -29,7 +29,9 @@ def once(a,b):
     body=body.replace(a,b)
 once("    s->status = 0xFFFF0002u;","    s->status = 0xFFFF0002u;\n    s->services=services;")
 once("    s->protocol[13] = s->granted_channel;","    s->resource_mask=1;\n    if (s->granted_channel<1 || s->granted_channel>6) { s->status=0xffff0003u; withdraw(s); return; }\n    s->protocol[13] = s->granted_channel;")
-once("        (void)RF_DEREGISTER(&s->channel, &s->granted_channel);\n        s->status = (u32)status;\n        return;\n    }\n    s->carplay_attribute.id", "        s->status=(u32)status; withdraw(s); return;\n    }\n    s->resource_mask|=2;\n    s->carplay_attribute.id")
+once("    status = SDP_ADD(&s->record);","    s->resource_mask|=2;\n    status = SDP_ADD(&s->record);")
+once("    status = SDP_ADD(&s->carplay_record);","    s->resource_mask|=4;\n    status = SDP_ADD(&s->carplay_record);")
+once("        (void)RF_DEREGISTER(&s->channel, &s->granted_channel);\n        s->status = (u32)status;\n        return;\n    }\n    s->carplay_attribute.id", "        s->status=(u32)status; withdraw(s); return;\n    }\n    s->carplay_attribute.id")
 once("        (void)SDP_REMOVE(&s->record);\n        (void)RF_DEREGISTER(&s->channel, &s->granted_channel);\n        s->status = (u32)status;\n        return;\n    }","        s->status=(u32)status; withdraw(s); return;\n    }")
 code=prefix+r'''
 /* SDK initialized evidence is not a lifecycle/lock proof. These functions
@@ -39,13 +41,31 @@ static int sdk_live(void) {
     volatile u8 *bytes=(volatile u8*)os;
     return os[0]==0x2c10d8u && bytes[0x16]==1 && os[1] && os[2] && os[3] && os[4];
 }
+/* Original SDK 0x2072b4 inserts before 0x207334 can fail; 0x207218
+ * unlinks before 0x207228 can fail. Mark attempts, not only successful
+ * returns. The stock unlink 0x1cc920 clears BOTH intrusive links.
+ * Storage is static, and must not be reused, even on ambiguous cleanup.
+ * A detached record is not evidence of controller EIR refresh. */
+static int remove_record(struct GraftState *s,struct SdpRecord *r,u32 bit) {
+    int rc=SDP_REMOVE(r);
+    volatile u32 *links=(volatile u32 *)(void *)r->bytes;
+    u32 next=links[0], prev=links[1];
+    if(rc!=0) s->sdp_remove_error|=bit;
+    if(next==0 && prev==0) {
+        s->resource_mask&=~bit;
+        return 1;
+    }
+    return 0;
+}
 static void withdraw(struct GraftState *s) {
     __atomic_store_n(&s->discovery_ready,0u,__ATOMIC_RELEASE);
     if (!sdk_live()) { if(s->resource_mask)s->cleanup_status=0xffffffffu; return; }
-    if ((s->resource_mask&4) && SDP_REMOVE(&s->carplay_record)==0) s->resource_mask&=~4u;
-    if ((s->resource_mask&2) && SDP_REMOVE(&s->record)==0) s->resource_mask&=~2u;
-    if ((s->resource_mask&1) && RF_DEREGISTER(&s->channel,&s->granted_channel)==0) s->resource_mask&=~1u;
+    if (s->resource_mask&4) (void)remove_record(s,&s->carplay_record,4);
+    if (s->resource_mask&2) (void)remove_record(s,&s->record,2);
+    /* Do not leave an SDP record pointing to a released RFCOMM channel. */
+    if ((s->resource_mask&7)==1 && RF_DEREGISTER(&s->channel,&s->granted_channel)==0) s->resource_mask&=~1u;
     s->cleanup_status=s->resource_mask;
+    if(s->sdp_remove_error) (void)EIR_REQUEST();
 }
 void mu_phase1_cleanup(void *os) {
     if ((u32)os==0x2d5644u) withdraw(ST);
@@ -62,7 +82,6 @@ void mu_phase1_start(u32 services) {
         *(volatile u32*)services!=0x2be500u ||
         *(volatile u8*)(services+0x1b0u)!=1u) return;
 '''+body+r'''
-    s->resource_mask|=4;
     s->status=0;
     __atomic_store_n(&s->discovery_ready,1u,__ATOMIC_RELEASE);
     (void)EIR_REQUEST();
