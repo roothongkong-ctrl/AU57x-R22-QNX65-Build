@@ -10,7 +10,7 @@
 #endif
 #define EXTRA_RX (INITIAL_RX ? 0 : 4)
 static InboundR5 b;
-static int sent,credits,decision,peer_allowed=1;
+static int sent,credits,decision,peer_allowed=1,disconnect_count;
 static unsigned lengths[8];static uint8_t bytes[32];static unsigned used;
 static int yes(void*p){(void)p;return 1;}
 static int retire_barrier(void*p,const Inbound*s){return *(int*)p && s==&b.service;}
@@ -21,7 +21,7 @@ static int rec(void*p){assert(p==&b.service.sdp||p==&b.service.carplay);return 0
 static int accept_rf(void*p,int v){assert(p==&b.service.rf);decision=v;return 2;}
 static int limit(void*p){assert(p==&b.service.rf);return 2;}
 static int send_rf(void*p,void*q){assert(p==&b.service.rf&&q==&b.service.packet);unsigned n=b.service.packet.words[3]&65535;assert(n&&n<=2);lengths[sent++]=n;memcpy(bytes+used,b.service.tx,n);used+=n;return 2;}
-static int disconnect_rf(void*p){(void)p;return 2;}
+static int disconnect_rf(void*p){assert(p==&b.service.rf);++disconnect_count;return 2;}
 static int credit(void*p,int n){assert(p==&b.service.rf);credits+=n;return 0;}
 static int resolve(void*p,const void*ch,const void*ev,uint8_t out[6]){(void)p;assert(ch==&b.service.rf);if(!peer_allowed)return 0;memcpy(out,ev,6);return 1;}
 static void tick(void){assert(ir5_tick(&b)==0);}
@@ -54,6 +54,38 @@ int main(void){
  assert(!ir5_discovery_ready(&b));
  puts("PASS actual R5 publication state controls discovery; no stale advertising");
  puts("PASS R5 clean link close permits certified native service withdrawal");
- close(remote);close(fd);close(server);
+ close(remote);close(fd);
+ /* New independent transport fixture, same real loopback listener.
+  * EOF during a queued native packet must drain, regardless of the order
+  * of close and matching completion. No old data goes to the next peer. */
+ for(int order=0;order<2;order++){
+  memset(&b,0,sizeof b);sent=credits=used=disconnect_count=0;
+  fd=socket(AF_INET,SOCK_STREAM,0);assert(fd>=0);
+  assert(!connect(fd,(struct sockaddr*)&a,sizeof a));remote=accept(server,NULL,NULL);assert(remote>=0);
+  assert(!ir5_init(&b,&ops,resolve,fd,0x1234));assert(!ir5_publish(&b));
+  assert(event(peer,1,0,NULL,0,0)==1);assert(!event(peer,2,0,NULL,0,0));tick();read_full(remote,r,14);
+  assert(send(remote,wire,sizeof wire,0)==sizeof wire);
+  for(int i=0;i<500&&!sent;i++){tick();struct pollfd x={fd,POLLIN,0};(void)poll(&x,1,1);}
+  assert(sent==1&&b.service.busy);
+  close(remote);
+  for(int i=0;i<500&&!b.dead;i++){(void)ir5_tick(&b);struct pollfd x={fd,POLLIN,0};(void)poll(&x,1,1);}
+  assert(b.dead&&disconnect_count==1&&ir5_drain(&b)==-1);
+  assert(event(peer,5,0,(const uint8_t*)"x",1,0)<0);
+  assert(event(peer,6,0,NULL,0,addr(&b.service.packet)+4)<0);
+  if(order==0){
+   assert(!event(peer,4,0,NULL,0,0)&&b.service.state==IN_DRAINING);
+   assert(ir5_drain(&b)==-1);assert(!event(peer,6,0,NULL,0,addr(&b.service.packet)));
+  }else{
+   assert(!event(peer,6,0,NULL,0,addr(&b.service.packet)));
+   assert(ir5_drain(&b)==-1);assert(!event(peer,4,0,NULL,0,0));
+  }
+  assert(ir5_drain(&b)==0&&disconnect_count==1&&sent==1);
+  assert(event(peer,1,0,NULL,0,0)==0&&decision==0);
+  assert(ir5_withdraw(&b,retire_barrier,&barrier_ready)==0);
+  assert(b.service.state==IN_RETIRED&&!b.service.published_mask);
+  close(fd);
+ }
+ close(server);
+ puts("PASS EOF with outstanding native TX drains in both close/completion orders");
  puts("PASS: TCP 57342, verified-peer fixture, CONNECTED MAC, RX payload, fragmented DATA, MTU 2/2/1, deferred event6, DISCONNECTED; OEM substitutes, no hardware.");return 0;
 }

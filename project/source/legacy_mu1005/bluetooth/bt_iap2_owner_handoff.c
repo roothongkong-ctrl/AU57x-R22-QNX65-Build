@@ -114,8 +114,8 @@ int au98_withdraw(Au98Handoff*s,int(*barrier)(void*,const Inbound*),void*ctx){
  int rc;
  if(!s||(s->state!=AU98_PUBLISHED&&s->state!=AU98_DRAINING)||!barrier||!oem_ok(s))return -1;
  rc=s->hooks.withdraw(s->hooks.opaque,barrier,ctx);
- /* ir5_withdraw/inbound_withdraw return -1 before any native mutation
-  * if a callback, pending packet, link, or barrier has not quiesced. */
+ /* -1 means drain pending or unregister preconditions not met.
+  * Native disconnect may have been queued; never release the descriptor. */
  if(rc==-1){s->state=AU98_DRAINING;return -1;}
  if(rc!=0){s->state=AU98_POISONED;return -2;}
  /* QNX native owner confirms no live channel, no pending callback and the
@@ -150,8 +150,17 @@ int au98_bind_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*
  h.withdraw=native_withdraw_adapter;
  return au98_publish(s,&h,o,57342);
 }
+int au98_rearm_stock_native(Au98Handoff*s,int(*reclaimed)(void*,const Inbound*),void*ctx){
+ if(!s||s->state!=AU98_RETIRED||s->fd!=-1||s->generations==UINT32_MAX||
+    !reclaimed||!oem_ok(s))return -1;
+ if(mu_bt_native_reclaim(reclaimed,ctx)!=0)return -1;
+ uint32_t generations=s->generations;
+ memset(s,0,sizeof *s);s->generations=generations;s->fd=-1;
+ return 0;
+}
 #else
 int au98_bind_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*o){
  (void)s;(void)p;(void)o;return -1;
 }
+int au98_rearm_stock_native(Au98Handoff*s,int(*reclaimed)(void*,const Inbound*),void*ctx){(void)s;(void)reclaimed;(void)ctx;return -1;}
 #endif

@@ -26,4 +26,5 @@ int mu_bt_native_discovery_ready(void);
 /* Serialized original owner only; no hook installed by this API. */
 int mu_bt_native_append_eir(uint8_t*,size_t,size_t,int (*)(void*),void*,size_t*);
 int mu_bt_native_withdraw(int (*barrier)(void *,const Inbound*),void *);
+int mu_bt_native_reclaim(int (*reclaimed)(void*,const Inbound*),void*);
 #endif

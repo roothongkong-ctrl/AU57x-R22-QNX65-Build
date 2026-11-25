@@ -24,5 +24,7 @@ int ir5_discovery_ready(const InboundR5 *);
  * raw_event is used only by the binder's real peer resolution function. */
 int ir5_event(InboundR5 *,void *,const void *,unsigned,unsigned,const uint8_t *,unsigned,uint32_t);
 int ir5_tick(InboundR5 *);
+/* Owner-only stop; 0 = known idle, -1 = wait, -2 = uncertain SDK state. */
+int ir5_drain(InboundR5 *);
 int ir5_withdraw(InboundR5 *,int (*barrier)(void*,const Inbound*),void*);
 #endif

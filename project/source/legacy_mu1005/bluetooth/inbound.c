@@ -43,12 +43,21 @@ int inbound_publish(Inbound*s){
  s->state=IN_PUBLISHED;return 0;
 }
 int inbound_event(Inbound*s,void*ch,unsigned code,unsigned status,const uint8_t*data,unsigned n,uint32_t packet_addr){
- if(!ok(s)||ch!=&s->rf||s->state<IN_REGISTERED||s->state>=IN_DIRTY)return -1;
+ if(!ok(s)||ch!=&s->rf)return -1;
+ /* Close can precede asynchronous packet completion. Retain native storage
+  * until the matching completion arrives; do not send or accept in DRAINING. */
+ if(s->state==IN_DRAINING){
+  if(code!=6||!s->busy||packet_addr!=s->ops.addr(&s->packet))return -1;
+  s->busy=0;
+  if(status){s->state=IN_DIRTY;return -2;}
+  s->state=IN_PUBLISHED;return 0;
+ }
+ if(s->state<IN_REGISTERED||s->state>=IN_DIRTY)return -1;
  if(code==1){int allow=!status&&s->state==IN_PUBLISHED&&!s->pending&&!s->busy&&s->ops.peer_ok(s->ops.opaque)==1&&s->ops.ready(s->ops.opaque)==1;
   if(allow)s->pending=1;
   if(s->ops.accept(ch,allow)!=2){s->state=IN_DIRTY;return -2;}return allow?1:0;}
  if(code==2){if(status||s->state!=IN_PUBLISHED||!s->pending)return -1;int mtu=s->ops.limit(ch);if(mtu<=0||mtu>MAX_DATA||s->ops.opened(s->ops.opaque,(unsigned)mtu)!=1){s->state=IN_DIRTY;return -2;}s->pending=0;s->state=IN_LINK;/* Bootstrap RX window only after transport opened. */if(!s->ops.initial_rx_credits&&s->ops.credit(ch,4)!=0){s->state=IN_DIRTY;return -2;}return 0;}
- if(code==4){s->pending=0;if(s->ops.closed(s->ops.opaque)!=1){s->state=IN_DIRTY;return -2;}/* Do not reuse an in-flight packet on close without OEM completion. */s->state=s->busy?IN_DIRTY:IN_PUBLISHED;return 0;}
+ if(code==4){s->pending=0;if(s->ops.closed(s->ops.opaque)!=1){s->state=IN_DIRTY;return -2;}/* Do not reuse an in-flight packet on close without OEM completion. */s->state=s->busy?IN_DRAINING:IN_PUBLISHED;return 0;}
  if(code==5){if(s->state!=IN_LINK||status!=0||!data||!n||n>MAX_DATA)return -1;if(s->ops.rx(s->ops.opaque,data,n)!=1){s->state=IN_DIRTY;return -2;}/* R5 defers refill until a whole frame has been written to TCP. */if(!s->ops.defer_rx_credit&&s->ops.credit(ch,1)!=0){s->state=IN_DIRTY;return -2;}return 0;}
  if(code==6){if(!s->busy||packet_addr!=s->ops.addr(&s->packet))return -1;s->busy=0;if(status){s->state=IN_DIRTY;return -2;}return 0;}
  return -1;

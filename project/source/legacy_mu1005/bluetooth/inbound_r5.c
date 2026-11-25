@@ -59,7 +59,31 @@ int ir5_event(InboundR5*b,void*ch,const void*raw,unsigned code,unsigned status,c
   * not recycle any descriptor or re-publish service storage here. */
  if(code==4)b->native_link=0;
  if(code==2&&!status&&b->service.pending)b->native_link=1;
- if(b->dead)return -1;
+ if(b->dead){
+  /* No data-plane work after EOF. Only exact close and TX completion
+   * may release known live resources; never clear uncertain SDK state. */
+  if(b->service.state==IN_DIRTY||b->service.uncertain_mask)return -1;
+  if(code==4&&status==0){
+   int r=inbound_event(&b->service,ch,code,status,NULL,0,0);
+   if(!r)b->authorized=0;
+   return r;
+  }
+  if(code==6){
+   int r=inbound_event(&b->service,ch,code,status,NULL,0,packet);
+   if(!r){
+    b->completion=0;
+    if(b->rf.tx_busy)(void)au_rf_send_complete(&b->rf,1);
+   }
+   return r;
+  }
+  /* Reject a fresh incoming request only if no earlier request/link owns
+   * this object. Do not admit it to an already-dead daemon. */
+  if(code==1&&b->service.state==IN_PUBLISHED&&!b->service.pending&&!b->service.busy&&!b->native_link){
+   if(b->vendor.accept(ch,0)!=2){b->service.state=IN_DIRTY;return -2;}
+   return 0;
+  }
+  return -1;
+ }
  if(code==1||code==2){uint8_t peer[6]={0};int valid=raw&&b->resolve(b->vendor.opaque,ch,raw,peer)==1&&valid_peer(peer);
   if(code==1){/* An additional incoming event must not replace an accepted peer. */
    if(b->service.pending||b->service.state==IN_LINK)return -1;
@@ -92,6 +116,20 @@ int ir5_tick(InboundR5*b){
  return 0;
 }
 
+int ir5_drain(InboundR5*b){
+ if(!b||!b->initialized||!cert(b))return -1;
+ (void)abort_stream(b);
+ /* A completion already observed before abort is no longer usable for
+  * sending new data, but releases the RF queue's copied packet ownership. */
+ if(b->completion&&!b->service.busy){
+  b->completion=0;
+  if(b->rf.tx_busy)(void)au_rf_send_complete(&b->rf,1);
+ }
+ if(b->service.state==IN_DIRTY||b->service.uncertain_mask)return -2;
+ if(b->native_link||b->service.pending||b->service.busy||b->native_rx_busy||
+    b->completion||b->rf.tx_busy||b->service.state!=IN_PUBLISHED)return -1;
+ return 0;
+}
 int ir5_withdraw(InboundR5*b,int (*barrier)(void*,const Inbound*),void*opaque){
  if(!b||!b->initialized||!cert(b)||b->native_link||b->rf.connected||b->service.pending||b->service.busy||b->native_rx_busy||b->completion)return -1;
  int r=inbound_withdraw(&b->service,barrier,opaque);

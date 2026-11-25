@@ -62,10 +62,26 @@ int mu_bt_native_attach(const MuBtOwner *o,int fd){
 }
 int mu_bt_native_discovery_ready(void){return ir5_discovery_ready(&res.bridge);}
 int mu_bt_native_tick(void){return cert(&res)&&res.bridge.initialized?ir5_tick(&res.bridge):-1;}
-int mu_bt_native_withdraw(int (*barrier)(void*,const Inbound*),void *p){return cert(&res)&&res.bridge.initialized?ir5_withdraw(&res.bridge,barrier,p):-1;}
+int mu_bt_native_withdraw(int (*barrier)(void*,const Inbound*),void *p){
+ if(!cert(&res)||!res.bridge.initialized||!barrier)return -1;
+ int r=ir5_drain(&res.bridge);
+ return r?r:ir5_withdraw(&res.bridge,barrier,p);
+}
+/* A retired SDK object may still have queued callbacks. Require a separate
+ * post-withdraw reclamation witness, not the prior unregister barrier. */
+int mu_bt_native_reclaim(int (*reclaimed)(void*,const Inbound*),void*p){
+ InboundR5*b=&res.bridge;
+ if(!cert(&res)||!reclaimed||!b->initialized||!b->dead||
+    b->service.state!=IN_RETIRED||b->service.published_mask||
+    b->service.uncertain_mask||b->service.pending||b->service.busy||
+    b->native_link||b->native_rx_busy||b->completion||b->rf.tx_busy||
+    reclaimed(p,&b->service)!=1||!cert(&res))return -1;
+ memset(&res,0,sizeof res);return 0;
+}
 #else
 int mu_bt_native_attach(const MuBtOwner *o,int fd){(void)o;(void)fd;return -1;}
 int mu_bt_native_discovery_ready(void){return 0;}
 int mu_bt_native_tick(void){return -1;}
 int mu_bt_native_withdraw(int (*barrier)(void*,const Inbound*),void *p){(void)barrier;(void)p;return -1;}
+int mu_bt_native_reclaim(int (*barrier)(void*,const Inbound*),void *p){(void)barrier;(void)p;return -1;}
 #endif

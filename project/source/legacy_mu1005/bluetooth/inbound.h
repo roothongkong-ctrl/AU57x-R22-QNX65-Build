@@ -40,7 +40,7 @@ typedef struct {
  uint8_t published_mask, uncertain_mask; /* vendor calls with known/unknown outcome */
  InboundOps ops;
 } Inbound;
-enum { IN_EMPTY,IN_PREPARED,IN_REGISTERED,IN_PUBLISHED,IN_LINK,IN_DIRTY,IN_WITHDRAWING,IN_RETIRED };
+enum { IN_EMPTY,IN_PREPARED,IN_REGISTERED,IN_PUBLISHED,IN_LINK,IN_DIRTY,IN_WITHDRAWING,IN_RETIRED,IN_DRAINING };
 enum { IN_RF=1, IN_IAP_SDP=2, IN_CP_SDP=4 };
 /* Zero-initialize stable instance ONCE; cannot move until OEM reclamation. */
 int inbound_prepare(Inbound*,const InboundOps*,uint32_t callback_address);

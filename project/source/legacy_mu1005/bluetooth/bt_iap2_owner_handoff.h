@@ -52,5 +52,8 @@ typedef struct {
  const Au100Evidence *route_evidence;
 } Au98OwnerProof;
 int au98_bind_stock_native(Au98Handoff*,const Au98OwnerProof*,const MuBtOwner*);
+/* After clean withdrawal and independent proof no old SDK callbacks can
+ * run, release storage for a fresh publication. No automatic retry. */
+int au98_rearm_stock_native(Au98Handoff*,int(*reclaimed)(void*,const Inbound*),void*);
 
 #endif
