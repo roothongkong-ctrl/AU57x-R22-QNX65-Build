@@ -2,7 +2,7 @@ name: MU1005 QNX inner iAP2 runtime integration (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/mu1005-qnx-inner.yml, lab/mu1005_qnx_runtime/inner_runtime.c, lab/mu1005_qnx_runtime/prepare_inner_ifs.py, lab/mu1005_qnx_runtime/full_chain.c]
+    paths: [.github/workflows/mu1005-qnx-inner.yml, lab/mu1005_qnx_runtime/inner_runtime.c, lab/mu1005_qnx_runtime/prepare_inner_ifs.py, lab/mu1005_qnx_runtime/full_chain.c, lab/mu1005_qnx_runtime/bootstrap_chain_fixture.c, lab/mu1005_qnx_runtime/vehicle_profile.h]
   workflow_dispatch:
 permissions:
   contents: read
@@ -30,6 +30,16 @@ jobs:
           for f in mm_peer.h inner_socket.h inner_iap2.h test_mm_peer.c; do
             cmp "previous-native/source/si/inner_iap2/$f" "integration/mu1005_si_native/inner_iap2/$f"
           done
+      - name: Verify continuous byte-level scenario on host before QNX
+        run: |
+          set -euxo pipefail
+          s=project/source/src
+          b=project/source/legacy_mu1005/bluetooth
+          a=project/source/legacy_mu1005/airplay
+          i=integration/mu1005_si_native/inner_iap2
+          gcc -std=gnu99 -D_DEFAULT_SOURCE -Wall -Wextra -O2 -ffunction-sections -fdata-sections -Wl,--gc-sections -Wl,--export-dynamic -I"$s" -I"$b" -I"$a" lab/mu1005_qnx_runtime/full_chain.c lab/mu1005_qnx_runtime/bootstrap_chain_fixture.c "$s"/{cp_cloud_pipeline,cp_wcp_autoconnect,cp_wcp_handoff,cp_radio_policy,cp_session_handoff,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_oem_boundary,cp_wireless,cp_event,cp_csm}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" "$i"/{inner_iap2,inner_socket,mm_peer}.c -ldl -o qnx-runtime-evidence/host-chain
+          qnx-runtime-evidence/host-chain | tee qnx-runtime-evidence/host-chain.log
+          grep -F 'CHAIN_IAP2_BYTES_AND_SOCKET_ROUND_TRIP_PASS_NO_OEM' qnx-runtime-evidence/host-chain.log
       - name: Fetch locked public QNX boot environment and QEMU
         run: |
           set -euxo pipefail
@@ -82,11 +92,11 @@ jobs:
             b=project/source/legacy_mu1005/bluetooth
             a=project/source/legacy_mu1005/airplay
             i=integration/mu1005_si_native/inner_iap2
-            arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -O2 -ffunction-sections -fdata-sections -Wl,--gc-sections -I"$s" -I"$b" -I"$a" lab/mu1005_qnx_runtime/full_chain.c "$s"/{cp_cloud_pipeline,cp_wcp_autoconnect,cp_wcp_handoff,cp_radio_policy,cp_session_handoff,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_oem_boundary,cp_wireless,cp_event,cp_csm}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" "$i"/{inner_iap2,inner_socket,mm_peer}.c -lsocket -lc -o qnx-runtime-evidence/mu1005-chain-probe
+            arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -O2 -ffunction-sections -fdata-sections -Wl,--gc-sections -Wl,--export-dynamic -I"$s" -I"$b" -I"$a" lab/mu1005_qnx_runtime/full_chain.c lab/mu1005_qnx_runtime/bootstrap_chain_fixture.c "$s"/{cp_cloud_pipeline,cp_wcp_autoconnect,cp_wcp_handoff,cp_radio_policy,cp_session_handoff,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_oem_boundary,cp_wireless,cp_event,cp_csm}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" "$i"/{inner_iap2,inner_socket,mm_peer}.c -lsocket -lc -o qnx-runtime-evidence/mu1005-chain-probe
           ' 2>&1 | tee qnx-runtime-evidence/chain-build.log
           export QNX_TEST_INNER_LIB="$PWD/previous-native/payload/libmu1005_inner_iap2_review.so"
           QEMU_KEEP_LOG="$PWD/qnx-runtime-evidence/chain-serial.log" QEMU_TIMEOUT=95 QEMU_RUN_SECS=50 sh toolchain/tests/qemu-run.sh "$PWD/qnx-runtime-evidence/mu1005-chain-probe" 8.5 2>&1 | tee qnx-runtime-evidence/chain-runtime.log
-          grep -F 'QNX_CHAIN_SIMULATED_HARDWARE_REAL_TRANSPORT_PASS_NO_OEM' qnx-runtime-evidence/chain-runtime.log
+          grep -F 'CHAIN_IAP2_BYTES_AND_SOCKET_ROUND_TRIP_PASS_NO_OEM' qnx-runtime-evidence/chain-runtime.log
           grep -E 'Process [0-9]+ \(mu1005-chain-probe\) exited status=0' qnx-runtime-evidence/chain-serial.log
       - uses: actions/upload-artifact@v4
         if: always()

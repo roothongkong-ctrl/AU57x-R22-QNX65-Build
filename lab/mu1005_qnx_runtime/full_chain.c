@@ -4,6 +4,8 @@
 #define main previous_pipeline_fixture_main
 #include "../../tests/test_cloud_pipeline.c"
 #undef main
+#include "vehicle_profile.h"
+extern int chain_bootstrap_fixture(void);
 #include "../../integration/mu1005_si_native/inner_iap2/mm_peer.h"
 #include "../../integration/mu1005_si_native/inner_iap2/inner_socket.h"
 static MuMmPeer chain_mm;
@@ -31,31 +33,50 @@ static int chain_event(void *ctx,const unsigned char *p,size_t n){
 static int chain_inner(void *ctx,uint32_t e){
  (void)ctx;return e==8&&chain_verified&&chain_events==1&&chain_used==6;
 }
-int main(void){
- setvbuf(stdout,NULL,_IONBF,0);
- struct cp_cloud_pipeline p;
- struct cp_step04_session b;
- struct cp_stock_mfi stock;
- Mu34ApServer ap_backend;
- struct cp_cloud_owner o=ops;
- o.inner_iap2_mfi_verified=chain_inner; /* TEST ONLY: transport proof, not MFi */
- reset_fixture();mocked_oem(&b,&stock,1);cp_cloud_init(&p);
- puts("CHAIN:BT_AND_MFI_FIXTURE");
- assert(cp_cloud_begin(&p,&b,&o,8,4)==CP_CLOUD_OK);
+static struct cp_cloud_pipeline p;
+static Mu34ApServer ap_backend;
+static struct cp_cloud_owner o;
+static int chain_bonjour(void *ctx,uint32_t e,const char *iface){
+ (void)ctx;return bonjour&&e==8&&!strcmp(iface,MU_LAB_AP_IFACE);
+}
+static int chain_listener(void *ctx,uint32_t e,const char *iface,unsigned port){
+ (void)ctx;return listener&&e==8&&port==MU_LAB_AP_PORT&&!strcmp(iface,MU_LAB_AP_IFACE);
+}
+static int chain_session(void *ctx,uint32_t e,const char *iface,unsigned port){
+ (void)ctx;return phone_session&&e==8&&port==MU_LAB_AP_PORT&&!strcmp(iface,MU_LAB_AP_IFACE);
+}
+static int chain_cf(void *ctx,const void *cf,char *out,size_t cap){
+ (void)ctx;(void)cf;
+ if(cap<sizeof MU_LAB_AP_IFACE)return -1;
+ memcpy(out,MU_LAB_AP_IFACE,sizeof MU_LAB_AP_IFACE);return sizeof MU_LAB_AP_IFACE-1;
+}
+void chain_after_identification(struct cp_step04_session *b){
+ reset_fixture();o=ops;
+ o.inner_iap2_mfi_verified=chain_inner; /* lab-only inner transport witness */
+ o.bonjour_identity_verified=chain_bonjour;
+ o.airplay_listener_verified=chain_listener;
+ o.airplay_session_connected=chain_session;
+ cp_cloud_init(&p);
+ assert(cp_s4_authenticated(b)&&b->identity_accepted);
+ assert(b->wireless.session->wifi.channel==MU_LAB_AP_CHANNEL);
+ assert(cp_cloud_begin(&p,b,&o,8,4)==CP_CLOUD_OK);
  assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
- puts("CHAIN:RADIO_FIXTURE_5_TO_24");
- assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK&&p.band==CP_RADIO_5);
- assert(cp_cloud_radio_result(&p,0,0)==CP_CLOUD_RETRY);
- assert(cp_cloud_radio_result(&p,0,1)==CP_CLOUD_RETRY);
+ /* Match actual R106 AP channel rather than pretending 5 GHz was observed. */
  assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK&&p.band==CP_RADIO_24);
  assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_OK);
- native_airplay(&ap_backend);
+ puts("CHAIN:R106_AP_UAP0_CHANNEL11_ASSOCIATION_FIXTURE");
+ const Mu34ApServerBinding bind={stock_owner,cf_ok,chain_cf,stock_owner,
+  setprop,control_ap,confirmed_ap,NULL,&airplay_object,&airplay_owner,
+  &airplay_interface_key,&airplay_start_key,&airplay_stop_key,8};
+ assert(mu34_ap_server_init(&ap_backend,&bind)==0);
  assert(cp_cloud_bind_airplay(&p,&ap_backend)==CP_CLOUD_OK);
- assert(cp_cloud_prepare_receiver(&p,"wlan0")==CP_CLOUD_OK);
- static const struct cp_session cfg={.airplay_port=5000};
- b.wireless.session=&cfg;b.wireless_bound=1;b.wireless.start_sent=1;
+ assert(cp_cloud_prepare_receiver(&p,MU_LAB_AP_IFACE)==CP_CLOUD_OK);
+ assert(cp_cloud_carplay_request(&p)==CP_CLOUD_PROOF);
+}
+void chain_after_start_ack(struct cp_step04_session *b){
+ assert(b==p.bootstrap&&b->wireless.start_sent&&!b->wireless_pending);
  assert(cp_cloud_carplay_request(&p)==CP_CLOUD_OK);
- assert(cp_cloud_airplay_ready(&p,"wlan0")==CP_CLOUD_OK);
+ assert(cp_cloud_airplay_ready(&p,MU_LAB_AP_IFACE)==CP_CLOUD_OK);
  puts("CHAIN:AIRPLAY_OWNER_FIXTURE_REAL_TRANSPORT_NEXT");
  assert(cp_cloud_inner_auth(&p)==CP_CLOUD_PROOF);
  int f[2];assert(socketpair(AF_UNIX,SOCK_STREAM,0,f)==0);
@@ -81,6 +102,9 @@ int main(void){
  assert(cp_cloud_end(&p)==CP_CLOUD_OK);
  assert(mu_mm_peer_release(&chain_mm)==0);
  mu_inner_socket_close(&chain_dio);
- puts("QNX_CHAIN_SIMULATED_HARDWARE_REAL_TRANSPORT_PASS_NO_OEM");
- return 0;
+ puts("CHAIN_IAP2_BYTES_AND_SOCKET_ROUND_TRIP_PASS_NO_OEM");
+}
+int main(void){
+ setvbuf(stdout,NULL,_IONBF,0);
+ return chain_bootstrap_fixture();
 }
