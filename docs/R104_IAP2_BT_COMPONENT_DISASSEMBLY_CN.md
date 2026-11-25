@@ -146,3 +146,48 @@ iAP2 协议引擎不负责创建蓝牙 socket，也不负责寻找 BluetoothTran
 不要再在 iAP2 packet parser 内盲目找 socket。应获取/分析同一固件的 `mm-ipod` 和 Bluetooth 相关 transport component ELF（若存在），并检查 `ipod_module` 的模块注册接口、模块配置加载和 transport factory；同时查找 `ipod-drvr-iap2.so` 中调用 `link_create` 的上层入口与参数来源。若所需 OEM ELF 不在当前文件集中，则明确列为唯一数据阻塞，不再将 host mock 或 donor 反汇编当成 MU1005 真实证据。
 
 状态保持：`RESEARCH_ONLY / NO_INSTALL / safe_to_flash=false / vehicle_verified=false`。
+
+
+## R104 第五轮：区分协议包队列与物理 transport producer（2026-11-26）
+
+本轮对原始 ELF 的 `transport_send_pkt`、`transport_recv_pkt`、`link_get_transport_data` 继续做指令级核验。
+
+### 1. 发送路径再次确认
+
+`transport_send_pkt` (0x2115c) 的尾部指令为：
+
+- 从 link-private 对象 `[link+0x14]` 取 private context；
+- 从 private+`0x40` 取 transport object；
+- 从 transport object+`0x28` 取 send callback；
+- 使用 packet buffer 的 data/length 字段作为参数调用；
+- callback 返回长度必须等于请求长度，否则返回错误。
+
+这证明 +0x28 是真实发送回调槽，不是根据结构体邻接推断。
+
+### 2. 接收路径分两段，不能混淆
+
+`transport_recv_pkt` (0x2121c) 先从 packet receive queue 取出一个 packet；随后调用 `link_get_transport_data(link, packet)` (0x12208)，再调用 packet header parse/probe handling。也就是说：
+
+- 物理 transport 的 receive callback（vtable +0x2c）负责把底层收到的数据交给 iAP2 接收队列；
+- `transport_recv_pkt` 是协议引擎消费队列、解析 iAP2 packet 的上层工作函数；
+- `link_get_transport_data` 处理 packet/transport data 的协议封装与提取，不是蓝牙 RFCOMM socket 的创建入口。
+
+这修正了“看到 link_get_transport_data 就能找到 Bluetooth producer”的错误方向。
+
+### 3. 当前可证明的 producer 边界
+
+同一个 link/private context 在协议层由 link object 的 `+0x14` 访问；transport object 指针由 private context 的 `+0x40` 提供。当前这份 `ipod-drvr-iap2.so` 中，能证明消费者如何调用 transport vtable，但尚未发现负责给 private+`0x40` 赋值的唯一构造路径。必须继续检查更上层模块/调用者，特别是 mm-ipod loader、transport component owner 或独立插件。
+
+### 4. 本轮实际进展
+
+- 发送物理回调 +0x28：机器码确认。
+- 接收物理回调 +0x2c：机器码确认。
+- 接收队列消费函数：确认是 `transport_recv_pkt`。
+- `link_get_transport_data`：确认是 packet data 提取/协议层辅助路径，不应当作 Bluetooth object constructor。
+- Bluetooth RFCOMM producer：仍未定位。
+
+### 5. 下一步最有效路径
+
+需要拿到同固件 `mm-ipod` 与实际 USB transport 插件 ELF，对其模块加载 ABI 和对象构造方式做对照；并检查 `ipod_module` 导出对象以及 `iap2_init` 的外层 caller，确认 transport object 是由驱动内部创建还是由外部组件注入。若没有对应 ELF，不能仅凭 iAP2 驱动库声称已找到蓝牙注册入口。
+
+状态保持 `RESEARCH_ONLY / NO_INSTALL / safe_to_flash=false / vehicle_verified=false`。
