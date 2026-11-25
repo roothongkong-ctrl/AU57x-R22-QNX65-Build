@@ -1,0 +1,17 @@
+{
+  "version": "R143-COMBINED-OWNER-THREAD-OBSERVER",
+  "baseline": "MHI2_CN_AU57x_K1006_2/MU1005",
+  "original_btstack_sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
+  "host_gcc": "pending_ci",
+  "host_clang": "pending_ci",
+  "qnx_arm32_compile": "pending_ci",
+  "qnx_qemu_synthetic_process": "pending_ci",
+  "real_oem_btstack_loaded": false,
+  "real_bluesdk_owner_verified": false,
+  "iap2_rfcomm_registered": false,
+  "mfi_verified": false,
+  "wireless_airplay_verified": false,
+  "vehicle_verified": false,
+  "installable": false,
+  "safe_to_flash": false
+}
