@@ -1,0 +1,92 @@
+name: R103 donor iAP2 daemon QNX Rust build (NO INSTALL)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - mu1005-wireless-implementation-r103-20261125
+    paths:
+      - ".github/workflows/r103-qnx-rust-donor.yml"
+      - "integration/r103_iap2_bridge/**"
+      - "third_party/**"
+      - "docs/MU1005_WIRELESS_PARALLEL_IMPLEMENTATION_CN.md"
+
+permissions:
+  contents: read
+
+jobs:
+  donor-rust-qnx:
+    name: Reuse upstream daemon and build native QNX ARMv7 Rust ELF
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout AU57x integration branch
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned upstream wireless CarPlay source
+        uses: actions/checkout@v4
+        with:
+          repository: luka-dev/mib2q-carplay-rgi
+          ref: 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          path: donor
+
+      - name: Checkout pinned QNX 6.5 Rust toolchain source
+        uses: actions/checkout@v4
+        with:
+          repository: luka-dev/qnx65-armv7-toolchain
+          ref: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          path: qnx-toolchain
+
+      - name: Build donor QNX 6.5 GCC 8.5 plus Rust toolchain
+        run: |
+          docker build --platform=linux/amd64 --target with-rust \
+            -t qnx65-armv7-toolchain:8.5-rust qnx-toolchain
+
+      - name: Run upstream daemon host test suite
+        run: |
+          docker run --rm --platform=linux/amd64 \
+            -v "$GITHUB_WORKSPACE":/src -w /src \
+            qnx65-armv7-toolchain:8.5-rust \
+            cargo test --offline --manifest-path /src/donor/wireless/daemon/Cargo.toml
+
+      - name: Cross-build original upstream daemon for QNX 6.5 ARMv7
+        run: |
+          docker run --rm --platform=linux/amd64 \
+            -v "$GITHUB_WORKSPACE":/src -w /src \
+            qnx65-armv7-toolchain:8.5-rust \
+            /opt/rust/qnx-cargo build --release --manifest-path \
+            /src/donor/wireless/daemon/Cargo.toml --bin mhi2q-wireless-daemon
+
+      - name: Verify QNX ELF architecture and dependencies
+        run: |
+          BIN="donor/wireless/daemon/target/armv7-unknown-nto-qnx650/release/mhi2q-wireless-daemon"
+          test -s "$BIN"
+          file "$BIN" | tee qnx-rust-elf.txt
+          docker run --rm --platform=linux/amd64 \
+            -v "$GITHUB_WORKSPACE":/src -w /src \
+            qnx65-armv7-toolchain:8.5-rust \
+            sh -c 'arm-unknown-nto-qnx6.5.0eabi-readelf -h /src/'"$BIN"' && \
+                   arm-unknown-nto-qnx6.5.0eabi-readelf -d /src/'"$BIN"''
+          file "$BIN" | grep -q "ELF 32-bit.*ARM"
+          sha256sum "$BIN" | tee qnx-rust-sha256.txt
+          {
+            echo "upstream_commit=20c94f51c0f0ae88b154c12e4f604643ba23022c"
+            echo "toolchain_commit=baa45224f18ae6b13c2e9c77c6663bb8181eb6a1"
+            echo "target=armv7-unknown-nto-qnx650"
+            echo "status=QNX_RUST_BUILD_REVIEW_ONLY"
+            echo "installable=false"
+            echo "safe_to_flash=false"
+            echo "vehicle_verified=false"
+          } > qnx-rust-build-info.txt
+
+      - name: Upload review-only QNX Rust ELF and build receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: R103-QNX-Rust-Daemon-REVIEW-ONLY
+          path: |
+            donor/wireless/daemon/target/armv7-unknown-nto-qnx650/release/mhi2q-wireless-daemon
+            qnx-rust-elf.txt
+            qnx-rust-sha256.txt
+            qnx-rust-build-info.txt
+          if-no-files-found: error
+          retention-days: 14
