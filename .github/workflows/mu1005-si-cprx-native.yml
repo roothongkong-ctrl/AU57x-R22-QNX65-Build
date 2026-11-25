@@ -84,7 +84,7 @@ jobs:
             s=review/source/si
             C=arm-unknown-nto-qnx6.5.0eabi-gcc
             R=arm-unknown-nto-qnx6.5.0eabi-readelf
-            "$C" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -shared -Wl,--no-undefined "$inner/inner_iap2.c" -lc -o review/payload/libmu1005_inner_iap2_review.so
+            "$C" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -shared -Wl,--no-undefined "$inner/inner_iap2.c" "$inner/inner_airplay.c" -lc -o review/payload/libmu1005_inner_iap2_review.so
             "$R" -h -dW -sW review/payload/libmu1005_inner_iap2_review.so > review/evidence/inner-iap2-elf.log
             "$C" -print-file-name=libc.so
             "$C" -print-file-name=libsocket.so
@@ -220,7 +220,7 @@ jobs:
               media)
                 bash ci/host_cloud_media.sh
                 inner=integration/mu1005_si_native/inner_iap2
-                cc -std=c99 -Wall -Wextra -Werror -O2 "$inner/inner_iap2.c" "$inner/test.c" -o "$RUNNER_TEMP/inner-iap2"
+                cc -std=c99 -Wall -Wextra -Werror -O2 "$inner/inner_iap2.c" "$inner/inner_airplay.c" "$inner/test.c" -ldl -o "$RUNNER_TEMP/inner-iap2"
                 "$RUNNER_TEMP/inner-iap2"
                 ;;
               recovery) bash ci/host_sd_txn.sh ;;

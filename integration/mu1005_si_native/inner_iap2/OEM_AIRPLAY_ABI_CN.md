@@ -1,0 +1,5 @@
+# MU1005 原厂 AirPlay iAP2 命令桥（第08步）
+本轮从用户原厂文件实查：libairplay.so SHA256 193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b5。
+AirPlayReceiverSessionSendCommand 0x25200，492字节；ARM 参数 r0=session、r1=命令字典、r2=completion、r3=context；0x253ac 的无 completion 路径仍经原厂 HTTP client；0x25208 读取 event client。CFDictionarySetCString 0x50fbc，CFDictionarySetData 0x51084，均实查四参数 ABI。原厂 CFLTypes retain callbacks 真实导出，非 Apple 通用符号名。发送使用 {type:"iAPSendMessage",params:{data:CFData}}，来自 congobg 技术说明（https://github.com/congobg/MHI2Q_WiFi_CarPlay/blob/main/docs/README.md）。原厂二进制本身未发现 iAPSendMessage 字符串，不能认定已经处理该命令。
+DIO sha e40b5bf9df3f96221ac01bc0484e06493e6c58e60cca32d2547939ff1d56f63c，导入 iap2_connect；libiap2client.so.1 (065cdb1300a30e1068e04c30213b61e233197a95109181a37fbfef843fe369b5) iap2_connect 0x2cec 调用原厂 open/devctl 通路，ipod-drvr-iap2.so 导出 transport_receive / transport_send_pkt；mm-ipod 可加载 ipod-transport-%s.so。此平台与 QC 的 Cinemo /dev/otg-cinemo 入口不同，下一步应针对独立 mm-ipod transport 插件及跨进程通道，非照搬 QC 的 open hook。
+实现绑定原厂 CFL 函数和 AirPlay 发送，解析已解密命令并交给已实现的 MuInner packet relay。发送成功只是排队；非相关命令交回原厂；忙时不回成功。未实现原厂 dispatch owner 注入、真实控制回调绑定、mm-ipod plugin 或加密，不得安装。真实 QNX ARM 编译尚待 CI。原厂库未上传。
