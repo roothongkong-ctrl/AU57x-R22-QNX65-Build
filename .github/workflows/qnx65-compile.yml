@@ -1,7 +1,7 @@
 name: AU57x R52 QNX6.5 ARMv7 (REVIEW ONLY)
 on:
   push:
-    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline, r95-offline-steps-03-to-17, r96-oneclick-lab-and-release-review, r97-stock-thread-origin-handoff, r98-stock-iap2-owner-transport, r99-stock-iap2-two-config-fallback, r100-failclosed-dual-route-graft, r101-rfcomm-scn-and-owner-snapshot]
+    branches: [main, r92-native-btstack-preload-owner-probe, r93-original-btstack-preload-proof-and-sd-diag, r94-launcher-preload-reversible-offline, r95-offline-steps-03-to-17, r96-oneclick-lab-and-release-review, r97-stock-thread-origin-handoff, r98-stock-iap2-owner-transport, r99-stock-iap2-two-config-fallback, r100-failclosed-dual-route-graft, r101-rfcomm-scn-and-owner-snapshot, mu1005-wireless-implementation-r103-20261125]
   workflow_dispatch:
 permissions:
   contents: read
