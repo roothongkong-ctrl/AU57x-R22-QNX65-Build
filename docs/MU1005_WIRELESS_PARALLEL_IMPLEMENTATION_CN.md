@@ -158,3 +158,18 @@ donor 仓库的 `docs/LICENSE` 是 **PolyForm Noncommercial 1.0.0**，不是 GPL
 - 已有直接复用成果：LuKa 原版 iAP2 LinkEngine（R103），其 host tests 已通过；donor Congo 项目本轮只复用架构知识，不复制其受 PolyForm Noncommercial 约束的程序。
 - 下一关键动作：以 MU1005 私有原厂样本为依据，优先定位 Bluetooth RFCOMM owner/SCN 与 AirPlay/DIO 无线 session 回调；随后按表实现 MU1005 专用适配层。5GHz 与多手机管理并行保持条件化设计。
 - 状态不变：`RESEARCH_ONLY / NO_INSTALL / safe_to_flash=false / vehicle_verified=false`。
+
+## R99 补充修正：Bluetooth transport 模板必须完整激活（2026-11-25）
+
+复核用户 70 版 `/etc/mm/iap2.cfg` 原文摘录后，发现旧版 R99 生成器有一个配置完整性缺口：当原文件只有注释版 `#[bluetooth]` 时，旧逻辑会在文件末尾新建一个仅含 `enable=1` 的活动 section，却没有启用原模板中已有的 `id`、`name`、`connectstatus`、`mac`。这不足以形成完整 transport 配置，不能把它当作可用配置。
+
+已修复 `tools/r99_stock_iap2_route.py::stage_iap2_ini()`：
+
+- 只接受唯一的注释版 Bluetooth section；
+- 必须从原模板找到且仅找到一次 `enable`、`id`、`name`、`connectstatus`、`mac` 五个字段；
+- 校验 transport ID 是 1–65535 数字、name 非空、connectstatus 已启用、MAC 为六组十六进制字节；
+- 仅解除这五个既有字段的注释，保留原值（enable 规范为 yes）；不生成 ID、名称、MAC，不新增空壳 section；
+- 模板缺字段、重复字段、非法 MAC 或未启用状态时直接 DENY；
+- 更新合成测试夹具为完整字段，但夹具明确是 DEMO_NOT_OEM，不代表实车配置。
+
+新增 3 个负向/完整性测试；R99 双配置测试总数由 23 增至 **26**。该修正仅改善离线配置生成器的正确性，仍不证明 transport component 已在 MU1005 运行，也不改变 NO_INSTALL 状态。
