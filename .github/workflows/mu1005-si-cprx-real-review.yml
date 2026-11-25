@@ -24,6 +24,14 @@ jobs:
           cc -std=c99 -O2 -Wall -Wextra -Werror -I"$a" -I"$s" "$s"/{si_mu1005_layout,si_mu1005_registration,si_mu1005_activation,si_mu1005_snapshot,si_mu1005_owner,si_mu1005_cprx,test_real_cprx}.c "$a"/{cprx_service,native_exports,semantic,mu1005_r34_ap_server}.c -ldl -o "$RUNNER_TEMP/real-cprx"
           timeout 30 "$RUNNER_TEMP/real-cprx" | tee evidence/real-cprx.log
           grep -F HOST_REAL_CPRX_OEM_FIXTURES_ONLY_NO_INSTALL evidence/real-cprx.log
+      - name: Verify original Bluetooth handoff revocation and fresh ACL recovery
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          bash ci/host_r98_iap2_handoff.sh | tee evidence/bt-owner-handoff.log
+          grep -F 'PASS owner/transport lease revoked before or during tick; no stale resume' evidence/bt-owner-handoff.log
+          bash ci/host_wcp_autoconnect.sh | tee evidence/bt-autoconnect.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
