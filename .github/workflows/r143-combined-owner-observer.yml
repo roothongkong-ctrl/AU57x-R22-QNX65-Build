@@ -1,0 +1,113 @@
+name: R143 MU1005 combined preload owner/thread observer (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-r143-combined-owner-observer]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host GCC and Clang strict regression
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang
+          bash r143/test_host.sh
+          CC=clang bash r143/test_host.sh
+  qnx65-arm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      PIN: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+      IMG: qnx65-armv7-toolchain:8.5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare QEMU and pinned QNX 6.5 toolchain source
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+          git init -q "$RUNNER_TEMP/toolchain"
+          git -C "$RUNNER_TEMP/toolchain" remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C "$RUNNER_TEMP/toolchain" fetch --depth 1 origin "$PIN"
+          git -C "$RUNNER_TEMP/toolchain" checkout -q FETCH_HEAD
+          git -C "$RUNNER_TEMP/toolchain" rev-parse HEAD | tee r143/toolchain_commit.txt
+          python3 - "$RUNNER_TEMP/toolchain/Dockerfile" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1]); s=p.read_text()
+          pairs=[
+            ("https://ftp.gnu.org/gnu/gcc/gcc-${GCC_VER}/gcc-${GCC_VER}.tar.xz",
+             "https://mirrors.ibiblio.org/gnu/gcc/gcc-${GCC_VER}/gcc-${GCC_VER}.tar.xz"),
+            ("https://ftp.gnu.org/gnu/binutils/binutils-${BINUTILS_VER}.tar.xz",
+             "https://mirrors.kernel.org/gnu/binutils/binutils-${BINUTILS_VER}.tar.xz")
+          ]
+          for a,b in pairs:
+            if s.count(a)!=1: raise SystemExit("mirror source anchor mismatch: "+a)
+            s=s.replace(a,b,1)
+          s=s.replace("curl -fsSL ", "curl --retry 4 --retry-all-errors --retry-delay 4 --connect-timeout 30 -fsSL ")
+          p.write_text(s)
+          PY
+      - uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+          install: true
+      - name: Build or restore cached QNX 6.5 ARM toolchain
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ runner.temp }}/toolchain
+          file: ${{ runner.temp }}/toolchain/Dockerfile
+          platforms: linux/amd64
+          target: base-env
+          build-args: |
+            BASE=base-8.5
+          tags: qnx65-armv7-toolchain:8.5
+          load: true
+          network: host
+          cache-from: type=gha,scope=qnx65-armv7-toolchain-v1
+          cache-to: type=gha,mode=max,scope=qnx65-armv7-toolchain-v1
+      - name: Build R143 ARM32 libraries and synthetic QNX process
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src/r143 "$IMG" bash build_r143_qnx.sh 2>&1 | tee r143/qnx_compile.log
+      - name: Execute R143 through the real QNX 6.5 runtime linker under QEMU
+        run: |
+          set -euxo pipefail
+          python3 - "$RUNNER_TEMP/toolchain/tests/qemu-run.sh" "$RUNNER_TEMP/toolchain/tests/qemu-run-r143.sh" <<'PY'
+          from pathlib import Path
+          import sys
+          src=Path(sys.argv[1]); dst=Path(sys.argv[2]); s=src.read_text()
+          def replace(old,new):
+              global s
+              if s.count(old)!=1: raise SystemExit("upstream QEMU runner anchor mismatch: "+old)
+              s=s.replace(old,new,1)
+          replace('cp "$BIN" "$WORK/$NAME"\n',
+                  'cp "$BIN" "$WORK/$NAME"\ncp "$REVIEW_LIB" "$WORK/"\n')
+          replace('    $NAME\n    display_msg "@@QNXRUN-END@@"\n',
+                  '    LD_PRELOAD=/proc/boot/libau57x_r143_preload_REVIEW.so AU57X_R143_PROBE=1 AU57X_R143_LOG=/dev/shmem/au57x_r143_btstack_probe.log $NAME\n    display_msg "@@QNXRUN-END@@"\n')
+          replace('EOF\n\ndocker run --rm --platform=linux/amd64',
+                  'EOF\nprintf "[data=copy] %s\\n" "$(basename "$REVIEW_LIB")" >> "$WORK/test.build"\n\ndocker run --rm --platform=linux/amd64')
+          dst.write_text(s)
+          PY
+          chmod +x "$RUNNER_TEMP/toolchain/tests/qemu-run-r143.sh"
+          REVIEW_LIB="$PWD/r143/build/qnx/libau57x_r143_preload_REVIEW.so" \
+          QEMU_KEEP_LOG="$PWD/r143/build/qnx/qnx_boot.log" \
+          QEMU_RUN_SECS=18 QEMU_TIMEOUT=80 \
+          bash "$RUNNER_TEMP/toolchain/tests/qemu-run-r143.sh" "$PWD/r143/build/qnx/btstack" 8.5 2>&1 | tee r143/qnx_runtime.log
+          grep -Fq R143_QNX_PROCESS_SHA_PIN_PASS r143/qnx_runtime.log
+          grep -Fq R143_QNX_PTHREAD_CREATE_TRANSPARENT_FORWARD_PASS r143/qnx_runtime.log
+          grep -Fq R143_QNX_STOCK_ORIGIN_TRACKER_PASS_SYNTHETIC_CALLSITE r143/qnx_runtime.log
+          grep -Fq R143_QNX_THREAD_NAME_TO_OWNER_CORRELATION_PASS r143/qnx_runtime.log
+          grep -Fq R143_QNX_NO_OEM_API_NO_IAP2_NO_MFI_NO_INSTALL r143/qnx_runtime.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R143-QNX65-ARM-NO-INSTALL-EVIDENCE
+          path: |
+            r143/*.log
+            r143/*.txt
+            r143/build/qnx/
+          retention-days: 14
