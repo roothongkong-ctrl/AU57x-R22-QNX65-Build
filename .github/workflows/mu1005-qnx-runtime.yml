@@ -2,7 +2,7 @@ name: MU1005 real QNX 6.5 runtime loader (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/mu1005-qnx-runtime.yml, lab/mu1005_qnx_runtime/**]
+    paths: [.github/workflows/mu1005-qnx-runtime.yml, lab/mu1005_qnx_runtime/runtime_loader.c, lab/mu1005_qnx_runtime/prepare_ifs.py, lab/mu1005_qnx_runtime/build_dependency_candidates.sh, tools/ci/mu1005_gnu_mirrors.sh]
   workflow_dispatch:
 permissions:
   contents: read

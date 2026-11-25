@@ -40,6 +40,9 @@ jobs:
           gcc -std=gnu99 -D_DEFAULT_SOURCE -Wall -Wextra -O2 -ffunction-sections -fdata-sections -Wl,--gc-sections -Wl,--export-dynamic -I"$s" -I"$b" -I"$a" lab/mu1005_qnx_runtime/full_chain.c lab/mu1005_qnx_runtime/bootstrap_chain_fixture.c "$s"/{cp_cloud_pipeline,cp_wcp_autoconnect,cp_wcp_handoff,cp_radio_policy,cp_session_handoff,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_oem_boundary,cp_wireless,cp_event,cp_csm}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" "$i"/{inner_iap2,inner_socket,mm_peer}.c -ldl -o qnx-runtime-evidence/host-chain
           qnx-runtime-evidence/host-chain | tee qnx-runtime-evidence/host-chain.log
           grep -F 'CHAIN_IAP2_BYTES_AND_SOCKET_ROUND_TRIP_PASS_NO_OEM' qnx-runtime-evidence/host-chain.log
+          gcc -std=gnu99 -D_DEFAULT_SOURCE -DMU_CHAIN_MODEL_IPC -Wall -Wextra -O2 -ffunction-sections -fdata-sections -Wl,--gc-sections -Wl,--export-dynamic -I"$s" -I"$b" -I"$a" lab/mu1005_qnx_runtime/full_chain.c lab/mu1005_qnx_runtime/bootstrap_chain_fixture.c "$s"/{cp_cloud_pipeline,cp_wcp_autoconnect,cp_wcp_handoff,cp_radio_policy,cp_session_handoff,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_oem_boundary,cp_wireless,cp_event,cp_csm}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" "$i"/inner_iap2.c -ldl -o qnx-runtime-evidence/host-model-chain
+          qnx-runtime-evidence/host-model-chain | tee qnx-runtime-evidence/host-model-chain.log
+          grep -F 'CHAIN_IAP2_BYTES_AND_MODEL_IPC_PASS_NO_OEM' qnx-runtime-evidence/host-model-chain.log
       - name: Fetch locked public QNX boot environment and QEMU
         run: |
           set -euxo pipefail
@@ -58,11 +61,14 @@ jobs:
         with:
           path: ~/.cache/au57x-gnu
           key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
+      - name: Configure reusable compiler build cache
+        uses: docker/setup-buildx-action@v3
       - name: Build verified toolchain
         run: |
           set -euxo pipefail
           bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee qnx-runtime-evidence/gnu.log
-          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee qnx-runtime-evidence/compiler.log
+          docker buildx build --load --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 --cache-from type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1 --cache-to type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1,mode=min,ignore-error=true -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee qnx-runtime-evidence/compiler.log
+          docker run --rm --platform linux/amd64 qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc --version | tee qnx-runtime-evidence/compiler-version.log
       - name: Run continuous scenario with explicit IPC model on QNX
         run: |
           set -euxo pipefail
