@@ -23,6 +23,8 @@ jobs:
           cp -R r85/project/source/legacy_mu1005/airplay review/source/
           cp -R integration/mu1005_si_native review/source/si
           cp -R project/source/legacy_mu1005/bluetooth review/source/bluetooth
+          bash integration/mu1005_si_native/r29_full_source/unpack.sh review/source/r29-full
+          bash review/source/r29-full/test.sh | tee review/evidence/r29-full-host.log
           # Reuse the actual upstream signer, not a replacement or software credential.
           git init luka
           git -C luka remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
@@ -85,6 +87,10 @@ jobs:
             "$R" -h -sW review/payload/r29-bt-profile-review.o > review/evidence/r29-profile-elf.log
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -Ireview/source/bluetooth -c review/source/bluetooth/bt_iap2_owner_handoff.c -o review/payload/r98-owner-handoff-review.o
             "$R" -h -sW review/payload/r98-owner-handoff-review.o > review/evidence/r98-owner-elf.log
+            sh review/source/r29-full/build_qnx_review.sh
+            cp review/source/r29-full/review-output/ipod-transport-R29-NO-INSTALL.so review/payload/
+            cp review/source/r29-full/review-output/elf.log review/evidence/r29-full-elf.log
+            rm -rf review/source/r29-full/review-output
           ' 2>&1 | tee review/evidence/native-build.log
           grep -Eq 'Machine:.*ARM' review/evidence/native-elf.log
           grep -Eq 'Type:.*DYN' review/evidence/native-elf.log
@@ -102,6 +108,12 @@ jobs:
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/r98-owner-elf.log
           done
           echo R98_OWNER_HANDOFF_NATIVE_OBJECT_ONLY_NO_OEM_ATTACH | tee review/evidence/r98-result.txt
+          grep -Eq 'Machine:.*ARM' review/evidence/r29-full-elf.log
+          grep -Eq 'Type:.*DYN' review/evidence/r29-full-elf.log
+          for sym in ipod_module wcp_lab_supply_fd wcp_oem_graft_pump wcp_graft_feed; do
+            awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/r29-full-elf.log
+          done
+          echo R29_FULL_PLUGIN_ARM_LINK_ONLY_INERT_NO_OEM_ATTACH | tee review/evidence/r29-full-result.txt
           for sym in MFiPlatform_CreateSignature MFiPlatform_CopyCertificate; do
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/signer-elf.log
           done
@@ -149,6 +161,8 @@ jobs:
               transport)
                 bash integration/mu1005_si_native/r29_profile/test.sh
                 bash ci/host_r98_iap2_handoff.sh
+                bash integration/mu1005_si_native/r29_full_source/unpack.sh "${RUNNER_TEMP}/r29-full"
+                bash "${RUNNER_TEMP}/r29-full/test.sh"
                 ;;
               stock-config) bash ci/host_r99_stock_iap2.sh ;;
               authentication) bash ci/host_step04_stock_mfi.sh ;;
