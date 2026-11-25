@@ -9,7 +9,7 @@ command -v "$CC" >/dev/null || { echo "BLOCKED QNX compiler: $CC"; exit 30; }
 command -v "$RE" >/dev/null || { echo "BLOCKED QNX readelf: $RE"; exit 31; }
 mkdir -p build/qnx
 FLAGS=(-std=c99 -D_QNX_SOURCE=1 -O2 -Wall -Wextra -Werror -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp)
-"$CC" "${FLAGS[@]}" tests/r143_smoke.c -lc -o build/qnx/btstack
+"$CC" "${FLAGS[@]}" r143_smoke.c -lc -o build/qnx/btstack
 SMOKE_SHA=$(sha256sum build/qnx/btstack | awk '{print $1}')
 SMOKE_DEFINE="-DAU57X_R143_STOCK_SHA256=\"$SMOKE_SHA\""
 "$CC" "${FLAGS[@]}" -fPIC -shared -Wl,--hash-style=sysv -Wl,--no-undefined \
