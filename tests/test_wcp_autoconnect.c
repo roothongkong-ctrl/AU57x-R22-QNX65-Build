@@ -11,6 +11,7 @@ static int linked(void *p,uint32_t g){struct fixture*s=p;return s->linked&&s->g=
 static int sdp(void *p,uint32_t g){struct fixture*s=p;return s->g==g?s->sdp:-1;}
 static int op(void *p,uint32_t g){struct fixture*s=p;assert(s->g==g);s->opens++;return s->open_rc;}
 static int cancel(void *p,uint32_t g){struct fixture*s=p;assert(s->g==g);s->cancels++;return s->cancel_rc;}
+static int released(void *p,uint32_t old){struct fixture *s=p;return s->cancel_rc&&old==7;}
 static void setup(struct cp_wcp_autoconnect *s,struct fixture *f){
  struct cp_wcp_bt_ops o={f,own,paired,wired,linked,sdp,op,cancel};
  memset(f,0,sizeof *f);f->g=7;f->owner=f->paired=f->wired=f->sdp=f->open_rc=f->cancel_rc=1;
@@ -31,6 +32,23 @@ int main(void){
  assert(cp_wcp_bt_abort(&s,7,1)==CP_WCP_OK);
  assert(s.state==CP_WCP_BLOCKED); /* fresh ACL event needed */
  assert(cp_wcp_bt_acl_up(&s,7,4102)==CP_WCP_DENIED);
+ assert(cp_wcp_bt_abort(&s,7,0)==CP_WCP_DENIED);
+ assert(cp_wcp_bt_rearm(&s,7,4102,released)==CP_WCP_STALE);
+ f.g=8;f.linked=0;f.cancel_rc=0;
+ assert(cp_wcp_bt_rearm(&s,8,4102,released)==CP_WCP_DENIED);
+ f.cancel_rc=1;f.wired=0;
+ assert(cp_wcp_bt_rearm(&s,8,4102,released)==CP_WCP_DENIED);
+ f.wired=1;
+ assert(cp_wcp_bt_rearm(&s,8,4100,released)==CP_WCP_CLOCK);
+ assert(cp_wcp_bt_rearm(&s,8,4102,released)==CP_WCP_OK);
+ assert(s.attempts==0&&s.requested==0);
+ assert(cp_wcp_bt_tick(&s,7,8102)==CP_WCP_STALE);
+ assert(cp_wcp_bt_tick(&s,8,8102)==CP_WCP_WAIT&&f.opens==2);
+ f.linked=1;assert(cp_wcp_bt_tick(&s,8,8103)==CP_WCP_LINK_READY);
+ assert(cp_wcp_bt_abort(&s,8,0)==CP_WCP_OK);
+ assert(cp_wcp_bt_acl_up(&s,8,8104)==CP_WCP_STALE);
+ f.g=9;f.linked=0;
+ assert(cp_wcp_bt_acl_up(&s,9,8104)==CP_WCP_OK&&s.attempts==0);
  setup(&s,&f);
  assert(cp_wcp_bt_acl_up(&s,7,0)==CP_WCP_OK);
  assert(cp_wcp_bt_tick(&s,7,4000)==CP_WCP_WAIT);
@@ -38,6 +56,7 @@ int main(void){
  assert(cp_wcp_bt_tick(&s,7,16000)==CP_WCP_WAIT);
  assert(s.state==CP_WCP_RESTORE_PENDING);
  assert(cp_wcp_bt_acl_up(&s,8,16001)==CP_WCP_DENIED);
+ assert(cp_wcp_bt_rearm(&s,8,16001,released)==CP_WCP_DENIED);
  f.cancel_rc=1;
  assert(cp_wcp_bt_restore_tick(&s,7)==CP_WCP_OK);
  assert(s.state==CP_WCP_BLOCKED);

@@ -19,16 +19,31 @@ int cp_wcp_bt_init(struct cp_wcp_autoconnect *s,const struct cp_wcp_bt_ops *ops)
     !ops->stock_open_iap2||!ops->stock_cancel_iap2)return CP_WCP_INVALID;
  memset(s,0,sizeof *s);s->ops=*ops;return CP_WCP_OK;
 }
-int cp_wcp_bt_acl_up(struct cp_wcp_autoconnect *s,uint32_t gen,uint64_t now){
- if(!s||!gen)return CP_WCP_INVALID;
- if(s->state!=CP_WCP_IDLE)return CP_WCP_DENIED;
+static int begin_acl(struct cp_wcp_autoconnect *s,uint32_t gen,uint64_t now){
+ if(s->generation&&gen<=s->generation)return CP_WCP_STALE;
+ if(s->generation&&now<s->last_ms)return CP_WCP_CLOCK;
  if(!s->ops.stock_owner_verified||!s->ops.wired_idle_verified||
     s->ops.stock_owner_verified(s->ops.ctx,gen)!=1||
     s->ops.paired_acl_verified(s->ops.ctx,gen)!=1||
     s->ops.wired_idle_verified(s->ops.ctx)!=1)return CP_WCP_DENIED;
  if(!deadline(now,CP_WCP_INITIAL_MS,&s->deadline_ms))return CP_WCP_CLOCK;
  s->generation=gen;s->last_ms=now;s->state=CP_WCP_DELAY;
+ s->attempts=0;s->requested=0;
  return CP_WCP_OK;
+}
+int cp_wcp_bt_acl_up(struct cp_wcp_autoconnect *s,uint32_t gen,uint64_t now){
+ if(!s||!gen)return CP_WCP_INVALID;
+ if(s->state!=CP_WCP_IDLE||s->requested)return CP_WCP_DENIED;
+ return begin_acl(s,gen,now);
+}
+int cp_wcp_bt_rearm(struct cp_wcp_autoconnect *s,uint32_t gen,uint64_t now,
+ int (*old_release_verified)(void *,uint32_t)){
+ if(!s||!gen||!old_release_verified)return CP_WCP_INVALID;
+ if(s->state!=CP_WCP_BLOCKED||s->requested)return CP_WCP_DENIED;
+ if(gen<=s->generation)return CP_WCP_STALE;
+ if(now<s->last_ms)return CP_WCP_CLOCK;
+ if(old_release_verified(s->ops.ctx,s->generation)!=1)return CP_WCP_DENIED;
+ return begin_acl(s,gen,now);
 }
 /* Never silently forget an outstanding native open. If cancel cannot be
  * proven, do not advertise IDLE or let a new generation take the channel. */
@@ -36,6 +51,7 @@ int cp_wcp_bt_abort(struct cp_wcp_autoconnect *s,uint32_t gen,int wired){
  if(!s||!gen)return CP_WCP_INVALID;
  if(s->state==CP_WCP_IDLE)return CP_WCP_STALE;
  if(gen!=s->generation)return CP_WCP_STALE;
+ if(s->state==CP_WCP_BLOCKED)return wired?CP_WCP_OK:CP_WCP_DENIED;
  if(s->requested){
   if(!owner(s)||s->ops.stock_cancel_iap2(s->ops.ctx,gen)!=1){
    s->state=CP_WCP_RESTORE_PENDING;

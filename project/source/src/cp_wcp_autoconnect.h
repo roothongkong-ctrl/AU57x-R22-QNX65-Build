@@ -51,6 +51,13 @@ struct cp_wcp_autoconnect {
 int cp_wcp_bt_init(struct cp_wcp_autoconnect *,const struct cp_wcp_bt_ops *);
 /* Only call with real paired ACL evidence from original btstack. */
 int cp_wcp_bt_acl_up(struct cp_wcp_autoconnect *,uint32_t generation,uint64_t now_ms);
+/* Owner-loop recovery after confirmed prior teardown and a newer verified
+ * paired ACL. Does not reset the controller, accept old events, bypass
+ * wired priority, or permit reuse of a still-pending native request.
+ * Generation is monotonic for this controller lifetime; on exhaustion,
+ * only a fully torn-down owner may construct a fresh controller. */
+int cp_wcp_bt_rearm(struct cp_wcp_autoconnect *,uint32_t generation,uint64_t now_ms,
+ int (*old_release_verified)(void *,uint32_t previous_generation));
 /* Call from the original serialized owner loop; never inside SDK callbacks. */
 int cp_wcp_bt_tick(struct cp_wcp_autoconnect *,uint32_t generation,uint64_t now_ms);
 /* Disconnect or wired priority requires OEM cancel acknowledgement first. */

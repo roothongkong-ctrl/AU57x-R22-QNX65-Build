@@ -5,6 +5,47 @@
 #include "../../tests/test_cloud_pipeline.c"
 #undef main
 #include "vehicle_profile.h"
+#include "cp_wcp_autoconnect.h"
+/* Lab owner observations, not a real BlueSDK adapter. Keep the same
+ * controller across generations so stale/blocked state is exercised. */
+struct chain_bt_fixture {uint32_t gen;int idle,linked,released,opens,cancels;};
+static struct chain_bt_fixture chain_bt={4,1,0,0,0,0};
+static struct cp_wcp_autoconnect chain_auto;
+static int chain_bt_gen(void *v,uint32_t g){return ((struct chain_bt_fixture*)v)->gen==g;}
+static int chain_bt_idle(void *v){return ((struct chain_bt_fixture*)v)->idle;}
+static int chain_bt_link(void *v,uint32_t g){return chain_bt_gen(v,g)&&((struct chain_bt_fixture*)v)->linked;}
+static int chain_bt_open(void *v,uint32_t g){assert(chain_bt_gen(v,g));++((struct chain_bt_fixture*)v)->opens;return 1;}
+static int chain_bt_cancel(void *v,uint32_t g){assert(chain_bt_gen(v,g));++((struct chain_bt_fixture*)v)->cancels;return 1;}
+static int chain_bt_released(void *v,uint32_t g){return g==4&&((struct chain_bt_fixture*)v)->released;}
+static void chain_auto_first(void){
+ const struct cp_wcp_bt_ops ops={&chain_bt,chain_bt_gen,chain_bt_gen,chain_bt_idle,
+  chain_bt_link,chain_bt_gen,chain_bt_open,chain_bt_cancel};
+ assert(cp_wcp_bt_init(&chain_auto,&ops)==CP_WCP_OK);
+ assert(cp_wcp_bt_acl_up(&chain_auto,4,0)==CP_WCP_OK);
+ assert(cp_wcp_bt_tick(&chain_auto,4,3999)==CP_WCP_WAIT&&chain_bt.opens==0);
+ assert(cp_wcp_bt_tick(&chain_auto,4,4000)==CP_WCP_WAIT&&chain_bt.opens==1);
+ chain_bt.linked=1;
+ assert(cp_wcp_bt_tick(&chain_auto,4,4001)==CP_WCP_LINK_READY);
+}
+static void chain_auto_after_teardown(void){
+ chain_bt.idle=0;
+ assert(cp_wcp_bt_tick(&chain_auto,4,4002)==CP_WCP_DENIED);
+ assert(chain_auto.state==CP_WCP_BLOCKED&&chain_bt.cancels==1);
+ chain_bt.gen=5;chain_bt.linked=0;
+ assert(cp_wcp_bt_rearm(&chain_auto,5,5000,chain_bt_released)==CP_WCP_DENIED);
+ chain_bt.released=1; /* caller reached confirmed lab pipeline teardown */
+ assert(cp_wcp_bt_rearm(&chain_auto,5,5000,chain_bt_released)==CP_WCP_DENIED);
+ chain_bt.idle=1;
+ assert(cp_wcp_bt_rearm(&chain_auto,4,5000,chain_bt_released)==CP_WCP_STALE);
+ assert(cp_wcp_bt_rearm(&chain_auto,5,5000,chain_bt_released)==CP_WCP_OK);
+ assert(chain_auto.attempts==0&&cp_wcp_bt_tick(&chain_auto,4,9000)==CP_WCP_STALE);
+ assert(cp_wcp_bt_tick(&chain_auto,5,8999)==CP_WCP_WAIT&&chain_bt.opens==1);
+ assert(cp_wcp_bt_tick(&chain_auto,5,9000)==CP_WCP_WAIT&&chain_bt.opens==2);
+ chain_bt.linked=1;
+ assert(cp_wcp_bt_tick(&chain_auto,5,9001)==CP_WCP_LINK_READY);
+ puts("CHAIN:FRESH_ACL_RECONNECT_LINK_READY_NO_OEM");
+ assert(cp_wcp_bt_abort(&chain_auto,5,0)==CP_WCP_OK&&chain_bt.cancels==2);
+}
 extern int chain_bootstrap_fixture(void);
 #include "../../integration/mu1005_si_native/inner_iap2/mm_peer.h"
 #include "../../integration/mu1005_si_native/inner_iap2/inner_socket.h"
@@ -158,6 +199,7 @@ void chain_after_start_ack(struct cp_step04_session *b){
  assert(cp_cloud_end(&p)==CP_CLOUD_OK);
  chain_verified=0;
  puts("CHAIN:WIRED_RESTORE_AFTER_INNER_LOSS");
+ chain_auto_after_teardown();
 #ifndef MU_CHAIN_MODEL_IPC
  mu_inner_socket_close(&chain_dio);
  puts("CHAIN_IAP2_BYTES_AND_SOCKET_ROUND_TRIP_PASS_NO_OEM");
@@ -168,5 +210,6 @@ void chain_after_start_ack(struct cp_step04_session *b){
 }
 int main(void){
  setvbuf(stdout,NULL,_IONBF,0);
+ chain_auto_first();
  return chain_bootstrap_fixture();
 }
