@@ -13,14 +13,14 @@
 - R43/R45：已有受限 iAP2 链路层移植和 MU1005 BlueSDK 原生模块静态复核；真实 BlueSDK callback owner、mm-ipod/iAP2 运行时接线仍未证明。
 - R50：已有无线控制、AirPlay listener/Bonjour、SI owner、媒体状态等组合模型；真实 OEM 回调仍需绑定。
 - R71–R85：已有 SI/DIO 分进程、AF_UNIX CPRX、同会话媒体证据、有线抢占与恢复协议；关键 SI/DIO 生产回调/进程身份 ABI 尚未在原厂二进制中定位。
-- R143：单独的 QNX 观察器/线程归属研究分支。QNX ARM 编译曾通过，但近期 QEMU 运行卡在原厂测试程序文件路径/读取预检；此观察器不是无线 CarPlay 的核心链路，不能阻塞其他模块并行研发。
+- R86：已有对原厂 dio_manager 调用 AirPlayReceiverServerSetDelegate / AirPlayReceiverSessionSetDelegate 的两级回调 ABI 静态还原，确定服务器回调结构 60 字节、会话回调结构 56 字节及 21 个真实 GOT 回调槽。它为只读观察层提供事实依据，但仍未证明真实运行回调触发和媒体/MFi结果。\n- R100：已有原厂路线 / 可回滚 graft 双路线门禁；原厂服务优先，缺失真实 endpoint、BlueSDK owner、iAP2 注册参数、原厂退出/恢复证明时不得 graft。\n- R103：已有 LuKa 上游 iAP2 LinkEngine 的 Rust RFCOMM 帧桥，C 主机 45/45 通过；Rust/TCP 测试虽有历史报告，但构建记录仍标记 PENDING GITHUB CI，必须重新执行确认。Rust QNX ARM 目标未构建。\n- R106/001：已有实车日志证据，原厂 uap0 2.4GHz AP（信道 11）启动并出现 STA_ASSOC；原厂有线 USB iAP2→dio_manager→AirPlay Receiver→carplay0 的 READY 证据。没有无线 iAP2/MFi/AirPlay 会话证据。\n- 5GHz：已有 uaputl、Marvell 固件和 WLAN 驱动静态证据，软件工具/驱动含 A-band 处理代码；connectionmanager 当前 AP 模板默认仅 1/6/11。无线固件实际加载版本、fw_bands 运行值、主板 PA/滤波器/射频通路均未证实。\n- R143：单独的 QNX 观察器/线程归属研究分支。QNX ARM 编译通过，但 QEMU 合成测试报告 /proc/boot/btstack 打不开（errno=2）；需要先确认 IFS 文件映射/测试执行路径。此观察器不是无线 CarPlay 的核心链路，不能阻塞其他模块并行研发。
 
 ## 二、执行策略：先做原厂能力边界，再并行推进
 
 ### Track A — 原厂能力与硬件边界（先行审计）
 1. 复核原厂 bluetooth、btstack、smartphone_integrator、dio_manager、libairplay.so、libiap2client.so.1、mm-ipod/iAP2 插件的样本版本、SHA256、ELF NEEDED、导出符号与静态调用边界。
-2. 对 Wi-Fi 驱动、接口、supplicant/hostapd、蓝牙控制器/BlueSDK、网络配置文件做只读盘点；只记录样本明确支持的频段/模式，不从“热点可打开”推断 CarPlay peer-to-peer 或 5GHz 可用。
-3. 输出“已证实 / 推断 / 未知 / 需要实车”的能力矩阵。缺少原厂样本的项明确列出取件路径，不伪造配置。
+2. 以 R106/001 实车快照为基准确认 uap0 2.4GHz AP 已启动且发生客户端关联；另复核 uaputl、sd8787_uapsta.bin、w8787_wlan_SDIO_bt_SDIO.bin、connectionmanager 与两版 mrvl_wlan 驱动。5GHz 只确认存在软件处理路径，实际加载固件/射频前端仍未知。
+3. 输出“已证实 / 推断 / 未知 / 需要实车”的能力矩阵。当前基线为：2.4GHz AP 有实车快照证据；5GHz 仅静态软件证据；iAP2 over Bluetooth、MFi、无线 AirPlay 仍未证实。
 
 ### Track B — Bluetooth / RFCOMM / iAP2
 1. 将 R39–R45 规范化 RFCOMM 队列、BlueSDK 适配与 iAP2 link/auth 组合为单一 owner/epoch/generation 接口。
@@ -34,7 +34,7 @@
 
 ### Track D — Wi-Fi / AirPlay
 1. 复核 R50 的无线电策略、Wi-Fi interface discovery、AirPlay listener、Bonjour identity 与 session 生命周期。
-2. 将 2.4/5GHz 选择实现为能力探测驱动：仅在原厂驱动/固件/接口报告支持时启用；失败回退必须验证关联、地址、路由和链路状态，不能仅凭配置项宣称成功。
+2. 将 2.4/5GHz 选择实现为能力探测驱动：先以已观察到的 2.4GHz AP 为基础连通路径；仅在实际无线固件/驱动报告支持且硬件射频通路有证据时启用 5GHz。失败回退必须验证关联、地址、路由和链路状态。
 3. 验证 AirPlay 发现、会话协商、密钥/认证、音视频 transport 与 teardown；不以 listener bind 成功代替 AirPlay session 成功。
 
 ### Track E — SI / DIO / 原厂媒体与有线恢复
@@ -58,7 +58,7 @@ H0–H3 通过只代表云端源码/仿真验证，不代表 H4–H6。未通过
 ## 四、当前执行顺序
 
 1. R143 QEMU 预检继续单独修复，但不阻塞其他轨道。
-2. Track A 输出只读能力矩阵。
+2. Track A 输出只读能力矩阵，并把 R86 的两级 DIO 回调 ABI 与 R100 的原厂/graft 双路线门禁纳入正式接口图。
 3. Track B/C 合并 iAP2 与原厂 MFi 的单 owner 契约，补齐失败/重连/有线抢占测试。
 4. Track D 对 Wi-Fi 频段能力、接口选择、AirPlay 会话边界做独立测试。
 5. Track E 补齐 SI/DIO 生产 callback 的证据清单；缺口未证实则不做虚假接线。
