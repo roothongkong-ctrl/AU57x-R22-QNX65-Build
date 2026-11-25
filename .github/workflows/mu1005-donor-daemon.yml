@@ -2,7 +2,7 @@ name: MU1005 complete upstream daemon reuse (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/mu1005-donor-daemon.yml, integration/mu1005_donor_daemon/**]
+    paths: [.github/workflows/mu1005-donor-daemon.yml, integration/mu1005_donor_daemon/**, tools/mu1005_efs_launcher_stage.py, tests/test_mu1005_efs_launcher_stage.py]
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,6 +15,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - name: Verify exact launcher schema staging (synthetic only)
+        run: python3 tests/test_mu1005_efs_launcher_stage.py
       - name: Fetch exact upstream daemon source
         run: |
           set -euxo pipefail
