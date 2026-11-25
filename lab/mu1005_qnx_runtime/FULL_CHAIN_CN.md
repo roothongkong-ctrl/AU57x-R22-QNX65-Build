@@ -1,0 +1,2 @@
+# Full chain cloud acceptance
+One QNX run drives original project state machine: bootstrap (fixture MFi), radio fallback (fixture AP), receiver start (fixture owner), live Unix packet round-trip between actual compiled transport modules, media state (fixture), wired preempt and teardown. Inner stage cannot advance before real round-trip. This is a scenario integration test, not actual CarPlay protocol authentication or OEM media. Real OEM library, real iPhone, radio and MFi still unverified. No installation.
