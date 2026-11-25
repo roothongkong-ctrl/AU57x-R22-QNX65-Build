@@ -222,6 +222,8 @@ jobs:
                 inner=integration/mu1005_si_native/inner_iap2
                 cc -std=c99 -Wall -Wextra -Werror -O2 "$inner/inner_iap2.c" "$inner/inner_airplay.c" "$inner/test.c" -ldl -o "$RUNNER_TEMP/inner-iap2"
                 "$RUNNER_TEMP/inner-iap2"
+                cc -std=c99 -Wall -Wextra -Werror -O2 -rdynamic "$inner/inner_iap2.c" "$inner/inner_airplay.c" "$inner/test_airplay.c" -ldl -o "$RUNNER_TEMP/inner-airplay"
+                "$RUNNER_TEMP/inner-airplay"
                 ;;
               recovery) bash ci/host_sd_txn.sh ;;
               *) exit 2 ;;
