@@ -29,6 +29,7 @@
 #endif
 extern char *__progname;
 static volatile unsigned probe_enabled;
+static volatile int probe_status;
 static const uintptr_t stock_callers[4]={0x236668u,0x2368c8u,0x236c2cu,0x236c48u};
 typedef int(*create_fn)(pthread_t*,const pthread_attr_t*,void*(*)(void*),void*);
 typedef int(*setname_fn)(pthread_t,const char*);
@@ -49,10 +50,11 @@ __attribute__((constructor)) static void r143_init(void) {
     resolve_symbols();
     if (custom && custom[0] == '/' && strlen(custom) < sizeof log_path)
         memcpy(log_path, custom, strlen(custom) + 1);
-    if (!opt || strcmp(opt, "1") != 0) return;
+    if (!opt || strcmp(opt, "1") != 0) { probe_status = 1; return; }
     if (!__progname || strcmp(__progname, "btstack") != 0) {
         log_line("process_reject", "wrong_basename", pthread_self(), __progname,
                  0, 0, 0, -1, -1, -1);
+        probe_status = 2;
         return;
     }
 #if defined(AU57X_R143_HOST_TEST)
@@ -63,20 +65,24 @@ __attribute__((constructor)) static void r143_init(void) {
     if (!digest_hex(stock_path, digest) || strcmp(digest, AU57X_R143_STOCK_SHA256) != 0) {
         log_line("process_reject", "stock_sha256_mismatch", pthread_self(), NULL,
                  0, 0, 0, -1, -1, -1);
+        probe_status = 3;
         return;
     }
     if (!real_create || !real_setname) {
         log_line("observer_reject", "pthread_symbol_missing", pthread_self(), NULL,
                  0, 0, 0, -1, -1, -1);
+        probe_status = 4;
         return;
     }
     probe_enabled = 1;
+    probe_status = 5;
     log_line("stock_image_pinned", "MU1005_btstack", pthread_self(), NULL,
              0, 0, 1, 0, -1, -1);
 }
 int pthread_create(pthread_t*t,const pthread_attr_t*a,void*(*start)(void*),void*arg){uintptr_t site;int stock=0,rc;if(!real_create)return ENOSYS;if(!probe_enabled)return real_create(t,a,start,arg);site=(uintptr_t)__builtin_return_address(0);for(size_t i=0;i<4;i++)if((site&~(uintptr_t)1)==(uintptr_t)stock_callers[i]+4u)stock=1;if(stock)rc=au97_pthread_create(t,a,start,arg,site,real_create);else rc=real_create(t,a,start,arg);log_line("pthread_create",stock?"MU1005_stock_callsite":"untrusted_callsite",rc==0?*t:pthread_self(),NULL,site,(uintptr_t)start,stock,rc,-1,-1);return rc;}
 int pthread_setname_np(pthread_t thread,const char*name){int rc;if(!real_setname)return ENOSYS;rc=real_setname(thread,name);if(probe_enabled&&name){const char*role=NULL;if(name[0]&&strstr(name+1,"bluetoothProc"))role="primary_bluetoothProc_candidate";else if(strstr(name,"mv8787bt_read"))role="secondary_bluesdk_read";else if(strstr(name,"mv8787bt_write"))role="secondary_bluesdk_write";if(role)log_line("thread_name",role,thread,name,0,0,-1,rc,au97_is_observed_thread(thread),au97_current_observed_thread());}return rc;}
 int au57x_r143_probe_active(void){return probe_enabled?1:0;}
+int au57x_r143_probe_status(void){return probe_status;}
 #ifdef AU57X_R143_TEST_API
 int r143_test_create_stock_thread(pthread_t*t,const pthread_attr_t*a,void*(*start)(void*),void*arg){if(!real_create||!probe_enabled)return -1;return au97_pthread_create(t,a,start,arg,0x23666cu,real_create);}
 #endif
