@@ -91,3 +91,27 @@ H0–H3 通过只代表云端源码/仿真验证，不代表 H4–H6。未通过
 4. **Track E（后续）**：只读核对 SI/DIO callback、peer identity 与 wired restore 证据；生产绑定未证明前保持 fail-closed。
 
 本轮新增 Wi-Fi resolver 测试不改变运行时配置，不调用 OEM API，不生成安装文件。
+
+## 第三轮：成熟项目复用与最新验收（2026-11-25 14:37 UTC）
+
+### 外部成熟项目核对
+
+- `congobg/MHI2Q_WiFi_CarPlay` 当前公开状态文档报告 MHI2Q QC / QNX 6.5 ARMv7、固件 3638 与 5092 上无线 CarPlay 实车运行，复用 stock btstack、stock iAP2 client、stock AirPlay receiver、stock HMI；5092 的启动、蓝牙配对/iAP2、Wi-Fi、Bonjour、媒体和长时间会话均有项目方记录。它是重要的流程与架构参考，不是 AU57x 安装包。
+- 该项目明确目标为 MHI2Q QC；AU57x 的 MHI2_CN_K1006_2/MU1005 不是同一固件/二进制基线。禁止复制 donor ELF/JAR/脚本直接装车。此前用户提供的 donor ZIP 已完成 8 个组件的文件名、大小、SHA256 和 ELF 类型审计；仅保留参考清单，没有把 donor 二进制放进本工程。
+- `luka-dev/mib2q-carplay-rgi` 的 iAP2 link 源码已按原始 Git blob 校验后纳入 `third_party/`，遵守 GPLv3 来源要求；R103 host CI 已通过。其上游 MHI2Q 固定地址不得用于 AU57x；本工程仅复用协议层/通用源码，OEM 绑定必须按 MU1005 原厂证据重新定位。
+
+### 最新云端验收（GitHub Actions）
+
+- R52 QNX6.5 ARMv7：run `45634440000` SUCCESS。45 个 C 源码预检、QNX GCC 8.5 工具链构建、native compile/shared link、R96/R92/R100/R101 QNX 对象/共享库、严格 ELF gate、QEMU QNX dlopen smoke 全部通过。生成的 `libau57x_r24_native_qnx_REVIEW_ONLY.so` 与 `libau57x_bt_preload_qnx_REVIEW_ONLY.so` 是 REVIEW ONLY；日志明确 NO_GO for installation，且 QEMU 未调用 OEM 原厂 API。
+- cloud12 全量离线回归：run `45634439831` SUCCESS。包含 45/45 host C strict compile、R87 autoconnect 状态机、R90 iAP2 link/fixture MFi 路径、R89 跨进程 socket 契约、R96 事务/回滚、R100 17 条门禁、R101 离线套件、50,000 组 fuzz、Wi-Fi IPv4→接口解析；其中 OEM/MFi/BlueSDK 真实事件仍未证明。
+- R103 上游 iAP2：run `45634439847` SUCCESS。上游 7/7、AU57x bridge 2/2、TCP lab 13/13 host tests 通过；不代表 Rust/QNX ARM 已构建，也不代表真实蓝牙/iPhone 连接。
+
+### 下一批实际工作（依赖优先）
+
+1. **优先完成 MU1005 OEM Bluetooth attach 的证据闭环**：R88/R89 已证明跨进程传输和 fail-closed 逻辑，但缺少可安全绑定到真实 btstack 回调 owner/线程的 OEM 运行时证明，以及 iAP2 profile/SCN 的独立证据。先审计 R97 的 pthread/GOT 观察路径、R89 原厂调用点和已有私有 btstack 样本，形成只读 attach 设计；不调用未知 ABI。
+2. **并行完成 donor 对照表**：将 congobg 项目的配对、SDP/RFCOMM、Wi-Fi AP/信道、Bonjour、dio_manager、HMI 启动顺序逐项映射到 MU1005；标记“可复用协议源码 / 需重写 OEM 适配 / 不可复用二进制”。
+3. **MFi / AirPlay / SI-DIO**：继续使用 R41/R44/R86/R85 既有成果，补齐原厂句柄/回调 owner/会话证据；mock 只作测试 fixture。
+4. **多手机管理**：设计 per-device pairing record、last-successful-device 优先、删除单设备清理其蓝牙与无线 CarPlay关联数据；先核对原厂 HMI/BT 配对数据库接口，禁止擅自清空全局目录。
+5. **SD 一键安装器**：复用 R95/R96 事务备份、校验和回滚引擎；等 OEM attach、启动入口、配置变更清单和持久路径证据闭环后才生成候选安装包。目标为安装后拔卡可运行，当前仍 NO_INSTALL。
+
+当前结论：云端 QNX ARM compile/link/ELF/QEMU smoke 与离线测试已通过；真实 MU1005 OEM Bluetooth attach、iPhone MFi、无线 AirPlay 媒体链路和整车验证未通过/未进行。状态保持 `RESEARCH_ONLY / NO_INSTALL / safe_to_flash=false / vehicle_verified=false`。
