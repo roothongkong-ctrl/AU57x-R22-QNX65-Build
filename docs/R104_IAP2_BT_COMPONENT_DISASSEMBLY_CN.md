@@ -115,3 +115,34 @@ iAP2 协议引擎不负责创建蓝牙 socket，也不负责寻找 BluetoothTran
 ### 下一步
 
 优先分析 `iap2_init` (0xea6c) 中 config parser 到 link context 的对象传递，并对 `link_get_transport_data` (0x12208) 及其 callers 做完整交叉引用；若 producer 位于独立 `mm-ipod`/transport plugin，则必须取得相应同固件 ELF，不能凭当前驱动库猜测。继续 NO_INSTALL。
+
+
+## R104 第五轮：核对 link_get_transport_data，排除“构造器”误判（2026-11-26）
+
+本轮使用当前会话可访问的原始 ELF `/mnt/data/ipod-drvr-iap2(2).so` 直接运行 `readelf` 与 `llvm-objdump`；SHA256 再次核对为 `42fd984ebbdccd11595bd45909683829565147c8cbc8a482618d6dd8e564d3bf`。
+
+### 反汇编结果
+
+- `link_get_transport_data` 位于 VA `0x12208`，长度 `0x554`。函数读取 link/context 内的缓冲区并解析 iAP2 transport data TLV/字段（包含长度、类型/标记、校验和及缓冲区推进），处理解析结果并更新 link 状态。它不是创建 BluetoothTransport 对象的构造器，也不是给 transport vtable 填充 callback 的函数。
+- `link_get_transport_data` 读取 link context+`0x7c` 的输入数据，并通过内部解析路径推进缓冲区偏移；它不对 link-private+`0x40` 执行可证明的 Bluetooth object 分配/构造。
+- 原始 ELF 动态符号表中可见的 transport 相关函数主要为 `transport_receive`、`transport_get_link_params`、`transport_send_pkt`、`transport_recv_pkt`、`link_get_transport_data`、`link_get_config_params`、`link_get_default_params`。没有导出名为 BluetoothTransportComponent constructor/factory 的符号。
+- `iap2_init` 的代码包含大量对配置项/特性项的逐项解析与状态初始化，但仅凭当前反汇编片段尚未证明其负责创建 Bluetooth 物理 transport object；不能把 config parsing 等同于 Bluetooth transport factory。
+
+### 对研究路径的修正
+
+先前将 `link_get_transport_data` 作为可能的 transport object producer 追踪入口，这一假设不成立：该函数处理的是 iAP2 transport data 内容，而不是底层物理 transport 实例的分配/注入。
+
+因此，物理 transport producer 很可能在当前 ELF 之外（例如上层 mm-ipod/transport component/另一个 owner），也可能经由未命名的配置回调或私有结构注入。当前单独的 `ipod-drvr-iap2.so` 无法证明哪一种。
+
+### 当前真实进度
+
+- iAP2 引擎的 transport callback ABI 已确认：get params +0x18、send +0x28、receive +0x2c。
+- 已确认协议层的 link 创建/建立会消费上层提供的 transport context。
+- 本轮排除了 `link_get_transport_data` 是物理 transport 构造器的错误方向。
+- 尚未找到物理 Bluetooth transport object 的分配者、构造函数、RFCOMM producer 或真实 owner/thread。
+
+### 下一步（优先级调整）
+
+不要再在 iAP2 packet parser 内盲目找 socket。应获取/分析同一固件的 `mm-ipod` 和 Bluetooth 相关 transport component ELF（若存在），并检查 `ipod_module` 的模块注册接口、模块配置加载和 transport factory；同时查找 `ipod-drvr-iap2.so` 中调用 `link_create` 的上层入口与参数来源。若所需 OEM ELF 不在当前文件集中，则明确列为唯一数据阻塞，不再将 host mock 或 donor 反汇编当成 MU1005 真实证据。
+
+状态保持：`RESEARCH_ONLY / NO_INSTALL / safe_to_flash=false / vehicle_verified=false`。
