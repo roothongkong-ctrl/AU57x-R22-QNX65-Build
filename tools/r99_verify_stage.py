@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
-from r99_stock_iap2_route import (sha, stage_bluetooth_json, stage_iap2_ini,
+from r99_stock_iap2_route import (sha, stage_bluetooth_json,
                                   BLUETOOTH_SHA, IAP2_DRIVER_SHA, read_bounded)
 
 EXPECTED = {
@@ -23,6 +23,8 @@ def verify(folder: Path, expected_bt: str | None = None, expected_iap2: str | No
     manifest = json.loads(read_bounded(folder/'R99_REVIEW_MANIFEST.json'))
     if manifest.get('release') != 'R99' or manifest.get('route')!='OEM_NATIVE_IAP2_CONFIG_FIRST':
         raise ValueError('wrong manifest origin')
+    if manifest.get('config_policy') != 'BT_JSON_ONLY_PRESERVE_IAP2_V2':
+        raise ValueError('obsolete status-reporting staging policy; regenerate from originals')
     for required_false in ('installable','safe_to_flash','vehicle_verified','real_mfi_proven',
                            'stock_bt_rfcomm_transport_proven','stock_runtime_iap2_registration_proven'):
         if manifest.get(required_false) is not False:
@@ -44,11 +46,11 @@ def verify(folder: Path, expected_bt: str | None = None, expected_iap2: str | No
     if expected_iap2 and sha(before_cfg) != expected_iap2:
         raise ValueError('external iAP2 original fingerprint mismatch')
     expected_bt_stage,_=stage_bluetooth_json(before_bt)
-    expected_iap2_stage,_=stage_iap2_ini(before_cfg)
+    expected_iap2_stage=before_cfg
     if expected_bt_stage!=read_bounded(folder/'bluetooth.STAGED_REVIEW_ONLY.json'):
         raise ValueError('Bluetooth config changed beyond permitted field')
     if expected_iap2_stage!=read_bounded(folder/'iap2.STAGED_REVIEW_ONLY.cfg'):
-        raise ValueError('iAP2 config changed beyond permitted section')
+        raise ValueError('iAP2 config must be preserved byte-for-byte')
     return {'R99_STAGE_VERIFIED':True, 'no_install_payload':True,
             'factory_iap2_runtime_unproven':True,
             'bluetooth.original.sha256':sha(before_bt), 'iap2.original.sha256':sha(before_cfg)}

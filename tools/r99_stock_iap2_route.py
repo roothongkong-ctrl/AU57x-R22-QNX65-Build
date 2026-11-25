@@ -95,6 +95,10 @@ def stage_bluetooth_json(raw: bytes) -> tuple[bytes, dict]:
 
 
 def stage_iap2_ini(raw: bytes) -> tuple[bytes, dict]:
+    """Legacy status-reporting experiment only. Not a transport enable switch.
+
+    Retained for historical fixture tests; prepare() no longer calls it.
+    """
     if len(raw) > MAX_FILE or b'\x00' in raw:
         raise ValueError('invalid original iap2.cfg')
     try:
@@ -169,10 +173,16 @@ def prepare(bt_config_path: Path, iap2_path: Path, original_bt_hash: str, origin
     verified_bt = audit_binary(oem_bt_path, BLUETOOTH_SHA, OEM_STRING_MARKERS['bluetooth'])
     verified_iap2 = audit_binary(oem_driver_path, IAP2_DRIVER_SHA, OEM_STRING_MARKERS['iap2_driver'])
     new_bt, info_bt = stage_bluetooth_json(orig_bt)
-    new_iap2, info_iap2 = stage_iap2_ini(orig_iap2)
-    assert new_bt != orig_bt and new_iap2 != orig_iap2
+    # The original driver interprets [bluetooth] enable as Connection Status
+    # reporting, not as a transport switch. Preserve the entire cfg bytewise.
+    # Do not invent a WiFi section or credentials from the multi-file dump.
+    new_iap2 = orig_iap2
+    info_iap2 = {'policy': 'PRESERVE_STATUS_CONFIG', 'modified': False,
+                 'reason': 'Bluetooth status reporting is not transport activation'}
+    assert new_bt != orig_bt and new_iap2 == orig_iap2
     manifest = {
         'release': 'R99', 'route': 'OEM_NATIVE_IAP2_CONFIG_FIRST',
+        'config_policy': 'BT_JSON_ONLY_PRESERVE_IAP2_V2',
         'original_platform': 'MHI2_CN_AU57x_K1006_2/MU1005',
         'verified_oem_bluetooth': verified_bt,
         'verified_oem_iap2_driver': verified_iap2,
@@ -192,7 +202,7 @@ def prepare(bt_config_path: Path, iap2_path: Path, original_bt_hash: str, origin
         'vehicle_verified': False,
         'installable': False,
         'safe_to_flash': False,
-        'result': 'TWO_CONFIG_OFFLINE_STAGING_DONE__RUNTIME_NO_GO',
+        'result': 'BT_JSON_REVIEW_ONLY_IAP2_BYTE_EXACT__RUNTIME_NO_GO',
     }
     out.parent.mkdir(parents=True,exist_ok=True)
     temp = Path(tempfile.mkdtemp(prefix='R99_private_stage_',dir=out.parent))

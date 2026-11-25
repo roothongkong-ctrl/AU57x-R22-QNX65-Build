@@ -40,12 +40,20 @@ class Tests(unittest.TestCase):
         self.assertEqual((self.out/'iap2.original.cfg').read_bytes(),INI)
         self.assertTrue(json.loads((self.out/'bluetooth.STAGED_REVIEW_ONLY.json').read_bytes())['enableIap'])
         staged=(self.out/'iap2.STAGED_REVIEW_ONLY.cfg').read_bytes()
-        self.assertIn(b'enable = 1',staged)
+        self.assertEqual(staged,INI)
+        self.assertEqual(manifest['config_policy'],'BT_JSON_ONLY_PRESERVE_IAP2_V2')
+        self.assertFalse(manifest['changes']['iap2_driver']['modified'])
         self.assertIn(b'[wifi]\nenable=0',staged)
         for name,digest in manifest['files'].items():
             self.assertEqual(r99.sha((self.out/name).read_bytes()),digest)
         for name in manifest['files']:
             self.assertEqual((self.out/name).stat().st_mode&0o777,0o600)
+
+    def test_no_bluetooth_section_invented(self):
+        raw=b'[general]\r\nmode=usb\r\n'
+        self.original_ini.write_bytes(raw)
+        self.go()
+        self.assertEqual((self.out/'iap2.STAGED_REVIEW_ONLY.cfg').read_bytes(),raw)
 
     def test_no_overwrite(self):
         self.go()

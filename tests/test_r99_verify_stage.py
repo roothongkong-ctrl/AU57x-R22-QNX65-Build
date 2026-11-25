@@ -24,6 +24,18 @@ class Verify(unittest.TestCase):
     def test_valid(self):
         x=verify_mod.verify(self.staged,route.sha(self.bt.read_bytes()),route.sha(self.cfg.read_bytes()))
         self.assertTrue(x['R99_STAGE_VERIFIED'])
+    def test_legacy_status_policy_rejected(self):
+        import json
+        p=self.staged/'R99_REVIEW_MANIFEST.json'
+        j=json.loads(p.read_text());j.pop('config_policy');p.write_text(json.dumps(j))
+        with self.assertRaisesRegex(ValueError,'obsolete status-reporting'):verify_mod.verify(self.staged)
+    def test_rehashed_status_change_rejected(self):
+        import json
+        cfg=self.staged/'iap2.STAGED_REVIEW_ONLY.cfg'
+        cfg.write_bytes(b'[bluetooth]\nenable=1\n')
+        p=self.staged/'R99_REVIEW_MANIFEST.json';j=json.loads(p.read_text())
+        j['files'][cfg.name]=route.sha(cfg.read_bytes());p.write_text(json.dumps(j))
+        with self.assertRaisesRegex(ValueError,'preserved byte-for-byte'):verify_mod.verify(self.staged)
     def test_tamper_stage_fail(self):
         p=self.staged/'iap2.STAGED_REVIEW_ONLY.cfg';p.write_bytes(p.read_bytes()+b'junk')
         with self.assertRaisesRegex(ValueError,'SHA256 mismatch'):verify_mod.verify(self.staged)
