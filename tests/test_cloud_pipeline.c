@@ -207,6 +207,24 @@ static void no_cert_no_radio(void){
  assert(cp_cloud_wired_preempt(&s)==CP_CLOUD_OK);
  assert(cp_cloud_end(&s)==CP_CLOUD_OK);
 }
+#ifdef MU_AP_REFRESH_TEST
+#include "../integration/mu1005_si_native/ap_live/ap_refresh.h"
+struct ap_refresh_fixture {unsigned calls;int channel,verified,unstable;};
+static int refresh_query(void*v,unsigned id,char*out,size_t cap){
+ struct ap_refresh_fixture*f=v;unsigned n=f->calls++;
+ const char*const vals[]={"BSS status = started\n","SSID = AUDI_REVIEW\n",
+  NULL,"AP MAC address = 02:00:00:00:00:01\n","PROTOCOL = WPA2\n","WPA passphrase = fixture-new\n"};
+ const char*str=id==2?(f->channel==36?"Channel = 36\nBand    = 5GHz\n":"Channel = 6\nBand    = 2.4GHz\n"):vals[id];
+ if(f->unstable&&id==1&&n>=6)str="SSID = DIFFERENT\n";
+ if(strlen(str)>=cap)return -1;
+ strcpy(out,str);return 0;
+}
+static int refresh_verify(void*v,uint32_t e,uint32_t g,enum cp_radio_band band,const struct mu_ap_live*s){
+ struct ap_refresh_fixture*f=v;
+ return f->verified&&e==8&&g==4&&s->channel==f->channel&&
+  cp_radio_channel_band(s->channel)==band&&!strcmp(s->ssid,"AUDI_REVIEW")&&!strcmp(s->key,"fixture-new");
+}
+#endif
 static int ap_config_fixture(void *ctx,uint32_t epoch,enum cp_radio_band band,const struct cp_session *cfg){
  return ctx!=NULL&&*(int*)ctx==1&&epoch==8&&
   ((band==CP_RADIO_5&&cfg->wifi.channel==36)||
@@ -260,6 +278,28 @@ static void radio_to_airplay_direction(enum cp_radio_band first){
  b.wireless_pending=0;
  assert(cp_cloud_refresh_ap_config(&p,&updated,ap_config_fixture,&verify)==CP_CLOUD_OK);
  assert(b.wireless.session==&updated);
+#ifdef MU_AP_REFRESH_TEST
+ struct mu_ap_refresh_slot slot={0};
+ struct ap_refresh_fixture f={0,first==CP_RADIO_5?36:6,0,0};
+ assert(mu_ap_refresh_prepare(&slot,&p,refresh_query,&f)==CP_CLOUD_PROOF);
+ f.calls=0;f.channel=updated.wifi.channel;f.unstable=1;
+ assert(mu_ap_refresh_prepare(&slot,&p,refresh_query,&f)==CP_CLOUD_PROOF);
+ f.calls=0;f.unstable=0;
+ assert(mu_ap_refresh_prepare(&slot,&p,refresh_query,&f)==CP_CLOUD_OK&&f.calls==12);
+ slot.generation=3;
+ assert(mu_ap_refresh_commit(&slot,&p,refresh_verify,&f)==CP_CLOUD_STALE);
+ slot.generation=4;
+ assert(mu_ap_refresh_commit(&slot,&p,refresh_verify,&f)==CP_CLOUD_PROOF);
+ f.verified=1;b.wireless_pending=1;
+ assert(mu_ap_refresh_commit(&slot,&p,refresh_verify,&f)==CP_CLOUD_RETRY);
+ b.wireless_pending=0;
+ assert(mu_ap_refresh_commit(&slot,&p,refresh_verify,&f)==CP_CLOUD_OK);
+ assert(b.wireless.session==&slot.session&&slot.session.wifi.channel==updated.wifi.channel);
+ assert(slot.session.public_key==updated.public_key&&slot.session.ip_addresses==updated.ip_addresses);
+ assert(mu_ap_refresh_clear(&slot,&p)==CP_CLOUD_BAD);
+ assert(mu_ap_refresh_prepare(&slot,&p,refresh_query,&f)==CP_CLOUD_BAD);
+ puts("PASS AP_READ_TO_AUTHENTICATED_REFRESH_FIXTURE_ONLY_NO_OEM");
+#endif
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1&&proof.live_hotspot);
  puts(first==CP_RADIO_5?"PASS 5_TO_24_REFRESH_BEFORE_ASSOCIATION_NO_OEM":"PASS 24_TO_5_REFRESH_BEFORE_ASSOCIATION_NO_OEM");
  ap=0;
@@ -281,6 +321,12 @@ static void radio_to_airplay_direction(enum cp_radio_band first){
  assert(cp_cloud_wired_preempt(&p)==CP_CLOUD_OK);
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==0);
  assert(cp_cloud_end(&p)==CP_CLOUD_OK);
+#ifdef MU_AP_REFRESH_TEST
+ /* Owner has ended this fixture; explicitly release the borrowed pointer. */
+ b.wireless.session=NULL;
+ assert(mu_ap_refresh_clear(&slot,&p)==CP_CLOUD_OK);
+ for(size_t i=0;i<sizeof slot;i++)assert(((unsigned char*)&slot)[i]==0);
+#endif
 }
 static void radio_to_airplay_proof(void){
  radio_to_airplay_direction(CP_RADIO_5);

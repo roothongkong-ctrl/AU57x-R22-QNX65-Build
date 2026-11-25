@@ -1,6 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * One cloud scenario. Real QNX code + socket transport; external radio,
  * MFi, and OEM receiver/media witnesses are fixture inputs, NOT OEM proof. */
+/* No stock uaputl is available in the QEMU fixture. Fail closed if called;
+ * only the injected fixture query is used by the read-to-refresh test. */
+int mhi2q_qnx_capture(const char *p,char *const a[],char *o,unsigned n,int *inc){
+ (void)p;(void)a;(void)o;(void)n;if(inc)*inc=1;return -1;
+}
 #define main previous_pipeline_fixture_main
 #include "../../tests/test_cloud_pipeline.c"
 #undef main
