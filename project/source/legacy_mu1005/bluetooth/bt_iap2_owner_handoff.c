@@ -54,6 +54,13 @@ static int connected(unsigned port){
 error:
  (void)close(fd);return -1;
 }
+/* Network worker only, not the original SDK event thread. */
+int au98_prepare_daemon_socket(unsigned port){
+#if !defined(AU57X_R98_HOST_TEST) || AU57X_R98_HOST_TEST!=1
+ if(port!=57342u)return -1;
+#endif
+ return connected(port);
+}
 int au98_publish(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*owner,unsigned port){
  unsigned char candidate_scn=0;
  int fd,rc;

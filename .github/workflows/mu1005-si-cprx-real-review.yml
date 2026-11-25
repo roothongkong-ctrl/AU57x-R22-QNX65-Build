@@ -57,6 +57,12 @@ jobs:
           b=project/source/legacy_mu1005/bluetooth
           cc -std=c99 -O2 -Wall -Wextra -Werror -I"$b" "$b/bt_owner_identity.c" tests/test_bt_owner_identity.c -o "$RUNNER_TEMP/bt-owner-identity"
           "$RUNNER_TEMP/bt-owner-identity" | tee evidence/bt-owner-identity.log
+      - name: Verify actual daemon socket producer
+        run: |
+          set -euxo pipefail
+          b=project/source/legacy_mu1005/bluetooth
+          cc -std=c99 -O2 -Wall -Wextra -Werror -pthread -DAU57X_R98_HOST_TEST=1 -I"$b" "$b"/{bt_socket_worker,bt_iap2_owner_handoff,rf_arg_experiment}.c tests/test_bt_socket_worker.c -o "$RUNNER_TEMP/bt-worker"
+          timeout 20 "$RUNNER_TEMP/bt-worker" | tee evidence/bt-worker.log
       - name: Verify original-first notify callback bridge
         run: |
           set -euxo pipefail

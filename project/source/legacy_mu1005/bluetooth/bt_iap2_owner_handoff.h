@@ -34,6 +34,8 @@ typedef struct {
 
 /* port is ALWAYS 57342 for deployment. An ephemeral port override exists
  * only in a host fixture built with AU57X_R98_HOST_TEST. */
+/* Worker-side bounded connect. No native SDK operation. */
+int au98_prepare_daemon_socket(unsigned);
 int au98_publish(Au98Handoff*,const Au98Hooks*,const MuBtOwner*,unsigned port);
 /* Worker transfers exclusive prepared nonblocking fd; -1 caller owns,
  * 0/-2 handoff owns. Exact daemon attestation must be nonblocking. */

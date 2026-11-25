@@ -2,7 +2,7 @@ name: MU1005 unified parallel development (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/mu1005-si-cprx-native.yml, integration/mu1005_si_native/**, tools/ci/mu1005_gnu_mirrors.sh, tools/mu1005_oem_inventory.py]
+    paths: [.github/workflows/mu1005-si-cprx-native.yml, integration/mu1005_si_native/**, project/source/legacy_mu1005/**, project/source/src/**, tools/ci/mu1005_gnu_mirrors.sh, tools/mu1005_oem_inventory.py, tests/**, ci/**]
   workflow_dispatch:
 permissions:
   contents: read
@@ -72,10 +72,25 @@ jobs:
         with:
           path: ~/.cache/au57x-gnu
           key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
-      - name: Build locked ARM toolchain using verified local archives
+      - name: Configure reusable QNX compiler build cache
+        uses: docker/setup-buildx-action@v3
+      - name: Build locked ARM toolchain with reusable compiler layers
+        uses: docker/build-push-action@v6
+        with:
+          context: toolchain
+          platforms: linux/amd64
+          target: base-env
+          build-args: BASE=base-8.5
+          tags: qnx65-armv7-toolchain:8.5
+          load: true
+          push: false
+          cache-from: type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1
+          cache-to: type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1,mode=min,ignore-error=true
+      - name: Record actual compiler and build provenance
         run: |
           set -euxo pipefail
-          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee review/evidence/compiler.log
+          docker image inspect qnx65-armv7-toolchain:8.5 --format '{{.Id}}' | tee review/evidence/compiler.log
+          docker run --rm --platform linux/amd64 qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc --version | tee -a review/evidence/compiler.log
       - name: Compile and link tested SI and actual CPRX transport on QNX ARM
         run: |
           set -euxo pipefail
@@ -101,7 +116,7 @@ jobs:
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -Ireview/source/bluetooth -c review/source/bluetooth/bt_iap2_owner_handoff.c -o review/payload/r98-owner-handoff-review.o
             "$R" -h -sW review/payload/r98-owner-handoff-review.o > review/evidence/r98-owner-elf.log
             b=review/source/bluetooth
-            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$b" "$b"/{native_binding,native_event,inbound,inbound_r5,mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump,rf_arg_experiment,native_eir_bridge,au102_eir_advertisement,upstream_eir,bt_iap2_owner_handoff,bt_route_gate,bt_startup_snapshot,bt_owner_identity,bt_notify_bridge}.c -lsocket -lc -o review/payload/libmu1005_bt_native_review.so
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$b" "$b"/{native_binding,native_event,inbound,inbound_r5,mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump,rf_arg_experiment,native_eir_bridge,au102_eir_advertisement,upstream_eir,bt_iap2_owner_handoff,bt_route_gate,bt_startup_snapshot,bt_owner_identity,bt_notify_bridge,bt_socket_worker}.c -lsocket -lc -o review/payload/libmu1005_bt_native_review.so
             "$R" -h -dW -sW review/payload/libmu1005_bt_native_review.so > review/evidence/native-bt-elf.log
             ap=review/source/ap-live
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined "$ap"/{ap_live,qnx_process,cp_csm}.c -lc -o review/payload/libmu1005_ap_live_review.so
@@ -118,7 +133,7 @@ jobs:
             "$C" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -shared -Wl,--no-undefined -I"$b" -I"$r" -I"$tcp" "$b"/{mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump}.c "$r"/{wcp_oem_graft_io,wcp_graft_frames,wcp_stream_bridge}.c "$tcp/tcp_adopt.c" -lsocket -lc -o review/payload/libmu1005_rf_r29_tcp_review.so
             "$R" -h -dW -sW review/payload/libmu1005_rf_r29_tcp_review.so > review/evidence/r29-tcp-elf.log
           ' 2>&1 | tee review/evidence/native-build.log
-          for sym in mu_bt_notify_bind mu_bt_notify_unbind mu_notify_call mu_bt_osapi_thread_matches mu_bt_osapi_identity mu_bt_osapi_identity_matches mu_bt_comm_words_match mu_bt_sdk_started mu_bt_native_append_eir mu_bt_native_discovery_ready ir5_discovery_ready ir5_drain mu_bt_native_reclaim au98_bind_stock_native au98_adopt_stock_native au98_adopt au98_drive au98_drive_stock_native au98_rearm_stock_native au98_tick au98_withdraw; do
+          for sym in mu_bt_worker_start mu_bt_worker_poll mu_bt_worker_stop au98_prepare_daemon_socket mu_bt_notify_bind mu_bt_notify_unbind mu_notify_call mu_bt_osapi_thread_matches mu_bt_osapi_identity mu_bt_osapi_identity_matches mu_bt_comm_words_match mu_bt_sdk_started mu_bt_native_append_eir mu_bt_native_discovery_ready ir5_discovery_ready ir5_drain mu_bt_native_reclaim au98_bind_stock_native au98_adopt_stock_native au98_adopt au98_drive au98_drive_stock_native au98_rearm_stock_native au98_tick au98_withdraw; do
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/native-bt-elf.log
           done
           grep -Eq 'Machine:.*ARM' review/evidence/native-elf.log

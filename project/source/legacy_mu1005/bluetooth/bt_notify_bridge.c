@@ -15,6 +15,7 @@ void mu_notify_call(MuNotifyGate*g,MuNotifyOriginal original,void*self,unsigned 
 #include "bt_owner_identity.h"
 #include "bt_startup_snapshot.h"
 #include <pthread.h>
+#include <unistd.h>
 #include <string.h>
 /* Exact original constructor stores callback self, function and zero
  * adjustment at OSAPI+0x2c/30/34. Only this writable slot is changed. */
@@ -40,7 +41,16 @@ static int safe(const MuBtNotifyBinding*b){
 static void after(void*p){
  (void)p;
  if(!safe(&n.b)||!mu_bt_osapi_identity_matches(&n.thread,tid(),n.b.owner.read_live,n.b.owner.opaque))return;
- (void)au98_drive_stock_native(n.b.handoff,n.b.prepared_fd,&n.b.policy,&n.b.proof,&n.b.owner,n.b.daemon_verified,n.b.daemon_context);
+ if(n.b.worker&&n.b.handoff->state==AU98_EMPTY&&*n.b.prepared_fd<0&&
+    n.b.policy.wired_idle(n.b.policy.opaque)==1)
+  (void)mu_bt_worker_poll(n.b.worker,n.b.prepared_fd);
+ int rc=au98_drive_stock_native(n.b.handoff,n.b.prepared_fd,&n.b.policy,&n.b.proof,&n.b.owner,n.b.daemon_verified,n.b.daemon_context);
+ /* Failed preflight never transfers ownership. Worker sockets have
+  * default non-lingering close; do not keep retrying a stale descriptor.
+  * An ambiguous native attach already transferred ownership, never close. */
+ if(rc==-1&&n.b.worker&&n.b.handoff->state==AU98_EMPTY&&*n.b.prepared_fd>=0){
+  (void)close(*n.b.prepared_fd);*n.b.prepared_fd=-1;
+ }
 }
 static void notify(void*self,unsigned char value){
  MuNotifyOriginal original=(MuNotifyOriginal)(uintptr_t)ORIGINAL;
