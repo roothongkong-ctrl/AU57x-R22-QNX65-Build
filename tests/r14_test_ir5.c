@@ -30,9 +30,15 @@ static int event(const uint8_t*peer,unsigned code,unsigned status,const uint8_t*
 int main(void){
  int server=socket(AF_INET,SOCK_STREAM,0),fd=socket(AF_INET,SOCK_STREAM,0);assert(server>=0&&fd>=0);int reuse=1;assert(!setsockopt(server,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof reuse));struct sockaddr_in a={0};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);a.sin_port=htons(57342);assert(!bind(server,(struct sockaddr*)&a,sizeof a)&&!listen(server,1));assert(!connect(fd,(struct sockaddr*)&a,sizeof a));int remote=accept(server,NULL,NULL);assert(remote>=0);
  InboundOps ops={0};ops.reg=reg;ops.unreg=unreg;ops.add=rec;ops.remove=rec;ops.accept=accept_rf;ops.limit=limit;ops.send=send_rf;ops.disconnect=disconnect_rf;ops.credit=credit;ops.addr=addr;ops.certify=yes;ops.ready=yes;ops.initial_rx_credits=INITIAL_RX;
- assert(!ir5_init(&b,&ops,resolve,fd,0x1234));assert(!ir5_publish(&b));uint8_t peer[6]={1,2,3,4,5,6},unknown[6]={0};
+ assert(!ir5_init(&b,&ops,resolve,fd,0x1234));assert(!ir5_discovery_ready(&b));
+ assert(!ir5_publish(&b));assert(ir5_discovery_ready(&b)==1);
+ b.service.uncertain_mask=IN_CP_SDP;assert(!ir5_discovery_ready(&b));b.service.uncertain_mask=0;
+ b.service.published_mask&=~IN_CP_SDP;assert(!ir5_discovery_ready(&b));b.service.published_mask|=IN_CP_SDP;
+ b.service.protocol[13]=4;assert(!ir5_discovery_ready(&b));b.service.protocol[13]=3;
+ assert(ir5_discovery_ready(&b)==1);
+ uint8_t peer[6]={1,2,3,4,5,6},unknown[6]={0};
  assert(event(unknown,1,0,NULL,0,0)==0&&decision==0);peer_allowed=0;assert(event(peer,1,0,NULL,0,0)==0&&decision==0);peer_allowed=1;
- assert(event(peer,1,0,NULL,0,0)==1&&decision==1);assert(!event(peer,2,0,NULL,0,0)&&credits==EXTRA_RX);tick();uint8_t r[14];read_full(remote,r,14);assert(r[0]==1&&r[2]==6&&r[4]==1&&!memcmp(r+8,peer,6));
+ assert(event(peer,1,0,NULL,0,0)==1&&decision==1);assert(!ir5_discovery_ready(&b));assert(!event(peer,2,0,NULL,0,0)&&credits==EXTRA_RX);assert(!ir5_discovery_ready(&b));tick();uint8_t r[14];read_full(remote,r,14);assert(r[0]==1&&r[2]==6&&r[4]==1&&!memcmp(r+8,peer,6));
  assert(!event(peer,5,0,(const uint8_t*)"hello",5,0)&&credits==EXTRA_RX);tick();assert(credits==EXTRA_RX+1);read_full(remote,r,13);assert(r[0]==2&&r[2]==5&&!memcmp(r+8,"hello",5));
  /* Burst of four outstanding frames: no credit grant before TCP commit. */
  for(int i=0;i<4;i++)assert(!event(peer,5,0,(const uint8_t*)"x",1,0));
@@ -40,11 +46,13 @@ int main(void){
  for(int i=0;i<4;i++){tick();read_full(remote,r,9);assert(r[0]==2&&r[2]==1&&r[8]=='x');assert(credits==EXTRA_RX+2+i);}
  uint8_t wire[]={2,0,5,0,1,0,0,0,'a','b','c','d','e'};assert(send(remote,wire,3,0)==3);tick();assert(!sent);assert(send(remote,wire+3,sizeof wire-3,0)==(ssize_t)(sizeof wire-3));for(int i=0;i<500&&!sent;i++){tick();struct pollfd x={fd,POLLIN,0};(void)poll(&x,1,1);}assert(sent==1&&lengths[0]==2&&b.service.busy);
  assert(event(peer,6,0,NULL,0,addr(&b.service.packet)+4)<0);assert(sent==1);assert(!event(peer,6,0,NULL,0,addr(&b.service.packet)));assert(sent==1);tick();assert(sent==2);assert(!event(peer,6,0,NULL,0,addr(&b.service.packet)));tick();assert(sent==3&&lengths[2]==1);assert(!event(peer,6,0,NULL,0,addr(&b.service.packet)));tick();assert(!b.rf.tx_busy&&!memcmp(bytes,"abcde",5));
- assert(!event(peer,4,0,NULL,0,0));assert(ir5_tick(&b)<0);read_full(remote,r,8);assert(r[0]==3&&r[2]==0&&r[4]==1);assert(b.dead);int barrier_ready=0;
+ assert(!event(peer,4,0,NULL,0,0));assert(ir5_tick(&b)<0);read_full(remote,r,8);assert(r[0]==3&&r[2]==0&&r[4]==1);assert(b.dead);assert(!ir5_discovery_ready(&b));int barrier_ready=0;
  assert(ir5_withdraw(&b,retire_barrier,&barrier_ready)==-1);
  assert(b.service.published_mask==(IN_RF|IN_IAP_SDP|IN_CP_SDP));
  barrier_ready=1;assert(ir5_withdraw(&b,retire_barrier,&barrier_ready)==0);
  assert(b.service.state==IN_RETIRED&&!b.service.published_mask&&!b.service.uncertain_mask);
+ assert(!ir5_discovery_ready(&b));
+ puts("PASS actual R5 publication state controls discovery; no stale advertising");
  puts("PASS R5 clean link close permits certified native service withdrawal");
  close(remote);close(fd);close(server);
  puts("PASS: TCP 57342, verified-peer fixture, CONNECTED MAC, RX payload, fragmented DATA, MTU 2/2/1, deferred event6, DISCONNECTED; OEM substitutes, no hardware.");return 0;

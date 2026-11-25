@@ -39,6 +39,18 @@ int ir5_init(InboundR5*b,const InboundOps*o,ResolvePeer res,int fd,uint32_t cb){
  if(inbound_prepare(&b->service,&ops,cb))return -1;
  b->initialized=1;return 0;
 }
+/* Original owner only: discovery is based on actual service publication,
+ * not on a caller-provided 'registered' flag. */
+int ir5_discovery_ready(const InboundR5*b){
+ if(!b||!b->initialized||b->dead||b->had_link||b->ipc.failed||b->rf.failed||
+    b->native_link||b->rf.connected||b->service.state!=IN_PUBLISHED||
+    b->service.pending||b->service.busy||b->service.uncertain_mask||
+    b->service.published_mask!=(IN_RF|IN_IAP_SDP|IN_CP_SDP)||
+    b->service.slot<MU_RFCOMM_SCN_MIN||b->service.slot>MU_RFCOMM_SCN_MAX||
+    b->service.protocol[13]!=b->service.slot||
+    !b->vendor.certify||!b->vendor.ready)return 0;
+ return b->vendor.certify(b->vendor.opaque)==1&&b->vendor.ready(b->vendor.opaque)==1;
+}
 int ir5_publish(InboundR5*b){if(!b||!b->initialized||b->dead)return -1;return inbound_publish(&b->service);}
 int ir5_event(InboundR5*b,void*ch,const void*raw,unsigned code,unsigned status,const uint8_t*data,unsigned len,uint32_t packet){
  if(!b||!b->initialized||!cert(b)||ch!=&b->service.rf)return -1;

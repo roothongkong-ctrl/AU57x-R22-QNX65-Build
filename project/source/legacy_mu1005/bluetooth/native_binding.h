@@ -22,5 +22,8 @@ typedef struct {
  * fd is already connected to 127.0.0.1:57342; caller owns fd afterwards. */
 int mu_bt_native_attach(const MuBtOwner *,int fd);
 int mu_bt_native_tick(void);
+int mu_bt_native_discovery_ready(void);
+/* Serialized original owner only; no hook installed by this API. */
+int mu_bt_native_append_eir(uint8_t*,size_t,size_t,int (*)(void*),void*,size_t*);
 int mu_bt_native_withdraw(int (*barrier)(void *,const Inbound*),void *);
 #endif

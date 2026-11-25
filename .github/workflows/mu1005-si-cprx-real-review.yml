@@ -34,6 +34,14 @@ jobs:
           bash ci/host_wcp_autoconnect.sh | tee evidence/bt-autoconnect.log
       - name: Test offline Bluetooth trace reference locator
         run: python3 -m unittest discover -s tests -p test_mu1005_bt_trace_entry.py -v
+      - name: Verify actual service state and upstream EIR discovery
+        run: |
+          set -euxo pipefail
+          bash ci/host_r14_native.sh | tee evidence/r5-native-discovery.log
+          bash ci/host_r102_upstream_reuse.sh | tee evidence/upstream-eir.log
+          grep -F 'PASS actual R5 publication state controls discovery' evidence/r5-native-discovery.log
+          b=project/source/legacy_mu1005/bluetooth
+          cc -std=c99 -Wall -Wextra -Werror -I"$b" -c "$b/native_eir_bridge.c" -o "$RUNNER_TEMP/native-eir-bridge.o"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

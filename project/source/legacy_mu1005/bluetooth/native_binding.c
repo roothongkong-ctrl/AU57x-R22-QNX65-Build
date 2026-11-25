@@ -60,10 +60,12 @@ int mu_bt_native_attach(const MuBtOwner *o,int fd){
  if(ir5_init(&res.bridge,&n,mu38_resolve_peer,fd,(uint32_t)(uintptr_t)callback))return -1;
  return ir5_publish(&res.bridge);
 }
+int mu_bt_native_discovery_ready(void){return ir5_discovery_ready(&res.bridge);}
 int mu_bt_native_tick(void){return cert(&res)&&res.bridge.initialized?ir5_tick(&res.bridge):-1;}
 int mu_bt_native_withdraw(int (*barrier)(void*,const Inbound*),void *p){return cert(&res)&&res.bridge.initialized?ir5_withdraw(&res.bridge,barrier,p):-1;}
 #else
 int mu_bt_native_attach(const MuBtOwner *o,int fd){(void)o;(void)fd;return -1;}
+int mu_bt_native_discovery_ready(void){return 0;}
 int mu_bt_native_tick(void){return -1;}
 int mu_bt_native_withdraw(int (*barrier)(void*,const Inbound*),void *p){(void)barrier;(void)p;return -1;}
 #endif
