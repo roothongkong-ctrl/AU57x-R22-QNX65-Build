@@ -35,6 +35,9 @@ typedef struct {
 /* port is ALWAYS 57342 for deployment. An ephemeral port override exists
  * only in a host fixture built with AU57X_R98_HOST_TEST. */
 int au98_publish(Au98Handoff*,const Au98Hooks*,const MuBtOwner*,unsigned port);
+/* Serialized original owner only. Any lost owner/transport proof on that
+ * thread enters DRAINING; recovering proof permits withdrawal, not tick.
+ * Wrong-thread calls are rejected without mutating the owner state. */
 int au98_tick(Au98Handoff*);
 int au98_withdraw(Au98Handoff*,int (*barrier)(void*,const Inbound*),void*);
 /* Concrete QNX adapter to existing native_binding.c, not a fake callback.

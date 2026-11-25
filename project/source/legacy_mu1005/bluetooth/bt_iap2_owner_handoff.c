@@ -95,8 +95,16 @@ int au98_publish(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*owner,unsigned 
  return -2;
 }
 int au98_tick(Au98Handoff*s){
- if(!s||s->state!=AU98_PUBLISHED||!oem_ok(s))return -1;
- if(s->hooks.tick(s->hooks.opaque)==0)return 0;
+ if(!s||s->state!=AU98_PUBLISHED)return -1;
+ /* A call from the wrong thread cannot mutate the serialized owner
+  * state. On the original thread, however, loss of the actual image,
+  * service, owner or authenticated transport is terminal for this
+  * publication, even if the proof later becomes true again. */
+ if(s->hooks.on_original_iap2_owner(s->hooks.opaque)!=1)return -1;
+ if(oem_ok(s)&&s->native_owner.transport_ready(s->native_owner.opaque)==1&&
+    s->hooks.tick(s->hooks.opaque)==0&&
+    oem_ok(s)&&s->native_owner.transport_ready(s->native_owner.opaque)==1)
+  return 0;
  /* A successfully published service can be quiesced after ordinary
   * transport failure. Do not treat this as an uncertain initial attach.
   * No more data-plane ticks or republish; only certified withdrawal. */

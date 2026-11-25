@@ -12,7 +12,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-typedef struct {int original,thread,service,owner,transport,profile,attach,withdraw,tick;int got_fd;unsigned calls;unsigned transport_checks;int revoke_after_check;} Fixture;
+typedef struct {int original,thread,service,owner,transport,profile,attach,withdraw,tick;int got_fd;unsigned calls;unsigned transport_checks;int revoke_after_check;int revoke_in_tick;} Fixture;
 static int yes_original(void*p){return ((Fixture*)p)->original;}
 static int yes_thread(void*p){return ((Fixture*)p)->thread;}
 static int yes_service(void*p){return ((Fixture*)p)->service;}
@@ -33,7 +33,7 @@ static int fake_attach(void*p,const MuBtOwner*owner,int fd){Fixture*f=p;struct s
  assert(sa.sin_addr.s_addr==htonl(INADDR_LOOPBACK));assert(fcntl(fd,F_GETFD)&FD_CLOEXEC);
  f->got_fd=fd;f->calls++;return f->attach;
 }
-static int fake_tick(void*p){Fixture*f=p;f->calls++;return f->tick;}
+static int fake_tick(void*p){Fixture*f=p;f->calls++;if(f->revoke_in_tick)f->transport=0;return f->tick;}
 static int fake_withdraw(void*p,int(*barrier)(void*,const Inbound*),void*v){Fixture*f=p;
  assert(barrier(v,NULL)==1);f->calls++;return f->withdraw;
 }
@@ -110,6 +110,28 @@ int main(void){
  {unsigned char byte;assert(recv(accepted,&byte,1,0)==0);}
  close(accepted);f.tick=0;
  puts("PASS successful attach -> transport failure -> certified withdrawal");
+ /* Real loopback remains open until verified withdrawal; a revoked lease
+  * must never restart forwarding merely because the proof recovers. */
+ for(int which=0;which<4;which++){
+  Au98Handoff lost={0};unsigned n;
+  assert(au98_publish(&lost,&k,&o,port)==0);
+  accepted=accept(listen_fd,NULL,NULL);assert(accepted>=0);
+  n=f.calls;
+  if(which==0)f.transport=0;
+  if(which==1)f.service=0;
+  if(which==2)f.owner=0;
+  if(which==3)f.revoke_in_tick=1;
+  assert(au98_tick(&lost)==-2&&lost.state==AU98_DRAINING);
+  assert(f.calls==n+(which==3?1u:0u));
+  f.transport=f.service=f.owner=1;f.revoke_in_tick=0;
+  n=f.calls;
+  assert(au98_tick(&lost)<0&&f.calls==n);
+  assert(au98_publish(&lost,&k,&o,port)<0);
+  assert(au98_withdraw(&lost,barrier,&ok)==0&&lost.fd==-1);
+  {unsigned char byte;assert(recv(accepted,&byte,1,0)==0);}
+  close(accepted);
+ }
+ puts("PASS owner/transport lease revoked before or during tick; no stale resume");
  Au98Handoff uncertain={0};f.withdraw=-2;
  assert(au98_publish(&uncertain,&k,&o,port)==0);
  accepted=accept(listen_fd,NULL,NULL);assert(accepted>=0);
