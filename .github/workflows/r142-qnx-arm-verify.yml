@@ -1,0 +1,80 @@
+name: R142 MU1005 QNX 6.5 ARM preload verification (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-r142-qnx-native-verify]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host GCC and Clang fixture
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang
+          python3 r142/tests/test_r142_thread_name_probe.py
+          CC=clang python3 r142/tests/test_r142_thread_name_probe.py
+  qnx65-arm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      PIN: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+      IMG: qnx65-armv7-toolchain:8.5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare QEMU and pinned QNX 6.5 toolchain
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+          git init -q "$RUNNER_TEMP/toolchain"
+          git -C "$RUNNER_TEMP/toolchain" remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C "$RUNNER_TEMP/toolchain" fetch --depth 1 origin "$PIN"
+          git -C "$RUNNER_TEMP/toolchain" checkout -q FETCH_HEAD
+          git -C "$RUNNER_TEMP/toolchain" rev-parse HEAD | tee r142/toolchain_commit.txt
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t "$IMG" "$RUNNER_TEMP/toolchain" 2>&1 | tee r142/toolchain_build.log
+      - name: Compile R142 for QNX 6.5 ARM and audit ELF
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src/r142 "$IMG" bash ci/build_r142_qnx.sh 2>&1 | tee r142/qnx_compile.log
+      - name: Run real QNX 6.5 runtime linker and RTLD_NEXT smoke under QEMU
+        run: |
+          set -euxo pipefail
+          python3 - "$RUNNER_TEMP/toolchain/tests/qemu-run.sh" "$RUNNER_TEMP/toolchain/tests/qemu-run-r142.sh" <<'PY'
+          from pathlib import Path
+          import sys
+          src=Path(sys.argv[1]); dst=Path(sys.argv[2]); s=src.read_text()
+          def replace(old,new):
+              global s
+              if s.count(old)!=1:
+                  raise SystemExit("upstream qemu-run.sh anchor mismatch: "+old)
+              s=s.replace(old,new,1)
+          replace('cp "$BIN" "$WORK/$NAME"\n',
+                  'cp "$BIN" "$WORK/$NAME"\ncp "$REVIEW_LIB" "$WORK/"\n')
+          replace('    $NAME\n    display_msg "@@QNXRUN-END@@"\n',
+                  '    LD_PRELOAD=/proc/boot/libau57x_r142_thread_probe_REVIEW.so AU57X_R142_THREAD_PROBE=1 AU57X_R142_LOG=/dev/shmem/au57x_r142_thread_probe.log $NAME\n    display_msg "@@QNXRUN-END@@"\n')
+          replace('EOF\n\ndocker run --rm --platform=linux/amd64',
+                  'EOF\nprintf "[data=copy] %s\\n" "$(basename "$REVIEW_LIB")" >> "$WORK/test.build"\n\ndocker run --rm --platform=linux/amd64')
+          dst.write_text(s)
+          PY
+          chmod +x "$RUNNER_TEMP/toolchain/tests/qemu-run-r142.sh"
+          REVIEW_LIB="$PWD/r142/build/qnx/libau57x_r142_thread_probe_REVIEW.so" \
+          QEMU_KEEP_LOG="$PWD/r142/qnx_runtime_boot.log" \
+          QEMU_RUN_SECS=18 QEMU_TIMEOUT=80 \
+          bash "$RUNNER_TEMP/toolchain/tests/qemu-run-r142.sh" "$PWD/r142/build/qnx/r142_qnx_smoke" 8.5 2>&1 | tee r142/qnx_runtime.log
+          grep -Fq R142_QNX_LD_PRELOAD_CONSTRUCTOR_PASS r142/qnx_runtime.log
+          grep -Fq R142_QNX_RTLD_NEXT_FORWARD_PASS r142/qnx_runtime.log
+          grep -Fq R142_QNX_THREAD_NAME_CLASSIFICATION_PASS r142/qnx_runtime.log
+          grep -Fq R142_QNX_SYNTHETIC_PROCESS_ONLY_NOT_OEM_BTSTACK r142/qnx_runtime.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R142-QNX65-ARM-NO-INSTALL-EVIDENCE
+          path: |
+            r142/*.log
+            r142/*.txt
+            r142/build/qnx/
+          retention-days: 14
