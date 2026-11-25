@@ -64,6 +64,13 @@ H0–H3 通过只代表云端源码/仿真验证，不代表 H4–H6。未通过
 5. Track E 补齐 SI/DIO 生产 callback 的证据清单；缺口未证实则不做虚假接线。
 6. 最后统一集成、构建和只读研究包；绝不把研究包伪装成安装包。
 
+## 云端验证记录（2026-11-25）
+
+- R103 上游 iAP2 LinkEngine + AU57x RFCOMM bridge：GitHub Actions 45631876350 SUCCESS；原始上游测试 7/7、bridge 测试 2/2、TCP lab 13/13，共 22 项 Rust 测试通过；C RFCOMM frame test PASS。仅 Linux host 测试，不是 QNX Rust 或 OEM 蓝牙运行。
+- 全量 cloud12 review：GitHub Actions 45631876359 SUCCESS；包含 45/45 C host strict compile、R86 delegate ABI parser negative tests、R100 17 条 route gate assertions、R101 13/13 offline suites、R95 15/15 offline matrix、R96/R97/R98/R99 regressions、50,000 CSM fuzz、67 native SD transaction tests；全部为 host/静态研究，不是车机运行。
+- R52 QNX 6.5 ARMv7 构建：修正 preflight 源码计数由 44 改为 45 后，新任务 45632187935 正在构建 QNX 工具链；QNX ARM 编译、ELF gate 与 QEMU 结果尚未返回。
+- 独立 R143 QEMU 观察器：45629972898 已确认 QNX ARM32 编译 PASS，但合成进程的 /proc/boot/btstack 打开失败（errno=2）；该问题与 R103 iAP2 host 测试独立，暂不阻塞并行模块。
+
 ## 五、首轮并行任务状态
 
 | 轨道 | 首轮任务 | 状态 |
