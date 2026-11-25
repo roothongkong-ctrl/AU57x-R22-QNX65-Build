@@ -66,8 +66,8 @@ H0–H3 通过只代表云端源码/仿真验证，不代表 H4–H6。未通过
 
 ## 云端验证记录（2026-11-25）
 
-- R103 上游 iAP2 LinkEngine + AU57x RFCOMM bridge：GitHub Actions 45631876350 SUCCESS；原始上游测试 7/7、bridge 测试 2/2、TCP lab 13/13，共 22 项 Rust 测试通过；C RFCOMM frame test PASS。仅 Linux host 测试，不是 QNX Rust 或 OEM 蓝牙运行。
-- 全量 cloud12 review：GitHub Actions 45631876359 SUCCESS；包含 45/45 C host strict compile、R86 delegate ABI parser negative tests、R100 17 条 route gate assertions、R101 13/13 offline suites、R95 15/15 offline matrix、R96/R97/R98/R99 regressions、50,000 CSM fuzz、67 native SD transaction tests；全部为 host/静态研究，不是车机运行。
+- R103 上游 iAP2 LinkEngine + AU57x RFCOMM bridge：GitHub Actions 45634439847 SUCCESS；原始上游测试 7/7、bridge 测试 2/2、TCP lab 13/13，共 22 项 Rust host 测试通过；不代表 QNX Rust 或 OEM 蓝牙运行。
+- 全量 cloud12 review：GitHub Actions 45634439831 SUCCESS；包含 45/45 C host strict compile、R86 delegate ABI parser negative tests、R100 17 条 route gate assertions、R101 13/13 offline suites、R95 15/15 offline matrix、R96/R97/R98/R99 regressions、50,000 CSM fuzz、67 native SD transaction tests；全部为 host/静态研究，不是车机运行。
 - R52 QNX 6.5 ARMv7：45632464697 曾成功构建 GCC 8.5 工具链，但 compile script 内部仍写 44（而 workflow preflight 已是 45），在正式 C 编译前退出。已将 `ci/compile_qnx_in_image.sh` 修正为 45；新任务 45633825933 已通过 45 源码预检，目前正在构建工具链，QNX C 编译、ELF gate 与 QEMU 尚未返回。
 - 独立 R143 QEMU 观察器：45629972898 已确认 QNX ARM32 编译 PASS，但合成进程的 /proc/boot/btstack 打开失败（errno=2）；该问题与 R103 iAP2 host 测试独立，暂不阻塞并行模块。
 
@@ -86,7 +86,7 @@ H0–H3 通过只代表云端源码/仿真验证，不代表 H4–H6。未通过
 ## 第二轮并行计划与当前提交（2026-11-25）
 
 1. **Track D / Wi-Fi interface resolution（云端可完成）**：新增 `tests/test_wifi_interface.c` 与 `ci/host_wifi_interface.sh`，验证非法 IPv4、loopback、未分配地址、真实 up/non-loopback IPv4 唯一映射及输出缓冲区边界；已接入 cloud12 workflow。该测试只验证地址到接口名解析，不宣称 Wi-Fi AP、频段、iPhone 或 AirPlay 已工作。
-2. **R52 QNX build（正在进行）**：以 45 个 C 文件为唯一清单；若通过，继续看 native .so link、NEEDED、ELF gate、QEMU smoke；若失败，按第一个编译/链接错误修复，不跳过后续门禁。
+2. **R52 QNX build（本轮已通过）**：45 个 C 文件基线、QNX C shared link、ELF gate 和 QEMU dlopen smoke 已通过；下一步是将真正可复用的 donor daemon/graft 组件分别交叉编译，而不是把这次 C 工程成功当作完整无线系统成功。
 3. **Track B/C（下一并行批）**：基于已通过的 R103 host link bridge，审查 QNX 端 Rust target/标准库可用性；若 QNX Rust 不可行，评估 C ABI 边界/独立 Rust host daemon 的可行性，不先假定可移植。同步审查原厂 MFi API 句柄/内存释放/线程契约，所有模拟认证继续标为 fixture。
 4. **Track E（后续）**：只读核对 SI/DIO callback、peer identity 与 wired restore 证据；生产绑定未证明前保持 fail-closed。
 
