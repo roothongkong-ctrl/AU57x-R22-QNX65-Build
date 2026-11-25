@@ -1,5 +1,6 @@
 #ifndef MU1005_BT_STARTUP_SNAPSHOT_H
 #define MU1005_BT_STARTUP_SNAPSHOT_H
+#include <sys/types.h>
 #include <stdint.h>
 #include <stddef.h>
 /* Original pinned MU1005 only. Read on certified serialized owner, through

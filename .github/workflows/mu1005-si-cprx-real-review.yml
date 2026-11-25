@@ -50,6 +50,12 @@ jobs:
           b=project/source/legacy_mu1005/bluetooth
           cc -std=c99 -O2 -Wall -Wextra -Werror -I"$b" "$b/bt_startup_snapshot.c" tests/test_mu1005_bt_startup_snapshot.c -o "$RUNNER_TEMP/bt-startup"
           "$RUNNER_TEMP/bt-startup" | tee evidence/bt-startup.log
+      - name: Verify original OSAPI ActiveObject thread identity
+        run: |
+          set -euxo pipefail
+          b=project/source/legacy_mu1005/bluetooth
+          cc -std=c99 -O2 -Wall -Wextra -Werror -I"$b" "$b/bt_owner_identity.c" tests/test_bt_owner_identity.c -o "$RUNNER_TEMP/bt-owner-identity"
+          "$RUNNER_TEMP/bt-owner-identity" | tee evidence/bt-owner-identity.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
