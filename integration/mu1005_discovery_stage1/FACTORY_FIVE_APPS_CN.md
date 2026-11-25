@@ -1,0 +1,7 @@
+# 原厂五程序输入补齐（静态核验，NO INSTALL）
+用户新上传 servicemgrmibhigh 与 persistenceTNG_mibhigh，真实文件 readelf/sha256 校验：
+- servicemgrmibhigh 548388 bytes SHA256 719e34dc990b4ef2ab87a90e3d84de3f2188189df2efa4f07b2433d312eb11d1 entry 0x107108
+- persistenceTNG_mibhigh 1155316 bytes SHA256 706561a8b005a2896ef7e1c99ccc69643de16f1ad3f119213f325edf604adfb7 entry 0x106eb8
+两者均 ET_EXEC ARM32 LE EABI5, interpreter /usr/lib/ldqnx.so.2；大小与历史 MU1005-folders.txt 一致。两者直接 NEEDED 集合相同（顺序不同）：libdsicommon.so, libiplcommon.so, libosal.so, libutil.so, libcomm.so, libservmngt.so, libirc_mmx_adapter.so, libsocket.so.3, libm.so.2, libecpp-ne.so.4, libc.so.3。
+在前次真实 stage2 递归依赖报告中补入这两个 ELF，已确认 5 个原厂程序与 6 个 stage2 库，暂缺 8 个唯一 NEEDED 名称；没有新增依赖名。缺少库为 libirc_mmx_adapter.so、libicuuc.so.58、libxml2.so.1、libz.so.2、libecpp-ne.so.4、libc.so.3、libm.so.2、libsocket.so.3。后三个属于 QNX 基础运行库，已有公开 QNX 工具链的测试版本，但未确认原厂等同。原始 app.img 与 stage2 的同名 libcomm/libosal/libutil 保留不同来源，不能混用为已验证原厂闭包。完整 framework.json 仍待补齐。真实 servicemgrmibhigh 可找到 dsistartup.json、framework.json、default_startup_mode、wait_for_ooc 和 setupCore/startCore 相关错误日志字面量；这些是静态证据，不是服务启动结果。
+实际使用私有本地文件 readelf，生成更新后 11 文件清单与 8 缺项报告。factory_inventory.py 增加两份文件固定 SHA，需将私有文件放入 --app 目录后使用，修改后的完整 inventory 工具尚未重新运行。本轮没有 OEM 文件上传、没有启动原厂程序、没有新增模拟协议。第一阶段继续以真实 OEM 启动与手机发现为验收。

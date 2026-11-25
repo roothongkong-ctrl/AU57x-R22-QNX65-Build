@@ -25,7 +25,7 @@ def inventory(raw,app,efs,out):
         pos+=n
     need(len(entries)>100,"unexpected directory")
     found={};missing=set();edges={};pending=[]
-    pins={"btstack":"51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566","bluetooth":"7d5ae31396f016f811e18a7255bf1311e0bfa471b2a3252a6f2eb4bd3ad04272","connectivity_launcher":"08896149dcdcc2bc5a6b22ce78682ad5949fbeb8fdc0fb1249162861e40914b8"}
+    pins={"btstack":"51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566","bluetooth":"7d5ae31396f016f811e18a7255bf1311e0bfa471b2a3252a6f2eb4bd3ad04272","connectivity_launcher":"08896149dcdcc2bc5a6b22ce78682ad5949fbeb8fdc0fb1249162861e40914b8","servicemgrmibhigh":"719e34dc990b4ef2ab87a90e3d84de3f2188189df2efa4f07b2433d312eb11d1","persistenceTNG_mibhigh":"706561a8b005a2896ef7e1c99ccc69643de16f1ad3f119213f325edf604adfb7"}
     for name,pin in pins.items():
         src=app/name;v=src.read_bytes();need(sha(v)==pin,"wrong original "+name)
         found[name]=dict(source="private original",sha256=pin,size=len(v));pending.append((name,src))
