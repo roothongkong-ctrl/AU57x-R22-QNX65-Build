@@ -18,6 +18,9 @@ typedef struct {
  uint8_t rf_arg3_snapshot_valid;
  /* Actual BluetoothServices this pointer captured by a verified owner. */
  uint32_t services_address;
+ /* Independently authenticated mapped original libcomm.so load bias.
+  * read_live must also support checked executable reads at attach. */
+ uint32_t comm_load_bias;
 } MuBtOwner;
 /* On QNX ARM32, resolve fixed ABI only for the pinned reference executable.
  * On other hosts returns -1 without reading/calling any native address.

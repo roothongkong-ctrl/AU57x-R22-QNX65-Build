@@ -1,6 +1,7 @@
 #include "native_binding.h"
 #include "rf_arg_experiment.h"
 #include "bt_startup_snapshot.h"
+#include "bt_owner_identity.h"
 #include <stdint.h>
 #include <string.h>
 #if defined(__QNXNTO__) && defined(__arm__) && UINTPTR_MAX == UINT32_MAX
@@ -8,9 +9,12 @@
  * owner must verify exact file SHA, same image mapping, initialization and
  * callback serialization before attaching. No production default owner. */
 #include "native_binding_words.h"
-typedef struct { Mu38PeerOps peer; MuBtOwner owner; InboundR5 bridge; int attempted; } Resident;
+#include <pthread.h>
+typedef struct { Mu38PeerOps peer; MuBtOwner owner; InboundR5 bridge; MuBtThreadIdentity thread; int attempted; } Resident;
 static Resident res;
-static int cert(void *p){Resident *r=p;return r==&res&&r->attempted&&r->owner.owner_ready&&r->owner.owner_ready(r->owner.opaque)==1;}
+static uint32_t current_tid(void){return (uint32_t)(uintptr_t)pthread_self();}
+static int cert(void *p){Resident *r=p;return r==&res&&r->attempted&&r->owner.owner_ready&&r->owner.owner_ready(r->owner.opaque)==1&&
+ mu_bt_osapi_identity_matches(&r->thread,current_tid(),r->owner.read_live,r->owner.opaque);}
 static int sdk_started(const MuBtOwner *o){return mu_bt_sdk_started(o->services_address,o->read_live,o->opaque);}
 static int ready(void *p){Resident *r=p;return cert(p)&&sdk_started(&r->owner)&&r->owner.transport_ready(r->owner.opaque)==1;}
 static uint32_t addr(const void *p){return (uint32_t)(uintptr_t)p;}
@@ -51,8 +55,11 @@ int mu_bt_native_attach(const MuBtOwner *o,int fd){
  if(!o||!o->owner_ready||!o->transport_ready||!o->read_live||!o->paired_authorized||
     o->rf_arg3_snapshot_valid!=1u||o->rf_arg3_snapshot<1u||o->rf_arg3_snapshot>7u||
     res.attempted||fd<0||o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
- if(!words_ok()||!sdk_started(o)||o->owner_ready(o->opaque)!=1)return -1;
- res.attempted=1;res.owner=*o;res.peer=(Mu38PeerOps){&res,assoc,rd,auth};
+ MuBtThreadIdentity identity;
+ if(!words_ok()||!sdk_started(o)||!mu_bt_comm_words_match(o->comm_load_bias,o->read_live,o->opaque)||
+    !mu_bt_osapi_identity(o->comm_load_bias,current_tid(),o->read_live,o->opaque,&identity)||
+    o->owner_ready(o->opaque)!=1)return -1;
+ res.attempted=1;res.owner=*o;res.thread=identity;res.peer=(Mu38PeerOps){&res,assoc,rd,auth};
  InboundOps n={0};n.reg=register_verified;n.unreg=RFN(int (*)(void*,uint8_t*),0x2779b4u);
  n.add=RFN(int (*)(void*),0x207244u);n.remove=RFN(int (*)(void*),0x2071c4u);
  n.accept=RFN(int (*)(void*,int),0x27733cu);n.limit=RFN(int (*)(void*),0x277074u);
