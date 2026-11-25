@@ -11,13 +11,13 @@ mkdir -p build/qnx
 FLAGS=(-std=c99 -D_QNX_SOURCE=1 -O2 -Wall -Wextra -Werror -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp)
 "$CC" "${FLAGS[@]}" tests/r143_smoke.c -lc -o build/qnx/btstack
 SMOKE_SHA=$(sha256sum build/qnx/btstack | awk '{print $1}')
-SMOKE_DEFINE="-DAU57X_R143_STOCK_SHA256=\\\"$SMOKE_SHA\\\""
+SMOKE_DEFINE="-DAU57X_R143_STOCK_SHA256=\"$SMOKE_SHA\""
 "$CC" "${FLAGS[@]}" -fPIC -shared -Wl,--hash-style=sysv -Wl,--no-undefined \
   -DAU57X_R143_QNX_TEST=1 -DAU57X_R143_TEST_API=1 "$SMOKE_DEFINE" \
   r143_preload_probe.c bt_thread_owner.c sha256.c -lc \
   -o build/qnx/libau57x_r143_preload_REVIEW.so
 "$CC" "${FLAGS[@]}" -fPIC -shared -Wl,--hash-style=sysv -Wl,--no-undefined \
-  -DAU57X_R143_STOCK_SHA256=\\\"51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566\\\" \
+  -DAU57X_R143_STOCK_SHA256=\"51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566\" \
   r143_preload_probe.c bt_thread_owner.c sha256.c -lc \
   -o build/qnx/libau57x_r143_preload_OEM_REVIEW.so
 "$RE" -h -d -Ws build/qnx/libau57x_r143_preload_REVIEW.so > build/qnx/r143_smoke_elf.txt
