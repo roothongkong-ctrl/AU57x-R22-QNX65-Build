@@ -37,3 +37,26 @@ SHA256：`42fd984ebbdccd11595bd45909683829565147c8cbc8a482618d6dd8e564d3bf`
 下一步优先反汇编 `link_create`、`link_setup`、`transport_receive`、`transport_send_pkt`，恢复 transport vtable 的真实字段与调用者；并分析 `iap2_init` 如何将配置组件绑定到 transport。随后再与 mm-ipod USB transport ABI 对照。未完成真实蓝牙物理 producer 绑定前不生成可刷写程序。
 
 状态：`RESEARCH_ONLY / NO_INSTALL / safe_to_flash=false / vehicle_verified=false`。
+
+
+## R104 第二轮：transport vtable 调用约定已从机器码确认（2026-11-26）
+
+使用本轮上传且 SHA256 精确匹配的 ELF 原件完成 ARM32 反汇编：
+
+- `link_create` VA `0x11da0`，大小 `0x468`；入口直接调用 `transport_get_link_params(link, &params)`。
+- `link_setup` VA `0x12888`，大小 `0x438`；再次读取 transport link params，之后建立 iAP2 session、构造并发送 SYN。
+- `transport_receive` VA `0x2111c`：从 `link+0x14` 取 link-private object，再从 private+`0x40` 取 transport object；从 transport object+`0x2c` 取函数指针并 BLX 调用。故接收回调槽偏移可确认为 transport vtable/object 的 `+0x2c`。
+- `transport_get_link_params` VA `0x21144`：同一 transport object 的 `+0x18` 位置是 get-link-params 函数指针。
+- `transport_send_pkt` VA `0x2115c`：调用 send 路径时将 link-private object 的 `+0x48` 字段作为状态/速率门限读取；它本身没有直接通过 transport vtable 的可见 send slot 完成发送，需继续追踪后半段和其 caller。
+- 全 ELF 直接 BL 调用 xref：`transport_send_pkt` caller 至少在 `0x1127c` 与 `0x11980`；`transport_receive` caller 在 `0x126b4`；`transport_get_link_params` caller 在 `0x11e0c` 与 `0x128a4`。
+
+### 当前能确认的 ABI 形态（不是完整结构体）
+
+- transport object 指针位于 link-private+`0x40`。
+- transport.get_link_params 函数指针位于 transport+`0x18`。
+- transport.receive 函数指针位于 transport+`0x2c`。
+- 仍未从该 ELF 单独确认 transport.send 对应的 vtable slot 偏移、对象创建者、Bluetooth 实例具体绑定点；不可自行补齐为相邻偏移。
+
+### 结论更新
+
+现在已找到 iAP2 协议引擎调用物理 transport 的真实间接调用边界：接收数据必须由 transport object 的 receive slot（+0x2c）交给 link；链路参数由 slot（+0x18）提供。下一步不是继续改 `bt_update_recv`，而是沿 link-private 的 transport object 初始化/赋值 xref 回溯其 producer，并找出 BluetoothTransportComponent 如何填充该对象及 send 对应回调。USB 插件 ABI 可作参照，但还不能宣称蓝牙绑定已找到。
