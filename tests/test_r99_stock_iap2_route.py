@@ -90,14 +90,29 @@ class Tests(unittest.TestCase):
         self.assertEqual(details['style'],'existing active section')
         self.assertIn(b'[wifi]\nenable=0',changed)
 
-    def test_commented_template_enables_new_section(self):
-        raw=b'# [bluetooth]\n# enable=0\n[wifi]\nenable=0\n'
-        with self.assertRaisesRegex(ValueError,'no unique'):r99.stage_iap2_ini(raw)
-        raw=b'#[bluetooth]\n#enable=0\n[wifi]\nenable=0\n'
+    def test_commented_template_uncomments_complete_existing_transport(self):
+        raw=b'#[bluetooth]\n#enable=yes\n#id=1111\n#name=Bluetooth\n#connectstatus=enable\n#mac=02:11:22:33:44:55\n[wifi]\nenable=0\n'
         staged,details=r99.stage_iap2_ini(raw)
-        self.assertTrue(staged.startswith(raw))
-        self.assertIn(b'\n[bluetooth]\nenable = 1\n',staged)
-        self.assertIn('commented',details['style'])
+        self.assertIn(b'[bluetooth]\nenable = yes\nid = 1111\nname = Bluetooth\nconnectstatus = enable\nmac = 02:11:22:33:44:55\n',staged)
+        self.assertIn(b'[wifi]\nenable=0\n',staged)
+        self.assertNotIn(b'#[bluetooth]',staged)
+        self.assertEqual(details['fields_activated'],['enable','id','name','connectstatus','mac'])
+        self.assertEqual(details['transport_id'],1111)
+
+    def test_reject_incomplete_commented_template(self):
+        raw=b'#[bluetooth]\n#enable=yes\n[wifi]\nenable=0\n'
+        with self.assertRaisesRegex(ValueError,'missing required fields'):
+            r99.stage_iap2_ini(raw)
+
+    def test_reject_invalid_commented_mac(self):
+        raw=b'#[bluetooth]\n#enable=yes\n#id=1111\n#name=Bluetooth\n#connectstatus=enable\n#mac=unknown\n'
+        with self.assertRaisesRegex(ValueError,'MAC'):
+            r99.stage_iap2_ini(raw)
+
+    def test_reject_duplicate_commented_fields(self):
+        raw=b'#[bluetooth]\n#enable=yes\n#id=1111\n#name=Bluetooth\n#connectstatus=enable\n#mac=02:11:22:33:44:55\n#mac=02:11:22:33:44:56\n'
+        with self.assertRaisesRegex(ValueError,'duplicate commented'):
+            r99.stage_iap2_ini(raw)
 
     def test_reject_ambiguous_sections(self):
         with self.assertRaisesRegex(ValueError,'duplicate'):
