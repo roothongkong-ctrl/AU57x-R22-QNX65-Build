@@ -20,7 +20,14 @@ jobs:
           echo '969aa9f3341964a3988eed8807c6f57ac58232cda9b442ca1a64e0ba10f4f325  observer_review/source.tar.gz' | sha256sum -c -
           mkdir -p observer-src build/observer
           tar -xzf observer_review/source.tar.gz -C observer-src
-          (cd observer-src && sha256sum -c SOURCE_SHA256.txt)
+          # The source manifest was opened before find, so it lists itself.
+          # The outer archive hash is already checked; verify every actual source.
+          (
+            cd observer-src
+            awk '$2 != "./SOURCE_SHA256.txt"' SOURCE_SHA256.txt > /tmp/observer-source-files.sha256
+            test "$(wc -l < /tmp/observer-source-files.sha256)" -eq 8
+            sha256sum -c /tmp/observer-source-files.sha256
+          )
       - name: Prepare proven QNX toolchain
         run: |
           set -euxo pipefail
