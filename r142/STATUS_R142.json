@@ -1,0 +1,14 @@
+{
+  "version": "R142-QNX-VERIFY",
+  "baseline": "MHI2_CN_AU57x_K1006_2/MU1005",
+  "host_fixture": "pending_ci",
+  "qnx_arm_build": "pending_ci",
+  "qnx_ld_preload_smoke": "pending_ci",
+  "rtld_next_forwarding": "pending_ci",
+  "oem_btstack_executed": false,
+  "native_iap2_owner": false,
+  "mfi_verified": false,
+  "wireless_carplay_verified": false,
+  "installable": false,
+  "safe_to_flash": false
+}
