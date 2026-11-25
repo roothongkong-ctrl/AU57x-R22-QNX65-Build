@@ -95,6 +95,14 @@ def stage_bluetooth_json(raw: bytes) -> tuple[bytes, dict]:
 
 
 def stage_iap2_ini(raw: bytes) -> tuple[bytes, dict]:
+    """Enable only a complete, already-present commented Bluetooth transport.
+
+    The original MU1005 template contains enable/id/name/connectstatus/mac.
+    Appending a bare [bluetooth] enable=1 section is unsafe: it silently drops
+    the transport identity and link parameters. Unknown/incomplete templates
+    are rejected rather than populated with guessed values.
+    """
+    import re
     if len(raw) > MAX_FILE or b'\x00' in raw:
         raise ValueError('invalid original iap2.cfg')
     try:
@@ -107,49 +115,107 @@ def stage_iap2_ini(raw: bytes) -> tuple[bytes, dict]:
     if '\r\n' in text and '\n' in text.replace('\r\n', ''):
         raise ValueError('mixed line endings not accepted')
     lines = text.splitlines(keepends=True)
-    active_bluetooth_sections = []
-    commented_bluetooth_sections = []
+    active_sections = []
+    commented_sections = []
     current = None
-    enable_entries = []
+    active_enable = []
     for n, line in enumerate(lines):
         s = line.strip()
         if s.startswith('[') and s.endswith(']'):
             current = s[1:-1].strip().lower()
             if current == 'bluetooth':
-                active_bluetooth_sections.append(n)
+                active_sections.append(n)
             continue
-        if s.startswith(('#[',';[')) and s.endswith(']'):
-            sec = s[2:-1].strip().lower()
-            if sec == 'bluetooth': commented_bluetooth_sections.append(n)
-            # Commented sections are not real INI sections.
+        if s.startswith('#[') and s.endswith(']'):
+            section = s[2:-1].strip().lower()
+            if section == 'bluetooth':
+                commented_sections.append(n)
             continue
-        if s.startswith((';','#')) or not s:
+        if s.startswith((';', '#')) or not s:
             continue
         if current == 'bluetooth' and '=' in s and s.split('=', 1)[0].strip().lower() == 'enable':
-            enable_entries.append((n, s.split('=', 1)[1].strip()))
-    if len(active_bluetooth_sections) > 1 or len(enable_entries) > 1:
+            active_enable.append((n, s.split('=', 1)[1].strip()))
+    if len(active_sections) > 1 or len(active_enable) > 1:
         raise ValueError('duplicate iAP2 Bluetooth section or enable setting')
-    if not active_bluetooth_sections:
-        # Refuse to guess the meaning of commented sections; append a genuinely
-        # active section only if the original has a clearly commented template.
-        if len(commented_bluetooth_sections) != 1:
-            raise ValueError('no unique Bluetooth section/template; cannot enable safely')
-        if not text.endswith(('\r\n','\n')):
-            text += eol
-        staged = text + eol + '[bluetooth]' + eol + 'enable = 1' + eol
-        return staged.encode('utf8'), {'style': 'new section after one commented template', 'before': 'commented', 'after': '1'}
-    if len(enable_entries) != 1:
-        raise ValueError('active Bluetooth section has no unique enable value')
-    index, value = enable_entries[0]
-    if value not in ('0','false','False','off','OFF'):
-        raise ValueError('Bluetooth enable value unknown or already true')
-    old_line = lines[index]
-    line_no_eol = old_line.rstrip('\r\n')
-    indent = line_no_eol[:len(line_no_eol)-len(line_no_eol.lstrip())]
-    new_line = indent + 'enable = 1' + (eol if old_line.endswith('\n') else '')
-    lines[index] = new_line
-    return ''.join(lines).encode('utf8'), {'style': 'existing active section', 'before': value, 'after': '1'}
+    if active_sections:
+        if len(active_enable) != 1:
+            raise ValueError('active Bluetooth section has no unique enable value')
+        index, value = active_enable[0]
+        if value not in ('0', 'false', 'False', 'off', 'OFF'):
+            raise ValueError('Bluetooth enable value unknown or already true')
+        old_line = lines[index]
+        line_no_eol = old_line.rstrip('\r\n')
+        indent = line_no_eol[:len(line_no_eol)-len(line_no_eol.lstrip())]
+        lines[index] = indent + 'enable = yes' + (eol if old_line.endswith('\n') else '')
+        return ''.join(lines).encode('utf8'), {
+            'style': 'existing active section', 'before': value, 'after': 'yes'
+        }
+    if len(commented_sections) != 1:
+        raise ValueError('no unique Bluetooth section/template; cannot enable safely')
 
+    section_start = commented_sections[0]
+    section_end = len(lines)
+    for n in range(section_start + 1, len(lines)):
+        s = lines[n].strip()
+        if s.startswith('[') and s.endswith(']'):
+            section_end = n
+            break
+    required = ('enable', 'id', 'name', 'connectstatus', 'mac')
+    found = {key: [] for key in required}
+    parsed = {}
+    for n in range(section_start + 1, section_end):
+        line = lines[n]
+        match = re.match(r'^(\s*)#\s*([A-Za-z][A-Za-z0-9_]*)\s*=\s*(.*?)\s*(\r?\n)?$', line)
+        if not match:
+            continue
+        key = match.group(2).lower()
+        if key in found:
+            found[key].append((n, match))
+            parsed[key] = match.group(3).strip()
+    missing = [key for key, values in found.items() if not values]
+    duplicate = [key for key, values in found.items() if len(values) > 1]
+    if missing:
+        raise ValueError('commented Bluetooth template missing required fields: ' + ','.join(missing))
+    if duplicate:
+        raise ValueError('duplicate commented Bluetooth fields: ' + ','.join(duplicate))
+    if parsed['enable'].lower() not in ('yes', 'true', '1', 'on', 'enable'):
+        raise ValueError('commented Bluetooth enable value is not enabled; refusing to infer desired value')
+    try:
+        transport_id = int(parsed['id'], 10)
+    except ValueError as exc:
+        raise ValueError('commented Bluetooth transport id must be numeric') from exc
+    if not 1 <= transport_id <= 65535:
+        raise ValueError('commented Bluetooth transport id out of range')
+    if not parsed['name']:
+        raise ValueError('commented Bluetooth transport name is empty')
+    if parsed['connectstatus'].lower() not in ('enable', 'yes', 'true', '1', 'on'):
+        raise ValueError('commented Bluetooth connectstatus is not enabled')
+    if not re.fullmatch(r'(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}', parsed['mac']):
+        raise ValueError('commented Bluetooth MAC is not a six-octet address')
+
+    # Activate exactly the existing template's known fields; keep all other
+    # comments and sections byte-for-byte. Do not synthesize IDs or MACs.
+    staged = list(lines)
+    header = lines[section_start]
+    newline = '\r\n' if header.endswith('\r\n') else ('\n' if header.endswith('\n') else '')
+    indent = header[:len(header)-len(header.lstrip())]
+    staged[section_start] = indent + '[bluetooth]' + newline
+    for key in required:
+        n, match = found[key][0]
+        old = lines[n]
+        line_eol = '\r\n' if old.endswith('\r\n') else ('\n' if old.endswith('\n') else '')
+        body = match.group(3).strip()
+        if key == 'enable':
+            body = 'yes'
+        staged[n] = match.group(1) + key + ' = ' + body + line_eol
+    updated = ''.join(staged).encode('utf8')
+    return updated, {
+        'style': 'uncommented complete existing Bluetooth template',
+        'before': 'commented', 'after': 'enabled',
+        'transport_id': transport_id,
+        'transport_name': parsed['name'],
+        'fields_activated': list(required)
+    }
 
 def assert_hash(data: bytes, value: str | None, kind: str):
     if not value or len(value) != 64 or not all(c in '0123456789abcdef' for c in value):
