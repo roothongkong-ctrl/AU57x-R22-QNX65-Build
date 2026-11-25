@@ -1,0 +1,79 @@
+name: MU1005 QNX inner iAP2 runtime integration (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/mu1005-qnx-inner.yml, lab/mu1005_qnx_runtime/inner_runtime.c, lab/mu1005_qnx_runtime/prepare_inner_ifs.py]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  qnx-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download previously verified exact ARM payload
+        uses: actions/download-artifact@v4
+        with:
+          name: mu1005-si-cprx-arm-NO-INSTALL
+          run-id: 45546789122
+          github-token: ${{ github.token }}
+          path: previous-native
+      - name: Verify locked artifact and fixture source
+        run: |
+          set -euxo pipefail
+          mkdir -p qnx-runtime-evidence
+          grep -Fx 'source=082340439793b5c4aaf4b90d20b48e9a4318535c' previous-native/evidence/revisions.txt
+          (cd previous-native && sha256sum -c SHA256SUMS) > qnx-runtime-evidence/checksums.log
+          sha256sum previous-native/payload/libmu1005_inner_iap2_review.so | tee qnx-runtime-evidence/library.sha256
+          for f in mm_peer.h inner_socket.h inner_iap2.h test_mm_peer.c; do
+            cmp "previous-native/source/si/inner_iap2/$f" "integration/mu1005_si_native/inner_iap2/$f"
+          done
+      - name: Fetch locked public QNX boot environment and QEMU
+        run: |
+          set -euxo pipefail
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          for f in startup-virt libstartup.a devc-serdebug u-boot.bin; do test -s "toolchain/tests/qemu/$f"; done
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+          qemu-system-arm --version | tee qnx-runtime-evidence/qemu-version.log
+          sha256sum toolchain/tests/qemu/{startup-virt,libstartup.a,devc-serdebug,u-boot.bin} toolchain/tests/qemu-run.sh | tee qnx-runtime-evidence/boot-inputs.sha256
+      - uses: actions/cache/restore@v4
+        id: gnu-cache
+        with:
+          path: ~/.cache/au57x-gnu
+          key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
+      - name: Build verified toolchain
+        run: |
+          set -euxo pipefail
+          bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee qnx-runtime-evidence/gnu.log
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee qnx-runtime-evidence/compiler.log
+      - name: Run integrated dual-ended transport with real QNX socket manager
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            set -eux
+            arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 lab/mu1005_qnx_runtime/inner_runtime.c -lsocket -lc -o qnx-runtime-evidence/mu1005-inner-probe
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW qnx-runtime-evidence/mu1005-inner-probe
+          ' 2>&1 | tee qnx-runtime-evidence/probe-build.log
+          python3 lab/mu1005_qnx_runtime/prepare_inner_ifs.py toolchain/tests/qemu-run.sh
+          export QNX_TEST_INNER_LIB="$PWD/previous-native/payload/libmu1005_inner_iap2_review.so"
+          set +e
+          QEMU_KEEP_LOG="$PWD/qnx-runtime-evidence/qemu-serial.log" QEMU_TIMEOUT=95 QEMU_RUN_SECS=50 sh toolchain/tests/qemu-run.sh "$PWD/qnx-runtime-evidence/mu1005-inner-probe" 8.5 2>&1 | tee qnx-runtime-evidence/runtime.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          if test -f qnx-runtime-evidence/qemu-serial.log; then tail -100 qnx-runtime-evidence/qemu-serial.log; fi
+          test "$rc" -eq 0
+          grep -F 'QNX_INNER_BIDIRECTIONAL_REAL_RUNTIME_PASS_NO_OEM' qnx-runtime-evidence/runtime.log
+          grep -E 'Process [0-9]+ \(mu1005-inner-probe\) exited status=0' qnx-runtime-evidence/qemu-serial.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mu1005-qnx-inner-runtime-evidence-NO-INSTALL
+          path: qnx-runtime-evidence/
+          retention-days: 30
