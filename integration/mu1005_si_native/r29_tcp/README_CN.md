@@ -1,0 +1,2 @@
+# R29/R45 TCP 联合通信（NO INSTALL）
+以明确的已连接 TCP descriptor 适配 R98 固定端口57342，保留原有 AF_UNIX lab API 不变。校验本地/远端 IPv4 loopback、socket 类型、非阻塞、端口、FD_CLOEXEC；额外要求调用者提供独立进程身份及独占 owner 证明。测试 proof 仅是 fixture，不是实际身份认证；只在接管时检查，持续授权撤销及 fd 生命周期仍需外部 owner 负责。尚未调用实际 R98 原厂 attach，也没有安装/启动监听器。测试用临时端口，TCP_NODELAY 与短时 poll 用于真实 TCP 时序。真实 TCP socket 的五项测试重复3轮全部通过（本地 ASan/UBSan），包括拒绝无证明、5035字节接收、40段发送、旧数据隔离、未来世代拒绝。新增目标 QNX ARM 联合库，编译结果待核验。OEM 插件仍禁止自动启动；MFi、iPhone 和车机均未验证。不得将现有 R98 端口同时交给 LuKa daemon 与 R29，必须单消费者。未修改 main。

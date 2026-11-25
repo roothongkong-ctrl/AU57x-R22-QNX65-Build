@@ -95,6 +95,9 @@ jobs:
             r=review/source/r29-full
             "$C" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -shared -Wl,--no-undefined -I"$b" -I"$r" "$b"/{mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump}.c "$r"/{wcp_oem_graft_io,wcp_graft_frames,wcp_stream_bridge}.c -lsocket -lc -o review/payload/libmu1005_rf_r29_review.so
             "$R" -h -dW -sW review/payload/libmu1005_rf_r29_review.so > review/evidence/r29-r45-elf.log
+            tcp=review/source/si/r29_tcp
+            "$C" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -shared -Wl,--no-undefined -I"$b" -I"$r" -I"$tcp" "$b"/{mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump}.c "$r"/{wcp_oem_graft_io,wcp_graft_frames,wcp_stream_bridge}.c "$tcp/tcp_adopt.c" -lsocket -lc -o review/payload/libmu1005_rf_r29_tcp_review.so
+            "$R" -h -dW -sW review/payload/libmu1005_rf_r29_tcp_review.so > review/evidence/r29-tcp-elf.log
           ' 2>&1 | tee review/evidence/native-build.log
           grep -Eq 'Machine:.*ARM' review/evidence/native-elf.log
           grep -Eq 'Type:.*DYN' review/evidence/native-elf.log
@@ -124,6 +127,10 @@ jobs:
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/r29-r45-elf.log
           done
           echo R29_R45_JOINT_ARM_LINK_NO_OEM_OWNER | tee review/evidence/r29-r45-result.txt
+          grep -Eq 'Machine:.*ARM' review/evidence/r29-tcp-elf.log
+          grep -Eq 'Type:.*DYN' review/evidence/r29-tcp-elf.log
+          awk '$7!="UND" && $8=="wcp_r29_tcp_adopt" {found=1} END {exit !found}' review/evidence/r29-tcp-elf.log
+          echo R29_TCP_ARM_LINK_ONLY_EXTERNAL_PEER_PROOF_REQUIRED | tee review/evidence/r29-tcp-result.txt
           for sym in MFiPlatform_CreateSignature MFiPlatform_CopyCertificate; do
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/signer-elf.log
           done
@@ -174,6 +181,7 @@ jobs:
                 bash integration/mu1005_si_native/r29_full_source/unpack.sh "${RUNNER_TEMP}/r29-full"
                 bash "${RUNNER_TEMP}/r29-full/test.sh"
                 bash integration/mu1005_si_native/r29_r45/test.sh "${RUNNER_TEMP}/r29-full"
+                bash integration/mu1005_si_native/r29_tcp/test.sh "${RUNNER_TEMP}/r29-full"
                 ;;
               stock-config) bash ci/host_r99_stock_iap2.sh ;;
               authentication) bash ci/host_step04_stock_mfi.sh ;;
