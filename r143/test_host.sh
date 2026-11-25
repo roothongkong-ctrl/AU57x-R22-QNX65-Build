@@ -17,4 +17,7 @@ R143_NEGATIVE=1 AU57X_R143_PROBE=1 AU57X_R143_HOST_TARGET="$w/btstack" LD_PRELOA
 grep -q 'event=process_reject' /tmp/au57x_r143_btstack_probe.log
 ! grep -q 'event=thread_name' /tmp/au57x_r143_btstack_probe.log
 ! grep -q 'event=pthread_create' /tmp/au57x_r143_btstack_probe.log
-echo 'R143 HOST PASS: exact process hash pin, transparent pthread_create, origin/name correlation, wrong-hash fail-closed.'
+rm -f /tmp/au57x_r143_btstack_probe.log
+R143_NEGATIVE=1 R143_EXPECT_REJECT=31 AU57X_R143_PROBE=1 AU57X_R143_HOST_TARGET="$w/does-not-exist" LD_PRELOAD="$w/libr143.so" "$w/btstack"
+! grep -q 'event=pthread_create' /tmp/au57x_r143_btstack_probe.log
+echo 'R143 HOST PASS: exact process hash pin, transparent pthread_create, origin/name correlation, wrong-hash and unreadable-file fail-closed.'
