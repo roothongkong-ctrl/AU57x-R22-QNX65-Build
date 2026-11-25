@@ -12,6 +12,7 @@ extern int chain_bootstrap_fixture(void);
 static MuMmPeer chain_mm;
 #else
 static MuInner chain_model;
+static int model_owner_up=1;
 #endif
 #ifndef MU_CHAIN_MODEL_IPC
 static MuInnerSocket chain_dio;
@@ -41,7 +42,7 @@ static int chain_event(void *ctx,const unsigned char *p,size_t n){
 #else
 /* Explicit lab-only replacement for unavailable OS socket service.
  * Exercise unchanged production frame parser/pump, not a fake success flag. */
-static int model_live(void *ctx,uint64_t e){return ctx==&chain_model&&e==8;}
+static int model_live(void *ctx,uint64_t e){return model_owner_up&&ctx==&chain_model&&e==8;}
 static int model_event(void *ctx,const unsigned char *p,size_t n){
  assert(ctx==&chain_model&&n==6&&!memcmp(p,chain_marker,n));
  ++chain_events;return 1;
@@ -53,7 +54,13 @@ static int model_receive(void *ctx,const unsigned char *p,size_t n){
 }
 #endif
 static int chain_inner(void *ctx,uint32_t e){
- (void)ctx;return e==8&&chain_verified&&chain_events==1&&chain_used==6;
+ (void)ctx;
+#ifndef MU_CHAIN_MODEL_IPC
+ if(!chain_dio.relay.active||chain_dio.fd<0||!chain_mm.active)return 0;
+#else
+ if(!chain_model.active||!model_owner_up)return 0;
+#endif
+ return e==8&&chain_verified&&chain_events==1&&chain_used==6;
 }
 static struct cp_cloud_pipeline p;
 static Mu34ApServer ap_backend;
@@ -130,12 +137,28 @@ void chain_after_start_ack(struct cp_step04_session *b){
  assert(cp_cloud_inner_auth(&p)==CP_CLOUD_OK);
  assert(cp_cloud_media_ready(&p)==CP_CLOUD_OK&&cp_cloud_is_active(&p));
  puts("CHAIN:MEDIA_FIXTURE");
- chain_verified=0;
- assert(!cp_cloud_is_active(&p));
- assert(cp_cloud_wired_preempt(&p)==CP_CLOUD_OK);
- assert(cp_cloud_end(&p)==CP_CLOUD_OK);
+ /* Lose the actual transport, not just a fixture boolean. The live
+  * predicate must invalidate media even while chain_verified stays set. */
 #ifndef MU_CHAIN_MODEL_IPC
  assert(mu_mm_peer_release(&chain_mm)==0);
+ assert(mu_inner_socket_tick(&chain_dio,8)==-1);
+ assert(chain_dio.fd==-1&&!chain_dio.relay.active);
+ assert(mu_inner_from_control(&chain_dio.relay,8,chain_marker,6)==-1);
+ assert(mu_mm_peer_send(&chain_device,chain_marker,6)==-1);
+ puts("CHAIN:REAL_PEER_EOF_REVOKED_OLD_SESSION");
+#else
+ model_owner_up=0;
+ assert(mu_inner_pump(&chain_model,8)==-1&&!chain_model.active);
+ assert(mu_inner_from_control(&chain_model,8,chain_marker,6)==-1);
+ puts("CHAIN:MODEL_OWNER_LOSS_REVOKED_OLD_SESSION");
+#endif
+ assert(chain_verified&&chain_events==1&&chain_used==6);
+ assert(!cp_cloud_is_active(&p));
+ assert(cp_cloud_wired_preempt(&p)==CP_CLOUD_OK&&!cp_cloud_is_active(&p));
+ assert(cp_cloud_end(&p)==CP_CLOUD_OK);
+ chain_verified=0;
+ puts("CHAIN:WIRED_RESTORE_AFTER_INNER_LOSS");
+#ifndef MU_CHAIN_MODEL_IPC
  mu_inner_socket_close(&chain_dio);
  puts("CHAIN_IAP2_BYTES_AND_SOCKET_ROUND_TRIP_PASS_NO_OEM");
 #else
