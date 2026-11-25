@@ -1,0 +1,5 @@
+# 第一阶段实际 OEM 离线合并结果（NO INSTALL）
+云端 45573646570 的真实错误为 ld.lld command not found（exit 127），并非 ARM C/汇编编译失败。已修正 workflow，复用原来已验证的 lld 安装方式。
+取回该 run 的 artifact 15003342633，使用其中真实 discovery.o、entry.o、eir.o 与 bf6abfae 的 phase1.ld 在私有容器链接，成功，无未解析 relocation。链接 ELF SHA256 d678a5c2556148c65424320c9c63fabcbd495317bb936fa6c68c999da0ebbe56，.graft 2411 bytes。重新从本地用户原始 btstack SHA256 51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566 读取 7 条原始指令，全部匹配；按照现有 merge 脚本逻辑合并（私有环境执行等价检查，未将 OEM 文件上传），7 PHDR，原始 LOAD/INTERP/DYNAMIC 不变，原始文件实际改变16字节（ELF header + 三个 hook 指令），逆向恢复与原文件逐字节相同。候选长度1851392，SHA256 78e90f78f91919d23c184d589527ef915afff1c75ae7ae623fe651a6a64d31b2。
+三个链接入口 0x510100/0x510128/0x51014c；分别回到原始 0x11ec9c/0x27a618/0x12a6a4。llvm-objdump 核对 displaced instructions、APSR 保留、整数寄存器保存和分支目标。原始代码中初始 RF credits 4、7 的两处 BL 仍匹配；4 是候选值，不是经实车验证的 iAP2 配置。
+阶段1仅完成实际 OEM 私有离线构建，尚无 OEM SDK 实际执行、线程/锁/清理并发证明、真实 HCI 广播或手机发现。此版故意拒绝 RFCOMM 请求，不能连接手机，也不能刷车。新增代码无 worker，但不是原厂生命周期互斥证明；不以静态回滚代替运行回滚。下一步只能以真实原厂运行/实车证据推进阶段1；不重复增加模拟协议测试。若需使用 OEM 文件运行云端，须用户授权及完整依赖环境，当前未上传。

@@ -26,6 +26,11 @@ jobs:
             clang -target armv7-none-eabi -march=armv7-a -marm -mfloat-abi=soft -O2 -ffreestanding -fno-builtin -fno-pic -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables -c "evidence/ported/$f.c" -o "evidence/$f.o"
           done
           clang -target armv7-none-eabi -march=armv7-a -marm -c "$r/entry.S" -o evidence/entry.o
+          if ! command -v ld.lld >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq lld
+          fi
+          ld.lld --version | tee evidence/linker-version.txt
           ld.lld -flavor gnu -m armelf -T "$r/phase1.ld" --no-undefined evidence/{entry,discovery,eir}.o -o evidence/discovery-NO-INSTALL.elf
           readelf -h -lW -SW -sW -rW evidence/discovery-NO-INSTALL.elf | tee evidence/elf.log
           python3 -c 'import sys;from pathlib import Path;sys.path.insert(0,"tools");from mu1005_discovery_candidate import read_graft;code,symbols=read_graft(Path("evidence/discovery-NO-INSTALL.elf"));print(len(code),symbols)'
