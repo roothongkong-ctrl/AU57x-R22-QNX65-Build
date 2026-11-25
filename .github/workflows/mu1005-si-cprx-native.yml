@@ -1,4 +1,4 @@
-name: MU1005 SI CPRX native library (NO INSTALL)
+name: MU1005 unified parallel development (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -80,11 +80,19 @@ jobs:
             # RTLD_NEXT must later resolve genuine libairplay in the same owner process.
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -c review/source/upstream-signer/mfi_stock.c -o review/payload/mfi_stock-review.o
             "$R" -h -sW review/payload/mfi_stock-review.o > review/evidence/signer-elf.log
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -DWCP_QNX_LAB_ONLY -DWCP_LAB_BT_TYPE_CANDIDATE=3 -c "$s/r29_profile/wcp_bt_link_profile.c" -o review/payload/r29-bt-profile-review.o
+            "$R" -h -sW review/payload/r29-bt-profile-review.o > review/evidence/r29-profile-elf.log
           ' 2>&1 | tee review/evidence/native-build.log
           grep -Eq 'Machine:.*ARM' review/evidence/native-elf.log
           grep -Eq 'Type:.*DYN' review/evidence/native-elf.log
           grep -Eq 'Machine:.*ARM' review/evidence/signer-elf.log
           grep -Eq 'Type:.*REL' review/evidence/signer-elf.log
+          grep -Eq 'Machine:.*ARM' review/evidence/r29-profile-elf.log
+          grep -Eq 'Type:.*REL' review/evidence/r29-profile-elf.log
+          for sym in wcp_bt_link_profile_default wcp_bt_type_candidate; do
+            awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/r29-profile-elf.log
+          done
+          echo R29_NATIVE_TYPE3_PROFILE_COMPILED_NOT_FULL_PLUGIN | tee review/evidence/r29-result.txt
           for sym in MFiPlatform_CreateSignature MFiPlatform_CopyCertificate; do
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/signer-elf.log
           done
@@ -111,3 +119,108 @@ jobs:
           path: review/
           retention-days: 30
           if-no-files-found: error
+
+  parallel-host:
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [transport, stock-config, authentication, radio, media, recovery]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Execute existing source tests and new profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p lane-evidence
+          lane="${{ matrix.lane }}"
+          {
+            case "$lane" in
+              transport)
+                bash integration/mu1005_si_native/r29_profile/test.sh
+                bash ci/host_r98_iap2_handoff.sh
+                ;;
+              stock-config) bash ci/host_r99_stock_iap2.sh ;;
+              authentication) bash ci/host_step04_stock_mfi.sh ;;
+              radio) bash ci/host_radio_policy.sh ;;
+              media) bash ci/host_cloud_media.sh ;;
+              recovery) bash ci/host_sd_txn.sh ;;
+              *) exit 2 ;;
+            esac
+            echo "HOST_LANE_PASS:$lane:NO_INSTALL"
+          } 2>&1 | tee "lane-evidence/$lane.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unified-lane-${{ matrix.lane }}
+          path: lane-evidence/
+          retention-days: 14
+  upstream-graft:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned earlier source port and upstream
+        run: |
+          set -euxo pipefail
+          mkdir -p graft-evidence
+          git fetch --depth 1 origin c99d9a357672e55cbbeacf7aaeffbe85140392d4
+          test "$(git rev-parse FETCH_HEAD)" = c99d9a357672e55cbbeacf7aaeffbe85140392d4
+          git show FETCH_HEAD:integration/mu1005_full_graft/port.py > graft-evidence/port.py
+          git init upstream
+          git -C upstream remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C upstream fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C upstream checkout --detach FETCH_HEAD
+          test "$(git -C upstream rev-parse HEAD)" = 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          python3 graft-evidence/port.py upstream adapted | tee graft-evidence/port.log
+      - name: Link existing source port without OEM attachment
+        run: |
+          set -euxo pipefail
+          for f in graft eir deny; do
+            clang -target armv7-none-eabi -march=armv7-a -marm -O2 -ffreestanding -fno-builtin -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-stack-protector -fno-pic -DAU57X_LINK_REVIEW_ONLY -c "adapted/$f.c" -o "adapted/$f.o"
+          done
+          ld.lld -flavor gnu -m armelf -T adapted/graft.ld --no-undefined adapted/{graft,eir,deny}.o -o adapted/review.elf
+          readelf -h -SW -sW -rW adapted/review.elf | tee graft-evidence/elf.log
+          grep -Eq 'Machine:.*ARM' graft-evidence/elf.log
+          grep -q 'There are no relocations' graft-evidence/elf.log
+          grep -q au57x_review_owner graft-evidence/elf.log
+          echo UPSTREAM_GRAFT_LINKED_DENY_ONLY_NO_OEM | tee graft-evidence/result.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unified-upstream-graft-evidence
+          path: graft-evidence/
+          retention-days: 14
+  collect-review:
+    if: always()
+    needs: [native-library, parallel-host, upstream-graft]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: unified-*
+          path: combined/lanes
+      - uses: actions/download-artifact@v4
+        if: needs.native-library.result == 'success'
+        with:
+          name: mu1005-si-cprx-arm-NO-INSTALL
+          path: combined/native
+      - uses: actions/download-artifact@v4
+        if: needs.native-library.result != 'success'
+        with:
+          name: si-cprx-native-build-evidence
+          path: combined/native-failure
+      - name: Record results without claiming vehicle readiness
+        if: always()
+        run: |
+          mkdir -p combined
+          printf '%s\n' 'NO INSTALL — no OEM execution or vehicle verification' 'native-library=${{ needs.native-library.result }}' 'parallel-host=${{ needs.parallel-host.result }}' 'upstream-graft=${{ needs.upstream-graft.result }}' "revision=$GITHUB_SHA" > combined/STATUS.txt
+          cat combined/STATUS.txt >> "$GITHUB_STEP_SUMMARY"
+          (cd combined && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: MU1005-unified-review-NO-INSTALL
+          path: combined/
+          retention-days: 30
