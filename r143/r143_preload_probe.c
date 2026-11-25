@@ -59,11 +59,21 @@ __attribute__((constructor)) static void r143_init(void) {
     }
 #if defined(AU57X_R143_HOST_TEST)
     stock_path = getenv(AU57X_R143_STOCK_PATH_ENV);
+#elif defined(AU57X_R143_QNX_TEST)
+    /* Ask QNX for the actual executable pathname first.  /proc/boot is only
+     * a fallback: depending on the IFS launch context, the process may have
+     * been started through another pathname. */
+    stock_path = getenv("AU57X_R143_STOCK_PATH");
+    if (!stock_path || !stock_path[0]) stock_path = getexecname();
+    if (!stock_path || stock_path[0] != '/') stock_path = AU57X_R143_STOCK_PATH;
 #else
     stock_path = AU57X_R143_STOCK_PATH;
 #endif
     if (!digest_hex(stock_path, digest)) {
-        char why[96]; snprintf(why, sizeof why, "stock_open_or_read_errno_%d", errno);
+        int saved_errno = errno;
+        char why[220];
+        snprintf(why, sizeof why, "stock_read_errno_%d_path_%s", saved_errno,
+                 stock_path ? stock_path : "(null)");
         log_line("process_reject", why, pthread_self(), NULL, 0, 0, 0, -1, -1, -1);
         probe_status = 31;
         return;
