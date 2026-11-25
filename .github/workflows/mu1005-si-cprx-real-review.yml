@@ -70,6 +70,12 @@ jobs:
           cc -std=c99 -O2 -Wall -Wextra -Werror -pthread -I"$b" lab/mu1005_qnx_runtime/bt_owner_runtime.c "$b"/{bt_socket_worker,bt_iap2_owner_handoff,rf_arg_experiment,bt_notify_bridge}.c -o "$RUNNER_TEMP/bt-owner-runtime"
           timeout 20 "$RUNNER_TEMP/bt-owner-runtime" | tee evidence/bt-owner-runtime.log
           grep -F 'BT_OWNER_REAL_SOCKET_PTHREAD_TWO_SESSIONS_PASS_NO_OEM' evidence/bt-owner-runtime.log
+      - name: Verify periodic event coalescing and release
+        run: |
+          set -euxo pipefail
+          b=project/source/legacy_mu1005/bluetooth
+          cc -std=c99 -O2 -Wall -Wextra -Werror -I"$b" "$b/bt_queue_pulse.c" tests/test_bt_queue_pulse.c -o "$RUNNER_TEMP/bt-pulse"
+          "$RUNNER_TEMP/bt-pulse" | tee evidence/bt-pulse.log
       - name: Verify original-first notify callback bridge
         run: |
           set -euxo pipefail

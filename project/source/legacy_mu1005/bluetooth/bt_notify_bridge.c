@@ -27,7 +27,7 @@ static struct {
  MuBtThreadIdentity thread;
  MuNotifyGate gate;
  volatile unsigned active;
- int attempted;
+ int attempted,queue_only;
 } n;
 static uint32_t tid(void){return (uint32_t)(uintptr_t)pthread_self();}
 static int on_owner(void*p){(void)p;return tid()==n.thread.tid;}
@@ -69,7 +69,7 @@ static int words(const MuBtOwner*o,uint32_t fn){
  return o->read_live(o->opaque,OSAPI+0x2cu,b,12)==1&&
  le(b)==OSAPI&&le(b+4)==fn&&le(b+8)==0;
 }
-int mu_bt_notify_bind(const MuBtNotifyBinding*b){
+static int bind_common(const MuBtNotifyBinding*b,int queue_only){
  MuBtThreadIdentity id;
  if(!b||n.attempted||!b->handoff||b->handoff->state!=AU98_EMPTY||!b->prepared_fd||
  !b->policy.safe_dispatch||!b->policy.wired_idle||!b->policy.withdraw_barrier||!b->policy.reclaimed||
@@ -81,25 +81,34 @@ int mu_bt_notify_bind(const MuBtNotifyBinding*b){
  !mu_bt_comm_words_match(b->owner.comm_load_bias,b->owner.read_live,b->owner.opaque)||
  !mu_bt_osapi_identity(b->owner.comm_load_bias,tid(),b->owner.read_live,b->owner.opaque,&id)||
  !words(&b->owner,ORIGINAL)||!safe(b))return -1;
- n.attempted=1;n.b=*b;n.thread=id;
+ n.attempted=1;n.b=*b;n.thread=id;n.queue_only=queue_only;
  n.gate=(MuNotifyGate){NULL,on_owner,enabled,after,0};
  /* Publish immutable context before pointer change. No retry after a
   * competing slot writer. External safe witness must cover slot lifetime. */
  __sync_synchronize();
- if(!__sync_bool_compare_and_swap((volatile uint32_t*)(uintptr_t)SLOT,ORIGINAL,(uint32_t)(uintptr_t)notify))return -1;
+ if(!queue_only&&!__sync_bool_compare_and_swap((volatile uint32_t*)(uintptr_t)SLOT,ORIGINAL,(uint32_t)(uintptr_t)notify))return -1;
  __sync_lock_test_and_set(&n.active,1u);
  return 0;
+}
+int mu_bt_notify_bind(const MuBtNotifyBinding*b){return bind_common(b,0);}
+int mu_bt_notify_bind_queue_only(const MuBtNotifyBinding*b){return bind_common(b,1);}
+int mu_bt_notify_periodic_dispatch(void){
+ if(!enabled(NULL)||!on_owner(NULL)||n.gate.inside||!safe(&n.b)||
+    !mu_bt_osapi_identity_matches(&n.thread,tid(),n.b.owner.read_live,n.b.owner.opaque))return -1;
+ n.gate.inside=1;after(NULL);n.gate.inside=0;return 0;
 }
 int mu_bt_notify_unbind(void){
  if(!enabled(NULL)||!on_owner(NULL)||n.gate.inside||n.b.handoff->state!=AU98_EMPTY||
  !safe(&n.b)||!mu_bt_osapi_identity_matches(&n.thread,tid(),n.b.owner.read_live,n.b.owner.opaque)||
- !words(&n.b.owner,(uint32_t)(uintptr_t)notify))return -1;
- if(!__sync_bool_compare_and_swap((volatile uint32_t*)(uintptr_t)SLOT,(uint32_t)(uintptr_t)notify,ORIGINAL))return -1;
+ !words(&n.b.owner,n.queue_only?ORIGINAL:(uint32_t)(uintptr_t)notify))return -1;
+ if(!n.queue_only&&!__sync_bool_compare_and_swap((volatile uint32_t*)(uintptr_t)SLOT,(uint32_t)(uintptr_t)notify,ORIGINAL))return -1;
  __sync_lock_release(&n.active);
  /* No freeing or unloading: a previously fetched callback may still run. */
  return 0;
 }
 #else
 int mu_bt_notify_bind(const MuBtNotifyBinding*b){(void)b;return -1;}
+int mu_bt_notify_bind_queue_only(const MuBtNotifyBinding*b){(void)b;return -1;}
+int mu_bt_notify_periodic_dispatch(void){return -1;}
 int mu_bt_notify_unbind(void){return -1;}
 #endif

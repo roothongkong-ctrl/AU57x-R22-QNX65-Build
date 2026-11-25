@@ -27,5 +27,8 @@ typedef struct {
  void *daemon_context;
 } MuBtNotifyBinding;
 int mu_bt_notify_bind(const MuBtNotifyBinding*);
+/* Queue-only mode leaves original notification slot unchanged. */
+int mu_bt_notify_bind_queue_only(const MuBtNotifyBinding*);
+int mu_bt_notify_periodic_dispatch(void);
 int mu_bt_notify_unbind(void);
 #endif
