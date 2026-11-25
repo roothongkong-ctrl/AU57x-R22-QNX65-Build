@@ -14,3 +14,7 @@ for name in test_withdraw test_native_event test_ir5; do
     -o "$OUT/r45_${name}"
   "$OUT/r45_${name}" | tee "$OUT/r45_${name}.log"
 done
+
+# Exercise the native registration credit path separately from old zero-credit fixture.
+gcc -std=c99 -O1 -g -Wall -Wextra -Werror -D_DEFAULT_SOURCE -DINITIAL_RX=4 -fsanitize=address,undefined -fno-omit-frame-pointer -no-pie -I"$SRC" "$ROOT/tests/r14_test_ir5.c" "$SRC/inbound.c" "$SRC/inbound_r5.c" "$SRC/native_event.c" "$SRC/native_binding.c" "$SRC/mu1005_rf_ingress.c" "$SRC/mu1005_ipc_stream.c" "$SRC/mu1005_socket_pump.c" -o "$OUT/r45_test_ir5_native_credits"
+"$OUT/r45_test_ir5_native_credits" | tee "$OUT/r45_native_credits.log"

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Real C publication-path check with MOCK vendor functions, not OEM runtime.
- * Valid RFCOMM server channel range is 1..30, matching SDP RFCOMM byte. */
+ * MU1005 local allocator range is 1..6, matching SDP RFCOMM byte. */
 #include "inbound.h"
 #include <assert.h>
 #include <stdint.h>
@@ -50,9 +50,9 @@ static void attempt(uint8_t channel,int allowed){
  }
 }
 int main(void){
- assert(MU_RFCOMM_SCN_MIN==1 && MU_RFCOMM_SCN_MAX==30);
- attempt(0,0);attempt(1,1);attempt(6,1);attempt(7,1);
- attempt(10,1);attempt(30,1);attempt(31,0);attempt(255,0);
- puts("R101 RFCOMM SCN 1..30, SDP sync, no publish on invalid: PASS (MOCK SDK)");
+ assert(MU_RFCOMM_SCN_MIN==1 && MU_RFCOMM_SCN_MAX==6);
+ attempt(0,0);attempt(1,1);attempt(6,1);attempt(7,0);
+ attempt(10,0);attempt(30,0);attempt(31,0);attempt(255,0);
+ puts("R101 MU1005 SCN 1..6, SDP sync, no publish on invalid: PASS (MOCK SDK)");
  return 0;
 }

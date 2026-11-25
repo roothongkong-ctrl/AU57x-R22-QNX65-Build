@@ -26,14 +26,12 @@ int inbound_prepare(Inbound*s,const InboundOps*o,uint32_t cb){
 }
 int inbound_publish(Inbound*s){
  if(!ok(s)||s->state!=IN_PREPARED||s->ops.ready(s->ops.opaque)!=1)return -1;
- /* Upstream donor uses zero third argument; not initial RX credits. */
+ if(s->ops.initial_rx_credits>7)return -1;
  s->uncertain_mask=IN_RF;
- int r=s->ops.reg(&s->rf,&s->slot,0);
+ int r=s->ops.reg(&s->rf,&s->slot,(uint16_t)s->ops.initial_rx_credits);
  if(r||s->slot<MU_RFCOMM_SCN_MIN||s->slot>MU_RFCOMM_SCN_MAX){s->state=IN_DIRTY;return -2;}
  s->published_mask=IN_RF;s->uncertain_mask=0;
- /* RFCOMM server channels use the full 1..30 range. A previous donor-only
- * 1..6 cap rejected valid OEM-assigned channels such as 7. The returned
- * channel must agree with SDP ProtocolDescriptorList before publication. */
+ /* Local MU1005 allocator and deregister accept 1..6. */
  s->state=IN_REGISTERED;s->protocol[13]=s->slot;
  /* Do not assume a nonzero vendor return means nothing was mutated. Preserve
   * storage, flag dirty, require owner-supervised rollback on partial failure. */
@@ -49,7 +47,7 @@ int inbound_event(Inbound*s,void*ch,unsigned code,unsigned status,const uint8_t*
  if(code==1){int allow=!status&&s->state==IN_PUBLISHED&&!s->pending&&!s->busy&&s->ops.peer_ok(s->ops.opaque)==1&&s->ops.ready(s->ops.opaque)==1;
   if(allow)s->pending=1;
   if(s->ops.accept(ch,allow)!=2){s->state=IN_DIRTY;return -2;}return allow?1:0;}
- if(code==2){if(status||s->state!=IN_PUBLISHED||!s->pending)return -1;int mtu=s->ops.limit(ch);if(mtu<=0||mtu>MAX_DATA||s->ops.opened(s->ops.opaque,(unsigned)mtu)!=1){s->state=IN_DIRTY;return -2;}s->pending=0;s->state=IN_LINK;/* Bootstrap RX window only after transport opened. */if(s->ops.credit(ch,4)!=0){s->state=IN_DIRTY;return -2;}return 0;}
+ if(code==2){if(status||s->state!=IN_PUBLISHED||!s->pending)return -1;int mtu=s->ops.limit(ch);if(mtu<=0||mtu>MAX_DATA||s->ops.opened(s->ops.opaque,(unsigned)mtu)!=1){s->state=IN_DIRTY;return -2;}s->pending=0;s->state=IN_LINK;/* Bootstrap RX window only after transport opened. */if(!s->ops.initial_rx_credits&&s->ops.credit(ch,4)!=0){s->state=IN_DIRTY;return -2;}return 0;}
  if(code==4){s->pending=0;if(s->ops.closed(s->ops.opaque)!=1){s->state=IN_DIRTY;return -2;}/* Do not reuse an in-flight packet on close without OEM completion. */s->state=s->busy?IN_DIRTY:IN_PUBLISHED;return 0;}
  if(code==5){if(s->state!=IN_LINK||status!=0||!data||!n||n>MAX_DATA)return -1;if(s->ops.rx(s->ops.opaque,data,n)!=1){s->state=IN_DIRTY;return -2;}/* R5 defers refill until a whole frame has been written to TCP. */if(!s->ops.defer_rx_credit&&s->ops.credit(ch,1)!=0){s->state=IN_DIRTY;return -2;}return 0;}
  if(code==6){if(!s->busy||packet_addr!=s->ops.addr(&s->packet))return -1;s->busy=0;if(status){s->state=IN_DIRTY;return -2;}return 0;}

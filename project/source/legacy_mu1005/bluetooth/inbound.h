@@ -5,7 +5,7 @@
  * contain 32-bit addresses; host tests use explicit token mappings. */
 #include <stdint.h>
 #include <stddef.h>
-enum { RF_SIZE=176, PACKET_SIZE=100, SDP_SIZE=36, MAX_DATA=5035, MU_RFCOMM_SCN_MIN=1, MU_RFCOMM_SCN_MAX=30 };
+enum { RF_SIZE=176, PACKET_SIZE=100, SDP_SIZE=36, MAX_DATA=5035, MU_RFCOMM_SCN_MIN=1, MU_RFCOMM_SCN_MAX=6 };
 typedef struct { uint32_t words[RF_SIZE/4]; } RfObject;
 typedef struct { uint32_t words[PACKET_SIZE/4]; } RfPacket;
 typedef struct { uint32_t words[SDP_SIZE/4]; } SdpRecord;
@@ -30,6 +30,7 @@ typedef struct {
  void *opaque;
  /* Set by R5 bridge: grant RX credit only on complete socket frame commit. */
  int defer_rx_credit;
+ unsigned initial_rx_credits; /* negotiated via arg3, zero = legacy fixture */
 } InboundOps;
 typedef struct {
  RfObject rf; RfPacket packet; SdpRecord sdp,carplay;

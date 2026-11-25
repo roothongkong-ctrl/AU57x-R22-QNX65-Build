@@ -1,0 +1,2 @@
+# 原厂 RFCOMM 参数修正（NO INSTALL）
+上一轮源码修正实际合并。基于原厂 btstack 静态反汇编：arg3 写入 +0x8b/+0x86，PN 初始上限7，RF_CREDIT 累加 +0x86；arg2 为原厂分配输出槽位，分配和注销范围 1..6。区分通用 RFCOMM 1..30 和此分配器。原厂调用初始信用1..7，去除 event2 重复 grant；旧零值 fixture 保留。R5 同时覆盖两种情况。完整 native_binding 共享库纳入 ARM 编译；未核实实际原厂 owner/线程及生命周期，不加载、不安装。旧 R101 历史报告需要以此修正覆盖。无实车验证。

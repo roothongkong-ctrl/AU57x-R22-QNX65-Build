@@ -20,16 +20,12 @@ static int assoc(void *p,const void *ch,uint32_t a,unsigned code){
 }
 static int rd(void*p,uint32_t a,void*out,size_t n){Resident*r=p;return cert(r)&&r->owner.read_live(r->owner.opaque,a,out,n)==1;}
 static int auth(void*p,uint32_t a,const uint8_t mac[6]){Resident*r=p;return cert(r)&&r->owner.paired_authorized(r->owner.opaque,a,mac)==1;}
-/* Original MU1005 HFP passes 7 and SIM passes 4 to arg3; the vendor
- * function copies that value into RF channel-state fields. The value is
- * CHANNEL-LIKE, not a verified "profile enumeration". iAP2 must still get
- * an original-owner attestation of its own SCN and ABI context; never reuse
- * HFP's 7 or SIM's 4 by inference. */
+/* MU1005 arg3 is initial RX credit budget; allocated SCN is *slot. */
 static int register_verified(void *channel,uint8_t *slot,uint16_t ignored){
  Resident *r=&res;
  (void)ignored;
  if(!cert(r)||r->owner.rf_arg3_snapshot_valid!=1u||
-    r->owner.rf_arg3_snapshot<1u||r->owner.rf_arg3_snapshot>30u)return -1;
+    r->owner.rf_arg3_snapshot<1u||r->owner.rf_arg3_snapshot>7u)return -1;
  /* Do not call the external proof function a second time after RFCOMM/TCP
   * setup: its answer could change between check and native registration. */
  return ((int (*)(void*,uint8_t*,uint16_t))(uintptr_t)0x277a18u)
@@ -51,7 +47,7 @@ static int words_ok(void){
 #define RFN(type,a) ((type)(uintptr_t)(a))
 int mu_bt_native_attach(const MuBtOwner *o,int fd){
  if(!o||!o->owner_ready||!o->transport_ready||!o->read_live||!o->paired_authorized||
-    o->rf_arg3_snapshot_valid!=1u||o->rf_arg3_snapshot<1u||o->rf_arg3_snapshot>30u||
+    o->rf_arg3_snapshot_valid!=1u||o->rf_arg3_snapshot<1u||o->rf_arg3_snapshot>7u||
     res.attempted||fd<0||o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
  if(!words_ok())return -1;
  res.attempted=1;res.owner=*o;res.peer=(Mu38PeerOps){&res,assoc,rd,auth};
@@ -60,6 +56,7 @@ int mu_bt_native_attach(const MuBtOwner *o,int fd){
  n.accept=RFN(int (*)(void*,int),0x27733cu);n.limit=RFN(int (*)(void*),0x277074u);
  n.send=RFN(int (*)(void*,void*),0x2771f8u);n.disconnect=RFN(int (*)(void*),0x2773f8u);n.credit=RFN(int (*)(void*,int),0x27715cu);
  n.certify=cert;n.ready=ready;n.addr=addr;n.opaque=&res;
+ n.initial_rx_credits=res.owner.rf_arg3_snapshot;
  if(ir5_init(&res.bridge,&n,mu38_resolve_peer,fd,(uint32_t)(uintptr_t)callback))return -1;
  return ir5_publish(&res.bridge);
 }

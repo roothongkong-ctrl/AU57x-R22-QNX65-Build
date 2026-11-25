@@ -5,13 +5,17 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <poll.h>
+#ifndef INITIAL_RX
+#define INITIAL_RX 0
+#endif
+#define EXTRA_RX (INITIAL_RX ? 0 : 4)
 static InboundR5 b;
 static int sent,credits,decision,peer_allowed=1;
 static unsigned lengths[8];static uint8_t bytes[32];static unsigned used;
 static int yes(void*p){(void)p;return 1;}
 static int retire_barrier(void*p,const Inbound*s){return *(int*)p && s==&b.service;}
 static uint32_t addr(const void*p){return (uint32_t)(0x10000+(const uint8_t*)p-(const uint8_t*)&b);}
-static int reg(void*p,uint8_t*s,uint16_t v){assert(p==&b.service.rf&&v==0);*s=3;return 0;}
+static int reg(void*p,uint8_t*s,uint16_t v){assert(p==&b.service.rf&&v==INITIAL_RX);*s=3;return 0;}
 static int unreg(void*p,uint8_t*s){(void)p;(void)s;return 0;}
 static int rec(void*p){assert(p==&b.service.sdp||p==&b.service.carplay);return 0;}
 static int accept_rf(void*p,int v){assert(p==&b.service.rf);decision=v;return 2;}
@@ -25,15 +29,15 @@ static void read_full(int fd,uint8_t *p,size_t n){while(n){struct pollfd x={fd,P
 static int event(const uint8_t*peer,unsigned code,unsigned status,const uint8_t*p,unsigned n,uint32_t pkt){return ir5_event(&b,&b.service.rf,peer,code,status,p,n,pkt);}
 int main(void){
  int server=socket(AF_INET,SOCK_STREAM,0),fd=socket(AF_INET,SOCK_STREAM,0);assert(server>=0&&fd>=0);int reuse=1;assert(!setsockopt(server,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof reuse));struct sockaddr_in a={0};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);a.sin_port=htons(57342);assert(!bind(server,(struct sockaddr*)&a,sizeof a)&&!listen(server,1));assert(!connect(fd,(struct sockaddr*)&a,sizeof a));int remote=accept(server,NULL,NULL);assert(remote>=0);
- InboundOps ops={0};ops.reg=reg;ops.unreg=unreg;ops.add=rec;ops.remove=rec;ops.accept=accept_rf;ops.limit=limit;ops.send=send_rf;ops.disconnect=disconnect_rf;ops.credit=credit;ops.addr=addr;ops.certify=yes;ops.ready=yes;
+ InboundOps ops={0};ops.reg=reg;ops.unreg=unreg;ops.add=rec;ops.remove=rec;ops.accept=accept_rf;ops.limit=limit;ops.send=send_rf;ops.disconnect=disconnect_rf;ops.credit=credit;ops.addr=addr;ops.certify=yes;ops.ready=yes;ops.initial_rx_credits=INITIAL_RX;
  assert(!ir5_init(&b,&ops,resolve,fd,0x1234));assert(!ir5_publish(&b));uint8_t peer[6]={1,2,3,4,5,6},unknown[6]={0};
  assert(event(unknown,1,0,NULL,0,0)==0&&decision==0);peer_allowed=0;assert(event(peer,1,0,NULL,0,0)==0&&decision==0);peer_allowed=1;
- assert(event(peer,1,0,NULL,0,0)==1&&decision==1);assert(!event(peer,2,0,NULL,0,0)&&credits==4);tick();uint8_t r[14];read_full(remote,r,14);assert(r[0]==1&&r[2]==6&&r[4]==1&&!memcmp(r+8,peer,6));
- assert(!event(peer,5,0,(const uint8_t*)"hello",5,0)&&credits==4);tick();assert(credits==5);read_full(remote,r,13);assert(r[0]==2&&r[2]==5&&!memcmp(r+8,"hello",5));
+ assert(event(peer,1,0,NULL,0,0)==1&&decision==1);assert(!event(peer,2,0,NULL,0,0)&&credits==EXTRA_RX);tick();uint8_t r[14];read_full(remote,r,14);assert(r[0]==1&&r[2]==6&&r[4]==1&&!memcmp(r+8,peer,6));
+ assert(!event(peer,5,0,(const uint8_t*)"hello",5,0)&&credits==EXTRA_RX);tick();assert(credits==EXTRA_RX+1);read_full(remote,r,13);assert(r[0]==2&&r[2]==5&&!memcmp(r+8,"hello",5));
  /* Burst of four outstanding frames: no credit grant before TCP commit. */
  for(int i=0;i<4;i++)assert(!event(peer,5,0,(const uint8_t*)"x",1,0));
- assert(credits==5);
- for(int i=0;i<4;i++){tick();read_full(remote,r,9);assert(r[0]==2&&r[2]==1&&r[8]=='x');assert(credits==6+i);}
+ assert(credits==EXTRA_RX+1);
+ for(int i=0;i<4;i++){tick();read_full(remote,r,9);assert(r[0]==2&&r[2]==1&&r[8]=='x');assert(credits==EXTRA_RX+2+i);}
  uint8_t wire[]={2,0,5,0,1,0,0,0,'a','b','c','d','e'};assert(send(remote,wire,3,0)==3);tick();assert(!sent);assert(send(remote,wire+3,sizeof wire-3,0)==(ssize_t)(sizeof wire-3));for(int i=0;i<500&&!sent;i++){tick();struct pollfd x={fd,POLLIN,0};(void)poll(&x,1,1);}assert(sent==1&&lengths[0]==2&&b.service.busy);
  assert(event(peer,6,0,NULL,0,addr(&b.service.packet)+4)<0);assert(sent==1);assert(!event(peer,6,0,NULL,0,addr(&b.service.packet)));assert(sent==1);tick();assert(sent==2);assert(!event(peer,6,0,NULL,0,addr(&b.service.packet)));tick();assert(sent==3&&lengths[2]==1);assert(!event(peer,6,0,NULL,0,addr(&b.service.packet)));tick();assert(!b.rf.tx_busy&&!memcmp(bytes,"abcde",5));
  assert(!event(peer,4,0,NULL,0,0));assert(ir5_tick(&b)<0);read_full(remote,r,8);assert(r[0]==3&&r[2]==0&&r[4]==1);assert(b.dead);int barrier_ready=0;

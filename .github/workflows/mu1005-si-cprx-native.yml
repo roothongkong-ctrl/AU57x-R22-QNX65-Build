@@ -93,6 +93,9 @@ jobs:
             "$R" -h -sW review/payload/r29-bt-profile-review.o > review/evidence/r29-profile-elf.log
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -Ireview/source/bluetooth -c review/source/bluetooth/bt_iap2_owner_handoff.c -o review/payload/r98-owner-handoff-review.o
             "$R" -h -sW review/payload/r98-owner-handoff-review.o > review/evidence/r98-owner-elf.log
+            b=review/source/bluetooth
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$b" "$b"/{native_binding,native_event,inbound,inbound_r5,mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump,rf_arg_experiment}.c -lsocket -lc -o review/payload/libmu1005_bt_native_review.so
+            "$R" -h -dW -sW review/payload/libmu1005_bt_native_review.so > review/evidence/native-bt-elf.log
             ap=review/source/ap-live
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined "$ap"/{ap_live,qnx_process,cp_csm}.c -lc -o review/payload/libmu1005_ap_live_review.so
             "$R" -h -dW -sW review/payload/libmu1005_ap_live_review.so > review/evidence/ap-live-elf.log
@@ -193,6 +196,9 @@ jobs:
               transport)
                 bash integration/mu1005_si_native/r29_profile/test.sh
                 bash ci/host_r98_iap2_handoff.sh
+                bash ci/host_rf_arg_experiment.sh
+                cc -std=c99 -Wall -Wextra -Werror -Iproject/source/legacy_mu1005/bluetooth tests/test_r101_scn_contract.c project/source/legacy_mu1005/bluetooth/inbound.c -o /tmp/mu1005-scn-fixture
+                /tmp/mu1005-scn-fixture
                 bash ci/host_r14_native.sh
                 bash integration/mu1005_si_native/r29_full_source/unpack.sh "${RUNNER_TEMP}/r29-full"
                 bash "${RUNNER_TEMP}/r29-full/test.sh"
