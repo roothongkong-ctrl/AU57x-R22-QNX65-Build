@@ -1,7 +1,7 @@
 # MU1005 纯软件无线 CarPlay 并行实施计划（NO INSTALL）
 
 基线：2017 Audi A6L C7，MHI2_CN_AU57x_K1006_2 / MU1005，QNX 6.5 ARMv7。
-执行分支：mu1005-wireless-integration-20261125
+执行分支：mu1005-wireless-implementation-r103-20261125
 基线提交：7f595231394d97091ec0fee209677b6e45fd50dc
 
 > 本计划是源码研发与云端验证计划，不是可安装包。禁止将主机 fixture、QEMU 合成进程、静态符号或接口契约表述为真实 iPhone / MFi / 车机无线链路成功。原厂有线 CarPlay 必须保持优先，任何原厂进程/接口的生产绑定未得到证据前均 fail closed。
@@ -13,7 +13,7 @@
 - R43/R45：已有受限 iAP2 链路层移植和 MU1005 BlueSDK 原生模块静态复核；真实 BlueSDK callback owner、mm-ipod/iAP2 运行时接线仍未证明。
 - R50：已有无线控制、AirPlay listener/Bonjour、SI owner、媒体状态等组合模型；真实 OEM 回调仍需绑定。
 - R71–R85：已有 SI/DIO 分进程、AF_UNIX CPRX、同会话媒体证据、有线抢占与恢复协议；关键 SI/DIO 生产回调/进程身份 ABI 尚未在原厂二进制中定位。
-- R86：已有对原厂 dio_manager 调用 AirPlayReceiverServerSetDelegate / AirPlayReceiverSessionSetDelegate 的两级回调 ABI 静态还原，确定服务器回调结构 60 字节、会话回调结构 56 字节及 21 个真实 GOT 回调槽。它为只读观察层提供事实依据，但仍未证明真实运行回调触发和媒体/MFi结果。\n- R100：已有原厂路线 / 可回滚 graft 双路线门禁；原厂服务优先，缺失真实 endpoint、BlueSDK owner、iAP2 注册参数、原厂退出/恢复证明时不得 graft。\n- R103：已有 LuKa 上游 iAP2 LinkEngine 的 Rust RFCOMM 帧桥，C 主机 45/45 通过；Rust/TCP 测试虽有历史报告，但构建记录仍标记 PENDING GITHUB CI，必须重新执行确认。Rust QNX ARM 目标未构建。\n- R106/001：已有实车日志证据，原厂 uap0 2.4GHz AP（信道 11）启动并出现 STA_ASSOC；原厂有线 USB iAP2→dio_manager→AirPlay Receiver→carplay0 的 READY 证据。没有无线 iAP2/MFi/AirPlay 会话证据。\n- 5GHz：已有 uaputl、Marvell 固件和 WLAN 驱动静态证据，软件工具/驱动含 A-band 处理代码；connectionmanager 当前 AP 模板默认仅 1/6/11。无线固件实际加载版本、fw_bands 运行值、主板 PA/滤波器/射频通路均未证实。\n- R143：单独的 QNX 观察器/线程归属研究分支。QNX ARM 编译通过，但 QEMU 合成测试报告 /proc/boot/btstack 打不开（errno=2）；需要先确认 IFS 文件映射/测试执行路径。此观察器不是无线 CarPlay 的核心链路，不能阻塞其他模块并行研发。
+- R86：已有对原厂 dio_manager 调用 AirPlayReceiverServerSetDelegate / AirPlayReceiverSessionSetDelegate 的两级回调 ABI 静态还原，确定服务器回调结构 60 字节、会话回调结构 56 字节及 21 个真实 GOT 回调槽。它为只读观察层提供事实依据，但仍未证明真实运行回调触发和媒体/MFi结果。\n- R100：已有原厂路线 / 可回滚 graft 双路线门禁；原厂服务优先，缺失真实 endpoint、BlueSDK owner、iAP2 注册参数、原厂退出/恢复证明时不得 graft。\n- R103：已有 LuKa 上游 iAP2 LinkEngine 的 Rust RFCOMM 帧桥，C 主机 45/45 通过；Rust/TCP 测试已在本分支 GitHub Actions 45633825725 SUCCESS：上游 7/7、bridge 2/2、TCP lab 13/13，共 22 项 Rust host 测试通过；C bridge test 通过。Rust QNX ARM 目标仍未构建。\n- R106/001：已有实车日志证据，原厂 uap0 2.4GHz AP（信道 11）启动并出现 STA_ASSOC；原厂有线 USB iAP2→dio_manager→AirPlay Receiver→carplay0 的 READY 证据。没有无线 iAP2/MFi/AirPlay 会话证据。\n- 5GHz：已有 uaputl、Marvell 固件和 WLAN 驱动静态证据，软件工具/驱动含 A-band 处理代码；connectionmanager 当前 AP 模板默认仅 1/6/11。无线固件实际加载版本、fw_bands 运行值、主板 PA/滤波器/射频通路均未证实。\n- R143：单独的 QNX 观察器/线程归属研究分支。QNX ARM 编译通过，但 QEMU 合成测试报告 /proc/boot/btstack 打不开（errno=2）；需要先确认 IFS 文件映射/测试执行路径。此观察器不是无线 CarPlay 的核心链路，不能阻塞其他模块并行研发。
 
 ## 二、执行策略：先做原厂能力边界，再并行推进
 
@@ -68,7 +68,7 @@ H0–H3 通过只代表云端源码/仿真验证，不代表 H4–H6。未通过
 
 - R103 上游 iAP2 LinkEngine + AU57x RFCOMM bridge：GitHub Actions 45631876350 SUCCESS；原始上游测试 7/7、bridge 测试 2/2、TCP lab 13/13，共 22 项 Rust 测试通过；C RFCOMM frame test PASS。仅 Linux host 测试，不是 QNX Rust 或 OEM 蓝牙运行。
 - 全量 cloud12 review：GitHub Actions 45631876359 SUCCESS；包含 45/45 C host strict compile、R86 delegate ABI parser negative tests、R100 17 条 route gate assertions、R101 13/13 offline suites、R95 15/15 offline matrix、R96/R97/R98/R99 regressions、50,000 CSM fuzz、67 native SD transaction tests；全部为 host/静态研究，不是车机运行。
-- R52 QNX 6.5 ARMv7 构建：修正 preflight 源码计数由 44 改为 45 后，新任务 45632187935 正在构建 QNX 工具链；QNX ARM 编译、ELF gate 与 QEMU 结果尚未返回。
+- R52 QNX 6.5 ARMv7：45632464697 曾成功构建 GCC 8.5 工具链，但 compile script 内部仍写 44（而 workflow preflight 已是 45），在正式 C 编译前退出。已将 `ci/compile_qnx_in_image.sh` 修正为 45；新任务 45633825933 已通过 45 源码预检，目前正在构建工具链，QNX C 编译、ELF gate 与 QEMU 尚未返回。
 - 独立 R143 QEMU 观察器：45629972898 已确认 QNX ARM32 编译 PASS，但合成进程的 /proc/boot/btstack 打开失败（errno=2）；该问题与 R103 iAP2 host 测试独立，暂不阻塞并行模块。
 
 ## 五、首轮并行任务状态
@@ -83,3 +83,11 @@ H0–H3 通过只代表云端源码/仿真验证，不代表 H4–H6。未通过
 | R143 | QEMU 原厂样本路径预检 | 独立运行中 |
 
 最后更新：2026-11-25。
+## 第二轮并行计划与当前提交（2026-11-25）
+
+1. **Track D / Wi-Fi interface resolution（云端可完成）**：新增 `tests/test_wifi_interface.c` 与 `ci/host_wifi_interface.sh`，验证非法 IPv4、loopback、未分配地址、真实 up/non-loopback IPv4 唯一映射及输出缓冲区边界；已接入 cloud12 workflow。该测试只验证地址到接口名解析，不宣称 Wi-Fi AP、频段、iPhone 或 AirPlay 已工作。
+2. **R52 QNX build（正在进行）**：以 45 个 C 文件为唯一清单；若通过，继续看 native .so link、NEEDED、ELF gate、QEMU smoke；若失败，按第一个编译/链接错误修复，不跳过后续门禁。
+3. **Track B/C（下一并行批）**：基于已通过的 R103 host link bridge，审查 QNX 端 Rust target/标准库可用性；若 QNX Rust 不可行，评估 C ABI 边界/独立 Rust host daemon 的可行性，不先假定可移植。同步审查原厂 MFi API 句柄/内存释放/线程契约，所有模拟认证继续标为 fixture。
+4. **Track E（后续）**：只读核对 SI/DIO callback、peer identity 与 wired restore 证据；生产绑定未证明前保持 fail-closed。
+
+本轮新增 Wi-Fi resolver 测试不改变运行时配置，不调用 OEM API，不生成安装文件。
