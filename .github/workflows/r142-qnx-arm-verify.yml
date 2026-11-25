@@ -35,7 +35,23 @@ jobs:
           git -C "$RUNNER_TEMP/toolchain" fetch --depth 1 origin "$PIN"
           git -C "$RUNNER_TEMP/toolchain" checkout -q FETCH_HEAD
           git -C "$RUNNER_TEMP/toolchain" rev-parse HEAD | tee r142/toolchain_commit.txt
-          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t "$IMG" "$RUNNER_TEMP/toolchain" 2>&1 | tee r142/toolchain_build.log
+          python3 - "$RUNNER_TEMP/toolchain/Dockerfile" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1]); s=p.read_text()
+          pairs=[
+            ("https://ftp.gnu.org/gnu/gcc/gcc-${GCC_VER}/gcc-${GCC_VER}.tar.xz",
+             "https://mirrors.ibiblio.org/gnu/gcc/gcc-${GCC_VER}/gcc-${GCC_VER}.tar.xz"),
+            ("https://ftp.gnu.org/gnu/binutils/binutils-${BINUTILS_VER}.tar.xz",
+             "https://mirrors.kernel.org/gnu/binutils/binutils-${BINUTILS_VER}.tar.xz")
+          ]
+          for a,b in pairs:
+            if s.count(a)!=1: raise SystemExit("mirror source anchor mismatch: "+a)
+            s=s.replace(a,b,1)
+          s=s.replace("curl -fsSL ", "curl --retry 4 --retry-all-errors --retry-delay 4 --connect-timeout 30 -fsSL ")
+          p.write_text(s)
+          PY
+          docker build --network=host --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t "$IMG" "$RUNNER_TEMP/toolchain" 2>&1 | tee r142/toolchain_build.log
       - name: Compile R142 for QNX 6.5 ARM and audit ELF
         run: |
           set -euxo pipefail
