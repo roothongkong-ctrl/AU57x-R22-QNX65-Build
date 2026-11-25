@@ -65,7 +65,9 @@ static void write_line(const char *role, pthread_t tid, const char *name, int rc
         unsigned char c = (unsigned char)name[i]; line[n++] = (c >= 32 && c <= 126) ? (char)c : '?';
     }
     n = append_text(line, sizeof line, n, "\n");
-    (void)write(log_fd, line, n); unlock_log();
+    ssize_t written = write(log_fd, line, n);
+    if (written != (ssize_t)n) log_fd = -1;
+    unlock_log();
 }
 static void resolve_original(void) {
     void *sym = dlsym(RTLD_NEXT, "pthread_setname_np");
@@ -87,7 +89,8 @@ __attribute__((constructor)) static void r142_init(void) {
     if (log_fd < 0) { __sync_lock_test_and_set(&probe_state, -2); return; }
     __sync_lock_test_and_set(&probe_state, 1);
     static const char ready[] = "event=observer_ready mode=read_only target=MU1005_btstack\n";
-    (void)write(log_fd, ready, sizeof ready - 1);
+    ssize_t ready_written = write(log_fd, ready, sizeof ready - 1);
+    if (ready_written != (ssize_t)(sizeof ready - 1)) { close(log_fd); log_fd = -1; __sync_lock_test_and_set(&probe_state, -2); }
 }
 int pthread_setname_np(pthread_t thread, const char *name) {
     if (!next_setname) return ENOSYS;
