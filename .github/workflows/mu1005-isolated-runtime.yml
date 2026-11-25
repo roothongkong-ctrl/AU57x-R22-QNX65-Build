@@ -50,8 +50,34 @@ jobs:
           #include <stdio.h>
           #include <unistd.h>
           #include <string.h>
+          #include <stdint.h>
+          #include <fcntl.h>
+          #include "loader_expected.h"
+          static int describe(const char *label,const char *path,int exact) {
+            struct stat st;
+            unsigned char b[4096]; uint64_t hash=UINT64_C(14695981039346656037);
+            unsigned long long total=0; ssize_t n; int fd;
+            if(stat(path,&st)!=0){printf("%s STAT_FAIL errno=%d\n",label,errno);return 1;}
+            fd=open(path,O_RDONLY);
+            if(fd<0){printf("%s OPEN_FAIL errno=%d\n",label,errno);return 1;}
+            for(;;) {
+              n=read(fd,b,sizeof b);
+              if(n<0 && errno==EINTR) continue;
+              if(n<0){printf("%s READ_FAIL errno=%d bytes=%llu\n",label,errno,total);close(fd);return 1;}
+              if(!n) break;
+              for(ssize_t i=0;i<n;i++) hash=(hash^b[i])*UINT64_C(1099511628211);
+              total+=(unsigned long long)n;
+            }
+            close(fd);
+            int match=total==EXPECTED_BYTES && hash==EXPECTED_FNV;
+            printf("%s stat=%ld read=%llu digest=%016llx match=%d\n",label,(long)st.st_size,total,(unsigned long long)hash,match);
+            return exact&&!match;
+          }
           int main(void) {
             const char *path="/proc/boot/libau57x_r137_preload_REVIEW.so";
+            int raw=describe("RAW_REFERENCE","/proc/boot/review-reference.bin",1);
+            int normal=describe("NORMAL_IFS",path,0);
+            printf("REVIEW_EXPECTED bytes=%llu digest=%016llx raw_status=%d normal_read_status=%d\n",(unsigned long long)EXPECTED_BYTES,(unsigned long long)EXPECTED_FNV,raw,normal);
             struct stat st;
             if(stat(path,&st)){printf("REVIEW_STAT_FAIL errno=%d %s\n",errno,strerror(errno));return 1;}
             printf("REVIEW_STAT_OK size=%ld\n",(long)st.st_size);
@@ -64,10 +90,21 @@ jobs:
             memcpy(&pid,&p,sizeof pid);memcpy(&count,&q,sizeof count);
             if(pid()!=(int)getpid()||count()!=1){puts("REVIEW_CONSTRUCTOR_FAIL");return 5;}
             puts("REVIEW_DLOPEN_CONSTRUCTOR_OK_NO_OEM");
+            if(raw){puts("REVIEW_RAW_REFERENCE_FAILED");return 6;}
+            puts("REVIEW_RAW_REFERENCE_OK");
             return 0;
           }
           C
-          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src "$IMG" bash -c 'bash ci/r137_target.sh && arm-unknown-nto-qnx6.5.0eabi-gcc -D_QNX_SOURCE=1 -O2 -Wall -Wextra -Werror build/qnx/loader_diag.c -o build/qnx/loader_diag' 2>&1 | tee build/qnx/loader_compile.log
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src "$IMG" bash ci/r137_target.sh 2>&1 | tee build/qnx/preload_compile.log
+          python3 - <<'PY'
+          from pathlib import Path
+          b=Path("build/qnx/libau57x_r137_preload_REVIEW.so").read_bytes()
+          h=14695981039346656037
+          for x in b: h=((h^x)*1099511628211)&((1<<64)-1)
+          Path("build/qnx/loader_expected.h").write_text(f"#define EXPECTED_BYTES {len(b)}ULL\n#define EXPECTED_FNV UINT64_C(0x{h:016x})\n")
+          PY
+          sha256sum build/qnx/libau57x_r137_preload_REVIEW.so | tee build/qnx/original_library.sha256
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src "$IMG" arm-unknown-nto-qnx6.5.0eabi-gcc -D_QNX_SOURCE=1 -std=c99 -O2 -Wall -Wextra -Werror build/qnx/loader_diag.c -o build/qnx/loader_diag 2>&1 | tee build/qnx/loader_compile.log
           python3 - "$RUNNER_TEMP/toolchain/tests/qemu-run.sh" <<'PY'
           from pathlib import Path
           import sys
@@ -76,8 +113,8 @@ jobs:
           def replace(s,a,b):
               if s.count(a)!=1: raise SystemExit("upstream anchor mismatch: "+a)
               return s.replace(a,b,1)
-          s=replace(s,'cp "$BIN" "$WORK/$NAME"\n','cp "$BIN" "$WORK/$NAME"\ncp "$REVIEW_LIB" "$WORK/"\n')
-          s=replace(s,'EOF\n\ndocker run --rm --platform=linux/amd64 -v "$WORK":/w','EOF\nprintf "%s\\n" "$(basename "$REVIEW_LIB")" >> "$WORK/test.build"\n\ndocker run --rm --platform=linux/amd64 -v "$WORK":/w')
+          s=replace(s,'cp "$BIN" "$WORK/$NAME"\n','cp "$BIN" "$WORK/$NAME"\ncp "$REVIEW_LIB" "$WORK/"\ncp "$REVIEW_LIB" "$WORK/review-reference.bin"\n')
+          s=replace(s,'EOF\n\ndocker run --rm --platform=linux/amd64 -v "$WORK":/w','EOF\nprintf "[data=copy] %s\\n[+raw] review-reference.bin\\n" "$(basename "$REVIEW_LIB")" >> "$WORK/test.build"\n\ndocker run --rm --platform=linux/amd64 -v "$WORK":/w')
           p.with_name("qemu-run-loader-review.sh").write_text(s)
           t=replace(s,'    $NAME\n    display_msg "@@QNXRUN-END@@"','    LD_PRELOAD=/proc/boot/libau57x_r137_preload_REVIEW.so /proc/boot/$NAME preloaded\n    display_msg "@@QNXRUN-END@@"')
           p.with_name("qemu-run-preload-review.sh").write_text(t)
@@ -88,6 +125,7 @@ jobs:
           set -euxo pipefail
           REVIEW_LIB="$PWD/build/qnx/libau57x_r137_preload_REVIEW.so" QEMU_KEEP_LOG="$PWD/build/qnx/dlopen_boot.log" QEMU_RUN_SECS=20 QEMU_TIMEOUT=80 bash "$RUNNER_TEMP/toolchain/tests/qemu-run-loader-review.sh" "$PWD/build/qnx/loader_diag" 8.5 2>&1 | tee build/qnx/dlopen_runtime.log
           grep -Fq REVIEW_DLOPEN_CONSTRUCTOR_OK_NO_OEM build/qnx/dlopen_runtime.log
+          grep -Fq REVIEW_RAW_REFERENCE_OK build/qnx/dlopen_runtime.log
       - name: Separate QNX boot - LD_PRELOAD only
         if: always() && steps.preload_build.outcome == 'success'
         run: |
