@@ -2,7 +2,7 @@ name: MU1005 complete upstream daemon reuse (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/mu1005-donor-daemon.yml, integration/mu1005_donor_daemon/**, tools/mu1005_efs_launcher_stage.py, tests/test_mu1005_efs_launcher_stage.py]
+    paths: [.github/workflows/mu1005-donor-daemon.yml, integration/mu1005_donor_daemon/**, tools/mu1005_lifecycle_observer.py, tools/mu1005_efs_launcher_stage.py, tests/test_mu1005_efs_launcher_stage.py]
   workflow_dispatch:
 permissions:
   contents: read
@@ -139,6 +139,17 @@ jobs:
           grep -F MU1005_DONOR_QNX_RUST_ENGINE_TWO_TCP_PASS_NO_OEM donor-arm-evidence/lab-runtime.log
           grep -F MU1005_DONOR_QNX_SPAWN_AND_FOUR_GENERATIONS_PASS_NO_OEM donor-arm-evidence/lab-runtime.log
           grep -E 'Process [0-9]+ \(mu1005-donor-launch\) exited status=0' donor-arm-evidence/lab-serial.log
+      - name: Validate relocated PHDR layout on real QNX lab executable
+        run: |
+          set -euxo pipefail
+          python3 integration/mu1005_donor_daemon/qnx_phdr_lab.py donor-arm-evidence/mu1005-donor-launch donor-arm-evidence/mu1005-phdr-lab
+          readelf -lW donor-arm-evidence/mu1005-phdr-lab | tee donor-arm-evidence/phdr-layout.log
+          export QNX_DONOR_LAB="$PWD/donor/wireless/daemon/target/armv7-unknown-nto-qnx650/release/examples/mu1005-donor-lab"
+          export QNX_DONOR_DIO_FIXTURE="$PWD/donor/wireless/daemon/probes/dio_manager.fixture.json"
+          QEMU_KEEP_LOG="$PWD/donor-arm-evidence/phdr-serial.log" QEMU_TIMEOUT=95 QEMU_RUN_SECS=50 sh toolchain/tests/qemu-run.sh "$PWD/donor-arm-evidence/mu1005-phdr-lab" 8.5 2>&1 | tee donor-arm-evidence/phdr-runtime.log
+          grep -F MU1005_DONOR_QNX_SPAWN_AND_FOUR_GENERATIONS_PASS_NO_OEM donor-arm-evidence/phdr-runtime.log
+          grep -E 'Process [0-9]+ \(mu1005-phdr-lab\) exited status=0' donor-arm-evidence/phdr-serial.log
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

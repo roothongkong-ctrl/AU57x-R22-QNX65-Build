@@ -1,0 +1,4 @@
+# 原厂启动和关闭观察入口（NO INSTALL）
+ac80d7a4 的 45570311855、45570311880 均成功，真实 QNX spawn/Rust 协议引擎双 TCP/四次初始化运行通过（独立 lab，未使用 OEM radio/MFi）。
+真实原厂 btstack SHA 51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566：0x11ec98 e5c531b0 为原厂 started flag store；0x27a614 e5d03016 为公共 OSAPI cleanup 入口。两点实测离线反汇编。原厂 RX 文件终止 0x1b97dc，RW 同偏移起始；末尾 224 字节并非零，不能照搬 MU1316 在原 RX 尾部重定位 PHDR 的做法。原厂 RW 内存末尾 0x508780。
+新增精确 OEM hash 的私有离线生成器，原始 LOAD headers 保留，新 PT_PHDR 表在追加 RX LOAD，独立 RW zero state。保留原指令、寄存器和条件标志，记录 started/cleanup 观察状态，不调用 SDK，不注册 RFCOMM、不扩展 EIR、不读取身份/凭据。state 记录仅供观察，不提供生命周期 lease，也不是线程安全计数或认证证据。实际用户原始 btstack 本地生成通过；原文件不变，readelf 验证 7 个 PHDR、新 RX 0x510000、新 RW 0x520000，原始字节仅 ELF header 与两条 ARM 分支改变。真实私有输出 hash 0a1f56118a150ba3b6e97e5a12e829ce465123423e0d14c2445d9a27b6524b01。未上传原厂内容。新增 QNX lab ELF appended PHDR 验收，针对已实际运行的 C/Rust 双进程测试程序；未验证前不能认定 QNX loader 兼容。即使通过也不代表 OEM 加载成功。仍缺原厂实际启动、关闭互斥、BlueSDK register、手机真实 MFi。不得安装。
