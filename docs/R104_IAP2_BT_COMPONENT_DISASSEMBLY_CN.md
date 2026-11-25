@@ -88,3 +88,30 @@ SHA256：`42fd984ebbdccd11595bd45909683829565147c8cbc8a482618d6dd8e564d3bf`
 - USB transport 的函数表是否布局完全相同（必须读取 USB ELF 代码验证，不能仅凭名字推断）。
 
 下一步沿 `link_create` 中的 link-private 初始化字段、`ipod_module` 入口及 `iap2_init` 配置解析回溯 transport object producer，并对照 USB transport ELF。保持 NO_INSTALL。
+
+
+## R104 第四轮：transport object 的分配/注入边界（2026-11-26）
+
+本轮直接复核上传 ELF 原件（SHA256 与预期一致），并对 `link_create` 完整函数反汇编。
+
+### 新确认
+
+1. `link_create` (0x11da0) 接收的第一个参数是 link/config context；函数通过 context+`0x14` 访问 owner/context，再从 owner+`0x20`、owner+`0x24` 取值用于初始化 link/session。该函数内未发现对 BluetoothTransportComponent 构造函数的直接调用。
+2. `link_create` 中调用 `transport_get_link_params` (0x21144)，随后将 link-private 状态对象挂到 link 的 `+0x14` 字段。协议引擎的物理 transport 指针不是在 `transport_receive` 内创建，而是由 link-private+`0x40` 预先提供。
+3. `transport_send_pkt` (0x2115c) 机器码明确从 link-private+`0x40` 取得 transport object，再从 transport+`0x28` 取 send callback 并 BLX；参数为 transport object、packet data、packet length。发送成功条件为返回字节数等于 packet length。
+4. `transport_receive` (0x2111c) 同样从 link-private+`0x40` 取得 transport object，再从 transport+`0x2c` 调用 receive callback。
+5. `transport_get_link_params` (0x21144) 使用 transport+`0x18` callback。
+
+### 对当前问题的意义
+
+iAP2 协议引擎不负责创建蓝牙 socket，也不负责寻找 BluetoothTransportComponent。它只消费由上层准备好的 transport object。真正要定位的 producer 应在 `iap2_init` / config component setup 或外部 owner 对 link-private context 的初始化中，而不是继续在 `transport_send_pkt` 内找 RFCOMM 注册。
+
+### 尚未完成的反向追踪
+
+- link-private+`0x40` 的赋值指令/上层对象创建者尚未从当前单个 ELF 完整定位；需要进一步追踪 link-private allocation/initialization 的调用路径以及相关函数指针表。
+- 当前 ELF 未提供可直接证明 BluetoothTransportComponent 的构造函数/注册入口；字符串存在不等于构造调用已找到。
+- 尚未证明 Bluetooth 组件的回调由 BlueSDK、btstack 还是独立 IPC owner 提供。
+
+### 下一步
+
+优先分析 `iap2_init` (0xea6c) 中 config parser 到 link context 的对象传递，并对 `link_get_transport_data` (0x12208) 及其 callers 做完整交叉引用；若 producer 位于独立 `mm-ipod`/transport plugin，则必须取得相应同固件 ELF，不能凭当前驱动库猜测。继续 NO_INSTALL。
