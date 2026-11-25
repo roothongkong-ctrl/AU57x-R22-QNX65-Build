@@ -16,6 +16,8 @@ typedef struct {
   * Not proof of live OEM iAP2 readiness. */
  uint8_t rf_arg3_snapshot;
  uint8_t rf_arg3_snapshot_valid;
+ /* Actual BluetoothServices this pointer captured by a verified owner. */
+ uint32_t services_address;
 } MuBtOwner;
 /* On QNX ARM32, resolve fixed ABI only for the pinned reference executable.
  * On other hosts returns -1 without reading/calling any native address.

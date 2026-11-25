@@ -43,6 +43,12 @@ jobs:
           grep -F 'PASS EOF with outstanding native TX drains in both close/completion orders' evidence/r5-native-discovery.log
           b=project/source/legacy_mu1005/bluetooth
           cc -std=c99 -Wall -Wextra -Werror -I"$b" -c "$b/native_eir_bridge.c" -o "$RUNNER_TEMP/native-eir-bridge.o"
+      - name: Verify OEM startup state snapshot
+        run: |
+          set -euxo pipefail
+          b=project/source/legacy_mu1005/bluetooth
+          cc -std=c99 -O2 -Wall -Wextra -Werror -I"$b" "$b/bt_startup_snapshot.c" tests/test_mu1005_bt_startup_snapshot.c -o "$RUNNER_TEMP/bt-startup"
+          "$RUNNER_TEMP/bt-startup" | tee evidence/bt-startup.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:

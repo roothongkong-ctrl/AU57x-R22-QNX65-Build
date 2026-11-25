@@ -1,5 +1,6 @@
 #include "native_binding.h"
 #include "rf_arg_experiment.h"
+#include "bt_startup_snapshot.h"
 #include <stdint.h>
 #include <string.h>
 #if defined(__QNXNTO__) && defined(__arm__) && UINTPTR_MAX == UINT32_MAX
@@ -10,7 +11,8 @@
 typedef struct { Mu38PeerOps peer; MuBtOwner owner; InboundR5 bridge; int attempted; } Resident;
 static Resident res;
 static int cert(void *p){Resident *r=p;return r==&res&&r->attempted&&r->owner.owner_ready&&r->owner.owner_ready(r->owner.opaque)==1;}
-static int ready(void *p){Resident *r=p;return cert(p)&&r->owner.transport_ready(r->owner.opaque)==1;}
+static int sdk_started(const MuBtOwner *o){return mu_bt_sdk_started(o->services_address,o->read_live,o->opaque);}
+static int ready(void *p){Resident *r=p;return cert(p)&&sdk_started(&r->owner)&&r->owner.transport_ready(r->owner.opaque)==1;}
 static uint32_t addr(const void *p){return (uint32_t)(uintptr_t)p;}
 static int assoc(void *p,const void *ch,uint32_t a,unsigned code){
  Resident*r=p;if(!cert(r)||ch!=&r->bridge.service.rf||(code!=1&&code!=2)||!a)return 0;
@@ -24,7 +26,7 @@ static int auth(void*p,uint32_t a,const uint8_t mac[6]){Resident*r=p;return cert
 static int register_verified(void *channel,uint8_t *slot,uint16_t ignored){
  Resident *r=&res;
  (void)ignored;
- if(!cert(r)||r->owner.rf_arg3_snapshot_valid!=1u||
+ if(!ready(r)||r->owner.rf_arg3_snapshot_valid!=1u||
     r->owner.rf_arg3_snapshot<1u||r->owner.rf_arg3_snapshot>7u)return -1;
  /* Do not call the external proof function a second time after RFCOMM/TCP
   * setup: its answer could change between check and native registration. */
@@ -49,7 +51,7 @@ int mu_bt_native_attach(const MuBtOwner *o,int fd){
  if(!o||!o->owner_ready||!o->transport_ready||!o->read_live||!o->paired_authorized||
     o->rf_arg3_snapshot_valid!=1u||o->rf_arg3_snapshot<1u||o->rf_arg3_snapshot>7u||
     res.attempted||fd<0||o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
- if(!words_ok())return -1;
+ if(!words_ok()||!sdk_started(o)||o->owner_ready(o->opaque)!=1)return -1;
  res.attempted=1;res.owner=*o;res.peer=(Mu38PeerOps){&res,assoc,rd,auth};
  InboundOps n={0};n.reg=register_verified;n.unreg=RFN(int (*)(void*,uint8_t*),0x2779b4u);
  n.add=RFN(int (*)(void*),0x207244u);n.remove=RFN(int (*)(void*),0x2071c4u);
@@ -61,7 +63,7 @@ int mu_bt_native_attach(const MuBtOwner *o,int fd){
  return ir5_publish(&res.bridge);
 }
 int mu_bt_native_discovery_ready(void){return ir5_discovery_ready(&res.bridge);}
-int mu_bt_native_tick(void){return cert(&res)&&res.bridge.initialized?ir5_tick(&res.bridge):-1;}
+int mu_bt_native_tick(void){return ready(&res)&&res.bridge.initialized?ir5_tick(&res.bridge):-1;}
 int mu_bt_native_withdraw(int (*barrier)(void*,const Inbound*),void *p){
  if(!cert(&res)||!res.bridge.initialized||!barrier)return -1;
  int r=ir5_drain(&res.bridge);
