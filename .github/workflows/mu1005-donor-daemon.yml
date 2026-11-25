@@ -113,6 +113,32 @@ jobs:
           cp "$bin" donor-arm-evidence/donor-daemon-MU1005-AP-REVIEW-ONLY.bin
           for f in LICENSE LICENSE.md COPYING; do if test -f "donor/$f"; then cp "donor/$f" donor-arm-evidence/; fi; done
           printf '%s\n' 'NO INSTALL: live AP source adapted; actual band selection, MU1005 runtime ABI, MFi owner, receiver and hardware not accepted' "donor=$DONOR" "toolchain=$TOOLCHAIN" "source=$GITHUB_SHA" > donor-arm-evidence/STATUS.txt
+      - name: Build and run actual adapted donor engine in QNX (isolated lab)
+        run: |
+          set -euxo pipefail
+          mkdir -p donor/wireless/daemon/examples
+          cp integration/mu1005_donor_daemon/qnx_bridge_lab.rs donor/wireless/daemon/examples/mu1005-donor-lab.rs
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src/donor mu1005-qnx65-rust:review \
+            /opt/rust/qnx-cargo build --locked --manifest-path /src/donor/wireless/daemon/Cargo.toml --example mu1005-donor-lab 2>&1 | tee donor-arm-evidence/lab-rust-build.log
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src mu1005-qnx65-rust:review bash -c '
+            set -eux
+            b=project/source/legacy_mu1005/bluetooth
+            r=integration/mu1005_donor_daemon
+            cc=arm-unknown-nto-qnx6.5.0eabi-gcc
+            "$cc" -std=gnu99 -O2 -Wall -Wextra -Werror -Dmain=mu1005_bridge_peer_main -I"$b" -c "$r/bridge_peer.c" -o donor-arm-evidence/lab-peer.o
+            "$cc" -std=gnu99 -O2 -Wall -Wextra -Werror "$r/qnx_launch_lab.c" donor-arm-evidence/lab-peer.o "$b"/{mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump}.c -lsocket -lc -o donor-arm-evidence/mu1005-donor-launch
+          ' 2>&1 | tee donor-arm-evidence/lab-c-build.log
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+          docker tag mu1005-qnx65-rust:review qnx65-armv7-toolchain:8.5
+          python3 integration/mu1005_donor_daemon/prepare_qnx_donor_ifs.py toolchain/tests/qemu-run.sh
+          export QNX_DONOR_LAB="$PWD/donor/wireless/daemon/target/armv7-unknown-nto-qnx650/release/examples/mu1005-donor-lab"
+          export QNX_DONOR_DIO_FIXTURE="$PWD/donor/wireless/daemon/probes/dio_manager.fixture.json"
+          test -s "$QNX_DONOR_LAB"
+          QEMU_KEEP_LOG="$PWD/donor-arm-evidence/lab-serial.log" QEMU_TIMEOUT=95 QEMU_RUN_SECS=50 sh toolchain/tests/qemu-run.sh "$PWD/donor-arm-evidence/mu1005-donor-launch" 8.5 2>&1 | tee donor-arm-evidence/lab-runtime.log
+          grep -F MU1005_DONOR_QNX_RUST_ENGINE_TWO_TCP_PASS_NO_OEM donor-arm-evidence/lab-runtime.log
+          grep -F MU1005_DONOR_QNX_SPAWN_AND_FOUR_GENERATIONS_PASS_NO_OEM donor-arm-evidence/lab-runtime.log
+          grep -E 'Process [0-9]+ \(mu1005-donor-launch\) exited status=0' donor-arm-evidence/lab-serial.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -1,0 +1,2 @@
+# QNX 完整 Rust 协议引擎真实启动验收（NO INSTALL）
+前版 a18941e8 45569391699、45569391900、45569391718 全成功。本轮直接在 QNX6.5 ARM QEMU 启动真实 Rust donor 库构建的独立 lab executable，而非继续只编译或运行 C 替代协议。复用原 C bridge_peer 四代 marker/SYN 及真实 QNX socket manager，QNX spawn 启动子程序，waitpid 检查退出码，两次实际 TCP 连接共四代。使用上游真实 Config parser 与固定 IFS fixture；拒绝接收器启动、UnavailableAuth，明确不访问原厂 MFi/I2C、AP、原车进程。此为单独 lab executable，非生产 main.rs，后者仍单独编译。不能据此证明 OEM btstack/SDP、实际蓝牙、认证、原厂 SI、5G 或装车成功。真实 factory launcher 的 hook/生命周期 provider 仍没有落实；此次不改车机配置、不写 EFS、不自动安装。最新运行测试待 CI 验收。
