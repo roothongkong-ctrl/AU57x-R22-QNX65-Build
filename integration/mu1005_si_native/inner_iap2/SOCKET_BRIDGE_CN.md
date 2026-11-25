@@ -1,0 +1,2 @@
+# 第二段 iAP2 本地通道
+新增 DIO 端 AF_UNIX 非阻塞流式连接适配器。真实 mm-ipod 端须由原厂 transport 插件交付已认证的独占 fd；禁止复用蓝牙引导端口。适配器在原厂 AirPlay owner 上调度 MuInner，读取原厂 iAP2 字节流并转为事件命令，将 control 命令传回本地流。处理拆包、背压、部分写、失效会话和断线，禁止向 OEM 进程泄漏 SIGPIPE。主机测试使用实际 socketpair、并非 OEM 进程。尚未实现 mm-ipod 端插件接入、OEM owner 证明及真实 AirPlay 回调，不得安装。
