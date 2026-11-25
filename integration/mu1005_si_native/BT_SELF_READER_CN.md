@@ -1,0 +1,4 @@
+# 原厂运行时读取 provider（NO INSTALL）
+此前 MuBtOwner.read_live 仍由外部提供。本轮实现 QNX ARM32 的当前进程只读 provider：按 getpid() 打开 /proc/<self pid>/as（O_RDONLY），DCMD_PROC_MAPINFO 查实际映射，lseek/read 严格字节数，读前后重新验证范围与授权，失败不修改调用方输出；trylock 防止共享 fd 偏移竞争，不写内存，不停止进程，不读取外部进程，不引入 SSH。拒绝显式 MAP_PHYS/PROT_NOCACHE、跨映射、越界、无效页。实际 QNX IFS 库映射是否被这些条件拒绝需要验收，不能声称全部 OEM 页已可读。
+依据 QNX 6.5 SP1 官方文档 Processes https://www.qnx.com/developers/docs/6.5.0SP1.update/com.qnx.doc.neutrino_prog/process.html 与 The /proc Filesystem https://www.qnx.com/developers/docs/6.5.0SP1.update/com.qnx.doc.neutrino_cookbook/s3_procfs.html。真实对象类型、生命周期 lease、原厂映射身份及精确读范围授权仍由调用者证明；不能以 map readable 替代这些证据。procfs IPC 可能阻塞，不在任意持锁回调内启用，需测实际时延。新增 QNX 独立映射读、禁止授权、PROT_NONE、跨映射、unmap、溢出测试；没有 OEM 对象或 iPhone，未运行前不宣称通过。
+上一轮 863b5c46 两个云端工作流均成功。此轮只完成真正的只读 backend 与 QNX 运行验收接入，不声称启动绑定或 MFi 已完成。
