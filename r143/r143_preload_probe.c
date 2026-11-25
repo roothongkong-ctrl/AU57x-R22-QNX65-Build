@@ -62,10 +62,16 @@ __attribute__((constructor)) static void r143_init(void) {
 #else
     stock_path = AU57X_R143_STOCK_PATH;
 #endif
-    if (!digest_hex(stock_path, digest) || strcmp(digest, AU57X_R143_STOCK_SHA256) != 0) {
-        log_line("process_reject", "stock_sha256_mismatch", pthread_self(), NULL,
+    if (!digest_hex(stock_path, digest)) {
+        char why[96]; snprintf(why, sizeof why, "stock_open_or_read_errno_%d", errno);
+        log_line("process_reject", why, pthread_self(), NULL, 0, 0, 0, -1, -1, -1);
+        probe_status = 31;
+        return;
+    }
+    if (strcmp(digest, AU57X_R143_STOCK_SHA256) != 0) {
+        log_line("process_reject", "stock_sha256_mismatch", pthread_self(), digest,
                  0, 0, 0, -1, -1, -1);
-        probe_status = 3;
+        probe_status = 32;
         return;
     }
     if (!real_create || !real_setname) {
