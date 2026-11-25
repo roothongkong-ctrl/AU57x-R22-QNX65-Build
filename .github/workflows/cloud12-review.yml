@@ -107,7 +107,7 @@ jobs:
         run: python3 ci/host_r97_continuous.py
       - name: R98 genuine loopback socket -> original-owner gated iAP2 service attach laboratory
         run: bash ci/host_r98_iap2_handoff.sh
-      - name: R99 original iAP2 two-config reversible staging and 23 fail-closed tests
+      - name: R99 original iAP2 two-config reversible staging and 26 fail-closed tests
         run: bash ci/host_r99_stock_iap2.sh
       - name: R100 pinned original MU1005 feature triage and runtime route gate (never activates OEM code)
         run: bash ci/host_r100_route_audit.sh
