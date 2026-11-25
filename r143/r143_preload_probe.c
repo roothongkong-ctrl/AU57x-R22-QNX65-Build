@@ -37,7 +37,33 @@ static create_fn real_create;
 static setname_fn real_setname;
 static void *libc_handle;
 static char log_path[256]=AU57X_R143_LOG_PATH;
-static int digest_hex(const char*path,char out[65]){unsigned char b[8192],d[32];static const char hex[]="0123456789abcdef";sha256_ctx c;size_t n,i;FILE*f;if(!path||(f=fopen(path,"rb"))==NULL)return 0;sha256_init(&c);while((n=fread(b,1,sizeof b,f))!=0)sha256_update(&c,b,n);if(ferror(f)){fclose(f);return 0;}if(fclose(f))return 0;sha256_final(&c,d);for(i=0;i<32;i++){out[2*i]=hex[d[i]>>4];out[2*i+1]=hex[d[i]&15];}out[64]=0;return 1;}
+static int digest_hex(const char *path, char out[65]) {
+    unsigned char b[8192], d[32];
+    static const char hex[] = "0123456789abcdef";
+    sha256_ctx c;
+    ssize_t n;
+    size_t i;
+    int fd;
+    if (!path) { errno = EINVAL; return 0; }
+    fd = open(path, O_RDONLY);
+    if (fd < 0) return 0;
+    sha256_init(&c);
+    for (;;) {
+        n = read(fd, b, sizeof b);
+        if (n > 0) { sha256_update(&c, b, (size_t)n); continue; }
+        if (n == 0) break;
+        if (errno == EINTR) continue;
+        { int saved = errno; close(fd); errno = saved; return 0; }
+    }
+    if (close(fd) != 0) return 0;
+    sha256_final(&c, d);
+    for (i = 0; i < 32; i++) {
+        out[2*i] = hex[d[i] >> 4];
+        out[2*i+1] = hex[d[i] & 15];
+    }
+    out[64] = 0;
+    return 1;
+}
 static size_t add(char*d,size_t cap,size_t n,const char*s){while(s&&*s&&n+1<cap)d[n++]=*s++;if(cap)d[n<cap?n:cap-1]=0;return n;}
 static size_t add_tid(char*d,size_t cap,size_t n,pthread_t t){static const char h[]="0123456789abcdef";const unsigned char*p=(const unsigned char*)&t;size_t i;for(i=0;i<sizeof t&&n+2<cap;i++){d[n++]=h[p[i]>>4];d[n++]=h[p[i]&15];}if(cap)d[n<cap?n:cap-1]=0;return n;}
 static void log_line(const char*event,const char*role,pthread_t tid,const char*name,uintptr_t caller,uintptr_t start,int stock,int rc,int target,int current){char b[512];size_t n=0;int fd;char num[32];b[0]=0;n=add(b,sizeof b,n,"event=");n=add(b,sizeof b,n,event);if(role){n=add(b,sizeof b,n," role=");n=add(b,sizeof b,n,role);}n=add(b,sizeof b,n," pid=");snprintf(num,sizeof num,"%ld",(long)getpid());n=add(b,sizeof b,n,num);n=add(b,sizeof b,n," tid=");n=add_tid(b,sizeof b,n,tid);if(name){n=add(b,sizeof b,n," name=");for(size_t i=0;name[i]&&i<80&&n+2<sizeof b;i++){unsigned char c=(unsigned char)name[i];b[n++]=(c>=32&&c<=126)?(char)c:'?';}b[n]=0;}if(caller){n=add(b,sizeof b,n," caller=");snprintf(num,sizeof num,"0x%lx",(unsigned long)caller);n=add(b,sizeof b,n,num);}if(start){n=add(b,sizeof b,n," start=");snprintf(num,sizeof num,"0x%lx",(unsigned long)start);n=add(b,sizeof b,n,num);}if(stock>=0){n=add(b,sizeof b,n," stock_pc=");snprintf(num,sizeof num,"%d",stock);n=add(b,sizeof b,n,num);}if(rc>=0){n=add(b,sizeof b,n," rc=");snprintf(num,sizeof num,"%d",rc);n=add(b,sizeof b,n,num);}if(target>=0){n=add(b,sizeof b,n," target_observed=");snprintf(num,sizeof num,"%d",target);n=add(b,sizeof b,n,num);}if(current>=0){n=add(b,sizeof b,n," caller_observed=");snprintf(num,sizeof num,"%d",current);n=add(b,sizeof b,n,num);}n=add(b,sizeof b,n,"\n");fd=open(log_path,O_WRONLY|O_CREAT|O_APPEND,0600);if(fd>=0){ssize_t wr=write(fd,b,n);(void)wr;close(fd);}}
@@ -80,8 +106,8 @@ __attribute__((constructor)) static void r143_init(void) {
      * a fallback: depending on the IFS launch context, the process may have
      * been started through another pathname. */
     stock_path = getenv("AU57X_R143_STOCK_PATH");
-    if (!stock_path || !stock_path[0]) stock_path = getexecname();
-    if (!stock_path || stock_path[0] != '/') stock_path = AU57X_R143_STOCK_PATH;
+    if (!stock_path || !stock_path[0] || stock_path[0] != '/')
+        stock_path = AU57X_R143_STOCK_PATH;
 #else
     stock_path = AU57X_R143_STOCK_PATH;
 #endif
