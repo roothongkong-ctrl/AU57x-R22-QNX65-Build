@@ -13,10 +13,10 @@
 typedef struct { Mu38PeerOps peer; MuBtOwner owner; InboundR5 bridge; MuBtThreadIdentity thread; int attempted; } Resident;
 static Resident res;
 static uint32_t current_tid(void){return (uint32_t)(uintptr_t)pthread_self();}
-static int cert(void *p){Resident *r=p;return r==&res&&r->attempted&&r->owner.owner_ready&&r->owner.owner_ready(r->owner.opaque)==1&&
- mu_bt_osapi_identity_matches(&r->thread,current_tid(),r->owner.read_live,r->owner.opaque);}
 static int sdk_started(const MuBtOwner *o){return mu_bt_sdk_started(o->services_address,o->read_live,o->opaque);}
-static int ready(void *p){Resident *r=p;return cert(p)&&sdk_started(&r->owner)&&r->owner.transport_ready(r->owner.opaque)==1;}
+static int cert(void *p){Resident *r=p;return r==&res&&r->attempted&&r->owner.owner_ready&&r->owner.owner_ready(r->owner.opaque)==1&&
+ mu_bt_osapi_identity_matches(&r->thread,current_tid(),r->owner.read_live,r->owner.opaque)&&sdk_started(&r->owner);}
+static int ready(void *p){Resident *r=p;return cert(p)&&r->owner.transport_ready(r->owner.opaque)==1;}
 static uint32_t addr(const void *p){return (uint32_t)(uintptr_t)p;}
 static int assoc(void *p,const void *ch,uint32_t a,unsigned code){
  Resident*r=p;if(!cert(r)||ch!=&r->bridge.service.rf||(code!=1&&code!=2)||!a)return 0;
@@ -44,11 +44,30 @@ static void callback(void *ch,const void *event){
 /* Require native executable words at all vendor call entry points, in
  * addition to the caller's full mapped-image verification. This is not a
  * replacement for that verification. Never read an arbitrary process. */
-static int words_ok(void){
- for(size_t i=0;i<sizeof mu_bt_words/sizeof mu_bt_words[0];i++){
-  const volatile uint32_t *p=(const volatile uint32_t *)(uintptr_t)mu_bt_words[i][0];
-  if(*p!=mu_bt_words[i][1])return 0;
- }return 1;
+static int checked_word(const MuBtOwner*o,uint32_t a,uint32_t want){
+ uint8_t b[4];
+ if(o->read_live(o->opaque,a,b,4)!=1)return 0;
+ return ((uint32_t)b[0]|(uint32_t)b[1]<<8|(uint32_t)b[2]<<16|(uint32_t)b[3]<<24)==want;
+}
+static int words_ok(const MuBtOwner*o){
+ for(size_t i=0;i<sizeof mu_bt_words/sizeof mu_bt_words[0];i++)
+  if(!checked_word(o,mu_bt_words[i][0],mu_bt_words[i][1]))return 0;
+ return 1;
+}
+/* Original SDP add/remove already schedule refresh. Reissue after full
+ * publication so the asynchronous EIR builder can observe final readiness.
+ * Does not insert UUID or claim controller completion. */
+static int eir_request_words(const MuBtOwner*o){
+ static const uint32_t a[][2]={{0x1db4c8,0xe92d4010},{0x1db4d0,0xeb027b15},
+ {0x1db4f0,0xe7831002},{0x1db500,0xe7c31002},{0x1db510,0xeb0025f7},{0x1db518,0xea027ae0}};
+ for(size_t i=0;i<sizeof a/sizeof a[0];i++)
+  if(!checked_word(o,a[i][0],a[i][1]))return 0;
+ return 1;
+}
+int mu_bt_native_refresh_eir(void){
+ if(!cert(&res)||!eir_request_words(&res.owner)||!cert(&res))return -1;
+ ((void(*)(void))(uintptr_t)0x1db4c8u)();
+ return 0;
 }
 #define RFN(type,a) ((type)(uintptr_t)(a))
 int mu_bt_native_attach(const MuBtOwner *o,int fd){
@@ -56,7 +75,7 @@ int mu_bt_native_attach(const MuBtOwner *o,int fd){
     o->rf_arg3_snapshot_valid!=1u||o->rf_arg3_snapshot<1u||o->rf_arg3_snapshot>7u||
     res.attempted||fd<0||o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
  MuBtThreadIdentity identity;
- if(!words_ok()||!sdk_started(o)||!mu_bt_comm_words_match(o->comm_load_bias,o->read_live,o->opaque)||
+ if(!words_ok(o)||!eir_request_words(o)||!sdk_started(o)||!mu_bt_comm_words_match(o->comm_load_bias,o->read_live,o->opaque)||
     !mu_bt_osapi_identity(o->comm_load_bias,current_tid(),o->read_live,o->opaque,&identity)||
     o->owner_ready(o->opaque)!=1)return -1;
  res.attempted=1;res.owner=*o;res.thread=identity;res.peer=(Mu38PeerOps){&res,assoc,rd,auth};
@@ -67,14 +86,19 @@ int mu_bt_native_attach(const MuBtOwner *o,int fd){
  n.certify=cert;n.ready=ready;n.addr=addr;n.opaque=&res;
  n.initial_rx_credits=res.owner.rf_arg3_snapshot;
  if(ir5_init(&res.bridge,&n,mu38_resolve_peer,fd,(uint32_t)(uintptr_t)callback))return -1;
- return ir5_publish(&res.bridge);
+ int rc=ir5_publish(&res.bridge);
+ if(rc==0)(void)mu_bt_native_refresh_eir();
+ return rc;
 }
 int mu_bt_native_discovery_ready(void){return ir5_discovery_ready(&res.bridge);}
 int mu_bt_native_tick(void){return ready(&res)&&res.bridge.initialized?ir5_tick(&res.bridge):-1;}
 int mu_bt_native_withdraw(int (*barrier)(void*,const Inbound*),void *p){
  if(!cert(&res)||!res.bridge.initialized||!barrier)return -1;
  int r=ir5_drain(&res.bridge);
- return r?r:ir5_withdraw(&res.bridge,barrier,p);
+ if(r)return r;
+ r=ir5_withdraw(&res.bridge,barrier,p);
+ if(r==0)(void)mu_bt_native_refresh_eir();
+ return r;
 }
 /* A retired SDK object may still have queued callbacks. Require a separate
  * post-withdraw reclamation witness, not the prior unregister barrier. */
@@ -90,6 +114,7 @@ int mu_bt_native_reclaim(int (*reclaimed)(void*,const Inbound*),void*p){
 #else
 int mu_bt_native_attach(const MuBtOwner *o,int fd){(void)o;(void)fd;return -1;}
 int mu_bt_native_discovery_ready(void){return 0;}
+int mu_bt_native_refresh_eir(void){return -1;}
 int mu_bt_native_tick(void){return -1;}
 int mu_bt_native_withdraw(int (*barrier)(void*,const Inbound*),void *p){(void)barrier;(void)p;return -1;}
 int mu_bt_native_reclaim(int (*barrier)(void*,const Inbound*),void *p){(void)barrier;(void)p;return -1;}

@@ -7,7 +7,7 @@ typedef struct {
  void *opaque;
  int (*owner_ready)(void *); /* real thread, lifecycle, lock context, verified image */
  int (*transport_ready)(void *); /* authenticated local endpoint ready */
- int (*read_live)(void *,uint32_t,void *,size_t); /* callback-scoped checked read */
+ int (*read_live)(void *,uint32_t,void *,size_t); /* checked executable/object/peer reads, scoped to verified lifetime */
  int (*paired_authorized)(void *,uint32_t,const uint8_t[6]);
  /* Historical callback name retained; attest initial RX credits 1..7, not SCN. */
  int (*iap2_profile_proven)(void *,uint8_t *profile);
@@ -28,6 +28,8 @@ typedef struct {
 int mu_bt_native_attach(const MuBtOwner *,int fd);
 int mu_bt_native_tick(void);
 int mu_bt_native_discovery_ready(void);
+/* Queue original EIR refresh on certified SDK owner. Not a controller ACK. */
+int mu_bt_native_refresh_eir(void);
 /* Serialized original owner only; no hook installed by this API. */
 int mu_bt_native_append_eir(uint8_t*,size_t,size_t,int (*)(void*),void*,size_t*);
 int mu_bt_native_withdraw(int (*barrier)(void *,const Inbound*),void *);
