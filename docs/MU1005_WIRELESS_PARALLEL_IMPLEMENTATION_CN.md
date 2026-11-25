@@ -115,3 +115,46 @@ H0–H3 通过只代表云端源码/仿真验证，不代表 H4–H6。未通过
 5. **SD 一键安装器**：复用 R95/R96 事务备份、校验和回滚引擎；等 OEM attach、启动入口、配置变更清单和持久路径证据闭环后才生成候选安装包。目标为安装后拔卡可运行，当前仍 NO_INSTALL。
 
 当前结论：云端 QNX ARM compile/link/ELF/QEMU smoke 与离线测试已通过；真实 MU1005 OEM Bluetooth attach、iPhone MFi、无线 AirPlay 媒体链路和整车验证未通过/未进行。状态保持 `RESEARCH_ONLY / NO_INSTALL / safe_to_flash=false / vehicle_verified=false`。
+
+## Track A：congobg 成熟项目 → MU1005 逐项移植对照（2026-11-25）
+
+### 结论先行
+
+congobg 项目公开状态页记录其 MHI2Q QC、QNX 6.5 ARMv7、3638/MU0917 与 5092 上的无线 CarPlay 测试；其核心架构是“蓝牙 iAP2 交换 Wi-Fi 凭据 → 车机 AP → 原厂 AirPlay receiver → 会话内原厂 iAP2 client → 有线 USB 优先”。这是本项目最有价值的**系统流程参照**。但 donor 明确目标是 MHI2Q QC，不是 AU57x CN MU1005；其 `wcp.tar.gz` 内程序、脚本、Java 和固定偏移不能直接装车。
+
+### 逐项移植表
+
+| donor 子系统/实现 | donor 已记录的作用 | MU1005 对应证据 | 处理结论 | 不能跳过的差异/验收 |
+|---|---|---|---|---|
+| Bluetooth 配对与 car-initiated iAP2 | stock btstack 上增加 RFCOMM/SDP，车机连上手机后约 4 秒发起 iAP2；失败取消/重试 | R29/R88/R89/R101 已有 MU1005 btstack 静态审计；HFP=7、SIM=4 的注册参数已识别，但 iAP2 profile/SCN 与真实 callback owner 未证实 | **架构复用，OEM 适配重写**；不复制 donor libbthook 或地址 | 先确认 MU1005 btstack 的线程、注册入口、SCN、arg3、回调 ABI、注销/恢复；host fixture 不算 OEM 证据 |
+| RFCOMM→iAP2 LinkEngine | donor 通过 RFCOMM 字节流承载 iAP2 | R103 已按上游 blob 复用 LuKa iAP2 LinkEngine；C frame bridge 与 Rust TCP host 测试通过 | **协议层已复用**；继续检查 QNX ARM Rust runtime/ABI，必要时移植至 C | R103 的 7+2+13 项是 Linux host tests，不代表 QNX Rust 或真实 BT |
+| MFi / Pair-Setup / Pair-Verify | donor 使用车内 MFi coprocessor、Ed25519 receiver identity 与加密通道 | R41/R44 有原厂 MFi 导出符号和 AA00–AA05 host 状态机；真实 iPhone peer_auth_succeeded 未证实 | **只复用流程与接口需求**；继续调用 MU1005 原厂 MFi | 不复制 donor pairing daemon/密钥/identity；验证句柄、内存释放、owner thread、真实 iPhone 事务 |
+| Wi-Fi AP / 2.4 GHz | donor 启动 AP，向手机发送 SSID、密码和运行中 AP 的真实信道 | R106/001 有 MU1005 uap0 active、BSS_ACTIVE、STA_ASSOC、信道 11、10.173.189.1 实车日志 | **MU1005 原厂 AP 优先**；复用“从运行态读取信道”原则 | 重新确认 MU1005 AP 配置来源、启动时序、地址/路由；不能照抄 donor start-ap.sh、SSID/密码/信道 |
+| Wi-Fi 5 GHz | donor 文档主要给出 AP/信道处理方案 | MU1005 有 A-band 软件符号，但实际 fw_bands、区域码和射频前端未知 | **条件性保留**，先稳定 2.4 GHz | 只有固件、驱动、区域码和硬件射频链均证明支持才启用；不强制设置 5GHz |
+| Bonjour / mDNS | donor 在需要时启动 mdnsd，注册 _airplay._tcp 并补充 TXT 信息 | MU1005 原厂 AirPlay/DIO 有线链路已证实；无线 mdnsd、服务 TXT、iPhone 发现未证实 | **复用服务发现流程**，按 MU1005 原厂配置实现 | 检查原厂 mdnsd 是否已运行、服务 owner、TXT 字段、冲突处理；不能因端口监听就报告 AirPlay 成功 |
+| AirPlay receiver / 加密媒体 | donor 把 Wi-Fi CarPlay 会话交给 stock AirPlay 210.81；hook 处理 pairing、加密、音视频流与事件通道 | R86 有 MU1005 两级 delegate ABI 静态还原；R106/001 证实有线 AirPlayReceiver READY；无线 session/media callback 未证实 | **优先复用 MU1005 原厂 receiver**；donor hook/偏移全部重写或不采用 | 逐项确认 MU1005 receiver 版本、控制/事件/视频/音频通道、密钥与 session lifecycle；不得使用 donor 的 dio_manager/btstack GOT 地址 |
+| 会话内第二条 iAP2 | donor 将原厂 Cinemo iAP2 client 的包映射到 AirPlay event/control channel，手机随后释放 BT iAP2 | MU1005 有 R41/R44 iAP2/MFi host 模型；真实 iAP2 client over AirPlay 未证实 | **协议思路复用，接口重新定位** | 先找到 MU1005 原厂 iAP2 client 的启动条件、设备/IPC、session 归属和 teardown；不得把 donor /dev 路径和 Cinemo 偏移直接移植 |
+| SI / DIO 与 USB 抢占 | donor 让 wireless dio_manager 按需启动；USB smartphone_integrator 启动时停掉 wireless 实例，USB wins | R81–R85 有 SI/DIO 分进程 IPC 与恢复设计；R106 有线 USB 路径已证实；生产 peer identity/restore ABI 未闭环 | **生命周期原则复用**；以 MU1005 SI/DIO 原厂 owner 为准 | 只允许单一 DIO owner；USB 插入必须抢占；DIO restore 与 SI teardown 双确认后才宣告恢复 |
+| HMI 虚拟设备 | donor 的 WCP.jar 注册虚拟 CarPlay device ID 200 并管理 AVAILABLE/CONNECTED/STARTED/DISCONNECTED | MU1005 HMI/SI 真实注册接口尚未完整映射 | **不复制 donor Java/JAR**；先找 MU1005 原厂设备注册与状态通道 | 适配当前固件 HMI/DSI；不能假设 device ID、类名、Java 运行时或 DSI ABI 相同 |
+| 音频/视频/仪表与控制 | donor 有音频解码/relay、main screen、cluster stream、旋钮/触控及 HMI 状态 | MU1005 有线媒体路径和部分回调 ABI 已有证据；无线音视频/旋钮/方向盘真实数据流未证实 | **复用媒体需求与测试矩阵**；优先走原厂 DIO sink | 不搬 donor 编解码器/格式表/端口/stream ID；先核对 MU1005 原厂 codec、媒体格式、cluster 输出及输入事件 |
+| 启动、看门狗与故障恢复 | donor 用 boot hook、进程锁、按需启动、状态文件、crash watch 与重启恢复 | MU1005 已有 R95/R96 SD 事务/备份/回滚基础；原厂 launcher 与安全 attach 仍待证明 | **复用事务和生命周期设计思想**，重写路径与启动接入 | 不覆盖原厂启动器；先确认持久目录、权限、进程 owner；任何失败必须恢复 stock |
+| 配对数据库/多手机 | donor 使用 receiver identity、pairid 和 per-peer 公钥文件；保留 identity 避免所有手机重新配对 | MU1005 原厂配对数据库/CarPlay pairing identity 接口尚未审计完 | **仅借鉴 per-device 数据模型** | 不清空原厂蓝牙配对库；需确认每手机记录键、撤销单设备配对的精确 API/文件；identity 迁移要有备份 |
+| 日志与诊断 | donor 有分组件日志、原始数据开关、session/watchdog 诊断 | MU1005 有 slog/QNX 诊断基础，已有多轮 host evidence | **复用分层日志与事件时间线**，重写到 MU1005 可用机制 | 禁止长期 raw dump 泄露密钥/个人数据；日志不得将 mock 标成 OEM PASS |
+
+### 关键差异：为什么不能整包照搬
+
+1. donor 的主机为 MHI2Q QC / mmx2qc，目标为 MHI2_CN_AU57x / MU1005；即使都是 QNX 6.5 ARMv7，OEM ELF、进程布局、GOT、调用约定、启动器、HMI/DSI 和无线驱动均不能视为相同。
+2. donor 记录的 stock AirPlay receiver 是 210.81；MU1005 必须以用户固件真实 `libairplay.so` / `dio_manager` 样本为准，不能推定版本、结构和回调偏移相同。
+3. donor 依赖 `libbthook.so`、`libwcpstart.so`、`wcpd`、`wcppaird`、`WCP.jar`、脚本及其构建产物；这些都不是可直接用于 AU57x 的通用二进制。
+4. donor 的配对目录、端口、接口名 `uap0`、IP、服务名、stream ID、HMI device ID 和固定地址都属于 donor 实现细节，必须逐项用 MU1005 证据替换。
+
+### 许可证与复用边界
+
+donor 仓库的 `docs/LICENSE` 是 **PolyForm Noncommercial 1.0.0**，不是 GPL。它允许符合许可定义的非商业个人研究/实验/测试，但不授予商业用途许可，也不允许转授许可。故本工程当前只将 donor 文档作为架构/流程参考，**不把 donor 的 `wcp.tar.gz` 二进制、脚本、Java 或源文件复制进公开 AU57x 工程或交付 ZIP**。如未来要分发 donor 派生代码，必须先核对具体许可义务与使用目的；不能把它与 LuKa 的 GPL-3.0 iAP2 LinkEngine 许可混为一谈。
+
+### 本轮输出与下一步
+
+- 已完成：读取 donor README、项目状态、技术参考和 LICENSE；对照 MU1005 原厂能力矩阵；完成上表的“协议层复用 / OEM 重写 / 不可复用二进制”分类。
+- 已有直接复用成果：LuKa 原版 iAP2 LinkEngine（R103），其 host tests 已通过；donor Congo 项目本轮只复用架构知识，不复制其受 PolyForm Noncommercial 约束的程序。
+- 下一关键动作：以 MU1005 私有原厂样本为依据，优先定位 Bluetooth RFCOMM owner/SCN 与 AirPlay/DIO 无线 session 回调；随后按表实现 MU1005 专用适配层。5GHz 与多手机管理并行保持条件化设计。
+- 状态不变：`RESEARCH_ONLY / NO_INSTALL / safe_to_flash=false / vehicle_verified=false`。
