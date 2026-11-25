@@ -26,6 +26,9 @@ static int check_log(void){int fd=open(LOG_PATH,O_RDONLY);char b[8192];ssize_t n
  if(!strstr(b,"role=untrusted_callsite")||!strstr(b,"stock_pc=0"))return 7;
  puts("R143_QNX_PROCESS_SHA_PIN_PASS");puts("R143_QNX_PTHREAD_CREATE_TRANSPARENT_FORWARD_PASS");puts("R143_QNX_STOCK_ORIGIN_TRACKER_PASS_SYNTHETIC_CALLSITE");puts("R143_QNX_THREAD_NAME_TO_OWNER_CORRELATION_PASS");puts("R143_QNX_NO_OEM_API_NO_IAP2_NO_MFI_NO_INSTALL");return 0;}
 int main(void){
+#ifdef __QNXNTO__
+ { const char *p=getenv("AU57X_R143_STOCK_PATH"); int fd, saved; char ch; if(!p||!p[0])p="/proc/boot/btstack"; fd=open(p,O_RDONLY); saved=errno; if(fd>=0){ssize_t nr=read(fd,&ch,1); printf("R143_QNX_PREFLIGHT path=%s open=PASS first_byte_read=%ld\\n",p,(long)nr);close(fd);}else{printf("R143_QNX_PREFLIGHT path=%s open=FAIL errno=%d\\n",p,saved);} }
+#endif
  if(getenv("R143_NEGATIVE")){
   pthread_t t; void *v=0;
   if (getenv("R143_EXPECT_REJECT")) {
