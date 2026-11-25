@@ -51,7 +51,24 @@ jobs:
           s=s.replace("curl -fsSL ", "curl --retry 4 --retry-all-errors --retry-delay 4 --connect-timeout 30 -fsSL ")
           p.write_text(s)
           PY
-          docker build --network=host --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t "$IMG" "$RUNNER_TEMP/toolchain" 2>&1 | tee r142/toolchain_build.log
+      - uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+          install: true
+      - name: Build and cache the pinned QNX 6.5 toolchain image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ runner.temp }}/toolchain
+          file: ${{ runner.temp }}/toolchain/Dockerfile
+          platforms: linux/amd64
+          target: base-env
+          build-args: |
+            BASE=base-8.5
+          tags: qnx65-armv7-toolchain:8.5
+          load: true
+          network: host
+          cache-from: type=gha,scope=qnx65-armv7-toolchain-v1
+          cache-to: type=gha,mode=max,scope=qnx65-armv7-toolchain-v1
       - name: Compile R142 for QNX 6.5 ARM and audit ELF
         run: |
           set -euxo pipefail
