@@ -60,3 +60,31 @@ SHA256：`42fd984ebbdccd11595bd45909683829565147c8cbc8a482618d6dd8e564d3bf`
 ### 结论更新
 
 现在已找到 iAP2 协议引擎调用物理 transport 的真实间接调用边界：接收数据必须由 transport object 的 receive slot（+0x2c）交给 link；链路参数由 slot（+0x18）提供。下一步不是继续改 `bt_update_recv`，而是沿 link-private 的 transport object 初始化/赋值 xref 回溯其 producer，并找出 BluetoothTransportComponent 如何填充该对象及 send 对应回调。USB 插件 ABI 可作参照，但还不能宣称蓝牙绑定已找到。
+
+
+## R104 第三轮：确认 send vtable slot，完成收发双向 ABI（2026-11-26）
+
+本轮直接使用上传 ELF 的 llvm-objdump 指令输出，纠正此前“send slot 尚未确认”的状态：
+
+- `transport_send_pkt` (0x2115c) 在函数尾部明确执行：从 link-private `+0x40` 取 transport object，再从 transport object `+0x28` 取函数指针并 BLX 调用；参数为 transport/private context、packet data pointer、packet length。
+- `transport_receive` (0x2111c) 从同一 transport object `+0x2c` 取函数指针并 BLX 调用。
+- `transport_get_link_params` (0x21144) 从同一 transport object `+0x18` 取函数指针并 BLX 调用。
+
+### 当前已确认的最小 transport vtable
+
+| 偏移 | 槽位用途 | 证据函数 |
+|---:|---|---|
+| +0x18 | get_link_params | transport_get_link_params |
+| +0x28 | send | transport_send_pkt |
+| +0x2C | receive | transport_receive |
+
+这三个槽位来自同一 transport object，且 send/receive 两条路径均由 iAP2 引擎间接调用。由此可以把“协议引擎所要求的底层物理 transport ABI”具体化，不再只是接口推测。
+
+### 尚未完成
+
+- 谁分配并填充 transport object；
+- BluetoothTransportComponent 实际如何构造这个 object；
+- callback owner/thread 与 RFCOMM socket/BlueSDK 的关系；
+- USB transport 的函数表是否布局完全相同（必须读取 USB ELF 代码验证，不能仅凭名字推断）。
+
+下一步沿 `link_create` 中的 link-private 初始化字段、`ipod_module` 入口及 `iap2_init` 配置解析回溯 transport object producer，并对照 USB transport ELF。保持 NO_INSTALL。
