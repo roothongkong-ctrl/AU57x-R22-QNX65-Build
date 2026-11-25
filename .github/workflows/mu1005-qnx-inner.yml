@@ -63,7 +63,22 @@ jobs:
           set -euxo pipefail
           bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee qnx-runtime-evidence/gnu.log
           docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee qnx-runtime-evidence/compiler.log
+      - name: Run continuous scenario with explicit IPC model on QNX
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            set -eux
+            s=project/source/src
+            b=project/source/legacy_mu1005/bluetooth
+            a=project/source/legacy_mu1005/airplay
+            i=integration/mu1005_si_native/inner_iap2
+            arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -DMU_CHAIN_MODEL_IPC -Wall -Wextra -O2 -ffunction-sections -fdata-sections -Wl,--gc-sections -Wl,--export-dynamic -I"$s" -I"$b" -I"$a" lab/mu1005_qnx_runtime/full_chain.c lab/mu1005_qnx_runtime/bootstrap_chain_fixture.c "$s"/{cp_cloud_pipeline,cp_wcp_autoconnect,cp_wcp_handoff,cp_radio_policy,cp_session_handoff,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_oem_boundary,cp_wireless,cp_event,cp_csm}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" "$i"/inner_iap2.c -lsocket -lc -o qnx-runtime-evidence/mu1005-model-chain
+          ' 2>&1 | tee qnx-runtime-evidence/model-build.log
+          QEMU_KEEP_LOG="$PWD/qnx-runtime-evidence/model-serial.log" QEMU_TIMEOUT=65 QEMU_RUN_SECS=20 sh toolchain/tests/qemu-run.sh "$PWD/qnx-runtime-evidence/mu1005-model-chain" 8.5 2>&1 | tee qnx-runtime-evidence/model-runtime.log
+          grep -F 'CHAIN_IAP2_BYTES_AND_MODEL_IPC_PASS_NO_OEM' qnx-runtime-evidence/model-runtime.log
+          grep -E 'Process [0-9]+ \(mu1005-model-chain\) exited status=0' qnx-runtime-evidence/model-serial.log
       - name: Run integrated dual-ended transport with real QNX socket manager
+        if: always()
         run: |
           set -euxo pipefail
           docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
