@@ -1,0 +1,1 @@
+Exact R138 source-only handoff from the current integrated project. SHA256 969aa9f3341964a3988eed8807c6f57ac58232cda9b442ca1a64e0ba10f4f325. No OEM binaries. QNX observer test deliberately rejects an unrelated image; it cannot prove live original-thread ownership, service registration, Bluetooth radio, or CarPlay. NO INSTALL.

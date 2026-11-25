@@ -1,0 +1,76 @@
+name: MU1005 exact native startup observer (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-native-observer-review]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  observer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      PIN: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+      IMG: qnx65-armv7-toolchain:8.5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact local observer sources
+        run: |
+          set -euxo pipefail
+          echo '969aa9f3341964a3988eed8807c6f57ac58232cda9b442ca1a64e0ba10f4f325  observer_review/source.tar.gz' | sha256sum -c -
+          mkdir -p observer-src build/observer
+          tar -xzf observer_review/source.tar.gz -C observer-src
+          (cd observer-src && sha256sum -c SOURCE_SHA256.txt)
+      - name: Prepare proven QNX toolchain
+        run: |
+          set -euxo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+          git init -q "$RUNNER_TEMP/toolchain"
+          git -C "$RUNNER_TEMP/toolchain" remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C "$RUNNER_TEMP/toolchain" fetch --depth 1 origin "$PIN"
+          git -C "$RUNNER_TEMP/toolchain" checkout -q FETCH_HEAD
+          git -C "$RUNNER_TEMP/toolchain" rev-parse HEAD | tee build/observer/toolchain_commit.txt
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t "$IMG" "$RUNNER_TEMP/toolchain" 2>&1 | tee build/observer/toolchain.log
+      - name: Build actual R138 native observer and loader
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src/observer-src "$IMG" bash -c '
+            set -euxo pipefail
+            CC=arm-unknown-nto-qnx6.5.0eabi-gcc
+            RE=arm-unknown-nto-qnx6.5.0eabi-readelf
+            "$CC" -dM -E -x c /dev/null > /src/build/observer/macros.txt
+            grep -q __QNXNTO__ /src/build/observer/macros.txt
+            grep -q __arm__ /src/build/observer/macros.txt
+            set -- -std=c11 -D_QNX_SOURCE=1 -include sys/types.h -O2 -Wall -Wextra -Werror -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp
+            "$CC" "$@" -fPIC -shared -Wl,--hash-style=sysv -Wl,--no-undefined -Inative_rf preload_review/r138_observer.c native_rf/r135_start_observer.c native_rf/sha256.c -lc -o /src/build/observer/libau57x_r138_preload_REVIEW.so
+            "$CC" "$@" ci/r138_observer_smoke.c -o /src/build/observer/r138_observer_smoke
+            "$RE" -h -d -Ws /src/build/observer/libau57x_r138_preload_REVIEW.so > /src/build/observer/observer_elf.txt
+            grep -Eq "Machine:.*ARM" /src/build/observer/observer_elf.txt
+            grep -Fq "Shared library: [libc.so.3]" /src/build/observer/observer_elf.txt
+            grep -Eq "FUNC[[:space:]]+GLOBAL.*r138_observation_status$" /src/build/observer/observer_elf.txt
+            sha256sum /src/build/observer/libau57x_r138_preload_REVIEW.so /src/build/observer/r138_observer_smoke > /src/build/observer/TARGET_SHA256.txt
+          ' 2>&1 | tee build/observer/compile.log
+      - name: Run actual observer in isolated QNX with wrong OEM image
+        run: |
+          set -euxo pipefail
+          python3 - "$RUNNER_TEMP/toolchain/tests/qemu-run.sh" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1])
+          s=p.read_text()
+          def replace(s,a,b):
+              if s.count(a)!=1: raise SystemExit("upstream anchor mismatch: "+a)
+              return s.replace(a,b,1)
+          s=replace(s,'cp "$BIN" "$WORK/$NAME"\n','cp "$BIN" "$WORK/$NAME"\ncp "$REVIEW_LIB" "$WORK/"\n')
+          s=replace(s,'EOF\n\ndocker run --rm --platform=linux/amd64 -v "$WORK":/w','EOF\nprintf "[data=copy] %s\\n" "$(basename "$REVIEW_LIB")" >> "$WORK/test.build"\n\ndocker run --rm --platform=linux/amd64 -v "$WORK":/w')
+          p.with_name("qemu-run-observer-review.sh").write_text(s)
+          PY
+          REVIEW_LIB="$PWD/build/observer/libau57x_r138_preload_REVIEW.so" QEMU_KEEP_LOG="$PWD/build/observer/boot.log" QEMU_RUN_SECS=20 QEMU_TIMEOUT=80 bash "$RUNNER_TEMP/toolchain/tests/qemu-run-observer-review.sh" "$PWD/build/observer/r138_observer_smoke" 8.5 2>&1 | tee build/observer/runtime.log
+          grep -Fq R138_WRONG_IMAGE_REJECTED_NO_OEM build/observer/runtime.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: MU1005-native-observer-QNX-NO-INSTALL
+          path: build/observer/
+          retention-days: 14
