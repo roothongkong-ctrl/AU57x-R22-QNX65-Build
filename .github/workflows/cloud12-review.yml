@@ -1,7 +1,7 @@
 name: AU57x cloud-only 12-step evidence and lifecycle gates (NO INSTALL)
 on:
   push:
-    branches: [main]
+    branches: [main, mu1005-wireless-integration-20261125]
   pull_request:
   workflow_dispatch:
 permissions:
