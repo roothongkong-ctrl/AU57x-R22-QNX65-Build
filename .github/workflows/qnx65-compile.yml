@@ -1,7 +1,7 @@
 name: AU57x R52 QNX6.5 ARMv7 (REVIEW ONLY)
 on:
   push:
-    branches: [main]
+    branches: [main, mu1005-wireless-integration-20261125]
   workflow_dispatch:
 permissions:
   contents: read
