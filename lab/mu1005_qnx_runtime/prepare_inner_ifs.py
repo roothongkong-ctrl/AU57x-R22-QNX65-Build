@@ -8,8 +8,8 @@ def replace(a,b):
     if s.count(a)!=1: raise SystemExit("unexpected upstream anchor: "+a)
     s=s.replace(a,b)
 replace('cp "$BIN" "$WORK/$NAME"', 'cp "$BIN" "$WORK/$NAME"\ncp "${QNX_TEST_INNER_LIB:?missing library}" "$WORK/libmu1005_inner_iap2_review.so"')
-replace('    display_msg "@@QNXRUN-START@@"','    /proc/boot/slogger &\n    waitfor /dev/slog 5\n    /proc/boot/random -t &\n    waitfor /dev/random 5\n    /proc/boot/io-pkt-v4-hc -v -ptcpip &\n    waitfor /dev/socket 15\n    /proc/boot/pidin ar\n    /proc/boot/sloginfo\n    /proc/boot/ifconfig lo0\n    display_msg "@@QNXRUN-START@@"')
-replace('devc-serdebug\n$NAME\nEOF','devc-serdebug\n[+raw +page_align perms=0555] slogger\n[+raw +page_align perms=0555] random\n[+raw +page_align perms=0555] io-pkt-v4-hc\n[+raw +page_align perms=0555] pidin\n[+raw +page_align perms=0555] sloginfo\n[+raw +page_align perms=0555] ifconfig\n[+raw +page_align perms=0555] libmu1005_inner_iap2_review.so\n$NAME\n[type=dir] /tmp\n[type=dir] /var\n[type=dir] /var/run\nEOF')
+replace('    display_msg "@@QNXRUN-START@@"','    /proc/boot/slogger &\n    waitfor /dev/slog 5\n    /proc/boot/random -t &\n    waitfor /dev/random 5\n    CACHE_NOP=1 /proc/boot/io-pkt-v4-hc -v -ptcpip &\n    waitfor /dev/socket 15\n    /proc/boot/pidin ar\n    /proc/boot/sloginfo\n    /proc/boot/ifconfig lo0\n    display_msg "@@QNXRUN-START@@"')
+replace('devc-serdebug\n[+raw +page_align perms=0555] libmu_lab_fixture.so\n$NAME\nEOF','devc-serdebug\n[+raw +page_align perms=0555] slogger\n[+raw +page_align perms=0555] random\n[+raw +page_align perms=0555] io-pkt-v4-hc\n[+raw +page_align perms=0555] pidin\n[+raw +page_align perms=0555] sloginfo\n[+raw +page_align perms=0555] ifconfig\n[+raw +page_align perms=0555] libmu1005_inner_iap2_review.so\n[+raw +page_align perms=0555] libmu_lab_fixture.so\n$NAME\n[type=dir] /tmp\n[type=dir] /var\n[type=dir] /var/run\nEOF')
 replace('export MKIFS_PATH=/w:$T/boot/sys:$T/bin:$T/lib:$T/usr/lib','''
 # Resolve real SDK network manager dependencies, never stub them.
 P=arm-unknown-nto-qnx6.5.0eabi

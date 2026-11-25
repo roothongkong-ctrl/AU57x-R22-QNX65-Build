@@ -2,7 +2,7 @@ name: MU1005 QNX inner iAP2 runtime integration (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/mu1005-qnx-inner.yml, lab/mu1005_qnx_runtime/inner_runtime.c, lab/mu1005_qnx_runtime/prepare_inner_ifs.py, lab/mu1005_qnx_runtime/full_chain.c, lab/mu1005_qnx_runtime/bootstrap_chain_fixture.c, lab/mu1005_qnx_runtime/vehicle_profile.h]
+    paths: [.github/workflows/mu1005-qnx-inner.yml, lab/mu1005_qnx_runtime/inner_runtime.c, lab/mu1005_qnx_runtime/prepare_inner_ifs.py, lab/mu1005_qnx_runtime/full_chain.c, lab/mu1005_qnx_runtime/bootstrap_chain_fixture.c, lab/mu1005_qnx_runtime/vehicle_profile.h, lab/mu1005_qnx_runtime/lab_fixture_provider.c, lab/mu1005_qnx_runtime/prepare_fixture_ifs.py]
   workflow_dispatch:
 permissions:
   contents: read
@@ -37,6 +37,8 @@ jobs:
           b=project/source/legacy_mu1005/bluetooth
           a=project/source/legacy_mu1005/airplay
           i=integration/mu1005_si_native/inner_iap2
+          gcc -std=gnu99 -fPIC -shared -Wall -Wextra lab/mu1005_qnx_runtime/lab_fixture_provider.c -o qnx-runtime-evidence/libmu_lab_fixture_host.so
+          export MU_LAB_FIXTURE_PATH="$PWD/qnx-runtime-evidence/libmu_lab_fixture_host.so"
           gcc -std=gnu99 -D_DEFAULT_SOURCE -Wall -Wextra -O2 -ffunction-sections -fdata-sections -Wl,--gc-sections -Wl,--export-dynamic -I"$s" -I"$b" -I"$a" lab/mu1005_qnx_runtime/full_chain.c lab/mu1005_qnx_runtime/bootstrap_chain_fixture.c "$s"/{cp_cloud_pipeline,cp_wcp_autoconnect,cp_wcp_handoff,cp_radio_policy,cp_session_handoff,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_oem_boundary,cp_wireless,cp_event,cp_csm}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" "$i"/{inner_iap2,inner_socket,mm_peer}.c -ldl -o qnx-runtime-evidence/host-chain
           qnx-runtime-evidence/host-chain | tee qnx-runtime-evidence/host-chain.log
           grep -F 'CHAIN_IAP2_BYTES_AND_SOCKET_ROUND_TRIP_PASS_NO_OEM' qnx-runtime-evidence/host-chain.log
@@ -69,6 +71,15 @@ jobs:
           bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee qnx-runtime-evidence/gnu.log
           docker buildx build --load --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 --cache-from type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1 --cache-to type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1,mode=min,ignore-error=true -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee qnx-runtime-evidence/compiler.log
           docker run --rm --platform linux/amd64 qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc --version | tee qnx-runtime-evidence/compiler-version.log
+      - name: Build isolated QNX test provider
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -fPIC -shared -Wl,--no-undefined -Wall -Wextra lab/mu1005_qnx_runtime/lab_fixture_provider.c -lc -o qnx-runtime-evidence/libmu_lab_fixture.so
+            arm-unknown-nto-qnx6.5.0eabi-readelf -sW qnx-runtime-evidence/libmu_lab_fixture.so
+          ' | tee qnx-runtime-evidence/fixture-exports.log
+          python3 lab/mu1005_qnx_runtime/prepare_fixture_ifs.py toolchain/tests/qemu-run.sh
+          echo "QNX_LAB_FIXTURE=$PWD/qnx-runtime-evidence/libmu_lab_fixture.so" >> "$GITHUB_ENV"
       - name: Run continuous scenario with explicit IPC model on QNX
         run: |
           set -euxo pipefail

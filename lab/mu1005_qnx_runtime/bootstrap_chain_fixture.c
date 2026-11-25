@@ -19,17 +19,13 @@ static int up=1,control_up=1,peer_ok=0,wired=1;
 static int airplay_up=1;
 static unsigned unrelated_count=0;
 static struct cp_oem_assertions proof={0,1,1,1,1,0};
-static unsigned cert_calls,signature_calls,tx_frames;
-int APSMFiPlatform_CopyCertificate(uint8_t **bytes,size_t *len){
- *bytes=malloc(4);if(!*bytes)return -1;
- memcpy(*bytes,"CERT",4);*len=4;cert_calls++;return 0;
-}
-int APSMFiPlatform_CreateSignature(const uint8_t *challenge,size_t len,
-                                   uint8_t **bytes,size_t *out){
- if(len!=20)return -1;
- *bytes=malloc(20);if(!*bytes)return -1;
- for(unsigned i=0;i<20;i++)(*bytes)[i]=(uint8_t)(challenge[i]^0x55);
- *out=20;signature_calls++;return 0;
+static unsigned tx_frames;
+static unsigned (*fixture_cert_count)(void),(*fixture_sig_count)(void);
+static int fixture_counts(void *h){
+ void *a=dlsym(h,"mu_lab_cert_calls"),*z=dlsym(h,"mu_lab_signature_calls");
+ if(!a||!z||sizeof a!=sizeof fixture_cert_count)return -1;
+ memcpy(&fixture_cert_count,&a,sizeof a);memcpy(&fixture_sig_count,&z,sizeof z);
+ return 0;
 }
 static int bt(void*p,uint32_t e,uint32_t g){(void)p;return up&&e==8&&g==4;}
 static int ctl(void*p,uint32_t e,uint32_t g){(void)p;return control_up&&e==8&&g==4;}
@@ -86,8 +82,17 @@ int chain_bootstrap_fixture(void){
  static const struct cp_stock_owner o={NULL,bt,stock_fingerprint,ctl,wi,release};
  static const struct cp_s4_external ext={NULL,bt,ctl,wi,peer,other};
  uint8_t b[256],message[64];const uint8_t mac[6]={1,2,3,4,5,6};
- void *lib=dlopen(NULL,RTLD_NOW);assert(lib);
- assert(cp_stock_mfi_bind(&stock,lib,&o,8,4)==CP_STOCK_OK);
+ #ifdef __QNXNTO__
+ void *lib=dlopen("/proc/boot/libmu_lab_fixture.so",RTLD_NOW|RTLD_LOCAL);
+#else
+ const char *path=getenv("MU_LAB_FIXTURE_PATH");
+ assert(path);void *lib=dlopen(path,RTLD_NOW|RTLD_LOCAL);
+#endif
+ if(!lib){fprintf(stderr,"LAB_PROVIDER_LOAD:%s\n",dlerror());return 2;}
+ assert(fixture_counts(lib)==0);
+ int br=cp_stock_mfi_bind(&stock,lib,&o,8,4);
+ printf("CHAIN:LAB_PROVIDER_BIND_RESULT=%d\n",br);
+ assert(br==CP_STOCK_OK);
  assert(cp_s4_init(&s,&stock,8,&ext)==CP_LK_OK);
  static const char *const ips[]={MU_LAB_AP_IP};
  static const struct cp_session config={
@@ -125,7 +130,7 @@ int chain_bootstrap_fixture(void){
  /* A real stream delivers AA00; not a function call to the isolated auth FSM. */
  control_msg(message,0xaa00,NULL,0);
  n=frame(b,0x40,43,99,10,message,6);
- feed(b,n,4);assert(cert_calls==1);
+ feed(b,n,4);assert(fixture_cert_count()==1);
  assert(s.auth.stage==CP_AUTH_CERT_PENDING&&s.link.outbound_seq==100);
  flush();
  n=frame(b,0x40,43,100,0,NULL,0);
@@ -134,7 +139,7 @@ int chain_bootstrap_fixture(void){
  uint8_t chal[20];for(int i=0;i<20;i++)chal[i]=(uint8_t)i;
  control_msg(message,0xaa02,chal,sizeof chal);
  n=frame(b,0x40,44,100,10,message,30);
- feed(b,n,6);assert(signature_calls==1);
+ feed(b,n,6);assert(fixture_sig_count()==1);
  assert(s.auth.stage==CP_AUTH_SIGNATURE_PENDING&&s.link.outbound_seq==101);
  flush();
  n=frame(b,0x40,44,101,0,NULL,0);
@@ -144,7 +149,7 @@ int chain_bootstrap_fixture(void){
  n=frame(b,0x40,45,101,10,message,6);
  feed(b,n,8);assert(cp_s4_authenticated(&s));
  flush();
- assert(cert_calls==1&&signature_calls==1&&s.auth.stage==CP_AUTH_SUCCEEDED);
+ assert(fixture_cert_count()==1&&fixture_sig_count()==1&&s.auth.stage==CP_AUTH_SUCCEEDED);
  /* iAP2 identification comes from a live OEM configuration, not a fake
   * hard-coded identity. 1D01 must be ACKed before the phone's 1D02. */
  control_msg(message,0x1d00,NULL,0);
