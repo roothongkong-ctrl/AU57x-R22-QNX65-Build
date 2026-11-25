@@ -16,6 +16,17 @@ int main(void){
  assert(mu_ap_live_session(&s,&ap,&receiver)==0&&s.wifi.channel==6&&s.wifi.ssid==ap.ssid&&s.wifi.passphrase==ap.key&&s.wifi.bssid6==ap.bssid);
  unsigned char b[1024];size_t n;assert(cp_encode_wifi_5703(&s.wifi,b,sizeof b,&n)==0&&b[4]==0x57&&b[5]==3);
  assert(cp_encode_start_4301(&s,b,sizeof b,&n)==0&&b[4]==0x43&&b[5]==1);
+ /* Direct callers must not bypass the same snapshot validation as uaputl. */
+ struct mu_ap_live bad=ap;
+ bad.channel=15;assert(mu_ap_live_session(&s,&bad,&receiver)<0);
+ bad=ap;bad.channel=36;assert(mu_ap_live_session(&s,&bad,&receiver)==0&&s.wifi.channel==36);
+ bad=ap;memset(bad.bssid,0,6);assert(mu_ap_live_session(&s,&bad,&receiver)<0);
+ bad=ap;bad.bssid[0]=1;assert(mu_ap_live_session(&s,&bad,&receiver)<0);
+ bad=ap;memset(bad.key,'z',64);bad.key[64]=0;assert(mu_ap_live_session(&s,&bad,&receiver)<0);
+ bad=ap;memset(bad.key,'a',64);bad.key[64]=0;
+ /* Valid hexadecimal PSK passes local validation; the stock encoder may impose additional rules. */
+ bad=ap;bad.key[1]='\x01';assert(mu_ap_live_session(&s,&bad,&receiver)<0);
+ mu_ap_live_clear(&bad,sizeof bad);
  receiver.public_key=NULL;assert(mu_ap_live_session(&s,&ap,&receiver)<0);
  mu_ap_live_clear(&ap,sizeof ap);for(size_t i=0;i<sizeof ap;i++)assert(((unsigned char*)&ap)[i]==0);
  puts("PASS stock output fixture -> live snapshot -> existing 5703/4301 encoders; no physical AP");

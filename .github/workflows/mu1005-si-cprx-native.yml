@@ -2,7 +2,7 @@ name: MU1005 unified parallel development (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/mu1005-si-cprx-native.yml, integration/mu1005_si_native/**, tools/ci/mu1005_gnu_mirrors.sh]
+    paths: [.github/workflows/mu1005-si-cprx-native.yml, integration/mu1005_si_native/**, tools/ci/mu1005_gnu_mirrors.sh, tools/mu1005_oem_inventory.py]
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,6 +16,8 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p review/{payload,source,evidence}
+          python3 -m py_compile tools/mu1005_oem_inventory.py
+          cp tools/mu1005_oem_inventory.py review/source/
           git fetch --depth 1 origin 7f595231394d97091ec0fee209677b6e45fd50dc
           test "$(git rev-parse FETCH_HEAD)" = 7f595231394d97091ec0fee209677b6e45fd50dc
           mkdir r85

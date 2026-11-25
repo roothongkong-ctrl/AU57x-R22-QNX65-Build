@@ -29,6 +29,22 @@ static int field(const char*b,const char*prefix,char*out,size_t cap){
 static int hex(int c){if(c>='0'&&c<='9')return c-'0';if(c>='a'&&c<='f')return c-'a'+10;if(c>='A'&&c<='F')return c-'A'+10;return -1;}
 static int mac(const char*s,uint8_t*b){unsigned any=0;if(strlen(s)!=17)return -1;
  for(unsigned i=0;i<6;i++){int a=hex(s[i*3]),c=hex(s[i*3+1]);if(a<0||c<0||(i<5&&s[i*3+2]!=':'))return -1;b[i]=(uint8_t)(16*a+c);any|=b[i];}return any&&!(b[0]&1)?0:-1;}
+/* Validate both driver-parsed snapshots and direct caller-supplied snapshots.
+ * These are wire-format bounds, not proof of regional channel availability. */
+static int ap_valid(const struct mu_ap_live *s){
+ size_t n;unsigned any=0;
+ if(!s||s->security!=2||!memchr(s->ssid,0,sizeof s->ssid)||
+    !memchr(s->key,0,sizeof s->key)||!s->ssid[0]||
+    !((s->channel>=1&&s->channel<=14)||(s->channel>=32&&s->channel<=177)))return 0;
+ for(unsigned i=0;i<6;i++)any|=s->bssid[i];
+ if(!any||(s->bssid[0]&1))return 0;
+ n=strlen(s->key);if(n<8||n>64)return 0;
+ for(size_t i=0;i<n;i++){
+  unsigned char k=(unsigned char)s->key[i];
+  if(n==64?hex(k)<0:k<32||k>126)return 0;
+ }
+ return 1;
+}
 static int sample(struct mu_ap_live*s,mu_ap_query q,void*ctx){
  char buf[1024]={0},v[128]={0},band[16]={0},*end;long ch;int rc=-1;
  for(unsigned i=0;i<6;i++){
@@ -45,7 +61,7 @@ static int sample(struct mu_ap_live*s,mu_ap_query q,void*ctx){
   case 5:if(field(buf,"WPA passphrase = ",s->key,sizeof s->key))goto done;
    {size_t n=strlen(s->key);if(n<8||n>64)goto done;if(n==64)for(size_t j=0;j<n;j++)if(hex(s->key[j])<0)goto done;}break;
   }
- }rc=0;
+ }rc=ap_valid(s)?0:-1;
 done:mu_ap_live_clear(buf,sizeof buf);mu_ap_live_clear(v,sizeof v);return rc;
 }
 int mu_ap_live_read(struct mu_ap_live*out,mu_ap_query q,void*ctx){
@@ -57,9 +73,7 @@ int mu_ap_live_read(struct mu_ap_live*out,mu_ap_query q,void*ctx){
 }
 int mu_ap_live_session(struct cp_session*out,const struct mu_ap_live*ap,const struct cp_session*receiver){
  unsigned char frame[4096];size_t n=0;struct cp_session s;int rc=-1;
- if(!out||!ap||!receiver||ap->security!=2||!ap->channel||
-    !memchr(ap->ssid,0,sizeof ap->ssid)||!memchr(ap->key,0,sizeof ap->key)||
-    !ap->ssid[0]||strlen(ap->key)<8||receiver->airplay_port!=5000)return -1;
+ if(!out||!receiver||!ap_valid(ap)||receiver->airplay_port!=5000)return -1;
  s=*receiver;s.wifi.ssid=ap->ssid;s.wifi.passphrase=ap->key;s.wifi.security=ap->security;s.wifi.channel=ap->channel;s.wifi.bssid6=ap->bssid;
  if(cp_encode_wifi_5703(&s.wifi,frame,sizeof frame,&n)==CP_OK&&
     cp_encode_start_4301(&s,frame,sizeof frame,&n)==CP_OK){*out=s;rc=0;}

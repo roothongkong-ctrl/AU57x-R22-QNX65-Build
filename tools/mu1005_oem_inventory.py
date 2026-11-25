@@ -4,6 +4,7 @@ import argparse, hashlib, json, os, re, struct
 from pathlib import Path
 
 PIN = {
+    "btstack": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
     "smartphone_integrator": "2c61e7a17d5c77df2f97023284b948b66dc4052010acad74be9bfa63b339de0b",
     "dio_manager": "e40b5bf9df3f96221ac01bc0484e06493e6c58e60cca32d2547939ff1d56f63c",
     "libairplay.so": "193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b5",
@@ -67,9 +68,11 @@ def main():
     a=p.parse_args()
     if not a.root.is_dir() or a.out.exists():p.error("root must be directory; output must not exist")
     root=a.root.resolve(); found={k:[] for k in sorted(set(PIN)|AUX)}
-    errors=[]
+    errors=[]; paths={}
     for folder,dirs,files in os.walk(root,followlinks=False):
         dirs.sort()
+        for n in sorted(files):
+            paths.setdefault(n,[]).append(Path(folder)/n)
         for n in sorted(set(files)&set(found)):
             f=Path(folder)/n
             if f.is_symlink():continue
@@ -82,12 +85,41 @@ def main():
                 found[n].append(entry)
             except OSError as e:errors.append({"relative_path":str(f.relative_to(root)),"error":str(e)})
     missing=[n for n in PIN if not any(x.get("matches_pinned") for x in found[n])]
-    result={"scope":"PRIVATE_OFFLINE_EVIDENCE_ONLY","pinned_set_found":not missing,
+    # Resolve the full DT_NEEDED closure without running an OEM executable.
+    # Preserve candidates rather than guessing QNX LD_LIBRARY_PATH precedence.
+    # Refuse symlinks outside the extracted tree. Scan each resolved file once.
+    queue=sorted({dep for entries in found.values() for x in entries
+                  for dep in x.get("elf",{}).get("needed",[])})
+    deps={}; cache={}
+    while queue:
+        n=queue.pop(0)
+        if n in deps:continue
+        choices=[]
+        for p in paths.get(n,[]):
+            try:
+                target=p.resolve(strict=True)
+                if not target.is_relative_to(root) or not target.is_file():continue
+                if target not in cache:
+                    cache[target]={"sha256":sha(target),"elf":inventory(target)}
+                x=cache[target]
+                choices.append({"relative_path":str(p.relative_to(root)),
+                                "resolved_path":str(target.relative_to(root)),
+                                "sha256":x["sha256"],"needed":x["elf"]["needed"]})
+                queue.extend(dep for dep in x["elf"]["needed"] if dep not in deps)
+            except (OSError,RuntimeError,ValueError,struct.error) as e:
+                errors.append({"relative_path":str(p.relative_to(root)),"error":str(e)})
+        deps[n]=choices
+    missing_deps=sorted(n for n,v in deps.items() if not v)
+    ambiguous_deps=sorted(n for n,v in deps.items() if len({x["sha256"] for x in v})>1)
+    result={"scope":"PRIVATE_OFFLINE_EVIDENCE_ONLY",
+            "dependency_candidates":deps,"unresolved_dependencies":missing_deps,
+            "ambiguous_dependencies":ambiguous_deps,"pinned_set_found":not missing,
             "missing_or_mismatched":missing,"files":found,"errors":errors,
             "runtime_verified":False,"mfi_verified":False,"installable":False}
     with a.out.open("x",encoding="utf-8") as f:json.dump(result,f,indent=2,ensure_ascii=False);f.write("\n")
     print("Matched pinned files:",len(PIN)-len(missing),"/",len(PIN))
     print("Missing/mismatched:",", ".join(missing) or "none")
+    print("Dependency names:",len(deps),"unresolved:",len(missing_deps),"ambiguous:",len(ambiguous_deps))
     print("Offline evidence only; no firmware changed.")
     return 2 if missing else 0
 if __name__=="__main__":raise SystemExit(main())
