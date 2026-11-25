@@ -41,7 +41,23 @@ static int digest_hex(const char*path,char out[65]){unsigned char b[8192],d[32];
 static size_t add(char*d,size_t cap,size_t n,const char*s){while(s&&*s&&n+1<cap)d[n++]=*s++;if(cap)d[n<cap?n:cap-1]=0;return n;}
 static size_t add_tid(char*d,size_t cap,size_t n,pthread_t t){static const char h[]="0123456789abcdef";const unsigned char*p=(const unsigned char*)&t;size_t i;for(i=0;i<sizeof t&&n+2<cap;i++){d[n++]=h[p[i]>>4];d[n++]=h[p[i]&15];}if(cap)d[n<cap?n:cap-1]=0;return n;}
 static void log_line(const char*event,const char*role,pthread_t tid,const char*name,uintptr_t caller,uintptr_t start,int stock,int rc,int target,int current){char b[512];size_t n=0;int fd;char num[32];b[0]=0;n=add(b,sizeof b,n,"event=");n=add(b,sizeof b,n,event);if(role){n=add(b,sizeof b,n," role=");n=add(b,sizeof b,n,role);}n=add(b,sizeof b,n," pid=");snprintf(num,sizeof num,"%ld",(long)getpid());n=add(b,sizeof b,n,num);n=add(b,sizeof b,n," tid=");n=add_tid(b,sizeof b,n,tid);if(name){n=add(b,sizeof b,n," name=");for(size_t i=0;name[i]&&i<80&&n+2<sizeof b;i++){unsigned char c=(unsigned char)name[i];b[n++]=(c>=32&&c<=126)?(char)c:'?';}b[n]=0;}if(caller){n=add(b,sizeof b,n," caller=");snprintf(num,sizeof num,"0x%lx",(unsigned long)caller);n=add(b,sizeof b,n,num);}if(start){n=add(b,sizeof b,n," start=");snprintf(num,sizeof num,"0x%lx",(unsigned long)start);n=add(b,sizeof b,n,num);}if(stock>=0){n=add(b,sizeof b,n," stock_pc=");snprintf(num,sizeof num,"%d",stock);n=add(b,sizeof b,n,num);}if(rc>=0){n=add(b,sizeof b,n," rc=");snprintf(num,sizeof num,"%d",rc);n=add(b,sizeof b,n,num);}if(target>=0){n=add(b,sizeof b,n," target_observed=");snprintf(num,sizeof num,"%d",target);n=add(b,sizeof b,n,num);}if(current>=0){n=add(b,sizeof b,n," caller_observed=");snprintf(num,sizeof num,"%d",current);n=add(b,sizeof b,n,num);}n=add(b,sizeof b,n,"\n");fd=open(log_path,O_WRONLY|O_CREAT|O_APPEND,0600);if(fd>=0){ssize_t wr=write(fd,b,n);(void)wr;close(fd);}}
-static void resolve_symbols(void){void*p=dlsym(RTLD_NEXT,"pthread_create");if(p&&sizeof real_create==sizeof p)memcpy(&real_create,&p,sizeof real_create);p=dlsym(RTLD_NEXT,"pthread_setname_np");if(!p){libc_handle=dlopen("libc.so.3",RTLD_NOW|RTLD_LOCAL);if(libc_handle)p=dlsym(libc_handle,"pthread_setname_np");}if(p&&sizeof real_setname==sizeof p)memcpy(&real_setname,&p,sizeof real_setname);}
+static void resolve_symbols(void){
+    void *p = dlsym(RTLD_NEXT, "pthread_create");
+    if (!p) {
+        libc_handle = dlopen("libc.so.3", RTLD_NOW | RTLD_LOCAL);
+        if (libc_handle) p = dlsym(libc_handle, "pthread_create");
+    }
+    if (p && sizeof real_create == sizeof p)
+        memcpy(&real_create, &p, sizeof real_create);
+
+    p = dlsym(RTLD_NEXT, "pthread_setname_np");
+    if (!p) {
+        if (!libc_handle) libc_handle = dlopen("libc.so.3", RTLD_NOW | RTLD_LOCAL);
+        if (libc_handle) p = dlsym(libc_handle, "pthread_setname_np");
+    }
+    if (p && sizeof real_setname == sizeof p)
+        memcpy(&real_setname, &p, sizeof real_setname);
+}
 __attribute__((constructor)) static void r143_init(void) {
     char digest[65];
     const char *opt = getenv("AU57X_R143_PROBE");
