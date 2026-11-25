@@ -58,6 +58,9 @@ jobs:
           set -euxo pipefail
           bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee qnx-runtime-evidence/gnu.log
           docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee qnx-runtime-evidence/compiler.log
+      - name: Build ICU 58.2 data candidate and check SDK XML exports
+        continue-on-error: true
+        run: bash lab/mu1005_qnx_runtime/build_dependency_candidates.sh
       - name: Build QNX process and load previous exact shared library
         run: |
           set -euxo pipefail

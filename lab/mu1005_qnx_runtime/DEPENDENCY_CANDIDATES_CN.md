@@ -1,0 +1,2 @@
+# 本轮修复
+45541185606 与 45541651218 均因 mkifs 不接受 align=4096 失败，尚未进入 QNX guest。根据 QNX 6.5 官方 mkifs 文档改为 +page_align，保留 +raw 与精确字节对比。新增公开 ICU 58.2 官方源码包中完整小端数据的 ARM ELF 候选库构建，验证 icudt58_dat 实际大小与 SONAME；并验证 LuKa SDK libxml2.so.1 四个真实导出。候选构建失败不阻断独立 QNX 加载诊断。未使用假符号或空数据。原厂 ABI 和运行期兼容仍未证明，禁止安装。
