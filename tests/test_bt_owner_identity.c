@@ -22,6 +22,15 @@ static void identity_cases(void){
  put(f.f+4,0x500004);
  assert(mu_bt_osapi_thread_matches(0x800000,9,rd,&f)==1);
  assert(!mu_bt_osapi_identity_matches(&id,9,rd,&f));
+ f=init();
+ assert(mu_bt_osapi_target(0x800000,rd,&f,&id)==1&&id.tid==9);
+ assert(!mu_bt_osapi_identity(0x800000,0,rd,&f,&id)&&id.tid==0);
+ assert(mu_bt_osapi_target(0x800000,rd,&f,&id)==1);
+ assert(!mu_bt_osapi_identity_matches(&id,7,rd,&f));
+ put(f.a+0x20,0);
+ assert(!mu_bt_osapi_target(0x800000,rd,&f,&id)&&id.tid==0);
+ f=init();f.change=4;assert(!mu_bt_osapi_target(0x800000,rd,&f,&id));
+ puts("PASS startup discovers actual AO thread without treating caller as owner");
  puts("PASS mapped libcomm anchors and original object lifetime identity");
 }
 int main(void){identity_cases();Fixture f=init();assert(mu_bt_osapi_thread_matches(0x800000,9,rd,&f)==1&&f.calls==6);f=init();assert(!mu_bt_osapi_thread_matches(0x800000,10,rd,&f));f=init();assert(!mu_bt_osapi_thread_matches(0x900000,9,rd,&f));f=init();f.os[22]=0;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));f=init();f.a[0xf0]=1;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));f=init();f.a[4]=0;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));f=init();f.change=4;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));for(unsigned i=1;i<=6;i++){f=init();f.fail=i;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));}f=init();assert(!mu_bt_osapi_thread_matches(0x800001,9,rd,&f)&&!f.calls);puts("PASS OSAPI ActiveObject identity, thread ID, stable lifetime (mock reads only)");}

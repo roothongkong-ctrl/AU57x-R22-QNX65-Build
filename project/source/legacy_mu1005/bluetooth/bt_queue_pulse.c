@@ -15,6 +15,7 @@ void mu_bt_pulse_disable(MuBtPulse*p){if(p)__sync_lock_release(&p->active);}
 int mu_bt_pulse_idle(MuBtPulse*p){return p&&load(&p->pending)==0;}
 #if defined(__QNXNTO__) && defined(__arm__) && UINTPTR_MAX == UINT32_MAX
 #include "bt_owner_identity.h"
+#include "bt_startup_snapshot.h"
 #include <time.h>
 /* Native util::SharedPtrDefaultBase is three words, not two. */
 typedef struct {uint32_t control,object,counter;} Share;
@@ -27,10 +28,22 @@ typedef struct {const Vtable*vptr;} Event;
 static struct {
  MuBtPulse pulse;MuBtQueuePulseBinding b;MuBtThreadIdentity thread;Share ao;
  Construct construct;Copy copy;Destroy destroy;Enque enque;pthread_t worker;
- int attempted,started,stopped,held,valid_share;
+ MuBtNotifyBinding bootstrap;
+ int attempted,started,stopped,held,valid_share,bootstrap_needed;
 } q;
 static uint32_t tid(void){return (uint32_t)(uintptr_t)pthread_self();}
-static int dispatch(void*p){(void)p;return mu_bt_notify_periodic_dispatch()==0;}
+static int dispatch(void*p){
+ (void)p;
+ /* Never treat the startup thread's authority as event thread authority. */
+ if(tid()!=q.thread.tid||!q.b.owner.owner_ready||
+    q.b.owner.owner_ready(q.b.owner.opaque)!=1||
+    !mu_bt_osapi_identity_matches(&q.thread,tid(),q.b.owner.read_live,q.b.owner.opaque))return 0;
+ if(q.bootstrap_needed){
+  if(mu_bt_notify_bind_queue_only(&q.bootstrap)!=0)return 0;
+  q.bootstrap_needed=0;
+ }
+ return mu_bt_notify_periodic_dispatch()==0;
+}
 static int run(void*p){(void)p;(void)mu_bt_pulse_execute(&q.pulse,dispatch,NULL);return 0;}
 static int matches(void*p,const void*other){(void)p;(void)other;return 0;}
 static void event_dtor(void*p){(void)p;}
@@ -68,19 +81,30 @@ static void*producer(void*p){
  }
  return NULL;
 }
-int mu_bt_queue_pulse_start(const MuBtQueuePulseBinding*b){
+static int begin(const MuBtQueuePulseBinding*b,const MuBtNotifyBinding*boot,int(*startup)(void*),void*ctx){
  MuBtThreadIdentity id;uint8_t f[16];const MuBtOwner*o;
  if(!b||q.attempted||!b->enter||!b->leave)return -1;
  o=&b->owner;
- if(!o->owner_ready||!o->read_live||o->owner_ready(o->opaque)!=1||
- !mu_bt_osapi_identity(o->comm_load_bias,tid(),o->read_live,o->opaque,&id)||!resolve(b))return -1;
+ if(!o->owner_ready||!o->read_live)return -1;
+ if(boot&&(!startup||startup(ctx)!=1||!boot->handoff||!boot->prepared_fd||
+    boot->owner.opaque!=o->opaque||boot->owner.read_live!=o->read_live||
+    boot->owner.owner_ready!=o->owner_ready||boot->owner.services_address!=o->services_address||
+    boot->owner.comm_load_bias!=o->comm_load_bias||
+    !boot->proof.original_image_verified||boot->proof.original_image_verified(boot->proof.opaque)!=1||
+    au100_route_select(boot->proof.route_evidence)!=AU100_GRAFT_RFCOMM_ROUTE))return -1;
+ if(!boot&&o->owner_ready(o->opaque)!=1)return -1;
  if(b->enter(b->lease_context)!=1)return -1;
- if(!mu_bt_osapi_identity_matches(&id,tid(),o->read_live,o->opaque)||
+ if(!resolve(b)||!mu_bt_sdk_started(o->services_address,o->read_live,o->opaque)||
+    !(boot?mu_bt_osapi_target(o->comm_load_bias,o->read_live,o->opaque,&id):
+      mu_bt_osapi_identity(o->comm_load_bias,tid(),o->read_live,o->opaque,&id))||
     o->read_live(o->opaque,id.factory,f,sizeof f)!=1||le(f+4)!=id.shared_control||
-    le(f+8)!=id.active_object||!le(f+12)||o->owner_ready(o->opaque)!=1){
+    le(f+8)!=id.active_object||!le(f+12)||
+    !mu_bt_osapi_identity_matches(&id,id.tid,o->read_live,o->opaque)||
+    (boot?startup(ctx)!=1:o->owner_ready(o->opaque)!=1)){
   b->leave(b->lease_context);return -1;
  }
  q.attempted=1;q.b=*b;q.thread=id;
+ if(boot){q.bootstrap=*boot;q.bootstrap_needed=1;}
  q.construct=(Construct)(uintptr_t)(b->util_load_bias+0x6f5f4u);
  q.copy=(Copy)(uintptr_t)(b->util_load_bias+0x6e3f0u);
  q.destroy=(Destroy)(uintptr_t)(b->util_load_bias+0x6fc5cu);
@@ -93,6 +117,11 @@ int mu_bt_queue_pulse_start(const MuBtQueuePulseBinding*b){
  __sync_lock_test_and_set(&q.pulse.active,1u);
  if(pthread_create(&q.worker,NULL,producer,NULL)!=0){mu_bt_pulse_disable(&q.pulse);q.stopped=1;return -1;}
  q.started=1;return 0;
+}
+int mu_bt_queue_pulse_start(const MuBtQueuePulseBinding*b){return begin(b,NULL,NULL,NULL);}
+int mu_bt_queue_bootstrap(const MuBtQueuePulseBinding*b,const MuBtNotifyBinding*boot,int(*startup)(void*),void*ctx){
+ if(!boot||!startup)return -1;
+ return begin(b,boot,startup,ctx);
 }
 int mu_bt_queue_pulse_stop(void){
  if(!q.started||tid()==q.thread.tid)return -1;
@@ -108,6 +137,7 @@ int mu_bt_queue_pulse_retire(void){
 }
 #else
 int mu_bt_queue_pulse_start(const MuBtQueuePulseBinding*b){(void)b;return -1;}
+int mu_bt_queue_bootstrap(const MuBtQueuePulseBinding*b,const MuBtNotifyBinding*n,int(*s)(void*),void*c){(void)b;(void)n;(void)s;(void)c;return -1;}
 int mu_bt_queue_pulse_stop(void){return -1;}
 int mu_bt_queue_pulse_retire(void){return -1;}
 #endif
