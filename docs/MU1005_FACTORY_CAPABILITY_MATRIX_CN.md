@@ -5,7 +5,7 @@
 | 子系统 | 已证实 | 未证实 / 不可推断 | 当前研发动作 |
 |---|---|---|---|
 | Bluetooth 高层 | R106/001 快照中 btstack、bluetooth、smartphone_integrator 进程存在；R29 静态样本中 bluetooth 有 DSI 对象候选、iapEnabled / bluetooth.enableIap / SERVICETYPE_IAP2 字符串 | 进程存在和配置字符串不证明 iAP2 服务已注册；btstack 未见可直接移植的命名 iAP2 endpoint；真实 RFCOMM owner、回调序列、iAP2 SCN 未证明 | 以 R100 factory-first / reversible-graft gate 为准；只接受真实 owner、endpoint、注册参数与撤销/恢复证据 |
-| RFCOMM / iAP2 | R101 静态审计中 HFP=7、SIM=4 经过同一注册函数；R103 将上游 iAP2 LinkEngine 与 8 字节 RFCOMM generation frame 桥接，具备主机 TCP lab | 7/4 不能推断为 iAP2 通道；R103 Rust QNX ARM 可执行尚未构建；真实 BlueSDK 回调/手机握手未验证 | 复验 R103 Rust/TCP CI；在 C/Rust 边界固定 generation、断链和 ACK；生产接入仍需 OEM iAP2 owner |
+| RFCOMM / iAP2 | R101 静态审计中 HFP=7、SIM=4 经过同一注册函数；R103 将上游 iAP2 LinkEngine 与 8 字节 RFCOMM generation frame 桥接；GitHub Actions 45634439847 的上游 7/7、bridge 2/2、TCP lab 13/13 host 测试通过 | 7/4 不能推断为 iAP2 通道；R103 Rust QNX ARM 可执行尚未构建；R103 Rust QNX ARM 目标仍未构建；真实 BlueSDK 回调/手机握手未验证 | 保留已通过的 R103 Rust/TCP host 基线；下一步核对 QNX Rust 运行时可用性和 C/Rust ABI；生产接入仍需 OEM iAP2 owner |
 | MFi | R41 样本中 libairplay.so 导出 APSMFiPlatform_CopyCertificate / APSMFiPlatform_CreateSignature；R44 有 AA00–AA05 状态机和 ACK 语义 | 静态符号 + host mock 不等于 iPhone MFi 成功；没有真实 peer_auth_succeeded 证据 | 保留原厂 MFi API，不造证书/签名；验证 handle、ABI、allocator/free、owner thread |
 | Wi-Fi 2.4GHz | R106/001 实车日志出现 uap0 active、MICRO_AP_EV_BSS_ACTIVE、MICRO_AP_EV_ID_STA_ASSOC；信道 11、10.173.189.1 | STA_ASSOC 不证明 iPhone CarPlay 会话，也不证明该客户端身份就是目标 iPhone | 以 2.4GHz 为基础研发路径；验证地址、路由、Bonjour 和 AirPlay 会话边界 |
 | Wi-Fi 5GHz | uaputl 有 BAND 参数与 A-band 校验函数；Marvell 8787 固件/驱动样本含 A-band / fw_bands 相关逻辑；connectionmanager AP 模板默认频道 1/6/11 | 实际开机加载哪份固件、fw_bands 实际返回值、区域码、主板 PA/滤波器/射频通路未证实；不能承诺软件改配置即可启用 | 5GHz 保留条件分支，只有真实能力探测与硬件证据成立才启用；否则不尝试强制切换 |
