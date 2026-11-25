@@ -1,0 +1,3 @@
+# MU1005 R29/R45 联合传输（NO INSTALL）
+直接复用现有两个完整传输实现，AF_UNIX socketpair 上验证数据和会话边界。修正 R45 在旧 generation 待发帧阻塞时不能接入新连接的问题：只丢弃已解码且明确小于当前代次的帧；零、未来及未分配代次拒绝。代次回绕原有实现中止。旧 SDK 发送仍需真实完成回调，未提前释放其缓冲。电脑测试 ASan/UBSan 四项通过：5035 字节接收、MTU 延迟后 40 段发送、旧代次排队清理、新手机只收新数据，以及未来代次拒绝。
+真实 OEM 静态取证：ipod-drvr-iap2.so SHA256 42fd984ebbdccd11595bd45909683829565147c8cbc8a482618d6dd8e564d3bf；USBDevice e1743821b166fcd93992b45fc7064ad14763ee8a4445478e9aa36e696f2f6e95。USB pulse 0x1db0/1db8/1dc0 清理 USB pipes，0x1df0..1e04 调 driver ops+0x20 (transport_recv_pkt)，不等于原厂会话完整销毁。driver link_destroy 在 0xf1e4 的直接调用来自 iap2_init 失败分支，未证实可用于成功会话的断线清理。原厂 R29 plugin init 继续禁用。R98 目前是 TCP loopback 接口，R29 本轮是 AF_UNIX；真实进程之间的端点分配、唯一消费者选择（不能与上游 daemon 同时消费）、peer owner 及清理尚未实现。没有真实 BlueSDK、iPhone、MFi、Wi-Fi 或车辆验证，不允许安装。

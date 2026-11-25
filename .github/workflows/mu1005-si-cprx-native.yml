@@ -91,6 +91,10 @@ jobs:
             cp review/source/r29-full/review-output/ipod-transport-R29-NO-INSTALL.so review/payload/
             cp review/source/r29-full/review-output/elf.log review/evidence/r29-full-elf.log
             rm -rf review/source/r29-full/review-output
+            b=review/source/bluetooth
+            r=review/source/r29-full
+            "$C" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -shared -Wl,--no-undefined -I"$b" -I"$r" "$b"/{mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump}.c "$r"/{wcp_oem_graft_io,wcp_graft_frames,wcp_stream_bridge}.c -lsocket -lc -o review/payload/libmu1005_rf_r29_review.so
+            "$R" -h -dW -sW review/payload/libmu1005_rf_r29_review.so > review/evidence/r29-r45-elf.log
           ' 2>&1 | tee review/evidence/native-build.log
           grep -Eq 'Machine:.*ARM' review/evidence/native-elf.log
           grep -Eq 'Type:.*DYN' review/evidence/native-elf.log
@@ -114,6 +118,12 @@ jobs:
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/r29-full-elf.log
           done
           echo R29_FULL_PLUGIN_ARM_LINK_ONLY_INERT_NO_OEM_ATTACH | tee review/evidence/r29-full-result.txt
+          grep -Eq 'Machine:.*ARM' review/evidence/r29-r45-elf.log
+          grep -Eq 'Type:.*DYN' review/evidence/r29-r45-elf.log
+          for sym in au_rf_connected au_ipc_pump au_socket_step wcp_oem_graft_adopt wcp_oem_graft_pump; do
+            awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/r29-r45-elf.log
+          done
+          echo R29_R45_JOINT_ARM_LINK_NO_OEM_OWNER | tee review/evidence/r29-r45-result.txt
           for sym in MFiPlatform_CreateSignature MFiPlatform_CopyCertificate; do
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/signer-elf.log
           done
@@ -163,6 +173,7 @@ jobs:
                 bash ci/host_r98_iap2_handoff.sh
                 bash integration/mu1005_si_native/r29_full_source/unpack.sh "${RUNNER_TEMP}/r29-full"
                 bash "${RUNNER_TEMP}/r29-full/test.sh"
+                bash integration/mu1005_si_native/r29_r45/test.sh "${RUNNER_TEMP}/r29-full"
                 ;;
               stock-config) bash ci/host_r99_stock_iap2.sh ;;
               authentication) bash ci/host_step04_stock_mfi.sh ;;

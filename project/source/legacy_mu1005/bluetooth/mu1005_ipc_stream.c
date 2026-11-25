@@ -4,11 +4,28 @@ void au_ipc_init(AuIpcStream*s,AuRfIngress*rf){if(!s)return;memset(s,0,sizeof(*s
 static int fail(AuIpcStream*s){s->failed=1;if(s->rf)au_rf_abort(s->rf);return -1;}
 int au_ipc_pump(AuIpcStream*s){
  if(!s||!s->rf||s->failed)return -1;
- /* Peer MTU might arrive after CONNECTED. Keep pending bytes intact. */
- if(!s->pending_count||s->rf->tx_busy||!s->rf->connected||!s->rf->max_payload)return 0;
- AuRfWire*w=&s->pending[s->pending_head];
- if(au_rf_daemon_data(s->rf,w->bytes,w->len))return fail(s);
- s->pending_head=(s->pending_head+1)%AU_RF_QSIZE;--s->pending_count;return 0;
+ /* The RF ingress generation advances on disconnect and never wraps to
+  * zero: wrap aborts the owner. Fully decoded older-generation records
+  * must not kill a fresh connection or reach the new handset. Discard
+  * only such records; zero/future/unassigned generations remain fatal. */
+ while(s->pending_count){
+  AuRfWire*w=&s->pending[s->pending_head];
+  uint32_t g=(uint32_t)w->bytes[4]|((uint32_t)w->bytes[5]<<8)|
+             ((uint32_t)w->bytes[6]<<16)|((uint32_t)w->bytes[7]<<24);
+  if(!g||g>s->rf->generation)return fail(s);
+  if(g==s->rf->generation){
+   if(!s->rf->connected)return fail(s);
+   /* Peer MTU might arrive after CONNECTED. Keep this generation intact. */
+   if(s->rf->tx_busy||!s->rf->max_payload)return 0;
+   if(au_rf_daemon_data(s->rf,w->bytes,w->len))return fail(s);
+   memset(w,0,sizeof(*w));
+   s->pending_head=(s->pending_head+1)%AU_RF_QSIZE;--s->pending_count;
+   return 0;
+  }
+  memset(w,0,sizeof(*w));
+  s->pending_head=(s->pending_head+1)%AU_RF_QSIZE;--s->pending_count;
+ }
+ return 0;
 }
 int au_ipc_feed(AuIpcStream*s,const uint8_t*p,size_t n){
  if(!s||!s->rf||s->failed||(!p&&n))return -1;
