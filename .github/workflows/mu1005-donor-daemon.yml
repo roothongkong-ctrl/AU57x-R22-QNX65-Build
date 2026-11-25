@@ -32,6 +32,14 @@ jobs:
           cargo +nightly-2026-07-21 build --offline --locked --bin mhi2q-wireless-daemon --manifest-path donor/wireless/daemon/Cargo.toml 2>&1 | tee donor-host-evidence/upstream-build.log
       - name: Join real donor executable to current MU1005 C transport and run rollback regression
         run: bash integration/mu1005_donor_daemon/run_host.sh donor donor-host-evidence
+      - name: Adapt complete donor daemon to original MU1005 live AP
+        run: |
+          set -euxo pipefail
+          python3 integration/mu1005_donor_daemon/adapt_live_ap.py donor | tee donor-host-evidence/ap-port.log
+          git -C donor diff -- wireless/daemon > donor-host-evidence/ap-port.diff
+          cargo +nightly-2026-07-21 test --offline --locked --workspace --manifest-path donor/wireless/daemon/Cargo.toml 2>&1 | tee donor-host-evidence/adapted-tests.log
+          cargo +nightly-2026-07-21 build --offline --locked --bin mhi2q-wireless-daemon --manifest-path donor/wireless/daemon/Cargo.toml 2>&1 | tee donor-host-evidence/adapted-build.log
+          grep -F 'mu1005_live_ap_both_bands_reach_real_donor_wire ... ok' donor-host-evidence/adapted-tests.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -77,7 +85,12 @@ jobs:
             type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1
             type=gha,scope=mu1005-qnx65-baa45224-rust-v1
           cache-to: type=gha,scope=mu1005-qnx65-baa45224-rust-v1,mode=min,ignore-error=true
-      - name: Build full upstream QNX daemon (default feature set)
+      - name: Adapt original MU1005 live AP source
+        run: |
+          set -euxo pipefail
+          python3 integration/mu1005_donor_daemon/adapt_live_ap.py donor | tee donor-arm-evidence/ap-port.log
+          git -C donor diff -- wireless/daemon > donor-arm-evidence/ap-port.diff
+      - name: Build adapted full QNX daemon (default feature set)
         run: |
           set -euxo pipefail
           docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src/donor mu1005-qnx65-rust:review \
@@ -89,9 +102,9 @@ jobs:
           grep -Eq 'Class:.*ELF32' donor-arm-evidence/elf.log
           sha256sum "$bin" | tee donor-arm-evidence/daemon.sha256
           # Explicitly non-installable research payload, not named like stock binary.
-          cp "$bin" donor-arm-evidence/donor-daemon-MU1316-REVIEW-ONLY.bin
+          cp "$bin" donor-arm-evidence/donor-daemon-MU1005-AP-REVIEW-ONLY.bin
           for f in LICENSE LICENSE.md COPYING; do if test -f "donor/$f"; then cp "donor/$f" donor-arm-evidence/; fi; done
-          printf '%s\n' 'NO INSTALL: unmodified donor; MU1005 runtime ABI, MFi owner, receiver and dual band not accepted' "donor=$DONOR" "toolchain=$TOOLCHAIN" "source=$GITHUB_SHA" > donor-arm-evidence/STATUS.txt
+          printf '%s\n' 'NO INSTALL: live AP source adapted; actual band selection, MU1005 runtime ABI, MFi owner, receiver and hardware not accepted' "donor=$DONOR" "toolchain=$TOOLCHAIN" "source=$GITHUB_SHA" > donor-arm-evidence/STATUS.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
