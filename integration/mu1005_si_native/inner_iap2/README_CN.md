@@ -1,0 +1,2 @@
+# 统一路线第 08 步：第二段 iAP2 传输
+congobg 的公开树 223b42f90bf7c15fbbbef23259da36caa9bd4994 提供实际安装包和技术说明，不提供完整可移植 C 源码。参照其 Technical Reference 第6节：原厂 Cinemo 的 iAP2 通过 AirPlay event/control 两路传输。LuKa 的公开源码（锁定提交 20c94f51c0f0ae88b154c12e4f604643ba23022c）及本工程 cp_step04_link.c 提供 FF55 detect、FF5A 长度、校验和规则。此新增模块只做原厂完整包双向无损传送，不重新实现认证，不复制不明确授权的二进制。处理拆包、合包、背压、部分写、当前 epoch、结束清理。下一实际接入点为 MU1005 原厂 Cinemo open 及真实 AirPlay iAPSendMessage event/control 回调；目前没有该 hook、加密或真实所有者接入，不能安装。主机及 ARM 编译由 CI 验证；不得将编译视作无线成功。QEMU 不再是前置条件。

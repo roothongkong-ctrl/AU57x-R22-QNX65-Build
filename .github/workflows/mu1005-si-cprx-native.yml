@@ -79,10 +79,13 @@ jobs:
           set -euxo pipefail
           docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
             set -eux
+            inner=review/source/si/inner_iap2
             a=review/source/airplay
             s=review/source/si
             C=arm-unknown-nto-qnx6.5.0eabi-gcc
             R=arm-unknown-nto-qnx6.5.0eabi-readelf
+            "$C" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -shared -Wl,--no-undefined "$inner/inner_iap2.c" -lc -o review/payload/libmu1005_inner_iap2_review.so
+            "$R" -h -dW -sW review/payload/libmu1005_inner_iap2_review.so > review/evidence/inner-iap2-elf.log
             "$C" -print-file-name=libc.so
             "$C" -print-file-name=libsocket.so
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$a" -I"$s" "$s"/{si_mu1005_layout,si_mu1005_registration,si_mu1005_activation,si_mu1005_snapshot,si_mu1005_owner,si_mu1005_cprx}.c "$a"/{cprx_service,native_exports,semantic,mu1005_r34_ap_server}.c -lsocket -lc -o review/payload/libmu1005_si_cprx.so
@@ -214,7 +217,12 @@ jobs:
                 bash ci/host_cloud_pipeline.sh
                 ;;
               radio) bash ci/host_radio_policy.sh ;;
-              media) bash ci/host_cloud_media.sh ;;
+              media)
+                bash ci/host_cloud_media.sh
+                inner=integration/mu1005_si_native/inner_iap2
+                cc -std=c99 -Wall -Wextra -Werror -O2 "$inner/inner_iap2.c" "$inner/test.c" -o "$RUNNER_TEMP/inner-iap2"
+                "$RUNNER_TEMP/inner-iap2"
+                ;;
               recovery) bash ci/host_sd_txn.sh ;;
               *) exit 2 ;;
             esac
