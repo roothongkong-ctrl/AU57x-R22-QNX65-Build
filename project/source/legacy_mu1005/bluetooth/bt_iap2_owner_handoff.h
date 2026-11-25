@@ -9,7 +9,8 @@
 #include <stdint.h>
 
 typedef enum {
- AU98_EMPTY=0, AU98_PUBLISHED=1, AU98_RETIRED=2, AU98_POISONED=3
+ AU98_EMPTY=0, AU98_PUBLISHED=1, AU98_RETIRED=2, AU98_POISONED=3,
+ AU98_DRAINING=4 /* successful attach, transport stopped; cleanup only */
 } Au98State;
 
 typedef struct {
@@ -19,6 +20,7 @@ typedef struct {
  int (*original_iap2_service_verified)(void *); /* actual original service role */
  int (*attach)(void *,const MuBtOwner *,int); /* QNX: mu_bt_native_attach */
  int (*tick)(void *); /* QNX: mu_bt_native_tick */
+ /* -1 = preconditions not met, no SDK mutation; -2 = uncertain mutation. */
  int (*withdraw)(void *,int (*barrier)(void*,const Inbound*),void*);
 } Au98Hooks;
 

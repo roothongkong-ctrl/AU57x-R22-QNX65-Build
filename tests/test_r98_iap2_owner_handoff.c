@@ -95,6 +95,28 @@ int main(void){
  assert(au98_withdraw(&h,barrier,&ok)==0&&h.state==AU98_RETIRED);
  assert(au98_tick(&h)<0&&au98_publish(&h,&k,&o,port)<0);
  assert(f.calls==3);close(accepted);
+ /* A clean transport failure after successful attach must still permit
+  * owner-certified retirement; no retry of native registration. */
+ Au98Handoff drained={0};f.tick=-1;
+ assert(au98_publish(&drained,&k,&o,port)==0);
+ accepted=accept(listen_fd,NULL,NULL);assert(accepted>=0);
+ assert(au98_tick(&drained)==-2&&drained.state==AU98_DRAINING);
+ assert(au98_tick(&drained)<0&&au98_publish(&drained,&k,&o,port)<0);
+ f.thread=0;assert(au98_withdraw(&drained,barrier,&ok)<0&&drained.state==AU98_DRAINING);
+ f.thread=1;f.withdraw=-1;
+ assert(au98_withdraw(&drained,barrier,&ok)==-1&&drained.state==AU98_DRAINING);
+ assert(fcntl(drained.fd,F_GETFD)>=0);
+ f.withdraw=0;assert(au98_withdraw(&drained,barrier,&ok)==0&&drained.state==AU98_RETIRED&&drained.fd==-1);
+ {unsigned char byte;assert(recv(accepted,&byte,1,0)==0);}
+ close(accepted);f.tick=0;
+ puts("PASS successful attach -> transport failure -> certified withdrawal");
+ Au98Handoff uncertain={0};f.withdraw=-2;
+ assert(au98_publish(&uncertain,&k,&o,port)==0);
+ accepted=accept(listen_fd,NULL,NULL);assert(accepted>=0);
+ assert(au98_withdraw(&uncertain,barrier,&ok)==-2&&uncertain.state==AU98_POISONED);
+ assert(au98_withdraw(&uncertain,barrier,&ok)<0&&fcntl(uncertain.fd,F_GETFD)>=0);
+ close(accepted);f.withdraw=0;
+ puts("PASS ambiguous withdrawal retains descriptor and cannot retry");
  /* An ambiguous native registration failure is POISONED, never retried.
   * The service may have captured native pointers before returning error. */
  Au98Handoff broken={0};f.attach=-1;

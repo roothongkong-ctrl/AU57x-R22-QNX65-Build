@@ -1,0 +1,2 @@
+# R98/R5 断线后的真实注销路径（NO INSTALL）
+保留 c90e4dc 的原厂配置修正。此前 au98_tick 任何失败均置 POISONED，导致成功 attach 后即便 R5 已经安全清理 link，也不能调用 ir5_withdraw。本次区分 DRAINING（成功注册后仅允许清理）和 POISONED（原厂注册/注销的结果存在不确定性），不允许重发/重新注册。原厂 owner 已核验且 barrier 通过时才允许注销；返回 -1 意味着原厂 mutation 之前的拒绝，可在确认前提满足后再次尝试；-2 意味不确定操作，保留 descriptor，不重试。R5 原有实际回调/SDK barrier 前提不变，旧链接 pending/busy 或 IN_DIRTY 仍不得强制清理；本轮只覆盖已正常收到 close 且无未完成 packet 的路径。补充 R98 真实 loopback 断开及 R5 清理测试，云端编译与测试结果待确认。原厂 owner、TCP 对端真实身份、真实 iAP2/MFi、Wi-Fi 尚未建立；不安装、不修改 main。

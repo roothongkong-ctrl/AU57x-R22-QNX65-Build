@@ -178,6 +178,7 @@ jobs:
               transport)
                 bash integration/mu1005_si_native/r29_profile/test.sh
                 bash ci/host_r98_iap2_handoff.sh
+                bash ci/host_r14_native.sh
                 bash integration/mu1005_si_native/r29_full_source/unpack.sh "${RUNNER_TEMP}/r29-full"
                 bash "${RUNNER_TEMP}/r29-full/test.sh"
                 bash integration/mu1005_si_native/r29_r45/test.sh "${RUNNER_TEMP}/r29-full"

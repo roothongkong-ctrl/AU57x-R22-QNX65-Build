@@ -97,12 +97,18 @@ int au98_publish(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*owner,unsigned 
 int au98_tick(Au98Handoff*s){
  if(!s||s->state!=AU98_PUBLISHED||!oem_ok(s))return -1;
  if(s->hooks.tick(s->hooks.opaque)==0)return 0;
- s->state=AU98_POISONED;return -2;
+ /* A successfully published service can be quiesced after ordinary
+  * transport failure. Do not treat this as an uncertain initial attach.
+  * No more data-plane ticks or republish; only certified withdrawal. */
+ s->state=AU98_DRAINING;return -2;
 }
 int au98_withdraw(Au98Handoff*s,int(*barrier)(void*,const Inbound*),void*ctx){
  int rc;
- if(!s||s->state!=AU98_PUBLISHED||!barrier||!oem_ok(s))return -1;
+ if(!s||(s->state!=AU98_PUBLISHED&&s->state!=AU98_DRAINING)||!barrier||!oem_ok(s))return -1;
  rc=s->hooks.withdraw(s->hooks.opaque,barrier,ctx);
+ /* ir5_withdraw/inbound_withdraw return -1 before any native mutation
+  * if a callback, pending packet, link, or barrier has not quiesced. */
+ if(rc==-1){s->state=AU98_DRAINING;return -1;}
  if(rc!=0){s->state=AU98_POISONED;return -2;}
  /* QNX native owner confirms no live channel, no pending callback and the
   * peer socket is quiesced; only then is it valid to release the fd. */
