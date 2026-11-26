@@ -145,3 +145,8 @@ R143 的 QEMU 合成调用点仅证明观察器逻辑能运行；不是车机真
 新一轮静态交叉核验已将 `/dev/ipod0` 的提供者收敛到 `mm-ipod` 宿主内动态加载的 `ipod-drvr-iap2.so`：mm-ipod 具有 `ipod-drvr-%s.so` 的 dlopen/dlsym 模块加载路径；driver 导出 `ipod_module`，并导入 `ipod_resmgr_mount`、QNX `iofunc_*`、`MsgReply/MsgWrite` 等 Resource Manager 相关接口；R44 又通过 OEM 机器指令验证了 mm-ipod 向模块注入 owner 并调用 init。DIO 只是通过 `libiap2client.so.1` 以 `/dev/ipod0` 为路径连接 client。
 
 目前精确 mount path 的 driver 调用点和车辆运行 PID 尚未闭环，因此结论为“高置信架构推导”，不是车机实测。详见 [R105.006 /dev/ipod0 Resource Manager 所属链报告](R105_006_IPOD0_RESOURCE_OWNER_CN.md)。保留原厂 `-t usbdevice`，不改配置、不装车。
+
+
+## R105.007 补充：iAP2 client 路径与消息边界
+
+已把 DIO client 的设备路径参数、libiap2client 的 QNX MsgSend-family IPC、driver 内部物理 Transport 回调分层。/dev/ipod0 很可能来自原厂 dio_manager 配置的 iap2.device，但配置解析到 0x17a614 callsite 的数据流尚未闭环。iap2_raw_msg_send 不能仅凭名字视为任意 RFCOMM 帧注入接口；需先恢复参数、消息封装和服务端 dispatch ABI。详见 [R105.007 报告](R105_007_IAP2_CLIENT_DEVICE_PATH_AND_MESSAGE_BOUNDARY_CN.md)。不改配置、不装车。
