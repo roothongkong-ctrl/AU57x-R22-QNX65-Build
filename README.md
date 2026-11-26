@@ -35,3 +35,8 @@ The result `r100_result/R100_ORIGINAL_MU1005_ROUTE_AUDIT.json` contains hashes a
 现已从 `luka-dev/mib2q-carplay-rgi` 精确引入 `wireless/graft/eir.c`，保证 1691 字节原文件与上游 Git blob 完全相同，并编译到 AU57x 的独立审计入口 `au102_eir_advertisement`。只在原厂 btstack、iAP2 RFCOMM 和 SDP 都已确认的情况下允许广播，保留有线 CarPlay 优先。测试：`bash ci/host_r102_upstream_reuse.sh`。
 
 详情：`docs/R102_OPEN_SOURCE_REUSE_CN.md`。**该源码只证明一个通用组件可移植，不证明无线 CarPlay 已完成；禁止装车。**
+
+
+## R105.005 — unified MU1005 wireless route review
+
+Reconciles R88–R103 with the newer R142/R143 owner observers, ASI Bluetooth iAP proxy, SI/DIO CPRX, AirPlay second-stage iAP2 relay and read-only AP discovery. Corrects the older R99 assumption: do not enable the commented `iap2.cfg [bluetooth]` status section. The next static targets are the ASI proxy's real callers and the OEM AirPlay event/control dispatch owner. User band policy remains 5GHz preferred with 2.4GHz fallback. See [R105.005 route reconciliation](integration/mu1005_si_native/R105_005_ROUTE_RECONCILIATION_CN.md). NO INSTALL.
