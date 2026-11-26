@@ -50,3 +50,8 @@ Static evidence narrows the likely provider to `ipod-drvr-iap2.so` dynamically h
 ### R105.007 — iAP2 client path/message boundary
 
 Clarified that DIO passes a caller-supplied device path to libiap2client; /dev/ipod0 in the factory config is the likely source, but the config parse-to-callsite dataflow is not yet closed. Also separated iap2_connect/client MsgSend IPC from iap2_raw_msg_send and the driver's physical transport callbacks: raw_msg_send is not proven to be an arbitrary RFCOMM injection API. [R105.007 report](integration/mu1005_si_native/R105_007_IAP2_CLIENT_DEVICE_PATH_AND_MESSAGE_BOUNDARY_CN.md). NO INSTALL.
+
+
+### R105.008 — transport layer reconciliation and R103 host gate
+
+The current route separates (1) mm-ipod physical Transport plugins, (2) internal iAP2 TransportComponents in ipod-drvr-iap2.so, and (3) the btstack RFCOMM producer/owner. The R103 upstream LinkEngine is retained for protocol handling; R98/R45 remain the candidate OEM integration layer. The factory usbdevice path is preserved. A dedicated current-branch HOST-ONLY regression workflow now checks the upstream source hash, Rust bridge/TCP tests, and C framing tests. [R105.008 report](integration/mu1005_si_native/R105_008_ROUTE_LAYER_RECONCILIATION_CN.md). NO INSTALL.
