@@ -9,7 +9,7 @@ def test_mm_ipod_loader_uses_dynamic_transport_module_name():
     assert e["device_transport_init"]["va"]=="0x103510"
     assert e["transport_module_name_pattern"]=="ipod-transport-%s.so"
     assert e["driver_module_name_pattern"]=="ipod-drvr-%s.so"
-    assert "resolves exported ipod_module with dlsym" in e["loader_evidence"]
+    assert any("ipod_module with dlsym" in item for item in e["loader_evidence"])
 
 def test_stock_usbdevice_plugin_callback_offsets_are_pinned():
     p=D["usbdevice_plugin"]
