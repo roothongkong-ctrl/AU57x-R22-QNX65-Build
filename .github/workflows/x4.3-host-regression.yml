@@ -11,6 +11,7 @@ on:
       - 'project/source/legacy_mu1005/bluetooth/inbound.h'
       - 'x3/**'
       - 'tests/test_r98_iap2_owner_handoff.c'
+      - 'tests/test_native_event_context.c'
       - 'tests/test_mu1005_rf_scn_extended.c'
       - 'ci/host_x4_3_native_regression.sh'
       - '.github/workflows/x4.3-host-regression.yml'
