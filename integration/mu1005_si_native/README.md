@@ -24,3 +24,11 @@ MU1005 SI registration adapter (NO INSTALL). Based on private target SI SHA256 2
 - [R105 Step 02 静态审计 JSON](../../docs/R105_STEP02_DRIVER_STATIC_AUDIT.json)
 - 已完成原厂 ELF 指纹、外层 Transport send/receive 分发、蓝牙状态更新和 Wi-Fi 配置消息静态映射。
 - RFCOMM 原始字节入口、BT/Wi-Fi 组件构造及 vtable 尚未证明。
+
+
+## 22 步执行进度：第 03 步
+
+- [R105.013：mm-ipod 动态插件加载与原厂 USB Transport ABI](R105_013_STEP03_MM_IPOD_PLUGIN_LOADER_AND_STOCK_USB_ABI_CN.md)
+- [R105 Step 03 静态审计 JSON](../../docs/R105_STEP03_MM_IPOD_PLUGIN_LOADER_AUDIT.json)
+- 已静态确认 mm-ipod 动态加载器、ipod_module 接口和 USB Device/Host 共同回调布局。
+- 蓝牙 RFCOMM 原始字节到 iAP2 transport 的桥接仍未证明；本次交接包内未找到蓝牙/Wi-Fi ipod transport 模块。
