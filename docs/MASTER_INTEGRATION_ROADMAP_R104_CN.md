@@ -129,3 +129,14 @@ R111 的 Congo/MHI2Q 研究只作为架构参照：它支持“原厂 btstack + 
 **把已有 MU1005 原厂文件做一次只读、哈希固定的 iAP2 client-owner ABI 总审计**，覆盖 btstack、bluetooth、ipod-drvr-iap2.so、connectivity_launcher、iap2.cfg，将 R45 server API、R87 client-open 缺口、R98 owner handoff、R101 SCN 不确定性、R103 link engine 输入输出放在同一份调用图里。先判断原厂 client-open 是否可直接复用；若能，接入 R87/R98；若不能，再研究最小、可撤销的 BlueSDK graft。只在证据明确后改代码。
 
 **最终成功标准**：用户 iPhone 不插线自动连接；原车中控 CarPlay 完整工作；原车音频/触控/旋钮/方向盘可用；用户现有仪表地图显示链路保留；有线 CarPlay 随时优先；断线自动重试与手动提示可靠；可完整备份、安装、验证、失败回滚。当前这些最终标准尚未在实车达到。
+
+
+## R105.002 补充：双层 Transport 边界（2026-11-26）
+
+R105.002 对照既有 USB 插件 ABI、R104 iAP2 驱动反汇编和 R106/001 实车快照后，明确必须区分：
+1. mm-ipod 外部物理插件 ipod-transport-%s.so（本车实证启动 -t usbdevice，USB 插件 ABI 已有历史复原）；
+2. ipod-drvr-iap2.so 内部 BluetoothTransportComponent / WiFiTransportComponent 与 Link Transport vtable（+0x18/+0x28/+0x2c 已有静态反汇编证据）。
+
+二者不是同一个插件/接口。R106 证明 USB 有线路径成功和 2.4GHz AP 有客户端关联；不能证明无线 iAP2/MFi 成功，也不能据此否定驱动内部 BluetoothTransportComponent。R105.002 是当前最新的边界核对文件，后续先复用已有 app.img/固件与 USB 插件样本，分别审计 mm-ipod loader 和 BluetoothTransportComponent producer，不再重做 HFP/PPS/packet parser/USB ABI。
+
+详见 [R105.002 双层 Transport 边界核对](R105_002_TRANSPORT_LAYER_BOUNDARY_AUDIT_CN.md)。已知 mm-ipod 静态样本的预期 SHA256 为 4b87cd2d41ddcee2f38800feafe8b4b340e4f23e1d86c7e97af303522aa15d09；对应只读审计脚本为 tools/verify_mu1005_ipod_loader.py。该样本仍需与原始 app.img/车机实际版本核对，不能只凭字符串或旧报告宣称生产运行已验证。
