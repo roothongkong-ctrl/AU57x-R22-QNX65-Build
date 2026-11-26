@@ -743,6 +743,52 @@ int cp_cloud_drive_remote_dio(struct cp_cloud_pipeline *p,uint64_t now){
   return CP_CLOUD_PROOF;
  return p->handoff.phase==CP_HO_MEDIA_ACTIVE?CP_CLOUD_OK:CP_CLOUD_RETRY;
 }
+int cp_cloud_drive_first_connect(struct cp_cloud_pipeline *p,const MuCprxRemoteEndpoint *e,
+ const char *iface,uint64_t now){
+ int r;
+ if(!p||!p->started||!p->bootstrap)return CP_CLOUD_BAD;
+ /* This is the remote original SI/DIO route, not a second receiver. */
+ if(p->native_dio||p->rx_service||p->airplay)return CP_CLOUD_ORDER;
+ if(p->remote_phase){
+  if(p->stopped||p->remote_phase>=3||p->remote_wired_pending)
+   return CP_CLOUD_STOPPED;
+  if(!p->owner.wired_idle||p->owner.wired_idle(p->owner.ctx)!=1){
+   (void)cp_cloud_wired_preempt(p);
+   return CP_CLOUD_STOPPED;
+  }
+  r=cp_cloud_drive_remote_dio(p,now);
+  if(cp_cloud_remote_video_at(p,now))return CP_CLOUD_OK;
+  return r==CP_CLOUD_OK?CP_CLOUD_RETRY:r;
+ }
+ if(p->stopped)return CP_CLOUD_STOPPED;
+ if(!eligible(p,1))return stop(p);
+ if(!p->bootstrap->wireless_bound||p->bootstrap->wireless_ctx!=p||
+    p->bootstrap->wireless_proof!=actual_wireless_proof)return CP_CLOUD_ORDER;
+ /* The radio is not yet associated: do NOT wait for DIO to pump 5702/5703.
+  * The existing iAP2 owner must continue receiving and transmitting. */
+ r=cp_s4_tick(p->bootstrap,now);
+ if(r<0&&r!=CP_LK_BACKPRESSURE)
+  return p->bootstrap->link.phase==CP_LK_DEAD?stop(p):CP_CLOUD_RETRY;
+ if(p->handoff.phase==CP_HO_BT_LINK){
+  r=cp_cloud_confirm_bootstrap_auth(p);
+  return r==CP_CLOUD_OK||r==CP_CLOUD_PROOF?CP_CLOUD_RETRY:r;
+ }
+ if(p->handoff.phase==CP_HO_BOOTSTRAP_AUTH){
+  if(p->radio.phase==CP_RADIO_IDLE){
+   r=cp_cloud_radio_start(p);
+   return r==CP_CLOUD_OK?CP_CLOUD_RETRY:r;
+  }
+  if(p->radio.phase!=CP_RADIO_CONNECTING)return CP_CLOUD_ORDER;
+  if(p->owner.ap_association(p->owner.ctx,p->epoch,p->band)!=1)
+   return CP_CLOUD_RETRY;
+  r=cp_cloud_radio_result(p,1,0);
+  return r==CP_CLOUD_OK||r==CP_CLOUD_PROOF?CP_CLOUD_RETRY:r;
+ }
+ if(p->handoff.phase!=CP_HO_WIFI_ASSOCIATED)return CP_CLOUD_ORDER;
+ if(!e||!iface)return CP_CLOUD_RETRY;
+ r=cp_cloud_bind_remote_dio(p,e,iface);
+ return r==CP_CLOUD_OK?CP_CLOUD_RETRY:r;
+}
 int cp_cloud_remote_graceful_end(struct cp_cloud_pipeline *p,uint64_t now){
  int r;
  if(!p||!p->remote_phase)return CP_CLOUD_BAD;

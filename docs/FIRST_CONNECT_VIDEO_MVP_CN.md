@@ -12,3 +12,6 @@ R105.046 native-library job 140207246275 success；SI run 45907376247 success；
 
 ## R105.048 首画面模式继续整合（SI + DIO）
 R105.047 unified run 45907707475 九个 jobs 全部 success（authentication 140208332410），SI 45907707437 和 iAP2 45907707426 success。原先 SI 独立激活适配器 si_mu1005_cprx.c 仍要求 mask==15，本轮新增显式 mu_si_cprx_init_first_video，保持原全功能入口 mask15 不变，首连入口只要求同一原厂会话实际 inner MFi、media7、video bit。DIO 现有 op11 将可选音频/MMI/方向盘的未知(-1)表现为无对应确认位，不再拒绝完整查询；video 未知仍 RETRY，原厂认证未知仍拒绝。不改变协议格式。真实跨进程 fixture 增加 first-video 模式，使用当前 DIO 源码，原 R85 pin 的全功能测试保留。未声称实车已显示，最新 CI 待验。仍需生产原厂运行时调用者，NO INSTALL。
+
+## R105.049 正常连接 owner 循环合并
+在现有 cp_cloud_pipeline.c 增加首连入口 cp_cloud_drive_first_connect，串联 cp_s4_tick、真实认证确认、已验证热点的 band 选择/准备、真实手机 association、原 DIO endpoint bind、同一 CPRX START/status、首视频判定。此前调用方必须在 association 前自行保持 5702/5703 pump，且逐项驱动多个状态；现在连接中也持续处理原 iAP2，等待真实 AP 状态，不自动制造 association、不重复启动 DIO。保留原有完整媒体模式、MFi、原厂有线优先与所有权，实际 RF bytes 仍须由真实传输生产者处理；不新增线程、不启动硬件。已有 R84 fixture 改用同一入口驱动 2.4GHz 等待关联→DIO START→首视频，确认无音频/控制也能报告 first-video；实际 OEM/手机仍是 fixture。R105.048/049 云端结果待查，NO INSTALL。真实启动调用者与车载原厂接口仍缺，不计固定10步完成。

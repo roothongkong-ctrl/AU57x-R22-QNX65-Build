@@ -1239,9 +1239,18 @@ static void native_remote_owner_cloud_pipeline(void){
  b.link.owner.opaque=&b;b.link.owner.live=owner;
  b.link.owner.acked=ack_wireless;
  assert(cp_cloud_begin(&p,&b,&ops,8,4)==CP_CLOUD_OK);
- assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
- assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK);
- assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_OK);
+ /* Single original-owner loop, no external sequencing of radio calls.
+  * Start with phone not associated, then observe the actual fixture edge. */
+ associated=0;
+ assert(cp_cloud_drive_first_connect(&p,NULL,NULL,90)==CP_CLOUD_RETRY);
+ assert(p.handoff.phase==CP_HO_BOOTSTRAP_AUTH);
+ assert(cp_cloud_drive_first_connect(&p,NULL,NULL,91)==CP_CLOUD_RETRY);
+ assert(p.radio.phase==CP_RADIO_CONNECTING&&p.band==CP_RADIO_24&&ap_calls==1);
+ assert(cp_cloud_drive_first_connect(&p,NULL,NULL,92)==CP_CLOUD_RETRY);
+ assert(p.radio.phase==CP_RADIO_CONNECTING);
+ associated=1;
+ assert(cp_cloud_drive_first_connect(&p,NULL,NULL,93)==CP_CLOUD_RETRY);
+ assert(p.handoff.phase==CP_HO_WIFI_ASSOCIATED&&!p.remote_phase);
  assert(mkdtemp(dir));
  assert(mu_dio_bind_interface(&native,h,&airplay_object,&airplay_owner,
                               8,&guard,"eth0","wlan0")==0);
@@ -1254,7 +1263,7 @@ static void native_remote_owner_cloud_pipeline(void){
  assert(cp_cloud_bind_remote_dio(&p,&e,"../../bad")==CP_CLOUD_PROOF);
  MuCprxRemoteEndpoint bad=e;bad.epoch=9;
  assert(cp_cloud_bind_remote_dio(&p,&bad,"wlan0")==CP_CLOUD_PROOF);
- assert(cp_cloud_bind_remote_dio(&p,&e,"wlan0")==CP_CLOUD_OK);
+ assert(cp_cloud_drive_first_connect(&p,&e,"wlan0",94)==CP_CLOUD_RETRY);
  assert(!p.native_dio&&!p.rx_service&&!p.airplay&&p.remote_phase==1);
  /* No ACK yet: even aborting the whole SI pipeline cannot assert DIO's
   * original singleton has been safely restored. */
@@ -1263,10 +1272,10 @@ static void native_remote_owner_cloud_pipeline(void){
  /* Actual remote START is sent and handled, without dereferencing DIO. */
  int acked=0;
  for(unsigned i=0;i<110&&!acked;i++){
-  int r=cp_cloud_drive_remote_dio(&p,100+i);
+  int r=cp_cloud_drive_first_connect(&p,&e,"wlan0",100+i);
   assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
   assert(mu_cprx_tick(&rx,100+i)==0);
-  r=cp_cloud_drive_remote_dio(&p,100+i);
+  r=cp_cloud_drive_first_connect(&p,&e,"wlan0",100+i);
   assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
   acked=p.remote_start_confirmed;
  }
@@ -1317,15 +1326,13 @@ static void native_remote_owner_cloud_pipeline(void){
  int video=0;uint64_t video_at=0;
  for(unsigned i=0;i<100&&!video;i++){
   uint64_t now=470+i;
-  int r=cp_cloud_drive_remote_dio(&p,now);
-  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
-  /* Either client tick may finish the split status response. The next
-   * query revokes that sample, so observe both completion opportunities. */
-  if(cp_cloud_remote_video_at(&p,now)){video=1;video_at=now;break;}
+  int r=cp_cloud_drive_first_connect(&p,&e,"wlan0",now);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF||r==CP_CLOUD_OK);
+  if(r==CP_CLOUD_OK){video=1;video_at=now;break;}
   assert(mu_cprx_tick(&rx,now)==0);
-  r=cp_cloud_drive_remote_dio(&p,now);
-  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
-  video=cp_cloud_remote_video_at(&p,now);if(video)video_at=now;
+  r=cp_cloud_drive_first_connect(&p,&e,"wlan0",now);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF||r==CP_CLOUD_OK);
+  video=r==CP_CLOUD_OK;if(video)video_at=now;
  }
  assert(video&&!cp_cloud_remote_live_at(&p,video_at));
  assert(p.handoff.phase==CP_HO_INNER_IAP_AUTH&&p.remote_channels==1);

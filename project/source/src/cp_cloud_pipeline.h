@@ -110,6 +110,15 @@ int cp_cloud_bind_remote_dio(struct cp_cloud_pipeline *,
  * socket. Reports OK only on a FRESH same-session op11 snapshot + original
  * owner iAP2/4301/media evidence, never on an old START ACK. */
 int cp_cloud_drive_remote_dio(struct cp_cloud_pipeline *,uint64_t now_ms);
+/* First-connect owner loop: pump the existing authenticated BT/iAP2 link
+ * while the hotspot is connecting, observe actual association, bind one
+ * original remote DIO endpoint and drive its START/status transaction.
+ * Endpoint and interface may be NULL until actually available.
+ * Caller still transports real RFCOMM bytes and supplies real OEM callbacks.
+ * Return OK only on a same-session first-video observation; no LCD claim.
+ * No concurrent second drive loop for the same receiver. */
+int cp_cloud_drive_first_connect(struct cp_cloud_pipeline *,const MuCprxRemoteEndpoint *,
+ const char *observed_iface,uint64_t now_ms);
 /* Caller supplies a monotonic time; this is a time-bounded observation,
  * not permanently granted streaming media. */
 int cp_cloud_remote_live_at(const struct cp_cloud_pipeline *,uint64_t now_ms);
