@@ -1,0 +1,89 @@
+{
+  "step": 4,
+  "target": "MHI2_CN_AU57x_K1006_2/MU1005 QNX6.5 ARM32",
+  "source_kind": "private_original_oem_elf_static_review",
+  "originals_publication": "hashes_and_offsets_only; OEM ELF binaries remain private",
+  "inputs": {
+    "bluetooth": {
+      "size_bytes": 1410944,
+      "sha256": "7d5ae31396f016f811e18a7255bf1311e0bfa471b2a3252a6f2eb4bd3ad04272",
+      "elf": "ELF32 ARM EABI5 QNX",
+      "markers": {
+        "bluetooth.enableIap": {"present": true, "file_offset": "0x1359ac"},
+        "iapEnabled": {"present": true, "file_offset": "0x1339b0"},
+        "SERVICETYPE_IAP2": {"present": true, "file_offset": "0x13cc2c"}
+      },
+      "symbols": {
+        "CBluetoothSmartphoneIntegration_vtable": {"va": "0x256698", "size": 36, "kind": "DSI/service-interface object vtable"},
+        "BluetoothSmartphoneIntegrationServiceRegistration_vtable": {"va": "0x252008", "size": 64, "kind": "ASI comm ServiceRegistration derived vtable"},
+        "CBluetoothSmartphoneIntegration_interfaceID": {"va": "0x25a540", "size": 20}
+      },
+      "registration_imports": [
+        {"symbol": "_ZN4comm19ServiceRegistration15registerServiceEv", "plt": "0x00114754"},
+        {"symbol": "_ZNK4comm19ServiceRegistration17unregisterServiceEv", "plt": "0x00113f44"}
+      ],
+      "interpretation": "Bluetooth app contains an iAP enable/configuration marker and a DSI SmartphoneIntegration service interface/registration class. These are control-plane/service-registration facts, not proof of the iAP2 RFCOMM channel, callback owner, or raw-byte transport."
+    },
+    "btstack": {
+      "size_bytes": 1846436,
+      "sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
+      "elf": "ELF32 ARM EABI5 QNX",
+      "symbols": {
+        "BluetoothServiceBase_vtable": {"va": "0x2be7a0", "size": 72},
+        "BtJobStartService_vtable": {"va": "0x2bec90", "size": 56},
+        "BtJobQuerySdp_vtable": {"va": "0x2be908", "size": 56},
+        "BtJobStartService_cmgrEvent": {"va": "0x13e350", "size": 4, "binding": "WEAK"},
+        "BtJobQuerySdp_queryDeviceCallback": {"va": "0x137764", "size": 308, "binding": "GLOBAL"}
+      },
+      "markers": {
+        "RFCOMM_trace_channel": {"present": true, "va": "0x2d5724", "symbol": "__tracing__channel_CON_BTSTACK_IA_RFCOMM"},
+        "RFCOMM_protocol_diagnostics": {"present": true, "strings": ["RFCOMM: Credit", "RFCOMM: CFC Request, Initial Credit", "RFCOMM: CFC Response, Initial Credit", "RFCOMM channel to device broken"]},
+        "IapDevice_literal": false,
+        "IapServices_literal": false,
+        "dev_iapDevice_literal": false,
+        "CIapBTChannel_literal": false
+      },
+      "imports": {
+        "pthread_create_plt": "0x00117390",
+        "pthread_join_plt": "0x00117bdc"
+      },
+      "interpretation": "btstack contains generic Bluetooth service base, SDP query/start-service jobs and RFCOMM diagnostics. The inspected dynamic symbol table does not expose an iAP2-specific RFCOMM service implementation or callback prototype. Missing literals/symbol names do not prove a dynamically constructed path is absent."
+    },
+    "iapproxy": {
+      "size_bytes": 48248,
+      "sha256": "44883ed28e44a8f06b5308266510981e17b3ee59d737f73208cd76e11ffc1c80",
+      "elf": "ELF32 ARM EABI5 QNX",
+      "markers": ["asi.connectivity.bluetooth.iap.IapDeviceServices", "IapDeviceServicesRPCStub"],
+      "interpretation": "ASI proxy/RPC interface for iAP device services; not a Bluetooth RFCOMM byte-stream callback implementation."
+    }
+  },
+  "reused_prior_evidence_not_repeated": {
+    "R88_btstack_exact_hash_and_40_arm_words": "PASS_STATIC",
+    "R101_hfp_arg3_7_sim_arg3_4": "PASS_STATIC; values are not iAP2",
+    "R45_server_first_event_bridge": "HOST_TESTED; not bound to OEM callback owner",
+    "R92_R93_pthread_interposition_structure": "STATIC_PARTIAL; no live btstack PID preload proof",
+    "R98_owner_handoff": "HOST_TESTED; no production owner evidence provider"
+  },
+  "owner_chain": [
+    {"edge": "bluetooth.enableIap -> iAP2 service creation in btstack", "status": "NOT_PROVEN"},
+    {"edge": "btstack iAP2 service registration -> RF_REGISTER/SDP_ADD", "status": "NOT_PROVEN"},
+    {"edge": "RF_REGISTER -> actual SCN and persistent RFCOMM channel object", "status": "PARTIAL_STATIC; iAP2-specific parameters unknown"},
+    {"edge": "RFCOMM callback -> R45 ingress in actual btstack process", "status": "NOT_RUNTIME_BOUND"},
+    {"edge": "R45 -> R98 original iAP2 serialized owner proof", "status": "NOT_PROVEN"},
+    {"edge": "raw RFCOMM bytes -> mm-ipod transport callback -> iAP2 driver", "status": "NOT_PROVEN"}
+  ],
+  "verdict": {
+    "bluetooth_iap_control_plane_markers": "PROVEN_STATIC",
+    "bluetooth_smartphone_integration_dsi_registration_class": "PROVEN_STATIC",
+    "btstack_generic_sdp_and_rfcomm_infrastructure": "PROVEN_STATIC",
+    "mu1005_iap2_specific_rfcomm_owner": "NOT_PROVEN",
+    "mu1005_iap2_scn_and_rf_register_arg": "NOT_PROVEN",
+    "callback_thread_lock_and_buffer_ownership": "NOT_PROVEN",
+    "raw_rfcomm_to_mm_ipod_iap2_data_path": "NOT_PROVEN",
+    "qnx_runtime": "NOT_TESTED",
+    "iphone_mfi": "NOT_TESTED",
+    "vehicle_verified": false,
+    "installable": false,
+    "safe_to_flash": false
+  }
+}
