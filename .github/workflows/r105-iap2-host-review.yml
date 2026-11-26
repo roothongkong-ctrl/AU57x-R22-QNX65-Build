@@ -1,0 +1,43 @@
+name: R105 iAP2 upstream bridge host regression (HOST ONLY / NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths:
+      - '.github/workflows/r105-iap2-host-review.yml'
+      - 'Cargo.toml'
+      - 'third_party/luka-dev/mib2q-carplay-rgi/wireless/daemon/vendor/iap2-link/**'
+      - 'integration/r103_iap2_bridge/**'
+      - 'ci/host_r103_*.sh'
+  pull_request:
+    paths:
+      - '.github/workflows/r105-iap2-host-review.yml'
+      - 'Cargo.toml'
+      - 'third_party/luka-dev/mib2q-carplay-rgi/wireless/daemon/vendor/iap2-link/**'
+      - 'integration/r103_iap2_bridge/**'
+      - 'ci/host_r103_*.sh'
+permissions:
+  contents: read
+jobs:
+  r103-host-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Verify exact upstream donor source and run all Rust tests
+        run: |
+          set -euxo pipefail
+          bash ci/host_r103_upstream_link.sh
+      - name: Compile and run the C wire framing tests
+        run: |
+          set -euxo pipefail
+          bash ci/host_r103_c_wire.sh
+      - name: Record scope boundary
+        run: |
+          printf '%s\n' 'HOST_ONLY=1' 'QNX_TARGET_RUNTIME=NOT_TESTED' 'OEM_RFCOMM_OWNER=NOT_PROVEN' 'MFI=NOT_TESTED' 'VEHICLE_VERIFIED=0' 'INSTALLABLE=0' | tee r105-host-scope.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r105-iap2-host-only-scope
+          path: r105-host-scope.txt
+          if-no-files-found: error
