@@ -50,18 +50,33 @@ mkdir -p "$OUT/configs" || { echo 'R105.004: cannot create output folder'; exit 
     fi
   done
   echo '--- bounded config discovery ---'
+  : > "$OUT/candidate_paths.txt"
   for ROOT in /eso /etc/mm /mnt/app/eso; do
     if [ -d "$ROOT" ]; then
       echo "### find under $ROOT (matching names only)"
-      find "$ROOT" -type f \( \
-        -name 'connectivity.json' -o \
-        -name 'bluetooth.json' -o \
-        -name 'bluetooth*.json' -o \
-        -name 'iap2.cfg' -o \
-        -name '*bluetooth*.cfg' \
-      \) -print 2>&1
+      find "$ROOT" -type f \\( \\
+        -name 'connectivity.json' -o \\
+        -name 'bluetooth.json' -o \\
+        -name 'bluetooth*.json' -o \\
+        -name 'iap2.cfg' -o \\
+        -name '*bluetooth*.cfg' \\
+      \\) -print >> "$OUT/candidate_paths.txt" 2>> "$OUT/find_errors.txt"
     fi
   done
+  cat "$OUT/candidate_paths.txt"
+  echo '--- copy discovered config files and hashes ---'
+  while IFS= read -r P; do
+    [ -r "$P" ] || continue
+    DEST="$OUT/configs/$(echo "$P" | sed 's#/#_#g')"
+    [ -f "$DEST" ] && continue
+    echo "COPY $P -> $DEST"
+    cp "$P" "$DEST" 2>&1
+    if command -v sha256sum >/dev/null 2>&1; then
+      sha256sum "$P" "$DEST" 2>&1
+    else
+      cksum "$P" "$DEST" 2>&1
+    fi
+  done < "$OUT/candidate_paths.txt"
   echo '--- selected config copies and hashes ---'
   for P in \
     /eso/etc/connectivity.json \
