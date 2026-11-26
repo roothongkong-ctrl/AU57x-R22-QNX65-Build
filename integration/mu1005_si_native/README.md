@@ -16,3 +16,11 @@ MU1005 SI registration adapter (NO INSTALL). Based on private target SI SHA256 2
 - [R105.011：mm-ipod 外层 Transport 插件 ABI 静态解析](R105_011_STEP01_MM_IPOD_PLUGIN_ABI_CN.md)
 - 已完成 loader 结构与七个 callback 槽位映射；新增 host C layout gate。
 - 函数签名、生命周期、运行时实际加载插件尚未证明；不安装。
+
+
+## 22 步执行进度：第 02 步
+
+- [R105.012：原厂 ipod-drvr-iap2.so 内部结构静态分析](R105_012_STEP02_IPOD_IAP2_DRIVER_INTERNAL_MAP_CN.md)
+- [R105 Step 02 静态审计 JSON](../../docs/R105_STEP02_DRIVER_STATIC_AUDIT.json)
+- 已完成原厂 ELF 指纹、外层 Transport send/receive 分发、蓝牙状态更新和 Wi-Fi 配置消息静态映射。
+- RFCOMM 原始字节入口、BT/Wi-Fi 组件构造及 vtable 尚未证明。
