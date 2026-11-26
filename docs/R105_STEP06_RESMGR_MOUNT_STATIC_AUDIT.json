@@ -1,0 +1,106 @@
+{
+  "step": 6,
+  "target": "MHI2_CN_AU57x_K1006_2/MU1005 QNX6.5 ARM32",
+  "source_kind": "private_original_oem_elf_static_review",
+  "installable": false,
+  "inputs": {
+    "mm_ipod": {
+      "size_bytes": 40297,
+      "sha256": "4b87cd2d41ddcee2f38800fe8afe8b4b340e4f23e1d86c7e97af303522aa15d09",
+      "exports": {
+        "ipod_resmgr_mount": {
+          "va": "0x103ad0",
+          "size": 512
+        },
+        "ipod_main": {
+          "va": "0x103d8c",
+          "size": 1320
+        }
+      }
+    },
+    "iap2_driver": {
+      "size_bytes": 739925,
+      "sha256": "42fd984ebbdccd11595bd45909683829565147c8cbc8a482618d6dd8e564d3bf",
+      "symbols": {
+        "iap2_start_features": {
+          "va": "0x5fdc",
+          "size": 1152
+        },
+        "link_handle_iap2pkt": {
+          "va": "0x12e00",
+          "size": 4668
+        }
+      },
+      "relocation": {
+        "symbol": "ipod_resmgr_mount",
+        "offset": "0x000a9a14",
+        "plt_stub": "0x4cd0"
+      }
+    }
+  },
+  "driver_call": {
+    "function": "iap2_start_features",
+    "callsite": "0x63d0",
+    "argument_source": "r9 loaded from [r0+0x14] at 0x5ff0",
+    "argument_setup": [
+      {
+        "va": "0x5ff0",
+        "instruction": "ldr r9, [r0, #0x14]",
+        "word": "0xe5909014"
+      },
+      {
+        "va": "0x63c8",
+        "instruction": "mov r0, r9",
+        "word": "0xe1a00009"
+      },
+      {
+        "va": "0x63cc",
+        "instruction": "mov r1, #1",
+        "word": "0xe3a01001"
+      },
+      {
+        "va": "0x63d0",
+        "instruction": "bl ipod_resmgr_mount@plt",
+        "word": "0xebfffa3e"
+      }
+    ],
+    "upstream_caller": {
+      "function": "link_handle_iap2pkt",
+      "callsite": "0x13628",
+      "state_precondition": "low two bits of state == 3",
+      "semantic_interpretation": "not established"
+    }
+  },
+  "host_mount_implementation": {
+    "function": "ipod_resmgr_mount",
+    "va": "0x103ad0",
+    "context_register": "r6=r0",
+    "mode_register": "r7=r1",
+    "mode_zero": {
+      "path": "format('%s%d', '/dev/ipod', devno)",
+      "devno_source": "rsrcdbmgr_devno_attach",
+      "used_by": "ipod_main call at 0x104168"
+    },
+    "mode_nonzero": {
+      "path_source": "*(context+0x04)",
+      "dispatch_source": "*(context+0x20)",
+      "used_by": "driver call mode 1"
+    },
+    "attach": {
+      "function": "resmgr_attach",
+      "plt": "0x101c84",
+      "callsite": "0x103c94"
+    },
+    "default_mount_help": "-m <mountpath>; default /dev/ipod#"
+  },
+  "limitations": {
+    "custom_mode1_path_runtime_value": "unknown",
+    "DIO_iap2_device_to_mount_instance": "not closed",
+    "vehicle_pidin_mount_snapshot": "not available",
+    "RFCOMM_to_driver_data_path": "not proven",
+    "MFi_runtime": "not tested",
+    "vehicle_runtime": "not tested",
+    "installable": false
+  },
+  "verdict": "PASS_STATIC_MOUNT_OWNER_AND_CALLSITE_ONLY"
+}

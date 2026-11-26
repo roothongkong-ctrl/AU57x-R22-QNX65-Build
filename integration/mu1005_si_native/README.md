@@ -51,3 +51,10 @@ MU1005 SI registration adapter (NO INSTALL). Based on private target SI SHA256 2
 - 修正第 25 轮过时判断：第 27 轮已从 app.img QNX6fs 按名取出 libirc_mmx_adapter.so，SHA256 3277e0c410ef3be3ea8d752ccd142c706e156e7a621f69ea95e6dd174b2ba9b2；它补齐 SI 的 IRC 符号依赖，但不提供 iAP2 raw transport。
 - ASI 裸字节桥路线正式关闭；下一阶段转向 DIO / libiap2client.so.1 / /dev/ipod0 与 AirPlay/Wi-Fi 数据面。
 - 仅静态审计；QNX runtime、iPhone MFi、车辆和安装均未验证。
+
+
+## 22 步执行进度：第 06 步
+
+- [R105.016：mm-ipod Resource Manager mount 调用链静态闭环](R105_016_STEP06_IPOD_RESMGR_MOUNT_STATIC_CN.md)
+- 新增 driver → mm-ipod 导出 mount helper → QNX resmgr_attach 的原厂静态调用链证据；区分默认 `/dev/ipod#` 与 mode-1 自定义路径。
+- 自定义路径的运行时值、DIO fd 对应的 mount instance、RFCOMM 字节接入仍未证明；不安装。

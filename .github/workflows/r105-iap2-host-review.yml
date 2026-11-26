@@ -19,6 +19,8 @@ on:
       - 'docs/R105_STEP04_BTSTACK_IAP2_OWNER_STATIC_AUDIT.json'
       - 'tests/test_r105_step05_asi_si_control_plane.py'
       - 'docs/R105_STEP05_ASI_SI_CONTROL_PLANE_AUDIT.json'
+      - 'tests/test_r105_step06_resmgr_mount_audit.py'
+      - 'docs/R105_STEP06_RESMGR_MOUNT_STATIC_AUDIT.json'
       - 'project/source/src/cp_ipod_module_layout.h'
       - 'docs/STEP05_MU1005_USB_PLUGIN_ABI_AUDIT.json'
   pull_request:
@@ -70,6 +72,10 @@ jobs:
         run: |
           set -euxo pipefail
           python3 tests/test_r105_step05_asi_si_control_plane.py
+      - name: Verify Step 06 mm-ipod Resource Manager mount owner (static evidence only)
+        run: |
+          set -euxo pipefail
+          python3 tests/test_r105_step06_resmgr_mount_audit.py
       - name: Record scope boundary
         run: |
           printf '%s\n' 'HOST_ONLY=1' 'QNX_TARGET_RUNTIME=NOT_TESTED' 'OEM_RFCOMM_OWNER=NOT_PROVEN' 'MFI=NOT_TESTED' 'VEHICLE_VERIFIED=0' 'INSTALLABLE=0' | tee r105-host-scope.txt
