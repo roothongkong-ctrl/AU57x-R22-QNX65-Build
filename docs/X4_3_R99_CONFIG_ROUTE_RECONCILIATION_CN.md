@@ -1,6 +1,11 @@
 # X4.3 R99 Configuration Route Reconciliation
 Date: 2026-11-26
-Status: offline staging evidence only / runtime NO_GO / NO_INSTALL
+Status: corrected by R106 audit — synthetic fixture only / runtime NO_GO / NO_INSTALL
+
+## R106 correction — important provenance finding
+The earlier wording that R99 represented a historical attempt against the actual vehicle configuration was too strong. The R99 release builder explicitly includes `tests/fixtures/R99_DEMO_NOT_OEM_bluetooth.json` and `tests/fixtures/R99_DEMO_NOT_OEM_iap2.cfg`; it stages these demo fixtures into `r99_result/R99_DEMO_NOT_OEM_STAGING/`. `R99_FINAL_STATUS.json` explicitly sets `synthetic_demo_only=true`, `genuine_vehicle_bluetooth_config_provided=false`, and `genuine_vehicle_iap2_cfg_provided=false`. The original hashes in `R99_DEMO_AUDIT.json` are therefore hashes of demo fixture inputs, not proof of actual MU1005 vehicle config bytes. The OEM ELF hashes and literal marker checks are real pinned binary evidence, but the config staging was synthetic. Do not count R99 as an OEM config experiment or as progress toward runtime activation.
+
+The demo Bluetooth fixture is a tiny synthetic JSON (`topologyLogic`, `enableIap`, `bluetoothMode`), explicitly named NOT_OEM. The demo iAP2 fixture is also NOT_OEM. The R99 host tests prove parser/staging behavior on those fixtures only.
 
 ## Historical result recovered from the user Library
 R99_DEMO_AUDIT.json identifies an OEM_NATIVE_IAP2_CONFIG_FIRST experiment for exact platform MHI2_CN_AU57x_K1006_2/MU1005.
@@ -12,14 +17,14 @@ R99_DEMO_AUDIT.json identifies an OEM_NATIVE_IAP2_CONFIG_FIRST experiment for ex
 - Audit explicitly says stock_runtime_iap2_registration_proven=false, stock_bt_rfcomm_transport_proven=false, real_mfi_proven=false, wireless_airplay_proven=false, vehicle_verified=false, installable=false and safe_to_flash=false.
 
 ## What this changes in the X4.3 understanding
-1. There is already a historical, offline-only attempt to activate the stock configuration route. Do not redo it as a new discovery task.
+1. R99 contains a synthetic demonstration of the stock-configuration route, not a test against actual MU1005 configuration. Do not treat its 23 host tests as OEM parser validation.
 2. It does not establish that the runtime creates an RFCOMM registration, a BluetoothTransportComponent instance, or a successful iPhone/MFi session.
-3. R99 is not a vehicle-tested solution and must not be treated as a patch to install.
+3. R99 is not a vehicle-tested solution and must not be treated as a patch to install. It must not be counted as an OEM configuration milestone.
 4. The config route must be reconciled with the MHI2Q reference's separate bootstrap/session-side iAP2 architecture. They may differ by platform/firmware; do not assume they are interchangeable.
 5. The factory mm-ipod -t usbdevice transport remains a separate physical transport boundary. Do not change it as part of the config experiment.
 
 ## Required next analysis (no vehicle write)
-- Recover the exact R99 staged config files and their parser assumptions from the original R99 package; compare line-by-line with the byte-exact original config.
+- Obtain the genuine vehicle Bluetooth JSON and `/etc/mm/iap2.cfg` from the exact K1006_2/MU1005 `app.img`; compare them byte-for-byte with the R99 synthetic fixtures. Until those exact originals are present, no config parser result can be called OEM-validated.
 - Disassemble the exact MU1005 bluetooth executable around bluetooth.enableIap and iapEnabled consumers; map which process and state machine it enables.
 - Disassemble ipod-drvr-iap2.so around iap2_init, config lookup, TransportComponentIdentifier, NativeTransportComponentIdentifier, BluetoothTransportComponent and WiFiTransportComponent.
 - Prove whether the driver instantiates a Bluetooth transport, how it obtains the underlying RFCOMM producer, and whether its data path is the same path used by the external MHI2Q reference.
