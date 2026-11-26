@@ -32,3 +32,11 @@ MU1005 SI registration adapter (NO INSTALL). Based on private target SI SHA256 2
 - [R105 Step 03 静态审计 JSON](../../docs/R105_STEP03_MM_IPOD_PLUGIN_LOADER_AUDIT.json)
 - 已静态确认 mm-ipod 动态加载器、ipod_module 接口和 USB Device/Host 共同回调布局。
 - 蓝牙 RFCOMM 原始字节到 iAP2 transport 的桥接仍未证明；本次交接包内未找到蓝牙/Wi-Fi ipod transport 模块。
+
+
+## 22 步执行进度：第 04 步
+
+- [R105.014：MU1005 原厂 Bluetooth / btstack iAP2 owner 边界审计](R105_014_STEP04_BTSTACK_IAP2_OWNER_BOUNDARY_CN.md)
+- [R105 Step 04 静态审计 JSON](../../docs/R105_STEP04_BTSTACK_IAP2_OWNER_STATIC_AUDIT.json)
+- 已确认 Bluetooth app 的 iAP 配置标记、SmartphoneIntegration DSI 注册类、btstack 通用 SDP/RFCOMM 基础设施和 ASI iAP RPC proxy 边界。
+- iAP2 专属 RFCOMM owner、SCN、callback ABI 和运行时绑定仍未证明。
