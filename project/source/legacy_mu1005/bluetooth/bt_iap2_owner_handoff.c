@@ -217,17 +217,14 @@ static int native_withdraw_adapter(void*unused,int(*barrier)(void*,const Inbound
  (void)unused;return mu_bt_native_withdraw(barrier,ctx);
 }
 int au98_bind_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*o){
- Au98Hooks h;
- if(!p||au100_route_select(p->route_evidence)!=AU100_GRAFT_RFCOMM_ROUTE||
-    !p->original_image_verified||!p->on_original_iap2_owner||
-    !p->original_iap2_service_verified)return -1;
- memset(&h,0,sizeof h);
- h.opaque=p->opaque;h.original_image_verified=p->original_image_verified;
- h.on_original_iap2_owner=p->on_original_iap2_owner;
- h.original_iap2_service_verified=p->original_iap2_service_verified;
- h.attach=native_attach_adapter;h.tick=native_tick_adapter;
- h.withdraw=native_withdraw_adapter;
- return au98_publish(s,&h,o,57342);
+ /* Deprecated fail-closed entry point. au98_publish() performs a bounded
+  * connect/poll and therefore MUST NOT be called from a BlueSDK/iAP2 owner
+  * callback. The only native activation route is now:
+  * worker prepares a nonblocking CLOEXEC fd -> au98_drive_stock_native()
+  * adopts it on the proven owner thread. Keep this symbol for ABI/source
+  * compatibility, but never block or mutate the OEM SDK from here. */
+ (void)s;(void)p;(void)o;
+ return -1;
 }
 int au98_adopt_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*o,int fd,int(*verified)(void*,int),void*ctx){
  Au98Hooks h;
