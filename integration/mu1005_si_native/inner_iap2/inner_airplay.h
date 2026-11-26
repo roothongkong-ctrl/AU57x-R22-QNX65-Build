@@ -40,4 +40,11 @@ int mu_inner_ap_send(void *,const unsigned char *,size_t);
  * 0 busy -> do not acknowledge; -1 malformed/owner lost -> fail session.
  * Never call on encrypted bytes or arbitrary network messages. */
 int mu_inner_ap_control(MuInnerAirplay *,MuInner *,uint64_t,const void *);
+/* Same semantics as mu_inner_ap_control, for a verified owner receiving
+ * separate decoded command and params objects. Session must match exactly.
+ * NOT a drop-in OEM delegate: R105.028 shows a stock path discards the
+ * delegate status. Never attach without a verified response contract. */
+int mu_inner_ap_control_parts(MuInnerAirplay *,MuInner *,uint64_t,
+                             const void *session,const void *command,
+                             const void *params);
 #endif

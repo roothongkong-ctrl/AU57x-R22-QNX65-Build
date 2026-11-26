@@ -67,15 +67,25 @@ int mu_inner_ap_send(void *ctx,const unsigned char *p,size_t n){
  if(d)a->release(d);
  return r;
 }
-int mu_inner_ap_control(MuInnerAirplay *a,MuInner *b,uint64_t e,const void *d){
- if(!live(a)||!b||e!=a->epoch||!d||a->type(d)!=a->dict_type())return -1;
- const void *t=a->get(d,a->key_type);
- if(!t||a->type(t)!=a->string_type()||!a->equal(t,a->cmd))return 2;
- const void *v=a->get(d,a->key_params);
+/* The OEM split callback and decoded wire envelope share the same parser.
+ * A caller must independently prove that it owns the decoded control
+ * dispatch and can propagate the return status to the peer. */
+int mu_inner_ap_control_parts(MuInnerAirplay *a,MuInner *b,uint64_t e,
+                             const void *session,const void *t,const void *v){
+ if(!live(a)||!b||e!=a->epoch||session!=a->session)return -1;
+ if(!t||a->type(t)!=a->string_type())return -1;
+ if(!a->equal(t,a->cmd))return 2;
  if(!v||a->type(v)!=a->dict_type())return -1;
  const void *data=a->get(v,a->key_data);
  if(!data||a->type(data)!=a->data_type())return -1;
  long n=a->length(data);const unsigned char *p=a->bytes(data);
  if(n<=0||n>(long)MU_INNER_CAP||!p)return -1;
  return mu_inner_from_control(b,e,p,(size_t)n);
+}
+int mu_inner_ap_control(MuInnerAirplay *a,MuInner *b,uint64_t e,const void *d){
+ if(!live(a)||!b||e!=a->epoch||!d||a->type(d)!=a->dict_type())return -1;
+ const void *t=a->get(d,a->key_type);
+ /* Preserve the existing envelope adapter's unrelated-message contract. */
+ if(!t||a->type(t)!=a->string_type()||!a->equal(t,a->cmd))return 2;
+ return mu_inner_ap_control_parts(a,b,e,a->session,t,a->get(d,a->key_params));
 }
