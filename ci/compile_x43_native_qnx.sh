@@ -28,7 +28,7 @@ for src in "${SRC[@]}"; do
   OBJS+=("$obj")
   i=$((i+1))
 done
-"$CC" -shared -Wl,--hash-style=sysv -Wl,--no-undefined -o "$OUT/libau57x_x43_native_REVIEW_ONLY.so" "${OBJS[@]}" -lc
+"$CC" -shared -Wl,--hash-style=sysv -Wl,--no-undefined -o "$OUT/libau57x_x43_native_REVIEW_ONLY.so" "${OBJS[@]}" -lsocket -lc
 "$RE" -h -d "$OUT/libau57x_x43_native_REVIEW_ONLY.so" > "$OUT/readelf.txt"
 grep -q "Shared library: \[libc.so.3\]" "$OUT/readelf.txt"
 python3 project/tools/qnx_elf_gate.py --candidate "$OUT/libau57x_x43_native_REVIEW_ONLY.so" --output "$OUT/elf_gate.json"
