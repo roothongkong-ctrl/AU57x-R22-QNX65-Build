@@ -40,7 +40,7 @@ def test_blocking_connect_is_worker_only_api():
     assert "connected(port)" in b
     assert "socket(" not in b
     assert "Worker-side bounded connect" in HDR
-    assert "Prepared socket handoff" in HDR
+    assert "Worker transfers exclusive prepared nonblocking fd" in HDR
 
 def test_owner_callback_contract_is_explicit():
     assert "original serialized iAP2 owner, not HFP" in HDR
