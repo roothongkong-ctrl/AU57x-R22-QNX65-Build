@@ -40,3 +40,14 @@ MU1005 SI registration adapter (NO INSTALL). Based on private target SI SHA256 2
 - [R105 Step 04 静态审计 JSON](../../docs/R105_STEP04_BTSTACK_IAP2_OWNER_STATIC_AUDIT.json)
 - 已确认 Bluetooth app 的 iAP 配置标记、SmartphoneIntegration DSI 注册类、btstack 通用 SDP/RFCOMM 基础设施和 ASI iAP RPC proxy 边界。
 - iAP2 专属 RFCOMM owner、SCN、callback ABI 和运行时绑定仍未证明。
+
+
+## 22 步执行进度：第 05 步
+
+- [R105.015：ASI / SmartphoneIntegration 控制面与 iAP2 数据面分离](R105_015_STEP05_ASI_SI_CONTROL_PLANE_AUDIT_CN.md)
+- [R105 Step 05 静态审计 JSON](../../docs/R105_STEP05_ASI_SI_CONTROL_PLANE_AUDIT.json)
+- 复用第 27 轮固件自带 EMS 契约和 app.img 778 ELF 全量扫描：IapDeviceServices 9 项方法只有设备/状态管理，没有 raw iAP2 帧/流方法；该 app.img 中未发现对应 provider。
+- BluetoothSmartphoneIntegration 9 项是配对/连接/模式状态；smartphone_integrator 46 项是会话/UI/输入/Now Playing 元数据。
+- 修正第 25 轮过时判断：第 27 轮已从 app.img QNX6fs 按名取出 libirc_mmx_adapter.so，SHA256 3277e0c410ef3be3ea8d752ccd142c706e156e7a621f69ea95e6dd174b2ba9b2；它补齐 SI 的 IRC 符号依赖，但不提供 iAP2 raw transport。
+- ASI 裸字节桥路线正式关闭；下一阶段转向 DIO / libiap2client.so.1 / /dev/ipod0 与 AirPlay/Wi-Fi 数据面。
+- 仅静态审计；QNX runtime、iPhone MFi、车辆和安装均未验证。
