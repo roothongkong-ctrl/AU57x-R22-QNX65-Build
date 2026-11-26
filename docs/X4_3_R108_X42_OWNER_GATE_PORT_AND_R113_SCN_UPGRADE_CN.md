@@ -28,6 +28,9 @@ Status: SOURCE_ONLY / HOST_FIXTURE_PASS / QNX_COMBINED_BUILD_PENDING / NO_INSTAL
 5. Real iPhone MFi, Wi-Fi handoff, AirPlay media/control, USB takeover/resume and vehicle wireless session remain untested.
 
 ## Next exact step
-Create a dedicated QNX 6.5 ARMv7 build target for the full X4.3 native path: `native_binding.c`, `native_event.c`, `inbound_r5.c`, `inbound.c`, `mu1005_rf_ingress.c`, `mu1005_ipc_stream.c`, `mu1005_socket_pump.c`, `rf_arg_experiment.c`, `bt_iap2_owner_handoff.c`, `bt_route_gate.c` and `mu1005_owner_gate.c`. Run ELF/NEEDED checks and QEMU smoke. Keep native attach disabled; this build validates ABI/compilation only, not original owner/MFi.
+A dedicated QNX 6.5 ARMv7 build script and GitHub Actions workflow have now been added: `ci/compile_x43_native_qnx.sh` and `.github/workflows/x4.3-qnx-native-build.yml`. It compiles/links the complete native path (`native_binding.c`, `native_event.c`, `inbound_r5.c`, `inbound.c`, RF/IPC/socket pumps, owner handoff, route gate and X3 gate), then runs ELF/NEEDED checks. The workflow run is not yet visible, so this remains PENDING. QEMU is intentionally not asked to execute the fixed-address native attach path; this target validates ABI/compilation only, not original owner/MFi.
 
 NO_INSTALL / safe_to_flash=false / vehicle_verified=false.
+
+## R109 update — target build gate created
+The full X4.3 QNX ARM32 build script and workflow are now in the branch. Pending evidence: a successful workflow run ID plus the uploaded ELF gate/readelf artifact. Until then, do not claim combined QNX compile PASS.
