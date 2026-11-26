@@ -30,19 +30,19 @@ static int32_t add(void*p,void*k,void*secondary){assert((uintptr_t)p==P&&k&&seco
 static void update(void*p,uint32_t id,void*info){assert((uintptr_t)p==P&&id==17&&info);}
 static void activate(void*p,uint32_t id,uint32_t app){assert((uintptr_t)p==B&&id==17&&app==0);activates++;put(B+MU_SI_DEFERRED_APP_OFF,0);put(B+MU_SI_DEFERRED_ID_OFF,id);}
 static int cleanup(void*c,const struct mu_owner_session*k,uint32_t id){return admit(c,k)&&id==17&&cleaned;}
-struct fixture{pid_t peer;int starts,samples,restores;};
+struct fixture{pid_t peer;int starts,samples,restores,first_video;};
 static int tuple(void*c,uint32_t g,uint64_t e,uint32_t s){return c&&g==42&&e==5&&s==8;}
 static int peer(void*p,int fd,uint32_t g,uint64_t e,uint32_t s){struct fixture*f=p;struct ucred u;socklen_t n=sizeof u;return tuple(p,g,e,s)&&getsockopt(fd,SOL_SOCKET,SO_PEERCRED,&u,&n)==0&&n==sizeof u&&u.pid==f->peer&&u.uid==geteuid()&&u.gid==getegid();}
 static int admission(void*p,uint32_t g){return p&&g==42;}
 static int identity(void*p,char*out,size_t cap){if(!p||cap<7)return -1;memcpy(out,"id-123",6);return 6;}
 static int media(void*p){struct fixture*f=p;return ++f->samples<=2?7:0;}
 static int auth(void*p,uint32_t g,uint64_t e,uint32_t s){return tuple(p,g,e,s)?((struct fixture*)p)->samples==1:-1;}
-static int channel(void*p,uint32_t g,uint64_t e,uint32_t s,unsigned ch){return tuple(p,g,e,s)&&ch>=1&&ch<=4;}
+static int channel(void*p,uint32_t g,uint64_t e,uint32_t s,unsigned ch){if(!tuple(p,g,e,s)||ch<1||ch>4)return -1;return ((struct fixture*)p)->first_video&&ch!=1?-1:1;}
 static int start(void*p,unsigned port){struct fixture*f=p;return port==5000&&++f->starts==1?2:-1;}
 static int poll_backend(void*p){return p?2:-1;}
 static int restore(void*p){struct fixture*f=p;return ++f->restores==1?1:0;}
-static int server(const char*dir,pid_t parent){
- struct fixture f={.peer=parent};
+static int server(const char*dir,pid_t parent,int first_video){
+ struct fixture f={.peer=parent,.first_video=first_video};
  MuReceiverBackend b={&f,42,start,poll_backend,restore};
  MuCprxEvidence e={.opaque=&f,.admitted=admission,.identity=identity,.media=media,.si_admitted=tuple,.si_client_verified=peer,.si_inner_iap2_mfi=auth,.si_media_channel=channel};
  MuCprxService s={0};
@@ -59,9 +59,10 @@ static int transact(MuCprxRemoteEndpoint*e,unsigned op){
  mu_cprx_client_close(&c);return rc;
 }
 static int drive(struct mu_si_cprx*b){uint64_t until=now()+7500;int rc=1;while(now()<until&&(rc=mu_si_cprx_tick(b,now(),NULL,NULL,0))==1)pause_tick();return rc;}
-int main(void){
+int main(int argc,char**argv){
+ int first_video=argc==2&&!strcmp(argv[1],"first-video");
  char dir[]="/tmp/au57x-review-XXXXXX";assert(mkdtemp(dir));
- pid_t child=fork();assert(child>=0);if(child==0)_exit(server(dir,getppid()));
+ pid_t child=fork();assert(child>=0);if(child==0)_exit(server(dir,getppid(),first_video));
  struct fixture f={.peer=child};
  MuCprxRemoteEndpoint e={.generation=42,.session=8,.epoch=5,.airplay_port=5000,.server_uid=geteuid(),.server_gid=getegid(),.owner_ctx=&f,.si_owner_verified=tuple,.dio_server_verified=peer};
  assert(snprintf(e.socket_path,sizeof e.socket_path,"%s/cprx.sock",dir)>0);
@@ -71,10 +72,10 @@ int main(void){
  puts("PASS real R85 START across processes");
  struct mu_owner_ops o={.registration={.owner_session_current=own,.add_unique_id=add,.update_record=update,.reader={0,rd}},.admitted=admit,.activate=activate,.cleanup_confirmed=cleanup};
  struct mu_owner_session k={B,8,5};struct mu_si_cprx b={0};uint64_t key[5]={0},info[20]={0};
- idle();assert(mu_si_cprx_init(&b,&o,&k,&e)==0);
+ idle();assert((first_video?mu_si_cprx_init_first_video(&b,&o,&k,&e):mu_si_cprx_init(&b,&o,&k,&e))==0);
  assert(mu_si_cprx_tick(&b,now(),key,info,sizeof info)==MU_OWNER_PENDING);
  active();assert(drive(&b)==MU_OWNER_CONNECTED&&adds==1&&activates==1&&!b.proof);
- puts("PASS real op11 with exact session and all channels");
+ puts(first_video?"PASS real op11 first video with optional channels unknown":"PASS real op11 with exact session and all channels");
  assert(drive(&b)==MU_OWNER_UNCERTAIN);
  puts("PASS real op11 loss of authentication latches uncertainty");
  assert(mu_si_cprx_cleanup(&b)==MU_OWNER_UNCERTAIN);

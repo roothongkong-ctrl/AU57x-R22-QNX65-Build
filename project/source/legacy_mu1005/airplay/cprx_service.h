@@ -34,7 +34,8 @@ typedef struct {
   * Epoch-only assertions from another AirPlay/iAP2 session are insufficient. */
  int (*si_inner_iap2_mfi)(void *,uint32_t generation,uint64_t epoch,uint32_t session);
  int (*si_media_channel)(void *,uint32_t generation,uint64_t epoch,uint32_t session,
-                         unsigned channel); /* 1 video, 2 audio, 3 MMI, 4 steering */
+                         unsigned channel); /* 1 video, 2 audio, 3 MMI, 4 steering;
+     result 1 confirmed, 0 absent, -1 unknown (optional channels unset) */
  /* R85: INDEPENDENT DIO original-owner wired transition, for the SAME
   * receiver lease. Never derive from SI's wire data, SI USB events alone,
   * a root UID or global media flag. Missing callback = DENY op 12. */

@@ -24,6 +24,12 @@ jobs:
           cc -std=c99 -O2 -Wall -Wextra -Werror -I"$a" -I"$s" "$s"/{si_mu1005_layout,si_mu1005_registration,si_mu1005_activation,si_mu1005_snapshot,si_mu1005_owner,si_mu1005_cprx,test_real_cprx}.c "$a"/{cprx_service,native_exports,semantic,mu1005_r34_ap_server}.c -ldl -o "$RUNNER_TEMP/real-cprx"
           timeout 30 "$RUNNER_TEMP/real-cprx" | tee evidence/real-cprx.log
           grep -F HOST_REAL_CPRX_OEM_FIXTURES_ONLY_NO_INSTALL evidence/real-cprx.log
+          # First-connect mode uses the current DIO implementation, not an
+          # old pinned server that cannot report optional unknown channels.
+          a=project/source/legacy_mu1005/airplay
+          cc -std=c99 -O2 -Wall -Wextra -Werror -I"$a" -I"$s" "$s"/{si_mu1005_layout,si_mu1005_registration,si_mu1005_activation,si_mu1005_snapshot,si_mu1005_owner,si_mu1005_cprx,test_real_cprx}.c "$a"/{cprx_service,native_exports,semantic,mu1005_r34_ap_server}.c -ldl -o "$RUNNER_TEMP/first-video-cprx"
+          timeout 30 "$RUNNER_TEMP/first-video-cprx" first-video | tee evidence/first-video-cprx.log
+          grep -F 'PASS real op11 first video with optional channels unknown' evidence/first-video-cprx.log
       - name: Verify original Bluetooth handoff revocation and fresh ACL recovery
         shell: bash
         run: |

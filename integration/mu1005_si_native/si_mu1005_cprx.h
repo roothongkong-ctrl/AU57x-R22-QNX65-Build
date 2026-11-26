@@ -11,8 +11,12 @@ struct mu_si_cprx {
  MuCprxClient query;
  uint64_t last_ms,first_ms,next_ms;
  int initialized,clock_set,querying,proof;
+ unsigned required_channels; /* 1 first video, 15 complete media */
 };
 int mu_si_cprx_init(struct mu_si_cprx*,const struct mu_owner_ops*,const struct mu_owner_session*,const MuCprxRemoteEndpoint*);
+/* Explicit first-connect mode: authenticated original receiver + actual
+ * video evidence, without requiring audio/MMI/steering. Does not prove LCD. */
+int mu_si_cprx_init_first_video(struct mu_si_cprx*,const struct mu_owner_ops*,const struct mu_owner_session*,const MuCprxRemoteEndpoint*);
 int mu_si_cprx_tick(struct mu_si_cprx*,uint64_t,void*,void*,size_t);
 int mu_si_cprx_cleanup(struct mu_si_cprx*);
 #endif

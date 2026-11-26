@@ -9,3 +9,6 @@
 
 ## R105.047
 R105.046 native-library job 140207246275 success；SI run 45907376247 success；unified run 45907376230 authentication host fixture assertion line1327 failed. 原因候选：客户端分段状态读取可能在每轮第一次 tick 确认快照，而第二次 tick 开始新查询并撤销快照，测试只检查第二次。现改为每次 tick 后立即检查 video，不改变媒体证据或授权。另修正现有 inner_session HTTP dispatcher：先使用已验证 library 判定是否 iAPSendMessage，再执行无线 owner 检查，非本协议原厂 requestUI 等始终由原函数处理，避免原厂 UI 受 relay 失效影响。现有测试加入该正常原厂回退路径。新 CI 待核实；真实原厂装载、授权、RF、Wi-Fi/AirPlay 仍无运行证据，NO INSTALL。
+
+## R105.048 首画面模式继续整合（SI + DIO）
+R105.047 unified run 45907707475 九个 jobs 全部 success（authentication 140208332410），SI 45907707437 和 iAP2 45907707426 success。原先 SI 独立激活适配器 si_mu1005_cprx.c 仍要求 mask==15，本轮新增显式 mu_si_cprx_init_first_video，保持原全功能入口 mask15 不变，首连入口只要求同一原厂会话实际 inner MFi、media7、video bit。DIO 现有 op11 将可选音频/MMI/方向盘的未知(-1)表现为无对应确认位，不再拒绝完整查询；video 未知仍 RETRY，原厂认证未知仍拒绝。不改变协议格式。真实跨进程 fixture 增加 first-video 模式，使用当前 DIO 源码，原 R85 pin 的全功能测试保留。未声称实车已显示，最新 CI 待验。仍需生产原厂运行时调用者，NO INSTALL。
