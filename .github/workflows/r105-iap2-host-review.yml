@@ -13,6 +13,8 @@ on:
       - 'tests/test_r105_step01_plugin_abi_layout.py'
       - 'tests/test_r105_step02_driver_static_audit.py'
       - 'docs/R105_STEP02_DRIVER_STATIC_AUDIT.json'
+      - 'tests/test_r105_step03_mm_ipod_plugin_loader.py'
+      - 'docs/R105_STEP03_MM_IPOD_PLUGIN_LOADER_AUDIT.json'
       - 'project/source/src/cp_ipod_module_layout.h'
       - 'docs/STEP05_MU1005_USB_PLUGIN_ABI_AUDIT.json'
   pull_request:
@@ -52,6 +54,10 @@ jobs:
         run: |
           set -euxo pipefail
           python3 tests/test_r105_step02_driver_static_audit.py
+      - name: Verify Step 03 mm-ipod loader and stock USB plugin ABI (metadata only)
+        run: |
+          set -euxo pipefail
+          python3 tests/test_r105_step03_mm_ipod_plugin_loader.py
       - name: Record scope boundary
         run: |
           printf '%s\n' 'HOST_ONLY=1' 'QNX_TARGET_RUNTIME=NOT_TESTED' 'OEM_RFCOMM_OWNER=NOT_PROVEN' 'MFI=NOT_TESTED' 'VEHICLE_VERIFIED=0' 'INSTALLABLE=0' | tee r105-host-scope.txt
