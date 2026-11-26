@@ -1307,7 +1307,19 @@ static void native_remote_owner_cloud_pipeline(void){
   if(got)when=now;
  }
  assert(got&&p.handoff.phase==CP_HO_MEDIA_ACTIVE);
+ assert(p.remote_bootstrap_committed);
  assert(cp_cloud_remote_live_at(&p,when));
+ /* The first BT bootstrap must retire only after independently verified
+  * inner MFi and actual disconnection; the original session stays live. */
+ assert(cp_cloud_bt_closed(&p,4)==CP_CLOUD_PROOF);
+ bt=0;
+ assert(!cp_cloud_remote_live_at(&p,when));
+ inner=0;
+ assert(cp_cloud_bt_closed(&p,4)==CP_CLOUD_PROOF);
+ inner=1;
+ assert(cp_cloud_bt_closed(&p,4)==CP_CLOUD_OK&&!p.handoff.bt_connected);
+ assert(cp_cloud_remote_live_at(&p,when));
+ inner=0;assert(!cp_cloud_remote_live_at(&p,when));inner=1;
  assert(!cp_cloud_remote_live_at(&p,when+501)); /* stale status */
  assert(!cp_cloud_is_active(&p)); /* must call remote_live_at with clock */
  /* DIO steering dropped while a cached 0x0f existed; the independent SI

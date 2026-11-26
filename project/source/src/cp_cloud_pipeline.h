@@ -68,6 +68,8 @@ struct cp_cloud_pipeline {
  MuCprxClient remote_client;
  unsigned remote_phase; /* 0 unbound, 1 START, 2 snapshot, 3 STOP, 4 restored */
  int remote_start_confirmed,remote_snapshot_fresh;
+ /* Historical bootstrap evidence, never a substitute for live inner MFi. */
+ int remote_bootstrap_committed;
  int remote_media,remote_inner;
  unsigned remote_channels;
  uint64_t remote_sample_ms;

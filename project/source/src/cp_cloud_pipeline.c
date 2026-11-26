@@ -5,15 +5,24 @@
 #include "cp_cloud_pipeline.h"
 #include <string.h>
 static int iface_ok(const char *p);
+/* BT is a bootstrap, not a permanent prerequisite for an already
+ * authenticated Wi-Fi session. Only an explicit OEM disconnect event
+ * after verified handoff may retire it. */
+static int remote_bt_released(const struct cp_cloud_pipeline *p){
+ return p&&p->remote_bootstrap_committed&&!p->handoff.bt_connected&&
+        p->handoff.first_iap_authenticated&&p->handoff.second_iap_authenticated&&
+        (p->handoff.phase==CP_HO_INNER_IAP_AUTH||p->handoff.phase==CP_HO_MEDIA_ACTIVE);
+}
 static int remote_owner_valid(struct cp_cloud_pipeline *p){
  const MuCprxRemoteEndpoint *e;
  if(!p||!p->remote_phase||!p->started||p->stopped||
     !p->bootstrap||p->bootstrap->epoch!=p->epoch||
-    !cp_s4_authenticated(p->bootstrap)||
+    (!remote_bt_released(p)&&!cp_s4_authenticated(p->bootstrap))||
     !p->owner.si_single_owner||
     p->owner.si_single_owner(p->owner.ctx,p->epoch)!=1||
     !p->owner.wired_idle||p->owner.wired_idle(p->owner.ctx)!=1||
-    !p->owner.bt_alive||p->owner.bt_alive(p->owner.ctx,p->epoch,p->bt_generation)!=1||
+    (!remote_bt_released(p)&&(!p->owner.bt_alive||
+      p->owner.bt_alive(p->owner.ctx,p->epoch,p->bt_generation)!=1))||
     p->radio.epoch!=p->epoch||p->radio.phase!=CP_RADIO_ASSOCIATED||
     !p->owner.ap_association||
     p->owner.ap_association(p->owner.ctx,p->epoch,p->band)!=1)return 0;
@@ -568,7 +577,7 @@ int cp_cloud_bind_remote_dio(struct cp_cloud_pipeline *p,
  mu_cprx_client_init(&p->remote_client);
  p->remote_media=p->remote_inner=-1;p->remote_channels=0;
  p->remote_sample_ms=0;p->remote_snapshot_fresh=0;
- p->remote_start_confirmed=0;p->remote_phase=1;
+ p->remote_start_confirmed=0;p->remote_bootstrap_committed=0;p->remote_phase=1;
  return CP_CLOUD_OK;
 }
 static void remote_revoke_snapshot(struct cp_cloud_pipeline *p){
@@ -579,12 +588,13 @@ static void remote_revoke_snapshot(struct cp_cloud_pipeline *p){
 static int remote_steady_proof(struct cp_cloud_pipeline *p){
  if(!remote_owner_valid(p)||!p->remote_start_confirmed||
     p->remote_media!=7||p->remote_inner!=1||p->remote_channels!=15||
-    !p->bootstrap->wireless.start_sent||p->bootstrap->wireless_pending||
-    p->bootstrap->link.outbound_pending||
-    !p->bootstrap->wireless.session||
-    p->bootstrap->wireless.session->airplay_port!=CP_CLOUD_PORT||
-    !p->owner.carplay_request_sent||
-    p->owner.carplay_request_sent(p->owner.ctx,p->epoch)!=1||
+    (!remote_bt_released(p)&&
+     (!p->bootstrap->wireless.start_sent||p->bootstrap->wireless_pending||
+      p->bootstrap->link.outbound_pending||
+      !p->bootstrap->wireless.session||
+      p->bootstrap->wireless.session->airplay_port!=CP_CLOUD_PORT||
+      !p->owner.carplay_request_sent||
+      p->owner.carplay_request_sent(p->owner.ctx,p->epoch)!=1))||
     !p->owner.bonjour_identity_verified||
     p->owner.bonjour_identity_verified(p->owner.ctx,p->epoch,p->iface)!=1||
     !p->owner.airplay_listener_verified||
@@ -663,7 +673,7 @@ int cp_cloud_drive_remote_dio(struct cp_cloud_pipeline *p,uint64_t now){
  }
  /* The cross-process DIO ack is not an MFi success. Drive the existing
   * iAP2 bootstrapping/4301 path through the ORIGINAL SI-owned link. */
- if(p->bootstrap->wireless_ctx==p&&
+ if(!remote_bt_released(p)&&p->bootstrap->wireless_ctx==p&&
     p->bootstrap->wireless_proof==actual_wireless_proof){
   r=cp_s4_tick(p->bootstrap,now);
   if(r<0&&r!=CP_LK_BACKPRESSURE)return CP_CLOUD_RETRY;
@@ -703,7 +713,10 @@ int cp_cloud_drive_remote_dio(struct cp_cloud_pipeline *p,uint64_t now){
  if(p->handoff.phase==CP_HO_INNER_IAP_AUTH&&
     cp_ho_signal(&p->handoff,p->epoch,CP_HO_EV_MEDIA_CONFIRMED,1)!=CP_HO_OK)
   return CP_CLOUD_PROOF;
- return p->handoff.phase==CP_HO_MEDIA_ACTIVE?CP_CLOUD_OK:CP_CLOUD_RETRY;
+ if(p->handoff.phase==CP_HO_MEDIA_ACTIVE){
+  p->remote_bootstrap_committed=1;return CP_CLOUD_OK;
+ }
+ return CP_CLOUD_RETRY;
 }
 int cp_cloud_remote_graceful_end(struct cp_cloud_pipeline *p,uint64_t now){
  int r;
@@ -789,6 +802,15 @@ int cp_cloud_bt_closed(struct cp_cloud_pipeline *s,uint32_t gen){
  if(gen!=s->bt_generation)return CP_CLOUD_STALE;
  if(s->handoff.phase<CP_HO_INNER_IAP_AUTH)
   return s->native_dio?native_failure(s):stop(s);
+ if(s->remote_phase){
+  if(!s->remote_bootstrap_committed||!s->remote_start_confirmed||
+     s->remote_phase!=2||!s->owner.bt_alive||
+     s->owner.bt_alive(s->owner.ctx,s->epoch,gen)!=0||
+     s->owner.si_single_owner(s->owner.ctx,s->epoch)!=1||
+     s->owner.inner_iap2_mfi_verified(s->owner.ctx,s->epoch)!=1||
+     s->owner.airplay_session_connected(s->owner.ctx,s->epoch,s->iface,CP_CLOUD_PORT)!=1)
+   return CP_CLOUD_PROOF;
+ }
  if(cp_ho_signal(&s->handoff,s->epoch,CP_HO_EV_BT_DISCONNECTED,1)!=CP_HO_OK)
   return CP_CLOUD_ORDER;
  return CP_CLOUD_OK;
