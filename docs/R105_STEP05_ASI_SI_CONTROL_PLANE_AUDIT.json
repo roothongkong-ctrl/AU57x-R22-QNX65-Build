@@ -1,0 +1,82 @@
+{
+  "step": 5,
+  "target": "MHI2_CN_AU57x_K1006_2/MU1005, app.img 70 variant evidence",
+  "source_kind": "private_original_app_img_contract_and_elf_static_review",
+  "scope": "ASI Bluetooth iAP proxy contract; BluetoothSmartphoneIntegration DSI contract; smartphone_integrator DSI UI contract; libirc adapter identity",
+  "asi_iap_device_services": {
+    "interface": "asi.connectivity.bluetooth.iap.IapDeviceServices",
+    "interface_version": "1.0.1",
+    "contract_source": "asi.connectivity.bluetooth.iap.ems_table.json",
+    "source_offset": "0x0F1D2989",
+    "json_offset": "0x0F1D29B6",
+    "json_size_bytes": 2207,
+    "methods": [
+      {"id":0,"name":"requestReconnectDevice","args":["dev:string"],"reply":true},
+      {"id":1,"name":"responseReconnectDevice","args":["dev:string","result:Result(OK=0,ERROR=1,ERROR_DEVICE_OPEN=2)"],"reply":true},
+      {"id":2,"name":"updateActiveDevice","args":["dev:string"],"reply":true},
+      {"id":3,"name":"stringRequest","args":["str:string"],"reply":false},
+      {"id":4,"name":"stringResponse","args":["str:string"],"reply":false},
+      {"id":5,"name":"updateActiveDevice","args":["dev:string","address:int64"],"reply":true},
+      {"id":6,"name":"updateLocalBtAddress","args":["address:int64"],"reply":false},
+      {"id":7,"name":"updateLocalFriendlyName","args":["name:string"],"reply":false},
+      {"id":8,"name":"updateActiveDevices","args":["devices:IapDevice[]{devPath:string,address:int64,inUse:bool}"],"reply":false}
+    ],
+    "proxy_elf": {
+      "name": "libasimmxconnectivity_bluetooth_iapproxy.so",
+      "size_bytes": 48248,
+      "sha256": "44883ed28e44a8f06b5308266510981e17b3ee59d737f73208cd76e11ffc1c80",
+      "exports": ["getProxyStubFactory"],
+      "markers": ["PROXY_asi_connectivity_bluetooth_iap_IapDeviceServices","STUB_asi_connectivity_bluetooth_iap_IapDeviceServices","IapDeviceServicesRPCStub::calls: unknown method ID=%d"],
+      "interpretation": "IDL-generated RPC proxy/stub only; no business implementation or raw iAP2 frame method established."
+    },
+    "server_search": {
+      "app_img_elf_count": 778,
+      "interface_implementation_found": false,
+      "proxy_DT_NEEDED_consumer_found": false,
+      "btstack_iap_service_provider_found": false,
+      "interpretation": "The inspected 70-variant app.img contains the proxy contract but no corresponding provider implementation. This is scoped to the inspected app.img, not every possible partition/runtime filesystem."
+    }
+  },
+  "smartphone_integration_contracts": {
+    "BluetoothSmartphoneIntegration": {
+      "method_count": 9,
+      "methods": [
+        "reportConnectionEstablished(btAddress,success)",
+        "reportParingSuccess(btAddress,paringSuccessful)",
+        "reportSharedSecret(btAddress,passkey)",
+        "requestLocalBluetoothAddress()",
+        "requestPrepareConnect(btAddress)",
+        "responseLocalBluetoothAddress(btAddress)",
+        "responsePrepareConnect(btAddress,alreadyPaired,alreadyHFPConnected)",
+        "updateSmartphoneMode(NOTHING|ANDROID_AUTO|CARPLAY|MIRRORLINK,btAddress)",
+        "updateSmartphoneMode(...CARLIFE...)"
+      ],
+      "classification": "pairing, connection, passkey and smartphone-mode control/status; no raw byte-array or stream payload"
+    },
+    "dsi.smartphoneintegration": {
+      "method_count": 46,
+      "representative_methods": ["connectDevice","disconnectDevice","updateDiscoveredDevices","startService","updateDeviceInfo","updateNowPlayingData","updateCoverArtUrl","requestTouchEvent","postTouchEvent","postCharacterEvent","postRotaryEvent","updateTelephonyState"],
+      "classification": "session/UI/input/metadata; updateNowPlayingData is media metadata, not a binary media stream; no raw iAP2 frame transport method"
+    }
+  },
+  "libirc_adapter": {
+    "name": "libirc_mmx_adapter.so",
+    "size_bytes": 296740,
+    "sha256": "3277e0c4ba9b2",
+    "source": "app.img QNX6fs named extraction (70 variant); earlier R25 app.img full-ELF scan conclusion superseded",
+    "defines_smartphone_integrator_missing_irc_symbols": true,
+    "interpretation": "Required adapter resolves the three SmartphoneIntegration_irc methods and related dumper vtables; its presence does not create an iAP2 raw-data service."
+  },
+  "decision": {
+    "ASI_IapDeviceServices_raw_iap2_transport": "CLOSED_NO_PROVIDER_NO_RAW_METHOD",
+    "BluetoothSmartphoneIntegration_role": "CONTROL_PLANE_ONLY",
+    "smartphone_integrator_role": "SESSION_UI_INPUT_METADATA_ONLY",
+    "libirc_adapter_role": "IRC_SMARTPHONE_INTEGRATION_ADAPTER_NOT_IAP2_TRANSPORT",
+    "continue_investment_in_ASI_raw_byte_bridge": false,
+    "next_data_plane_target": "dio_manager -> libiap2client.so.1 -> /dev/ipod0 and AirPlay/Wi-Fi session path",
+    "MFi_bypass": false,
+    "vehicle_verified": false,
+    "installable": false,
+    "safe_to_flash": false
+  }
+}
