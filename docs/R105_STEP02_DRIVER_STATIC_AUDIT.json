@@ -1,0 +1,74 @@
+{
+  "firmware": "MHI2_CN_AU57x_K1006_2/MU1005",
+  "sample": "ipod-drvr-iap2.so",
+  "source_archive": "AU57x_C7_无线CarPlay_交给其他AI_一包全资料_20261112.zip",
+  "archive_member": "02_原厂二进制_仅私有交接/ipod-drvr-iap2.so",
+  "size_bytes": 739925,
+  "sha256": "42fd984ebbdccd11595bd45909683829565147c8cbc8a482618d6dd8e564d3bf",
+  "build_id": "f66b11f264233f156e4414ab8b438917",
+  "elf": {
+    "class": "ELF32",
+    "machine": "ARM",
+    "eabi": "EABI5",
+    "needed": ["libstrm.so.1", "libpps.so.1", "libc.so.3"]
+  },
+  "transport_callback_dispatch": {
+    "transport_receive": {"va": "0x2111c", "size": 40, "slot_offset": "0x2c"},
+    "transport_get_link_params": {"va": "0x21144", "size": 24, "slot_offset": "0x18"},
+    "transport_send_pkt": {"va": "0x2115c", "size": 192, "slot_offset": "0x28"},
+    "transport_recv_pkt": {"va": "0x2121c", "size": 672, "uses": ["link_get_transport_data", "link_handle_iap2pkt"]},
+    "callback_table_owner_expression": "driver_context+0x14 -> transport_context+0x40 -> callback slots"
+  },
+  "bluetooth_iap2_feature_functions": {
+    "bt_stop_updates": {"va": "0x54a8", "size": 148},
+    "bt_update_recv": {"va": "0x505c", "size": 1100, "role": "parses Bluetooth status/profile update payload and publishes PPS state"},
+    "bt_start_updates": {"va": "0x553c", "size": 372, "message_id": "0x4e03"},
+    "bt_send_info": {"va": "0x56b0", "size": 328, "message_id": "0x4e01"}
+  },
+  "wifi_iap2_feature": {
+    "wifi_acc_config_info": {"va": "0x21b80", "size": 996, "message_id": "0x5703"},
+    "observed_parameters": ["SSID", "Passphrase", "SecurityType", "Channel"],
+    "scope": "iAP2 accessory Wi-Fi configuration information handler; not proof of radio/AP creation or successful iPhone association"
+  },
+  "iAP2_dispatch": {
+    "link_handle_iap2pkt": {"va": "0x12e00", "size": 4668},
+    "bt_update_recv_callsite": "0x13818",
+    "wifi_acc_config_info_callsite": "0x1382c",
+    "iap2_start_features": {"va": "0x5fdc", "size": 1152, "calls": ["bt_send_info", "bt_start_updates"]},
+    "init_features": {"va": "0xe2cc", "size": 1952}
+  },
+  "transport_identification_helpers": {
+    "ident_info_tspbt": {"va": "0xd490", "size": 728, "local": true},
+    "ident_info_tspwifi": {"va": "0xabf8", "size": 728, "local": true},
+    "ident_info_tspusbdev": {"va": "0xb9b0", "size": 920, "local": true},
+    "ident_info_tspserial": {"va": "0xa914", "size": 60, "local": true},
+    "ident_info_recvmsgs": {"va": "0xbd48", "size": 1804, "local": true},
+    "ident_info_sendmsgs": {"va": "0xc454", "size": 1820, "local": true}
+  },
+  "component_metadata_strings": [
+    "SerialTransportComponent",
+    "USBDeviceTransportComponent",
+    "USBHostTransportComponent",
+    "BluetoothTransportComponent",
+    "WiFiTransportComponent",
+    "BluetoothTransportComponentIdentifier",
+    "NativeTransportComponentIdentifier",
+    "TransportComponentIdentifier",
+    "TransportComponentName",
+    "TransportSupportsiAP2Connection",
+    "TransportSupportsCarPlay",
+    "BluetoothTransportMediaAccessControlAddress",
+    "ConnectedBluetoothProfiles"
+  ],
+  "limitations": {
+    "bluetooth_transport_constructor_or_vtable": "not yet mapped",
+    "wifi_transport_constructor_or_vtable": "not yet mapped",
+    "RFCOMM_socket_or_BlueSDK_callback_inside_this_ELF": "not proven",
+    "iap2_cfg_transport_selection_algorithm": "not proven",
+    "string_Doesnt_support_WIFI_context": "not resolved",
+    "MFi_runtime": "not tested",
+    "vehicle_runtime": "not tested",
+    "installable": false
+  },
+  "verdict": "PASS_STATIC_DRIVER_FUNCTION_AND_DISPATCH_MAP_ONLY"
+}
