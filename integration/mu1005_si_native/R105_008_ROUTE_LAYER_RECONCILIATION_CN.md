@@ -60,3 +60,19 @@ R105.006 已说明 driver 的 Resource Manager 与 mm-ipod 模块宿主关系是
 **结论：现在最有效的推进点不是修改 iap2.cfg 或 USB 插件，而是同时补齐 R103 的当前分支 host 回归和 MU1005 原厂 iAP2 client/server IPC ABI。**
 
 installable=false / safe_to_flash=false / vehicle_verified=false / mfi_apple_verified=false。
+
+## R105 HOST gate 实际日志（补充）
+
+新建的当前分支专用工作流已在 commit `55858991ae6192c1c98af0f752a15a0dd4db8c6c` 运行成功：
+- Rust AU57x bridge tests：7/7 PASS。
+- localhost TCP lab tests：2/2 PASS（实际 TCP loopback 双向收发）。
+- LuKa 上游 LinkEngine tests：13/13 PASS。
+- C 原 RFCOMM frame framing test：PASS。
+- 原版上游三个文件 hash 校验：PASS。
+- 工作流：`45755107085`，全部步骤成功。
+
+本轮最新分支 commit `8e72e5467acf29165f342edd3d10dc981e74e19d`：
+- SI real CPRX host 工作流 `45755163884`：SUCCESS。
+- unified development 工作流 `45755163707`：截至本报告更新时仍在 QNX 工具链/原生库构建阶段；其余并行 host 组均已 SUCCESS。最终结论以该 run 完成结果为准。
+
+以上仅说明协议引擎和帧桥在主机上的回归已实际跑通，不证明 MU1005 蓝牙 owner、QNX runtime、MFi 或 CarPlay 实车连接。
