@@ -8,12 +8,29 @@ static int q(void*ctx,unsigned id,char*out,size_t cap){
  const char*p=a[id];
  assert(strlen(p)<cap);strcpy(out,p);return 0;
 }
+static const uint8_t bt_id[6]={0x00,0x11,0x22,0x33,0x44,0x55},device_id[6]={0x02,0,0x22,0x44,0x66,0x88};
+static const char ie_ok[]="Querying custom IE successful\nIndex [2]\nManagement Subtype Mask = 0x12a\nIE Buffer: len=26\ndd 18 00 a0 40 00 00 02 80 22 06 06 00 11 22 33\n44 55 07 06 02 00 22 44 66 88\n";
+static int ie_query(void *ctx,unsigned id,char *out,size_t cap){
+ (void)ctx;assert(id==6&&sizeof ie_ok<=cap);memcpy(out,ie_ok,sizeof ie_ok);return 0;
+}
 int main(void){
  struct mu_ap_live ap;struct cp_session s;
  const char*const ip[]={"10.0.0.1"};
  struct cp_session receiver={.ip_addresses=ip,.ip_address_count=1,.airplay_port=5000,.public_key="fixture",.source_version="fixture"};
  int calls=0;assert(mu_ap_live_read(&ap,q,&calls)==0&&calls==12&&ap.channel==6);
  assert(mu_ap_live_session(&s,&ap,&receiver)==0&&s.wifi.channel==6&&s.wifi.ssid==ap.ssid&&s.wifi.passphrase==ap.key&&s.wifi.bssid6==ap.bssid);
+ assert(mu_ap_live_verify_device_ie(&ap,ie_query,NULL,2,bt_id,device_id)==1);
+ assert(mu_ap_device_ie_verify(ie_ok,1,bt_id,device_id)==0);
+ assert(mu_ap_device_ie_verify(ie_ok,4,bt_id,device_id)==-1);
+ char bad_ie[sizeof ie_ok+16];strcpy(bad_ie,ie_ok);
+ char *mask=strstr(bad_ie,"0x12a");assert(mask);mask[4]='b';
+ assert(mu_ap_device_ie_verify(bad_ie,2,bt_id,device_id)==-1);
+ strcpy(bad_ie,ie_ok);strcat(bad_ie,"ff\n");
+ assert(mu_ap_device_ie_verify(bad_ie,2,bt_id,device_id)==-1);
+ uint8_t other[6]={2,1,2,3,4,5};
+ assert(mu_ap_device_ie_verify(ie_ok,2,bt_id,other)==-1);
+ struct mu_ap_live five=ap;five.channel=36;
+ assert(mu_ap_live_verify_device_ie(&five,ie_query,NULL,2,bt_id,device_id)==-1);
  unsigned char b[1024];size_t n;assert(cp_encode_wifi_5703(&s.wifi,b,sizeof b,&n)==0&&b[4]==0x57&&b[5]==3);
  assert(cp_encode_start_4301(&s,b,sizeof b,&n)==0&&b[4]==0x43&&b[5]==1);
  /* Direct callers must not bypass the same snapshot validation as uaputl. */

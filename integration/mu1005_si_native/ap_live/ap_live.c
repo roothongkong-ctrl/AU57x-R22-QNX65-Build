@@ -8,9 +8,9 @@ void mu_ap_live_clear(void*p,size_t n){volatile unsigned char*v=p;while(n--)*v++
 /* Use original command path, explicit uap0, no shell and no setter. A timed
  * out driver ioctl is not known to be cancelled. Caller stops on failure. */
 int mu_ap_stock_query(void*ctx,unsigned id,char*out,size_t cap){
- static const char*const cmd[]={"sys_cfg_bss_status","sys_cfg_ssid","sys_cfg_channel_ext","sys_cfg_ap_mac_address","sys_cfg_protocol","sys_cfg_wpa_passphrase"};
+ static const char*const cmd[]={"sys_cfg_bss_status","sys_cfg_ssid","sys_cfg_channel_ext","sys_cfg_ap_mac_address","sys_cfg_protocol","sys_cfg_wpa_passphrase","sys_cfg_custom_ie"};
  int incomplete=0,n;int *uncertain=ctx;
- if(!uncertain||*uncertain||!out||cap<2||cap>INT_MAX||id>=6)return -1;
+ if(!uncertain||*uncertain||!out||cap<2||cap>INT_MAX||id>=7)return -1;
  char *argv[]={"/mnt/app/armle/sbin/uaputl","-i","uap0",(char*)cmd[id],NULL};
  n=mhi2q_qnx_capture(argv[0],argv,out,(unsigned)cap,&incomplete);
  if(incomplete)*uncertain=1;
@@ -78,4 +78,67 @@ int mu_ap_live_session(struct cp_session*out,const struct mu_ap_live*ap,const st
  if(cp_encode_wifi_5703(&s.wifi,frame,sizeof frame,&n)==CP_OK&&
     cp_encode_start_4301(&s,frame,sizeof frame,&n)==CP_OK){*out=s;rc=0;}
  mu_ap_live_clear(frame,sizeof frame);return rc;
+}
+
+/* Read-only adaptation of the GPL-3.0 upstream LuKa wifi_ie.rs
+ * (20c94f51c0f0ae88b154c12e4f604643ba23022c).
+ * Only the upstream-confirmed 2.4 GHz Device IE is recognized. Neither
+ * this query nor a matching IE proves association or MFi authorization. */
+static int ie_identity(const uint8_t *a){
+ unsigned any=0;if(!a||(a[0]&1))return 0;
+ for(unsigned i=0;i<6;i++)any|=a[i];
+ return any!=0;
+}
+int mu_ap_device_ie_verify(const char *out,unsigned slot,const uint8_t bt[6],const uint8_t id[6]){
+ uint8_t expected[26]={0xdd,0x18,0,0xa0,0x40,0,0,2,0x80,0x22,6,6,0,0,0,0,0,0,7,6};
+ char label[16];const char *p,*e;unsigned found=0;
+ if(!out||slot>3||!ie_identity(bt)||!ie_identity(id))return -1;
+ if(!strstr(out,"Querying custom IE successful")||strstr(out,"ERR:"))return -1;
+ memcpy(expected+12,bt,6);memcpy(expected+20,id,6);
+ /* Slot names are bounded by upstream utility's documented range. */
+ memcpy(label,"Index [0]",10);label[7]=(char)('0'+slot);
+ p=out;
+ while(*p){
+  e=strchr(p,'\n');size_t n=e?(size_t)(e-p):strlen(p);
+  if(n&&p[n-1]=='\r')--n;
+  if(n==9&&!memcmp(p,label,9)){if(found++)return -1;}
+  if(!e)break;
+  p=e+1;
+ }
+ if(!found)return 0;
+ p=strstr(out,label);if(!p)return -1;
+ p=strchr(p,'\n');if(!p)return -1;++p;
+ const char *mask="Management Subtype Mask = 0x";size_t ml=strlen(mask);
+ if(strncmp(p,mask,ml))return -1;
+ p+=ml;unsigned m=0,digits=0;
+ while(hex((unsigned char)*p)>=0){if(++digits>4)return -1;m=m*16u+(unsigned)hex((unsigned char)*p++);}
+ if(!digits)return -1;
+ if(*p=='\r')++p;
+ if(*p++!='\n')return -1;
+ const char *len="IE Buffer: len=";size_t ll=strlen(len);
+ if(strncmp(p,len,ll))return -1;
+ p+=ll;unsigned z=0;digits=0;
+ while(*p>='0'&&*p<='9'){if(++digits>3)return -1;z=z*10u+(unsigned)(*p++-'0');}
+ if(!digits||z>256)return -1;
+ if(*p=='\r')++p;
+ if(*p++!='\n')return -1;
+ if(!z)return 0;
+ if(z!=sizeof expected||m!=0x12au)return -1;
+ for(unsigned i=0;i<z;i++){
+  while(*p==' '||*p=='\t'||*p=='\r'||*p=='\n')++p;
+  int a=hex((unsigned char)*p);if(a<0)return -1;++p;
+  int b=hex((unsigned char)*p);if(b<0)return -1;++p;
+  if((uint8_t)(16*a+b)!=expected[i])return -1;
+  if(*p&&*p!=' '&&*p!='\t'&&*p!='\r'&&*p!='\n')return -1;
+ }
+ /* Do not silently accept a trailing extra byte in the same hexdump. */
+ while(*p==' '||*p=='\t'||*p=='\r'||*p=='\n')++p;
+ if(*p&&strncmp(p,"Index [",7))return -1;
+ return 1;
+}
+int mu_ap_live_verify_device_ie(const struct mu_ap_live *ap,mu_ap_query q,void *ctx,unsigned slot,const uint8_t bt[6],const uint8_t id[6]){
+ char buf[4096]={0};int r=-1;
+ if(!ap_valid(ap)||ap->channel>14||!q||slot>3)return -1;
+ if(!q(ctx,6,buf,sizeof buf)&&memchr(buf,0,sizeof buf))r=mu_ap_device_ie_verify(buf,slot,bt,id);
+ mu_ap_live_clear(buf,sizeof buf);return r;
 }
