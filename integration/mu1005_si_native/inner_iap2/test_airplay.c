@@ -101,7 +101,12 @@ static void joined_test(const MuInnerAirplayProof *proof){
  assert(mu_inner_session_tick(&joined,7)==1&&sends==0);
  assert(mu_inner_session_tick(&joined,7)==1&&sends==1);
  assert(mu_inner_session_control(&joined,6,&session,last->field[0],last->field[1])==-1&&joined.active);
- assert(mu_inner_session_control(&joined,7,&session,last->field[0],last->field[1])==1);
+ void *response=NULL;int status=123;
+ Obj ordinary={.type=STR,.str="requestUI"};
+ assert(mu_inner_session_http_command(&joined,7,&session,1,&ordinary,NULL,NULL,&response,&status)==0&&status==123);
+ assert(mu_inner_session_http_command(&joined,7,&session,0,last->field[0],NULL,last->field[1],&response,&status)==0&&status==123);
+ assert(mu_inner_session_http_command(&joined,7,&session,1,last->field[0],NULL,last->field[1],&response,&status)==1&&status==0&&!response);
+ assert(mu_inner_session_http_command(&joined,7,&session,1,last->field[0],NULL,last->field[1],&response,&status)==1&&status!=0&&!response);
  assert(mu_inner_session_control(&joined,7,&session,last->field[0],last->field[1])==0);
  assert(mu_inner_session_tick(&joined,7)==1);
  unsigned char out[8];assert(read(f[1],out,sizeof out)==6&&!memcmp(out,marker,6));

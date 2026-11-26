@@ -45,3 +45,25 @@ int mu_inner_session_control(MuInnerSession *s,uint64_t e,const void *session,
  if(r<0)mu_inner_session_stop(s);
  return r;
 }
+
+/* Adapter for the exact six-argument SessionControl call in the original
+ * _requestProcessCommand. The installer must independently establish that
+ * callsite and original queue; this code does not patch a library. */
+int mu_inner_session_http_command(MuInnerSession *s,uint64_t e,void *session,
+ unsigned flags,const void *command,const void *qualifier,const void *params,
+ void **response,int *status){
+ if(!status)return 0;
+ if(!s||!s->active||session!=s->airplay.session||flags!=1||qualifier||!response)
+  return 0;
+ MuInnerAirplay *a=&s->airplay;
+ if(!ap_live(s,e)){*status=-1;return 1;}
+ if(!command||a->type(command)!=a->string_type()||!a->equal(command,a->cmd))
+  return 0;
+ /* Original _requestProcessCommand initializes response to NULL and makes
+  * the empty dictionary itself on successful return. Never overwrite an
+  * existing object or fabricate a successful response for backpressure. */
+ if(*response){*status=-1;return 1;}
+ int r=mu_inner_session_control(s,e,session,command,params);
+ *status=r==1?0:-1;
+ return 1;
+}

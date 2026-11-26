@@ -23,4 +23,11 @@ int mu_inner_session_tick(MuInnerSession *,uint64_t);
 int mu_inner_session_control(MuInnerSession *,uint64_t,const void *,
  const void *,const void *);
 void mu_inner_session_stop(MuInnerSession *);
+/* For verified original _requestProcessCommand caller ONLY.
+ * 0: unhandled, call stock SessionControl with all original arguments.
+ * 1: handled, return *status to original caller. Busy/error nonzero.
+ * On success leave the initially NULL response untouched: stock allocates
+ * and serializes its normal empty dictionary. No hook or offset patch. */
+int mu_inner_session_http_command(MuInnerSession *,uint64_t,void *,
+ unsigned,const void *,const void *,const void *,void **,int *);
 #endif
