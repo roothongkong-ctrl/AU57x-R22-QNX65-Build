@@ -17,26 +17,29 @@ def body(name):
     assert depth==0, f"unterminated {name}"
     return SRC[start:i-1]
 
+def code_only(s):
+    return re.sub(r"/\\*.*?\\*/|//[^\\n]*", "", s, flags=re.S)
+
 def test_legacy_native_bind_is_fail_closed():
-    b=body("au98_bind_stock_native")
+    b=code_only(body("au98_bind_stock_native"))
     assert "return -1;" in b
     assert "au98_publish(" not in b
     assert "connect(" not in b and "poll(" not in b
 
 def test_native_owner_path_only_adopts_worker_prepared_fd():
-    b=body("au98_drive_stock_native")
+    b=code_only(body("au98_drive_stock_native"))
     assert "au98_drive(" in b
     assert "adopt_dispatch" in b
     assert "au98_publish(" not in b
     assert "au98_bind_stock_native(" not in b
 
 def test_native_adopt_dispatch_never_creates_socket():
-    b=body("adopt_dispatch")
+    b=code_only(body("adopt_dispatch"))
     assert "au98_adopt_stock_native(" in b
     assert "socket(" not in b and "connect(" not in b and "poll(" not in b
 
 def test_blocking_connect_is_worker_only_api():
-    b=body("au98_prepare_daemon_socket")
+    b=code_only(body("au98_prepare_daemon_socket"))
     assert "connected(port)" in b
     assert "socket(" not in b
     assert "Worker-side bounded connect" in HDR
