@@ -98,6 +98,12 @@ static int write_cinemo(void *p,const unsigned char *b,size_t n){
  (void)p;assert(n==6&&!memcmp(b,marker,n));return (int)n;
 }
 static MuInnerSession joined;
+static int stock_calls;
+static const void *stock_expected;
+static int stock_control(void *s,unsigned flags,const void *cmd,const void *qualifier,const void *params,void **response){
+ assert(s==&session&&flags==1&&cmd==stock_expected&&!qualifier&&!params&&response&&!*response);
+ stock_calls++;return -42;
+}
 static int peer_ok=1;
 static int peer_proof(void *ctx,int fd,uint64_t e){return ctx==&joined&&fd>=0&&e==owner_epoch&&peer_ok;}
 static void joined_test(const MuInnerAirplayProof *proof){
@@ -118,8 +124,10 @@ static void joined_test(const MuInnerAirplayProof *proof){
  void *response=NULL;int status=123;
  Obj ordinary={.type=STR,.str="requestUI"};
  assert(mu_inner_session_http_command(&joined,7,&session,1,&ordinary,NULL,NULL,&response,&status)==0&&status==123);
+ stock_expected=&ordinary;
+ assert(mu_inner_session_dispatch_command(&joined,7,stock_control,&session,1,&ordinary,NULL,NULL,&response)==-42&&stock_calls==1);
  assert(mu_inner_session_http_command(&joined,7,&session,0,last->field[0],NULL,last->field[1],&response,&status)==0&&status==123);
- assert(mu_inner_session_http_command(&joined,7,&session,1,last->field[0],NULL,last->field[1],&response,&status)==1&&status==0&&!response);
+ assert(mu_inner_session_dispatch_command(&joined,7,stock_control,&session,1,last->field[0],NULL,last->field[1],&response)==0&&!response&&stock_calls==1);
  assert(mu_inner_session_http_command(&joined,7,&session,1,last->field[0],NULL,last->field[1],&response,&status)==1&&status!=0&&!response);
  assert(mu_inner_session_control(&joined,7,&session,last->field[0],last->field[1])==0);
  assert(mu_inner_session_tick(&joined,7)==1);
@@ -200,7 +208,8 @@ int main(void){
  Obj reply={.type=DICT};
  deliver_completion(0,&reply);
  assert(completion_calls==1&&completion_status==0&&completion_reply==&reply);
- used=0;
+ /* Keep the four bound CFL key objects alive until unbind. Resetting
+  * the fake pool here overwrote key_type with a dictionary. */
  assert(mu_inner_ap_send_with_completion(&tracked,marker,6,completion,&cookie)==1);
  mu_inner_ap_unbind(&tracked);
  assert(pending_done&&completion_calls==1);

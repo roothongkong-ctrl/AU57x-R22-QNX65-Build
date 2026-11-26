@@ -1,0 +1,7 @@
+# R105.037 — 原厂 HTTPClient 读写事件源与 R105.036 回归修复（NO INSTALL）
+私有 R9 libairplay.so SHA256 193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b5；本轮实际本地 llvm-objdump/readelf。
+- 0x63e80 在 client+8 的 dispatch queue 创建 socket read/write source；0x63eb0/0x63f20 创建并存入 client+0x2c/+0x34。PIC base 0xaa618，0x63fd4 和 0x63fdc literal 分别解析到 0x6443c 与 0x64418 两个 event callback，0x63fd0 指向 0x643d8 cancel callback。两个 event callback 均进入 0x63fe0 状态机。
+- 0x64040 SocketWriteData，0x64088 HTTPMessageReset，0x64090–0x64094 state=3，0x640a4 HTTPMessageReadMessage；EAGAIN=11 走事件等待而非第二个 reader。rel.plt: HTTPMessageReadMessage GOT 0xaa90c，SocketWriteData 0xaa9c4，HTTPMessageReset 0xab234，dispatch_source_set_event_handler_f 0xab1d4。
+- 0x63d24 从 FIFO 摘首、更新 head/tail、把 transport status 写 message+0x9dd0 (0x63d50)，然后调用 message+0x9dec completion (0x63d5c)，释放消息。0x63d6c 取消 source，0x63e10–0x63e30 循环以错误 status 清空剩余队列。0x25a90 上层 completion thunk 没有直接读取 +0x9dd0，而是重新解析 plist 与字典 status。故不能把上层 status=0 当 HTTP 200/transport ACK，更不能当 MFi/iAP2 ACK。仍需验证 session 实际 fd 和 queue、错误响应及 callback drain。
+- R105.036 cloud run 45854820587/45854820612 的 host fixture 失败，日志为 test_airplay.c:49 slot: k->type==STR；native-library job 140030304996 success。原因：测试在 tracked adapter 仍持有 CFL key 时重置 fake object pool；删除该 reset，保留 unbind/延迟回调测试。
+- 增加六参数 command dispatcher，将已识别的 iAPSendMessage 交给现有 adapter；其他命令原样调用调用者提供的已验证原厂函数并传播返回码。未安装 GOT/PLT hook，未绑定实际 owner；不宣称实车已接通。

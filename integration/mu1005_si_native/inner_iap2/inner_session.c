@@ -67,3 +67,14 @@ int mu_inner_session_http_command(MuInnerSession *s,uint64_t e,void *session,
  *status=r==1?0:-1;
  return 1;
 }
+
+/* Preserve every argument and the original return code on the stock path.
+ * The caller supplies the verified nonrecursive original target. */
+int mu_inner_session_dispatch_command(MuInnerSession *s,uint64_t e,MuInnerStockControl stock,
+ void *session,unsigned flags,const void *command,const void *qualifier,const void *params,void **response){
+ int status=-1;
+ if(!stock)return -1;
+ if(mu_inner_session_http_command(s,e,session,flags,command,qualifier,params,response,&status))
+  return status;
+ return stock(session,flags,command,qualifier,params,response);
+}

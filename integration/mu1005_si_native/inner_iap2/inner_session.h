@@ -30,4 +30,10 @@ void mu_inner_session_stop(MuInnerSession *);
  * and serializes its normal empty dictionary. No hook or offset patch. */
 int mu_inner_session_http_command(MuInnerSession *,uint64_t,void *,
  unsigned,const void *,const void *,const void *,void **,int *);
+/* Original six-argument ABI. Only call from the verified HTTP command
+ * callsite; never install this as a process-wide symbol interposer.
+ * The original implementation must be a nonrecursive stock entry. */
+typedef int (*MuInnerStockControl)(void *,unsigned,const void *,const void *,const void *,void **);
+int mu_inner_session_dispatch_command(MuInnerSession *,uint64_t,MuInnerStockControl,
+ void *,unsigned,const void *,const void *,const void *,void **);
 #endif
