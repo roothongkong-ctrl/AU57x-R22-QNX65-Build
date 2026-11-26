@@ -90,9 +90,14 @@ int mu_inner_session_http_command(MuInnerSession *s,uint64_t e,void *session,
  if(!s||!s->active||session!=s->airplay.session||flags!=1||qualifier||!response)
   return 0;
  MuInnerAirplay *a=&s->airplay;
- if(!ap_live(s,e)){*status=-1;return 1;}
+ /* Do not suppress unrelated original commands (including requestUI)
+  * when the wireless relay owner/epoch changes. Only identify a command
+  * with a still verified mapped library and immutable bound key. */
+ if(!a->bound||!a->proof.library||a->proof.library(a->proof.ctx,a->handle)!=1)
+  return 0;
  if(!command||a->type(command)!=a->string_type()||!a->equal(command,a->cmd))
   return 0;
+ if(!ap_live(s,e)){*status=-1;return 1;}
  /* Original _requestProcessCommand initializes response to NULL and makes
   * the empty dictionary itself on successful return. Never overwrite an
   * existing object or fabricate a successful response for backpressure. */

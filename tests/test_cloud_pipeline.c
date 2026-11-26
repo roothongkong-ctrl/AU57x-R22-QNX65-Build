@@ -1319,6 +1319,9 @@ static void native_remote_owner_cloud_pipeline(void){
   uint64_t now=470+i;
   int r=cp_cloud_drive_remote_dio(&p,now);
   assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
+  /* Either client tick may finish the split status response. The next
+   * query revokes that sample, so observe both completion opportunities. */
+  if(cp_cloud_remote_video_at(&p,now)){video=1;video_at=now;break;}
   assert(mu_cprx_tick(&rx,now)==0);
   r=cp_cloud_drive_remote_dio(&p,now);
   assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);

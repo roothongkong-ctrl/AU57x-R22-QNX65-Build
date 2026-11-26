@@ -6,3 +6,6 @@
 * 现有 cp_cloud_confirm_bootstrap_auth 已按真实绑定 AP channel 选择首连频段（channel 1..14 为2.4GHz），无需重复修改双频逻辑。实际 AP/owner 启动尚未绑定。
 * 修改现有真实 Unix socket host fixture 的正常主链：4301 ACK→内层认证→BT close→仅 video→完整媒体。其 OEM/手机证据均为 fixture；QNX ARM 编译并不证明车辆连接。
 未新增通用安全模块；真实蓝牙启动和授权、原厂 MFi signer/daemon 绑定、Wi-Fi association、原厂 SI/DIO AirPlay 与 video 回调尚未实际运行；不可安装，固定10步未验收。首连四线并行，以这些真实接点为优先。
+
+## R105.047
+R105.046 native-library job 140207246275 success；SI run 45907376247 success；unified run 45907376230 authentication host fixture assertion line1327 failed. 原因候选：客户端分段状态读取可能在每轮第一次 tick 确认快照，而第二次 tick 开始新查询并撤销快照，测试只检查第二次。现改为每次 tick 后立即检查 video，不改变媒体证据或授权。另修正现有 inner_session HTTP dispatcher：先使用已验证 library 判定是否 iAPSendMessage，再执行无线 owner 检查，非本协议原厂 requestUI 等始终由原函数处理，避免原厂 UI 受 relay 失效影响。现有测试加入该正常原厂回退路径。新 CI 待核实；真实原厂装载、授权、RF、Wi-Fi/AirPlay 仍无运行证据，NO INSTALL。

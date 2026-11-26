@@ -127,7 +127,12 @@ static void joined_test(const MuInnerAirplayProof *proof){
  stock_expected=&ordinary;
  assert(mu_inner_session_dispatch_at(&joined,7,stock_control,0x10000000u,0x1002ccc8u,&session,1,&ordinary,NULL,NULL,&response)==-42&&stock_calls==1);
  assert(mu_inner_session_http_command(&joined,7,&session,0,last->field[0],NULL,last->field[1],&response,&status)==0&&status==123);
- assert(mu_inner_session_dispatch_at(&joined,7,stock_control,0x10000000u,0x1002cadcu,&session,1,last->field[0],NULL,last->field[1],&response)==0&&!response&&stock_calls==1);
+ /* Unrelated original UI control must pass through even if the
+  * wireless relay lost its owner. Genuine iAPSendMessage still rejects. */
+ owner_live=0;
+ assert(mu_inner_session_dispatch_at(&joined,7,stock_control,0x10000000u,0x1002cadcu,&session,1,&ordinary,NULL,NULL,&response)==-42&&stock_calls==2);
+ owner_live=1;
+ assert(mu_inner_session_dispatch_at(&joined,7,stock_control,0x10000000u,0x1002cadcu,&session,1,last->field[0],NULL,last->field[1],&response)==0&&!response&&stock_calls==2);
  assert(mu_inner_session_http_command(&joined,7,&session,1,last->field[0],NULL,last->field[1],&response,&status)==1&&status!=0&&!response);
  assert(mu_inner_session_control(&joined,7,&session,last->field[0],last->field[1])==0);
  assert(mu_inner_session_tick(&joined,7)==1);
