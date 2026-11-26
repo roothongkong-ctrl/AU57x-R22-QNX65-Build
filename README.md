@@ -45,3 +45,8 @@ The single consolidated architecture and remaining-gate plan is now documented i
 ## R105.002 — transport-layer boundary audit
 
 Clarifies the separate mm-ipod physical plugin and ipod-drvr-iap2 internal component/link transport layers. See [docs/R105_002_TRANSPORT_LAYER_BOUNDARY_AUDIT_CN.md](docs/R105_002_TRANSPORT_LAYER_BOUNDARY_AUDIT_CN.md). Research only; NO_INSTALL.
+
+
+## R105.003 — factory iAP2 route review
+
+Re-prioritizes the native MU1005 iAP2 path around the actual config consumer, `iap2_init` component factory/identifier map, and BlueSDK data producer. R88 host server-first adapter is retained; R100 runtime gates remain blocking; R99 staging is not an activation proof. See [docs/R105_003_FACTORY_IAP2_ROUTE_REVIEW_CN.md](docs/R105_003_FACTORY_IAP2_ROUTE_REVIEW_CN.md). NO_INSTALL.
