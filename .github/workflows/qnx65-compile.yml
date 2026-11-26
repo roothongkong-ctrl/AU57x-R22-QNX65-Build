@@ -144,7 +144,7 @@ jobs:
           docker run --rm --platform=linux/amd64 \
             -v "$GITHUB_WORKSPACE":/src -w /src \
             qnx65-armv7-toolchain:8.5-rust \
-            bash /src/ci/host_r103_upstream_link.sh
+            cargo test --offline --manifest-path /src/integration/r103_iap2_bridge/Cargo.toml
 
       - name: Cross-build AU57x R103 iAP2 bridge for QNX 6.5 ARMv7
         run: |
