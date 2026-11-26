@@ -29,7 +29,7 @@ The r113-r116-cloud-review branch contains the following production-source depen
 - mu1005_rf_ingress.c/h
 - mu1005_ipc_stream.c/h
 - mu1005_socket_pump.c/h
-R113 native_event.h includes inbound_r5.h; inbound_r5.h includes inbound.h and mu1005_socket_pump.h. These files must be restored as a coherent dependency set, not copied individually or replaced with test stubs.
+R113 native_event.h includes inbound_r5.h; inbound_r5.h includes inbound.h and mu1005_socket_pump.h. Follow-up SHA/blob comparison found that the R103-based X4.3 GitHub branch already contains exact R113 blobs for inbound_r5.c/h, native_event.c/h, native_binding_words.h, mu1005_rf_ingress.c/h, mu1005_ipc_stream.c/h and mu1005_socket_pump.c/h. These dependencies are already present and must not be redundantly recopied. Only inbound.c/h were older/different; X4.3 has now been updated to the exact R113 blobs (inbound.c 81bececd..., inbound.h 4c5fe122...).
 Important compatibility rule: retain X4.2's newer native_binding.c/h and bt_iap2_owner_handoff.c/h as the owner-gate/snapshot candidate; use the R113 branch's event/ingress/socket implementation only after exact include/API reconciliation. The older native_binding.c in the R113 branch does not contain X4.2's X3 gate and frozen snapshot contract, so do not replace X4.2 with it.
 
 ## 4. R113 iAP2 stream join is not full CarPlay control
