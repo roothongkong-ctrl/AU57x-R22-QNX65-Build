@@ -29,6 +29,8 @@ jobs:
           (cd review/source/airplay && sha256sum *.c *.h) > review/evidence/receiver-source.sha256
           cp -R integration/mu1005_si_native review/source/si
           cp -R project/source/legacy_mu1005/bluetooth review/source/bluetooth
+          mkdir -p review/source/connection
+          cp project/source/src/cp_*.{c,h} review/source/connection/
           cp third_party/luka-dev/mib2q-carplay-rgi/wireless/graft/eir.c review/source/bluetooth/upstream_eir.c
           test "$(git hash-object review/source/bluetooth/upstream_eir.c)" = 99f42933e7c6b98af11fb387a1e68727ffe31997
           bash integration/mu1005_si_native/r29_full_source/unpack.sh review/source/r29-full
@@ -125,6 +127,12 @@ jobs:
             ap=review/source/ap-live
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined "$ap"/{ap_live,qnx_process,cp_csm}.c -lc -o review/payload/libmu1005_ap_live_review.so
             "$R" -h -dW -sW review/payload/libmu1005_ap_live_review.so > review/evidence/ap-live-elf.log
+            # Compile the already host-tested connection coordinator and its
+            # exact TCP, MFi, AP, remote CPRX dependencies into one review DSO.
+            # Independent alternative review unit, not a second active receiver.
+            core=review/source/connection
+            "$C" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -shared -Wl,--no-undefined -I"$core" -I"$a" -I"$b" -I"$ap" "$core"/{cp_cloud_pipeline,cp_wcp_autoconnect,cp_wcp_handoff,cp_wcp_r45_remote,cp_step04_socket_io,cp_step04_tcp_bridge,cp_radio_policy,cp_session_handoff,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_oem_boundary,cp_wireless,cp_event,cp_csm}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" "$ap"/{ap_live,ap_refresh,qnx_process}.c -lsocket -lc -o review/payload/libmu1005_connection_review.so
+            "$R" -h -dW -sW review/payload/libmu1005_connection_review.so > review/evidence/connection-elf.log
             sh review/source/r29-full/build_qnx_review.sh
             cp review/source/r29-full/review-output/ipod-transport-R29-NO-INSTALL.so review/payload/
             cp review/source/r29-full/review-output/elf.log review/evidence/r29-full-elf.log
@@ -162,6 +170,12 @@ jobs:
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/ap-live-elf.log
           done
           echo OEM_AP_READ_AND_CSM_ENCODER_LINKED_NOT_EXECUTED_ON_QNX | tee review/evidence/ap-live-result.txt
+          grep -Eq 'Machine:.*ARM' review/evidence/connection-elf.log
+          grep -Eq 'Type:.*DYN' review/evidence/connection-elf.log
+          for sym in cp_s4_listener_open cp_s4_prepare_stock_mfi cp_wcp_r45_bootstrap_tick cp_wcp_begin_cloud cp_cloud_drive_first_connect cp_cloud_radio_report_failure mu_ap_refresh_prepare mu_ap_refresh_commit cp_cloud_remote_video_at cp_cloud_wired_preempt cp_cloud_end; do
+            awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/connection-elf.log
+          done
+          echo CONNECTION_COORDINATOR_ARM_LINK_ONLY_NO_OEM_NO_INSTALL | tee review/evidence/connection-result.txt
           grep -Eq 'Machine:.*ARM' review/evidence/r29-full-elf.log
           grep -Eq 'Type:.*DYN' review/evidence/r29-full-elf.log
           for sym in ipod_module wcp_lab_supply_fd wcp_oem_graft_pump wcp_graft_feed; do

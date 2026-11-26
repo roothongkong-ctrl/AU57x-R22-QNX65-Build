@@ -1,0 +1,2 @@
+# R105.064 联合连接主流程 ARM 构建
+先前 ARM review payload 只包含部分蓝牙、原厂 SI CPRX、AP read、R29/传输和内层 iAP2 模块。当前主机联合测试使用的 cp_cloud_pipeline、R44/R45 TCP、R87 MFi handoff、radio policy、AP refresh 没有作为同一 ARM DSO 输出。本轮把当前源码和依赖放入独立 review DSO，要求 ARM ELF/DYN、无未解析链接符号和关键入口导出。原来独立模块仍保留用于复核；此 DSO 与其他包含相同 CPRX 实现的库是替代 review 单元，不能当成多个并行生产 receiver。并未构造原厂进程启动器或安装入口，不声明真实 MFi、Wi-Fi、画面或实车运行成功。保持 NO INSTALL，编译结果待 CI。
