@@ -1,3 +1,5 @@
+> **主交接入口（2026-11-26）**：后续研发先读 [`docs/MASTER_HANDOFF_AND_NO_REPEAT_RULES_CN.md`](docs/MASTER_HANDOFF_AND_NO_REPEAT_RULES_CN.md)。该文件统一 22 步主计划、已有成果、GitHub/实车测试边界、CI 去重规则和下一任务；禁止从旧聊天摘要猜测进度。
+
 # R103: 上游原版 iAP2 链路引擎和 AU57x RFCOMM 帧桥（源码版禁止装车）
 
 本轮严格复用 `luka-dev/mib2q-carplay-rgi` 的 `iap2-link` 三个上游原始文件（逐个 Git object SHA-1 验证），新增 `integration/r103_iap2_bridge`，把 R45/R88 8 字节 little-endian RFCOMM 连接/数据/断开事件交给实际 LuKa `LinkEngine`，并将它的 Marker、SYN/LSP/ACK 结果包装为原来的 RFCOMM DATA。无 MFi 密钥、无原厂蓝牙注册、无 WIFI/AirPlay，只作主机验证。
