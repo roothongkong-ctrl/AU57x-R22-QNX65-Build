@@ -5,8 +5,8 @@ on:
     paths:
       - 'src/bluetooth/native_binding.c'
       - 'src/bluetooth/native_binding.h'
-      - 'src/bluetooth/bt_route_gate.c'
-      - 'src/bluetooth/bt_route_gate.h'
+      - 'project/source/legacy_mu1005/bluetooth/bt_route_gate.c'
+      - 'project/source/legacy_mu1005/bluetooth/bt_route_gate.h'
       - 'x3/src/**'
       - 'project/source/legacy_mu1005/bluetooth/**'
       - 'project/tools/qnx_elf_gate.py'
