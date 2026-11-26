@@ -94,3 +94,25 @@ https://github.com/congobg/MHI2Q_WiFi_CarPlay/blob/main/docs/Wireless%20CarPlay%
 本轮仅完成公开参考资料的技术提取与 AU57x 源码边界核对，没有修改原厂二进制，没有接通真实 AirPlay callback，没有执行车机或 iPhone 测试。
 
 installable=false / safe_to_flash=false / vehicle_verified=false / mfi_apple_verified=false。
+## 8. 重要更正：复用既有 R86 AirPlay delegate 审计（不得重复定位）
+
+在本轮后续检索 Library 历史成果时，发现 R86 已经对同一份 MU1005 原厂 dio_manager / libairplay.so 完成两级 delegate 的静态注册审计。因此本报告第 2、4、6 节中“AirPlay receiver callback owner 未定位”的表述过宽，现作如下更正：
+
+- AirPlay server delegate 的真实注册调用位于 dio_manager VA 0x15DF68，调用 AirPlayReceiverServerSetDelegate（PLT 0x112514）；libairplay.so VA 0x1CEEC 将 60 字节 delegate 结构复制到 server +16。
+- DIO server delegate 的 session-created 槽指向 s_sessionCreatedCallback VA 0x159374。
+- 在 s_sessionCreatedCallback 内 VA 0x159448 调用 AirPlayReceiverSessionSetDelegate（PLT 0x11270C）；libairplay.so VA 0x1FB44 将 56 字节 session delegate 复制到 session +20。
+- session delegate 的 offset +16（第 5 个 32-bit 槽）为 s_handleSessionControl VA 0x1594EC，GOT VA 0x1A7A3C。
+- session delegate 还包括 finalized、copy/notify property、modes changed、request UI、duck/unduck audio、audio torn down、AirPlay error 等回调。
+- 服务器 delegate 包括 serverCopyProperty、sessionCreated、sessionCreationFailed、sessionScreenCreated、audioType、waitAudioAvailableAck、音频 dump/flush/init 等回调。
+
+来源为既有私有原厂审计 R86_OEM_DELEGATE_AUDIT.json 与 R86_ORIGINAL_OEM_DELEGATE_ABI_CN.md；两个原厂 ELF 的 SHA256 与本工程 MU1005 基线一致。R86 只证明 delegate 注册布局、回调槽位和 GOT 重定位，不证明生产 interposition、运行时 owner 注入，也不证明 s_handleSessionControl 的参数中已经出现 iAPSendMessage。
+
+### 更新后的精确未知
+
+1. 已定位 AirPlay session control callback：s_handleSessionControl @ 0x1594EC。下一步不是再找 callback，而是反汇编该函数，恢复它的真实参数、调用栈、命令对象、返回语义、线程/队列和对原厂 handler 的委托关系。
+2. 尚未证明 AirPlay SessionControl callback 收到的对象是否为解密后的 CFDictionary，也未证明它能看到 {type:"iAPSendMessage", params:{data:CFData}}。
+3. 尚未证明如何在不破坏原厂返回值与回调生命周期的前提下，将该回调的解码命令交给 inner_airplay_control。
+4. Event Channel pump 的 socket fd、select/poll/read/write owner、请求回复 wire-order queue，仍是独立于 session delegate 的另一条逆向任务；R86 delegate audit 不包含该 pump。
+5. 本工程 inner_airplay_control 是一个适配器入口，不是已安装的 callback hook；禁止把两者混为一谈。
+
+R86 的两份原厂 delegate 审计成果已存在于 Library，不再向用户索取同一批 dio_manager/libairplay 文件，也不重复做 server/session delegate 的槽位扫描。
