@@ -186,7 +186,8 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq qemu-system-arm
-          BIN="target/armv7-unknown-nto-qnx650/release/au57x-r103-qnx-smoke"
+          BIN="au57x/target/armv7-unknown-nto-qnx650/release/au57x-r103-qnx-smoke"
+          test -s "$BIN"
           QEMU_RUN_SECS=20 QEMU_TIMEOUT=80 \
             bash qnx-toolchain/tests/qemu-run.sh "$BIN" 8.5-rust | tee qnx-r103-qemu.log
           grep -Fq AU57X_R103_QNX_IAP2_LINK_PASS qnx-r103-qemu.log
