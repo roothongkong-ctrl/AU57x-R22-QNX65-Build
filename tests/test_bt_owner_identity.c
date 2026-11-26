@@ -33,4 +33,34 @@ static void identity_cases(void){
  puts("PASS startup discovers actual AO thread without treating caller as owner");
  puts("PASS mapped libcomm anchors and original object lifetime identity");
 }
-int main(void){identity_cases();Fixture f=init();assert(mu_bt_osapi_thread_matches(0x800000,9,rd,&f)==1&&f.calls==6);f=init();assert(!mu_bt_osapi_thread_matches(0x800000,10,rd,&f));f=init();assert(!mu_bt_osapi_thread_matches(0x900000,9,rd,&f));f=init();f.os[22]=0;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));f=init();f.a[0xf0]=1;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));f=init();f.a[4]=0;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));f=init();f.change=4;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));for(unsigned i=1;i<=6;i++){f=init();f.fail=i;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));}f=init();assert(!mu_bt_osapi_thread_matches(0x800001,9,rd,&f)&&!f.calls);puts("PASS OSAPI ActiveObject identity, thread ID, stable lifetime (mock reads only)");}
+typedef struct{int bad_slot,bad_anchor,changed;unsigned got_reads;} BiasFixture;
+static int bias_read(void*p,uint32_t a,void*out,size_t n){
+ BiasFixture*f=p;
+ const uint32_t u=0x78460000u,m=0x78310000u;
+ static const uint32_t slots[]={0x2c14c4u,0x2c14d4u,0x2c13bcu,0x2c165cu};
+ static const uint32_t delta[]={0x6f5f4u,0x6e3f0u,0x6fc5cu,0x4e620u};
+ static const uint32_t va[]={0x4d878u,0x4d87cu,0x4e620u,0x4e9d0u,0x4ea74u,0x4eab4u};
+ static const uint32_t word[]={0xe2800008u,0xebff1d80u,0xe59030f0u,0xe280a0c8u,0xebff1b78u,0xe12fff33u};
+ if(n!=4)return 0;
+ for(unsigned i=0;i<4;i++)if(a==slots[i]){
+  uint32_t v=(i==3?m:u)+delta[i];
+  ++f->got_reads;
+  if(f->bad_slot==(int)i+1)v=0x117438u; /* unresolved PLT */
+  if(f->changed&&f->got_reads>4&&i==3)v+=0x1000u;
+  put(out,v);return 1;
+ }
+ for(unsigned i=0;i<6;i++)if(a==m+va[i]){put(out,word[i]);return 1;}
+ if(a==u+0x6f5f4u||a==u+0x6e3f0u||a==u+0x6fc5cu){
+  put(out,(a==u+0x6e3f0u?0xe5913008u:0xe92d4010u)^(f->bad_anchor!=0));return 1;
+ }
+ return 0;
+}
+static void bias_cases(void){
+ BiasFixture f={0};uint32_t u=0,m=0;
+ assert(mu_bt_library_biases(bias_read,&f,&u,&m)==1&&u==0x78460000u&&m==0x78310000u);
+ for(int i=1;i<=4;i++){f=(BiasFixture){.bad_slot=i};u=m=0;assert(!mu_bt_library_biases(bias_read,&f,&u,&m)&&!u&&!m);}
+ f=(BiasFixture){.bad_anchor=1};assert(!mu_bt_library_biases(bias_read,&f,&u,&m));
+ f=(BiasFixture){.changed=1};assert(!mu_bt_library_biases(bias_read,&f,&u,&m));
+ puts("PASS live GOT base discovery using recorded MU1005 mapping (mock reads; no native attach)");
+}
+int main(void){identity_cases();bias_cases();Fixture f=init();assert(mu_bt_osapi_thread_matches(0x800000,9,rd,&f)==1&&f.calls==6);f=init();assert(!mu_bt_osapi_thread_matches(0x800000,10,rd,&f));f=init();assert(!mu_bt_osapi_thread_matches(0x900000,9,rd,&f));f=init();f.os[22]=0;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));f=init();f.a[0xf0]=1;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));f=init();f.a[4]=0;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));f=init();f.change=4;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));for(unsigned i=1;i<=6;i++){f=init();f.fail=i;assert(!mu_bt_osapi_thread_matches(0x800000,9,rd,&f));}f=init();assert(!mu_bt_osapi_thread_matches(0x800001,9,rd,&f)&&!f.calls);puts("PASS OSAPI ActiveObject identity, thread ID, stable lifetime (mock reads only)");}

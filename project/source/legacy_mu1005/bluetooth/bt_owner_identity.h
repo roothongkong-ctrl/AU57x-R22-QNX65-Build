@@ -11,6 +11,11 @@ typedef struct {
 } MuBtThreadIdentity;
 /* A checked reader must cover executable words as well as live objects.
  * Anchors are extra guards, not full mapped-image authentication. */
+/* Read already-resolved original JUMP_SLOT entries, derive library bases
+ * at runtime, and verify against the existing pinned-code anchors. No
+ * lazy binding, dlopen, or hardcoded prior-boot mapping. Does not grant
+ * owner authority. Outputs unchanged if any slot/anchor is unavailable. */
+int mu_bt_library_biases(int(*)(void*,uint32_t,void*,size_t),void*,uint32_t*,uint32_t*);
 int mu_bt_comm_words_match(uint32_t,int(*)(void*,uint32_t,void*,size_t),void*);
 int mu_bt_osapi_identity(uint32_t,uint32_t,int(*)(void*,uint32_t,void*,size_t),void*,MuBtThreadIdentity*);
 /* Discover the queue's own thread, never claim the calling thread owns it.

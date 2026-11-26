@@ -20,6 +20,28 @@ int mu_bt_comm_words_match(uint32_t bias,int(*r)(void*,uint32_t,void*,size_t),vo
   if(r(c,bias+anchors[i][0],b,4)!=1||le(b)!=anchors[i][1])return 0;
  return 1;
 }
+static int slot_bases(int(*r)(void*,uint32_t,void*,size_t),void*c,uint32_t*u,uint32_t*m){
+ static const uint32_t addr[]={0x2c14c4u,0x2c14d4u,0x2c13bcu,0x2c165cu};
+ static const uint32_t offset[]={0x6f5f4u,0x6e3f0u,0x6fc5cu,0x4e620u};
+ uint32_t base[4];uint8_t b[4];
+ for(unsigned i=0;i<4;i++){
+  if(r(c,addr[i],b,4)!=1||le(b)<=offset[i])return 0;
+  base[i]=le(b)-offset[i];
+  if((base[i]&0xfffu)||base[i]<=0x2d5644u)return 0;
+ }
+ if(base[0]!=base[1]||base[0]!=base[2]||base[0]==base[3])return 0;
+ *u=base[0];*m=base[3];return 1;
+}
+int mu_bt_library_biases(int(*r)(void*,uint32_t,void*,size_t),void*c,uint32_t*util,uint32_t*comm){
+ uint32_t u,m,u2,m2;uint8_t b[4];
+ static const uint32_t anchor[][2]={{0x6f5f4u,0xe92d4010u},{0x6e3f0u,0xe5913008u},{0x6fc5cu,0xe92d4010u}};
+ if(!r||!util||!comm||util==comm||!slot_bases(r,c,&u,&m)||
+    u>UINT32_MAX-0x6fc5cu||!mu_bt_comm_words_match(m,r,c))return 0;
+ for(unsigned i=0;i<sizeof anchor/sizeof anchor[0];i++)
+  if(r(c,u+anchor[i][0],b,4)!=1||le(b)!=anchor[i][1])return 0;
+ if(!slot_bases(r,c,&u2,&m2)||u!=u2||m!=m2)return 0;
+ *util=u;*comm=m;return 1;
+}
 static int snapshot(uint32_t bias,uint32_t tid,int(*r)(void*,uint32_t,void*,size_t),void*c,MuBtThreadIdentity*out){
  Snap a,b;
  if(!out)return 0;

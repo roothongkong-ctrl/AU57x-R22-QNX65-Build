@@ -98,11 +98,25 @@ static int begin(const MuBtQueuePulseBinding*b,const MuBtNotifyBinding*boot,int(
  /* Use the actual initialized stock instance instead of requiring an
   * externally guessed pointer. Resolve under the existing lifetime lease.
   * Copy both bindings; q stores them by value before this call returns. */
- if(!o->services_address){
-  uint32_t s=mu_bt_sdk_service_address(o->read_live,o->opaque);
+ if(!o->services_address||!o->comm_load_bias||!b->util_load_bias){
+  uint32_t s=o->services_address,u=b->util_load_bias,m=o->comm_load_bias;
+  if(!s)s=mu_bt_sdk_service_address(o->read_live,o->opaque);
   if(!s){b->leave(b->lease_context);return -1;}
-  discovered=*b;discovered.owner.services_address=s;b=&discovered;o=&b->owner;
-  if(boot){discovered_boot=*boot;discovered_boot.owner.services_address=s;boot=&discovered_boot;}
+  if(!u||!m){
+   uint32_t actual_u,actual_m;
+   if(!mu_bt_library_biases(o->read_live,o->opaque,&actual_u,&actual_m)||
+      (u&&u!=actual_u)||(m&&m!=actual_m)){
+    b->leave(b->lease_context);return -1;
+   }
+   u=actual_u;m=actual_m;
+  }
+  discovered=*b;discovered.owner.services_address=s;
+  discovered.owner.comm_load_bias=m;discovered.util_load_bias=u;
+  b=&discovered;o=&b->owner;
+  if(boot){
+   discovered_boot=*boot;discovered_boot.owner.services_address=s;
+   discovered_boot.owner.comm_load_bias=m;boot=&discovered_boot;
+  }
  }
  if(!resolve(b)||!mu_bt_sdk_started(o->services_address,o->read_live,o->opaque)||
     !(boot?mu_bt_osapi_target(o->comm_load_bias,o->read_live,o->opaque,&id):

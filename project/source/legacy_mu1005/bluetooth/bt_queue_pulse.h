@@ -23,6 +23,8 @@ int mu_bt_queue_pulse_start(const MuBtQueuePulseBinding*);
  * First queued event binds the supplied notify context ON the actual AO.
  * Set services_address=0 in both bindings to obtain the initialized
  * original BluetoothServices instance from the stock listener under lease.
+ * Zero libcomm/libutil bias requests resolution from live original GOT
+ * entries under that same lease. Do not copy last-boot addresses.
  * All referenced context storage must remain valid until retirement. */
 int mu_bt_queue_bootstrap(const MuBtQueuePulseBinding*,const MuBtNotifyBinding*,int(*startup_authorized)(void*),void*);
 int mu_bt_queue_pulse_stop(void);
