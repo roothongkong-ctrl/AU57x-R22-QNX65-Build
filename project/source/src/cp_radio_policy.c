@@ -7,7 +7,7 @@ void cp_radio_init(struct cp_radio_policy *p) {
 static int checked(const struct cp_radio_policy *p,uint32_t epoch,int owner) {
  if(!p||!epoch)return CP_RADIO_INVALID;
  if(epoch!=p->epoch)return CP_RADIO_STALE;
- if(!owner)return CP_RADIO_NO_OWNER;
+ if(owner!=1)return CP_RADIO_NO_OWNER;
  if(p->wired||p->owner_lost||p->phase==CP_RADIO_CLOSED)
   return CP_RADIO_BLOCKED;
  return CP_RADIO_OK;

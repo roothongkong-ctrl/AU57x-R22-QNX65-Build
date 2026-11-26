@@ -228,7 +228,10 @@ int main(void){
  assert(ac.state==CP_WCP_BLOCKED); /* physical USB never starts wireless */
  assert(out.stock_iap2_connected(out.ctx,7)==1); /* iAP2, NOT MFi */
  /* Genuine socket loss: even intact heap data may not authorize session. */
- cp_s4_socket_abort(&w);
+ o.paired=0;
+ assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,124)==CP_WCP_DENIED);
+ assert(!w.attached&&t.closed&&ac.state==CP_WCP_BLOCKED);
+ puts("PASS established RFCOMM owner revoked before subsequent iAP2 socket pump");
  assert(out.stock_iap2_connected(out.ctx,7)==0);
  assert(cp_wcp_r45_remote_ops(&r,&out)==-1);
  cp_wcp_r45_remote_unbind(&r);

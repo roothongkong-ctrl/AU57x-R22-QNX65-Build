@@ -234,6 +234,7 @@ jobs:
               stock-config) bash ci/host_r99_stock_iap2.sh ;;
               authentication)
                 bash ci/host_step04_stock_mfi.sh
+                bash ci/host_wcp_r45_remote_mfi.sh
                 bash ci/host_step04_session.sh
                 bash ci/host_cloud_pipeline.sh
                 ;;

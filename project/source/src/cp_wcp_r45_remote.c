@@ -110,6 +110,14 @@ int cp_wcp_r45_bootstrap_tick(struct cp_wcp_r45_remote *r,
               ac->generation!=r->generation))return CP_WCP_DENIED;
  if(!r->bound&&(ac->state!=CP_WCP_IDLE||ac->generation||ac->requested))
   return CP_WCP_DENIED;
+ /* Do not process a new MFi frame after the established RFCOMM owner's
+  * pairing, publication, transport or USB-idle witness has been revoked.
+  * Before CONNECT the socket's existing independent verifier is authoritative. */
+ if(r->bound&&!live(r,r->generation)){
+  (void)cp_wcp_bt_abort(ac,r->generation,1);
+  cp_s4_socket_abort(w);
+  return CP_WCP_DENIED;
+ }
  rc=cp_s4_socket_poll(w,now);
  if(rc!=CP_LK_OK)return CP_WCP_DENIED;
  if(!t->connected)return CP_WCP_WAIT;

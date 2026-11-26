@@ -7,14 +7,18 @@ static void dual(void){
  cp_radio_init(&r);
  assert(cp_radio_begin(&r,1,1,1,1,1)==CP_RADIO_OK);
  assert(cp_radio_select(&r,1,1,&b)==CP_RADIO_OK&&b==CP_RADIO_5);
+ assert(cp_radio_connect_requested(&r,1,-1)==CP_RADIO_NO_OWNER);
  assert(cp_radio_connect_requested(&r,1,1)==CP_RADIO_OK);
  assert(cp_radio_association_result(&r,1,1,0,CP_RADIO_5,0)==CP_RADIO_PENDING);
  assert(cp_radio_select(&r,1,1,&b)==CP_RADIO_BAD_STATE);
  assert(cp_radio_association_result(&r,1,1,0,CP_RADIO_5,1)==CP_RADIO_PENDING);
  assert(cp_radio_select(&r,1,0,&b)==CP_RADIO_NO_OWNER);
+ assert(cp_radio_select(&r,1,-1,&b)==CP_RADIO_NO_OWNER);
+ assert(cp_radio_select(&r,1,2,&b)==CP_RADIO_NO_OWNER);
  assert(cp_radio_select(&r,1,1,&b)==CP_RADIO_OK&&b==CP_RADIO_24);
  assert(cp_radio_connect_requested(&r,1,1)==CP_RADIO_OK);
  assert(cp_radio_association_result(&r,1,1,1,CP_RADIO_5,0)==CP_RADIO_BAD_STATE);
+ assert(cp_radio_association_result(&r,1,-1,1,CP_RADIO_24,0)==CP_RADIO_NO_OWNER);
  assert(cp_radio_association_result(&r,1,1,1,CP_RADIO_24,0)==CP_RADIO_OK);
  assert(r.phase==CP_RADIO_ASSOCIATED);
  assert(cp_radio_select(&r,1,1,&b)==CP_RADIO_BAD_STATE);

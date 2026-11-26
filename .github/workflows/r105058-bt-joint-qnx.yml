@@ -2,7 +2,7 @@ name: R105.058 Bluetooth joint QNX ARM runtime (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/r105058-bt-joint-qnx.yml]
+    paths: [.github/workflows/r105058-bt-joint-qnx.yml, tests/r14_test_native_event.c, tests/r105057_joint_bt.c]
   workflow_dispatch:
 permissions:
   contents: read
