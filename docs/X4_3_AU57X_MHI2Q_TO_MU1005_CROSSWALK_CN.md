@@ -46,3 +46,18 @@ These boundaries must not be conflated. Do not infer that changing mm-ipod -t se
 - Preserve the current MMI CarPlay screen and instrument-cluster map, audio and controls.
 
 NO_INSTALL / safe_to_flash=false / vehicle_verified=false.
+## MU1005 transport-boundary correction from the OEM loader/auth audit
+The earlier string-only diagram must not conflate the following layers:
+1. mm-ipod physical transport plugin: device_transport_init loads `ipod-transport-%s.so`, resolves `ipod_module` / `ipod_transport`, ABI major 2. Factory launch is `-t usbdevice`; do not replace this.
+2. iAP2 protocol components: `BluetoothTransportComponent`, `WiFiTransportComponent`, `BluetoothiAP2Link` are strings/components in ipod-drvr-iap2.so; they do not prove a physical plugin or RFCOMM producer is active.
+3. iap2.cfg Bluetooth status sections: the available reference dump is not a raw config; its commented [bluetooth] sections are Bluetooth Connection Status reporting, not a proven enable switch. R99 used synthetic NOT_OEM fixtures only.
+Separate OEM static finding: the driver has a WiFi feature bit 0x8000 and a native `wifi_acc_config_info` path that reads SSID/Passphrase/SecurityType/Channel and sends 0x5703; it has an Authenticated PPS state. This does not prove a real WiFi section is enabled, a phone received the credentials, or the auth state belongs to the current wireless generation.
+
+## R113/R116 and X4.2 evidence reconciliation
+- R113/R116 GitHub Actions run 45208696553 passed its host tests, QNX 6.5 ARMv7 bridge/owner-layer cross-link, ELF checks and QEMU smoke. This validates the R113 owner publication layer, not the X4.2 native_binding QNX branch, original btstack owner, MFi, or vehicle wireless.
+- X4.2 added the X3 evidence gate to au98_publish/native_binding and freezes the owner arg3/SCN snapshot before local TCP. These are source-contract fixes with host fixture coverage; X4.2 still lacks production native_event.h/c, native_binding_words.h and the complete InboundR5 dependency graph in its archive.
+- R113 contains a coherent candidate dependency set: inbound.c/h, inbound_r5.c/h, native_event.c/h, native_binding_words.h, mu1005_rf_ingress.c/h, mu1005_ipc_stream.c/h and mu1005_socket_pump.c/h. Restore as a complete set and hash-verify. Keep X4.2's newer native_binding/owner handoff rather than replacing it with the older R113 native_binding.
+- R113's mu1005_iap2_stream deliberately discards RX/control callbacks. It is a link byte-stream join, not full iAP2 identify/MFi/WiFi/CarPlay control.
+- AllPlay GPL-3.0 WirelessTrigger is a useful protocol reference for 0x1Dxx, 0xAAxx, 0x5702/0x5703 and 0x4300/0x4301, but its sample identity/MFi source is not the vehicle's OEM identity. Avoid a second 0x5703 sender on the same native session.
+
+Next gate: selectively restore the R113 dependency set into X4.3, preserve X4.2 gate/snapshot, and create a CI target that compiles the complete X4.2 native_binding QNX ARM32 branch with production headers and sources. Keep NO_INSTALL until the genuine btstack owner and SI/DIO callback providers are proven.
