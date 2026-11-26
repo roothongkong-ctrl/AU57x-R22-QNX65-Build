@@ -5,6 +5,8 @@ on:
     paths:
       - 'src/bluetooth/native_binding.c'
       - 'src/bluetooth/native_binding.h'
+      - 'project/source/legacy_mu1005/bluetooth/native_event.c'
+      - 'project/source/legacy_mu1005/bluetooth/native_event.h'
       - 'project/source/legacy_mu1005/bluetooth/bt_iap2_owner_handoff.c'
       - 'project/source/legacy_mu1005/bluetooth/bt_iap2_owner_handoff.h'
       - 'project/source/legacy_mu1005/bluetooth/inbound.c'
