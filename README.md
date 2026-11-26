@@ -35,3 +35,8 @@ The result `r100_result/R100_ORIGINAL_MU1005_ROUTE_AUDIT.json` contains hashes a
 现已从 `luka-dev/mib2q-carplay-rgi` 精确引入 `wireless/graft/eir.c`，保证 1691 字节原文件与上游 Git blob 完全相同，并编译到 AU57x 的独立审计入口 `au102_eir_advertisement`。只在原厂 btstack、iAP2 RFCOMM 和 SDP 都已确认的情况下允许广播，保留有线 CarPlay 优先。测试：`bash ci/host_r102_upstream_reuse.sh`。
 
 详情：`docs/R102_OPEN_SOURCE_REUSE_CN.md`。**该源码只证明一个通用组件可移植，不证明无线 CarPlay 已完成；禁止装车。**
+
+
+## R104 — unified integration roadmap
+
+The single consolidated architecture and remaining-gate plan is now documented in [docs/MASTER_INTEGRATION_ROADMAP_R104_CN.md](docs/MASTER_INTEGRATION_ROADMAP_R104_CN.md). It consolidates R41–R103, assigns each existing module one responsibility, treats R87 as the existing Congo reference adaptation, keeps R103 as the upstream iAP2 link-layer component, and makes the missing MU1005 iAP2 client-owner ABI the next priority. No duplicate R111 implementation line is created. Research only; NO_INSTALL / safe_to_flash=false.
