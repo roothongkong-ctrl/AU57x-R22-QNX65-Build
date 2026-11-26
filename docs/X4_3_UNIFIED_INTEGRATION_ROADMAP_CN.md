@@ -145,7 +145,8 @@ H0-H3 are development evidence only. Wireless CarPlay is not end-to-end complete
 3. Independently compare joeyQuery's latest endpoint trace against MU1005, marking each edge SAME / DIFFERENT / UNKNOWN.
 4. Audit congobg's 2026-10-27 complete workflow and issue fixes as architecture reference; extract only generic, license-compatible ideas.
 5. Add CI gates for the evidence ledger and prohibit mock/host results from being promoted to OEM/vehicle PASS.
+6. R106 correction: R99's two config inputs were explicitly NOT_OEM synthetic fixtures. Do not count R99 as real OEM config validation; obtain the genuine K1006_2/MU1005 Bluetooth JSON and iap2.cfg before claiming config-parser progress.
 6. Continue Wi-Fi, AirPlay, SI/DIO and cluster-display evidence work in parallel; do not let the Bluetooth critical path prevent independent static work.
 
 ## Current status
-Unified plan and branch created; source code has NOT yet been merged into one production-ready implementation. R103 is the selected technical base because its pinned upstream iAP2 bridge and build evidence are available. X4.2 must be reconciled before its patch is imported. R143 remains an optional observer branch. No real wireless CarPlay session, MFi success, or vehicle validation is claimed. NO_INSTALL / safe_to_flash=false.
+Unified plan and branch created; source code has NOT yet been merged into one production-ready implementation. R103 is the selected technical base because its pinned upstream iAP2 bridge and build evidence are available. X4.2 must be reconciled before its patch is imported. R143 remains an optional observer branch. R99 config staging was synthetic-only and does not validate genuine OEM config. No real wireless CarPlay session, MFi success, or vehicle validation is claimed. NO_INSTALL / safe_to_flash=false.
