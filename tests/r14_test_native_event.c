@@ -20,15 +20,16 @@ static int send_rf(void*p,void*q){assert(p==&b.service.rf&&q==&b.service.packet)
 static int disconnect_rf(void*p){assert(p==&b.service.rf);disconnect_count++;return 2;}
 static int credit(void*p,int n){assert(p==&b.service.rf);credits+=n;return 0;}
 static uint8_t live_mac[6]={1,2,3,4,5,6};static int link_match=1,read_ok=1;
+static uint32_t fixture_association=0x20000;
 static const uint8_t *live_data;static unsigned live_len;
-static int assoc(void*p,const void*ch,uint32_t token,unsigned code){(void)p;assert(ch==&b.service.rf);return link_match&&token==(trace_mode?0x801100:0x20000)&&(code==1||code==2);}
-static int rd(void*p,uint32_t token,void*out,size_t n){(void)p;if(!read_ok)return 0;if(token==(trace_mode?0x80110d:0x2000d)&&n==6){memcpy(out,live_mac,6);return 1;}if(token==(trace_mode?0x801403:0x30000)&&n==live_len&&live_data){memcpy(out,live_data,n);return 1;}return 0;}
-static int auth(void*p,uint32_t token,const uint8_t mac[6]){(void)p;return peer_allowed&&token==(trace_mode?0x801100:0x20000)&&!memcmp(mac,live_mac,6);}
+static int assoc(void*p,const void*ch,uint32_t token,unsigned code){(void)p;assert(ch==&b.service.rf);return link_match&&token==(trace_mode?0x801100:fixture_association)&&(code==1||code==2);}
+static int rd(void*p,uint32_t token,void*out,size_t n){(void)p;if(!read_ok)return 0;if(token==(trace_mode?0x80110d:fixture_association+13u)&&n==6){memcpy(out,live_mac,6);return 1;}if(token==(trace_mode?0x801403:0x30000)&&n==live_len&&live_data){memcpy(out,live_data,n);return 1;}return 0;}
+static int auth(void*p,uint32_t token,const uint8_t mac[6]){(void)p;return peer_allowed&&token==(trace_mode?0x801100:fixture_association)&&!memcmp(mac,live_mac,6);}
 static Mu38PeerOps peerops={NULL,assoc,rd,auth};
 static void tick(void){assert(ir5_tick(&b)==0);}
 static void read_full(int fd,uint8_t *p,size_t n){while(n){struct pollfd x={fd,POLLIN,0};assert(poll(&x,1,500)>0);ssize_t k=recv(fd,p,n,0);assert(k>0);p+=k;n-=(size_t)k;}}
 static int event(const uint8_t*peer,unsigned code,unsigned status,const uint8_t*p,unsigned n,uint32_t pkt){
- uint8_t e[16]={0};uint32_t token= code==6?pkt:code==5?0x30000:0x20000;
+ uint8_t e[16]={0};uint32_t token= code==6?pkt:code==5?0x30000:fixture_association;
  if(code==1||code==2)memcpy(live_mac,peer,6);
  live_data=p;live_len=n;e[0]=code;e[2]=status;e[3]=status>>8;e[8]=n;e[9]=n>>8;
  for(unsigned i=0;i<4;i++)e[12+i]=(uint8_t)(token>>(8*i));
@@ -107,10 +108,12 @@ int main(int argc,char **argv){
   puts("PASS: exact 16-byte ARM interpreter callback snapshots -> C bridge -> TCP; simulated device memory, auth and TX completion scheduling; not QNX.");return 0;
  }
  assert(event(unknown,1,0,NULL,0,0)==0&&decision==0);peer_allowed=0;assert(event(peer,1,0,NULL,0,0)==0&&decision==0);peer_allowed=1;link_match=0;assert(event(peer,1,0,NULL,0,0)==0&&decision==0);link_match=1;read_ok=0;assert(event(peer,1,0,NULL,0,0)==0&&decision==0);read_ok=1;
- assert(event(peer,1,0,NULL,0,0)==1&&decision==1);
+ assert(event(peer,1,0,NULL,0,0)==1&&decision==1&&b.native_association==fixture_association);
  if(argc>1){
   /* Different identity at event2: shut bridge and queue OEM disconnect on owner tick only. */
-  peer_allowed=0;assert(event(peer,2,0,NULL,0,0)<0);assert(b.dead&&b.native_link&&!disconnect_count);
+  if(!strcmp(argv[1],"association-switch"))fixture_association+=4u;
+  else peer_allowed=0;
+  assert(event(peer,2,0,NULL,0,0)<0);assert(b.dead&&b.native_link&&!disconnect_count);
   assert(ir5_tick(&b)<0&&disconnect_count==1&&b.disconnect_rc==2);
   assert(ir5_tick(&b)<0&&disconnect_count==1);
   assert(event(peer,4,0,NULL,0,0)<0&&!b.native_link);

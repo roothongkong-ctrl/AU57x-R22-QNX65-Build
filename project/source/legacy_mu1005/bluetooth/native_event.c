@@ -20,7 +20,19 @@ int mu38_dispatch(InboundR5 *b,const Mu38PeerOps *o,void *ch,const void *raw){
  if(!b||!b->initialized||!o||o!=b->vendor.opaque||!raw||ch!=&b->service.rf||!b->vendor.certify||b->vendor.certify(b->vendor.opaque)!=1)return -1;
  memcpy(e,raw,sizeof e);code=e[0];status=le16(e+2);p=le32(e+12);
  switch(code){
- case 1:case 2:case 4:return ir5_event(b,ch,e,code,status,NULL,0,0);
+ case 1:
+  r=ir5_event(b,ch,e,code,status,NULL,0,0);
+  if(r==1)b->native_association=p;
+  return r;
+ case 2:
+  /* A new association can have the very same MAC. Keep native open/drain
+   * bookkeeping in ir5_event, but withhold peer evidence on mismatch.
+   * Never transform a mismatched object into a successful open. */
+  return ir5_event(b,ch,p&&p==b->native_association?e:NULL,code,status,NULL,0,0);
+ case 4:
+  r=ir5_event(b,ch,e,code,status,NULL,0,0);
+  if(!status&&!b->native_link)b->native_association=0;
+  return r;
  case 5:
   n=le16(e+8);if(status||!n||n>MAX_DATA||!p||p>UINT32_MAX-(n-1)||!o->read_live||b->native_rx_busy){
    /* A missing payload means the iAP2 byte stream can no longer be intact. */

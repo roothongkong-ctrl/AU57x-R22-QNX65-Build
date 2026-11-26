@@ -12,6 +12,9 @@ typedef struct {
  ResolvePeer resolve; int fd,initialized,dead,completion,authorized,had_link;
  uint8_t peer[6];
  uint32_t credits_committed;
+ /* Actual native association identity accepted on event1, not a MAC alias.
+  * Used only by native_event decoder; reset at genuine close. */
+ uint32_t native_association;
  /* An accepted native link is tracked independently of the daemon stream. */
  int native_link, disconnect_attempted, disconnect_rc;
  /* R38 fixed owned storage: avoid 5 KB on the native callback stack. */
