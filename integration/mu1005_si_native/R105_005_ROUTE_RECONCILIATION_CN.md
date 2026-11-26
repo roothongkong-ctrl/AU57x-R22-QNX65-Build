@@ -53,14 +53,17 @@ R143 的 QEMU 合成调用点仅证明观察器逻辑能运行；不是车机真
 
 现有 `inner_iap2` 模块仅在同一有效 AirPlay session、库身份和 owner epoch 已被外部证明时，才转发原始 iAP2 字节；它不伪造 ACK、认证或 session ID。静态核验 ABI 和主机 socket 测试，不等于原厂 AirPlay dispatch 已将该命令接入，也不等于加密/真实 iPhone 会话已验证。
 
-**关键缺口**：在 MU1005 原厂 AirPlay/Cinemo owner 中找到真实 event/control 收发回调、其线程和 session 生命周期，并证明第二段 iAP2 字节流确实可经该接口双向传送。
+**关键缺口**：把 `iap2_connect` 的 path、`iap2_raw_msg_send` 的消息句柄和 `/dev/ipod0` 的真实 owner 串成一条可复核双向数据路径；同时证明 AirPlay session callback 与 iAP2 网络 event/control 在同一真实 session 中关联。
 
-### 原厂 ASI Bluetooth iAP proxy
+### 原厂 ASI Bluetooth iAP proxy：数据桥路线关闭
 
-从用户原始资料中提取的 `libasimmxconnectivity_bluetooth_iapproxy.so` 有 9 个已识别方法：
-`requestReconnectDevice`、`responseReconnectDevice`、`updateActiveDevice`、`stringRequest`、`stringResponse`、`updateActiveDevice(address)`、`updateLocalBtAddress`、`updateLocalFriendlyName`、`updateActiveDevices`。
+第 27 轮历史交接已经完成了比“列出 9 个方法”更深入的全盘核验：
+- `libasimmxconnectivity_bluetooth_iapproxy.so` 是 48,248 B 的 IDL 生成代理/桩壳，只有 `getProxyStubFactory` 导出；
+- 固件 70 版 `app.img` 的 778 个 ARM ELF 全盘扫描中，`IapDeviceServices` 的 stub/proxy 只命中该库，没有第二个服务端实现，也没有其他 ELF 通过 `DT_NEEDED` 引用它；
+- `btstack` 没有 `asi.connectivity.bluetooth.iap` 服务；`BluetoothSmartphoneIntegration` 与 `dsi.smartphoneintegration` 的 EMS 方法是配对/状态/UI/输入/曲目元数据，不是原始帧流；
+- 9 个方法中 `stringRequest/stringResponse` 是单向字符串，不是有分片、序号和回包语义的原始 iAP2 byte stream。
 
-目前没有明确识别到公开 RFCOMM 原始字节收发方法。不能把该 proxy 当作完整 iAP2 data plane，也不能因未识别到字节 API 就断言私有传输不存在。下一步需确认其工厂、消息方向、实际调用者和是否只是设备状态/重连控制。
+因此，**停止把 ASI IapDeviceServices 当作无线 CarPlay 原始数据桥**。这是针对 70 版 `app.img` 的明确否定证据；不外推成“整个 MIFS 分区绝无任何相关服务”，但当前没有证据值得继续在 ASI proxy 上投入。保留蓝牙配对/状态上报能力即可，主数据面转到原厂 iAP2 client/device 与 AirPlay 网络路径。
 
 ### DIO / SI 进程边界
 
@@ -92,17 +95,23 @@ R143 的 QEMU 合成调用点仅证明观察器逻辑能运行；不是车机真
 
 ## 6. 下一步工作优先级（按信息增量排序）
 
-### A. 原厂 ASI proxy 真实调用链
+### A. 原厂 iAP2 client/device 通道（最高优先级）
 
-用已有私有原厂 ELF 及 R29 资料，建立 9 个方法的 vtable/调用者/参数对象/消息方向交叉引用，判断是否有隐藏的异步事件/transport 接口。输出逐项证据，不从方法名猜功能。
+基于已存在的 `dio_manager` → `libiap2client.so.1` → `/dev/ipod0` 证据，继续精确追踪：
+1. `dio_manager` 的 `iap2_connect` wrapper `0x17a054` / callsite `0x17a094`，找出 path 实参从哪个配置字段/环境变量进入；
+2. `iap2_raw_msg_send`（`libiap2client.so.1` VA `0x131c`）的参数 ABI、调用者和是否依赖当前连接句柄；
+3. `libiap2client` 的 QNX `MsgSend/MsgSendsv/MsgSendvs` 消息目的端，以及 `/dev/ipod0` 的 resource-manager owner；
+4. 将其与 `ipod-drvr-iap2.so` 的 `transport_receive` / `transport_send_pkt` 和 `mm-ipod` 的 plugin loader 对齐，确认原始 iAP2 字节实际从哪个进程、哪个 fd/设备句柄双向流动。
 
-### B. 原厂 AirPlay event/control dispatch owner
+不改 `iap2.cfg`，不猜 `/dev/ipod0` 的创建者，不用 ASI 字符串接口代替字节通道。
 
-从 `AirPlayReceiverSessionSendCommand` 的 caller 和接收端 dispatch 反向追踪，找到原厂 Cinemo/AirPlay owner、线程、session 创建/销毁和 iAP2 event/control handler。确认 `iAPSendMessage` 命令在目标 MU1005 上是否被处理，而不是只看第三方说明。
+### B. 原厂 AirPlay session 与 iAP2 event/control
+
+从 `dio_manager` 已知的真实 callback 候选开始：`s_sessionCreatedCallback` `0x159374`、`s_sessionFinalizedCallback` `0x159a58`、`s_handleSessionControl` `0x1594ec`；同时追踪 `AirPlayReceiverSessionSendCommand` 的发送调用者。确认同一 AirPlay session 的创建、控制命令收发、销毁和线程 owner，核实 `iAPSendMessage` 是否被目标 MU1005 原厂 dispatch 接受。第三方文档只作为协议参考，不能替代本机 dispatch 证据。
 
 ### C. 第一段 BlueSDK owner 和 iAP2 RFCOMM 注册
 
-复用 R143 观察器设计，但先用不注入的 R105.004 只读诊断确认实际进程、映射模块和配置路径。之后若有必要再做经审查的只读观察。必须区分 BlueSDK 工作线程、RFCOMM owner、SDP profile/SCN 与 iAP2 LinkEngine 的状态边界。
+复用 R143 观察器设计，但先用不注入的 R105.004 只读诊断确认实际进程、映射模块和配置路径。之后若有必要再做经审查的只读观察。必须区分 BlueSDK 工作线程、RFCOMM owner、SDP profile/SCN 与 iAP2 LinkEngine 的状态边界。R143 QEMU 合成调用点不算真实 owner 证明。
 
 ### D. 双段联调与有线抢占
 
