@@ -1,0 +1,24 @@
+name: X4.3 MU1005 native inbound regression (NO INSTALL)
+on:
+  push:
+    branches: [x4.3-integration-plan-20261126]
+    paths:
+      - 'project/source/legacy_mu1005/bluetooth/inbound.c'
+      - 'project/source/legacy_mu1005/bluetooth/inbound.h'
+      - 'tests/test_mu1005_rf_scn_extended.c'
+      - 'ci/host_mu1005_rf_scn_extended.sh'
+      - '.github/workflows/x4.3-host-regression.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scn-regression:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run MU1005 SCN 1..30 regression
+        run: bash ci/host_mu1005_rf_scn_extended.sh
+      - name: Verify NO_INSTALL guard
+        run: |
+          test ! -e install
+          echo "HOST_ONLY / NO_INSTALL / safe_to_flash=false"
