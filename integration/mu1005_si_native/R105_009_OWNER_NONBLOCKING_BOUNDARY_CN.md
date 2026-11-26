@@ -41,3 +41,14 @@
 **本轮结论：封住一条不应在 SDK owner 线程运行的阻塞接入路径；后续只允许 worker 预建连接、owner 非阻塞接管。**
 
 installable=false / safe_to_flash=false / vehicle_verified=false / mfi_apple_verified=false。
+
+
+## 自动门禁实测结果（2026-11-26）
+
+当前分支专用 R105 workflow run `45756262630` 已完成 SUCCESS：
+- 上游 iAP2 LinkEngine 原始文件 hash 校验与 Rust 测试通过；
+- AU57x C frame 测试通过；
+- 新增 5 项 owner nonblocking 源码边界测试全部 PASS；
+- workflow scope artifact 明确记录 HOST_ONLY、OEM owner NOT PROVEN、MFi NOT TESTED、VEHICLE_VERIFIED=0、INSTALLABLE=0。
+
+这次成功是主机回归门禁成功，不是车机 owner 已接通。
