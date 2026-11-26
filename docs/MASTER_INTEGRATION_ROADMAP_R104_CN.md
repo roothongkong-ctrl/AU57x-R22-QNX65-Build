@@ -152,3 +152,8 @@ R105.002 对照既有 USB 插件 ABI、R104 iAP2 驱动反汇编和 R106/001 实
 R88 已有 RFCOMM server-first host adapter 与原厂 btstack 静态样本指纹；不重复重写。R100 的 `route_eligible_for_auto_activation=false`、stock iAP endpoint/service 未观察到、真实 owner 未证明仍是硬门禁。R99 配置暂存工具只证明受控离线生成，不证明配置可运行；其 `mac` 字段语义、transport ID/name 作用域、同时声明多 transport 的行为必须先查明。
 
 R105.003 同时纠正研发优先级：mm-ipod 的 `-t usbdevice` 是 R106 证实的有线物理插件路径，不应先假设它就是蓝牙 iAP2 必经接口。详见 [R105.003 原厂 iAP2 路线复核](R105_003_FACTORY_IAP2_ROUTE_REVIEW_CN.md)。状态保持 NO_INSTALL。
+
+
+## R105.004 补充：一次性只读车机证据采集
+
+已基于 R93 旧脚本新增 `tools/R105_004_oem_iap2_readonly_probe.sh`：只读采集 bluetooth/btstack/connectivity_launcher/dio_manager/mm-ipod 进程与模块映射，查找真实 connectivity/bluetooth/iap2 配置路径，并将配置副本写入 SD 私有目录供离线分析。脚本不改车机配置、不重启服务、不注入代码。源码已提交但尚未实车执行；配置副本可能含 MAC，禁止公开上传。详见 [R105.004 说明](R105_004_READONLY_PROBE_CN.md)。
