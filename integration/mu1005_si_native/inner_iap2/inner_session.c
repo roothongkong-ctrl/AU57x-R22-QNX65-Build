@@ -137,3 +137,21 @@ int mu_inner_session_dispatch_at(MuInnerSession *s,uint64_t e,MuInnerStockContro
   return stock(session,flags,command,qualifier,params,response);
  return mu_inner_session_dispatch_command(s,e,stock,session,flags,command,qualifier,params,response);
 }
+
+int mu_inner_dio_iap_post(MuDioIapJob *j,uint64_t epoch,void *manager,const void *path,
+ unsigned exlap,MuDioIapPost post,MuDioIapProof proof,void *ctx){
+ if(!j||j->attempted||!epoch||epoch<=j->epoch||!manager||!path||exlap>1||
+    !post||!proof||(uintptr_t)manager>UINTPTR_MAX-0x130u)return -1;
+ void *proxy=(void *)((uintptr_t)manager+0x130u);
+ /* Owner proof must establish exact original manager/proxy, mapped entry,
+  * native path provenance, listener/transport readiness and current
+  * EXLAP policy. The adapter never makes that decision itself. */
+ if(proof(ctx,manager,proxy,path,exlap,epoch,post)!=1)return -1;
+ j->epoch=epoch;j->id=0;j->attempted=1;
+ j->id=post(proxy,path,exlap);
+ return j->id?1:-1;
+}
+int mu_inner_dio_iap_retire(MuDioIapJob *j,uint64_t epoch,int confirmed){
+ if(!j||!j->attempted||epoch!=j->epoch||confirmed!=1)return -1;
+ j->attempted=0;j->id=0;return 1;
+}

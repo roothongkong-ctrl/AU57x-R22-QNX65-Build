@@ -167,7 +167,35 @@ static void joined_test(const MuInnerAirplayProof *proof){
  close(f[1]);
  puts("MU1005_INNER_COMPOSED_SOCKET_AIRPLAY_PASS_HOST_FAKE_NO_OEM");
 }
+static union { uint32_t align; unsigned char bytes[0x160]; } job_manager;
+static int job_path,job_posts,job_allowed=1,job_fail;
+static uint64_t job_post(void *proxy,const void *path,unsigned exlap){
+ assert(proxy==job_manager.bytes+0x130&&path==&job_path&&exlap==0);
+ job_posts++;return job_fail?0:UINT64_C(0x123456789abc);
+}
+static int job_proof(void *ctx,void *manager,void *proxy,const void *path,unsigned exlap,uint64_t e,MuDioIapPost p){
+ return job_allowed&&ctx==&job_path&&manager==job_manager.bytes&&proxy==job_manager.bytes+0x130&&
+  path==&job_path&&!exlap&&e>=11&&p==job_post;
+}
+static void original_job_test(void){
+ MuDioIapJob j={0};
+ job_allowed=0;
+ assert(mu_inner_dio_iap_post(&j,11,job_manager.bytes,&job_path,0,job_post,job_proof,&job_path)==-1&&!job_posts);
+ job_allowed=1;
+ assert(mu_inner_dio_iap_post(&j,11,job_manager.bytes,&job_path,1,job_post,job_proof,&job_path)==-1&&!job_posts);
+ assert(mu_inner_dio_iap_post(&j,11,job_manager.bytes,&job_path,0,job_post,job_proof,&job_path)==1);
+ assert(j.id==UINT64_C(0x123456789abc)&&job_posts==1);
+ assert(mu_inner_dio_iap_post(&j,12,job_manager.bytes,&job_path,0,job_post,job_proof,&job_path)==-1&&job_posts==1);
+ assert(mu_inner_dio_iap_retire(&j,11,0)==-1);
+ assert(mu_inner_dio_iap_retire(&j,11,1)==1&&!j.id);
+ assert(mu_inner_dio_iap_post(&j,11,job_manager.bytes,&job_path,0,job_post,job_proof,&job_path)==-1&&job_posts==1);
+ job_fail=1;
+ assert(mu_inner_dio_iap_post(&j,12,job_manager.bytes,&job_path,0,job_post,job_proof,&job_path)==-1&&j.attempted&&job_posts==2);
+ assert(mu_inner_dio_iap_post(&j,13,job_manager.bytes,&job_path,0,job_post,job_proof,&job_path)==-1&&job_posts==2);
+ puts("MU1005_ORIGINAL_DIO_JOB_ABI_HOST_FIXTURE_PASS_NO_OEM");
+}
 int main(void){
+ original_job_test();
  handle=dlopen(NULL,RTLD_NOW);assert(handle);
  MuInnerAirplay a={0};MuInnerAirplayProof proof={0,library,owner};
  assert(mu_inner_ap_bind(&a,handle,&session,7,&proof)==1);

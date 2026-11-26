@@ -59,4 +59,18 @@ int mu_inner_session_tick_at(MuInnerSession *,uint64_t,uint64_t);
 int mu_inner_session_dispatch_at(MuInnerSession *,uint64_t,MuInnerStockControl,
  uintptr_t load_bias,uintptr_t caller_return,void *,unsigned,const void *,
  const void *,const void *,void **);
+/* MU1005 original CIAP2ServiceJobProxy connect producer (0x124990).
+ * Path is an already initialized native UnicodeString8, NOT a C string.
+ * The returned uint64 is a queued job identifier, never a connected device.
+ * Caller supplies a separately verified original executable entry, active
+ * manager, native path object and original policy decision, and serializes
+ * on the DIO owner. No direct low-level iap2_connect call. */
+typedef uint64_t (*MuDioIapPost)(void *,const void *,unsigned);
+typedef int (*MuDioIapProof)(void *,void *,void *,const void *,unsigned,uint64_t,MuDioIapPost);
+typedef struct { uint64_t epoch,id; int attempted; } MuDioIapJob;
+int mu_inner_dio_iap_post(MuDioIapJob *,uint64_t,void *manager,const void *native_path,
+ unsigned original_exlap_decision,MuDioIapPost,MuDioIapProof,void *);
+/* Retain epoch fence. Only the original owner's teardown observation may
+ * clear the in-flight job. A failed submission can have uncertain effects. */
+int mu_inner_dio_iap_retire(MuDioIapJob *,uint64_t,int original_teardown_confirmed);
 #endif
