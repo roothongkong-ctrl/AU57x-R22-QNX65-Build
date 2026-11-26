@@ -8,4 +8,4 @@
 
 ## R105.005 跨分支统一复核（2026-11-26）
 
-已核对 R88–R103、R142/R143、原厂 ASI Bluetooth iAP proxy、SI/DIO CPRX、AirPlay 第二段 iAP2 和 AP live。重要修正：不再修改 `iap2.cfg` 的 `[bluetooth]` 状态段；仅保留 `bluetooth.enableIap` 为待验证配置候选。下一重点是 ASI proxy 9 个方法的真实调用链，以及 `AirPlayReceiverSessionSendCommand` 对应 event/control dispatch owner。R143 线程观察和 QEMU 合成调用不能当作 OEM owner 证明。用户频段要求固定为 5GHz 优先、不可用回退 2.4GHz。详见 [R105.005 路线收敛报告](R105_005_ROUTE_RECONCILIATION_CN.md)。NO_INSTALL。
+已核对 R88–R103、R142/R143、原厂 ASI Bluetooth iAP proxy、SI/DIO CPRX、AirPlay 第二段 iAP2 和 AP live。重要修正：不再修改 `iap2.cfg` 的 `[bluetooth]` 状态段；仅保留 `bluetooth.enableIap` 为待验证配置候选。ASI IapDeviceServices 裸字节桥已根据第27轮对70版 app.img 的778个ELF全盘扫描关闭：仅有IDL代理壳，没有服务端；BluetoothSmartphoneIntegration/DSI方法是状态与UI，不是iAP2帧。下一重点改为 `dio_manager → libiap2client.so.1 → /dev/ipod0` 的真实双向设备路径，以及 AirPlay session callback/event-control owner。R143 线程观察和 QEMU 合成调用不能当作 OEM owner 证明。用户频段要求固定为 5GHz 优先、不可用回退 2.4GHz。详见 [R105.005 路线收敛报告](R105_005_ROUTE_RECONCILIATION_CN.md)。NO_INSTALL。
