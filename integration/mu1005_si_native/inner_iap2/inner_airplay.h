@@ -9,6 +9,11 @@ typedef struct {
  int (*library)(void *,void *);
  int (*owner)(void *,void *,uint64_t);
 } MuInnerAirplayProof;
+/* MU1005 completion thunk 0x25a90 passes status, borrowed response, ctx.
+ * Callback is asynchronous; keep ctx alive and serialize on the actual
+ * HTTPClient dispatch queue. Status is OEM plist-level status, NOT proof
+ * of an HTTP success, an iAP2 ACK, or authentication. */
+typedef void (*MuInnerAirplayCompletion)(int,const void *,void *);
 typedef struct {
  MuInnerAirplayProof proof;
  void *handle,*session;
@@ -27,7 +32,7 @@ typedef struct {
  long (*length)(const void *);
  const unsigned char *(*bytes)(const void *);
  void (*release)(const void *);
- int (*send)(void *,const void *,void (*)(void),void *);
+ int (*send)(void *,const void *,MuInnerAirplayCompletion,void *);
  int bound;
 } MuInnerAirplay;
 int mu_inner_ap_bind(MuInnerAirplay *,void *,void *,uint64_t,const MuInnerAirplayProof *);
@@ -35,6 +40,11 @@ void mu_inner_ap_unbind(MuInnerAirplay *);
 /* Callback for MuInnerOps.send_event. Successful return means original
  * AirPlay command queued, NOT response received or MFi authenticated. */
 int mu_inner_ap_send(void *,const unsigned char *,size_t);
+/* Optional native completion for a verified owner. Same admission result
+ * as the existing sender. No callback storage is owned by this adapter;
+ * stop/unbind does not cancel a previously accepted OEM request. */
+int mu_inner_ap_send_with_completion(MuInnerAirplay *,const unsigned char *,size_t,
+ MuInnerAirplayCompletion,void *);
 /* Caller invokes on decoded original control dispatch BEFORE normal handler.
  * 2 unrelated -> continue original handler; 1 copied -> reply success;
  * 0 busy -> do not acknowledge; -1 malformed/owner lost -> fail session.

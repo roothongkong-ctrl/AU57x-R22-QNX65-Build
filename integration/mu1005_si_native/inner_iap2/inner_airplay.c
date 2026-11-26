@@ -48,9 +48,9 @@ int mu_inner_ap_bind(MuInnerAirplay *a,void *h,void *s,uint64_t e,const MuInnerA
  a->bound=1;return 1;
 bad:mu_inner_ap_unbind(a);return -1;
 }
-int mu_inner_ap_send(void *ctx,const unsigned char *p,size_t n){
- MuInnerAirplay *a=ctx;
- if(!live(a)||!p||!n||n>MU_INNER_CAP)return -1;
+int mu_inner_ap_send_with_completion(MuInnerAirplay *a,const unsigned char *p,size_t n,
+ MuInnerAirplayCompletion done,void *ctx){
+ if(!live(a)||!p||!n||n>MU_INNER_CAP||(!done&&ctx))return -1;
  void *d=a->dict(NULL,0,a->key_callbacks,a->value_callbacks);
  void *v=a->dict(NULL,0,a->key_callbacks,a->value_callbacks);
  int r=-1;
@@ -60,12 +60,15 @@ int mu_inner_ap_send(void *ctx,const unsigned char *p,size_t n){
   if(a->get(d,a->key_params)==v&&live(a)){
    /* Stock 4-argument API serializes synchronously then enqueues HTTP.
     * Do not retry an error of uncertain side effects, or fabricate an ACK. */
-   if(a->send(a->session,d,NULL,NULL)==0)r=1;
+   if(a->send(a->session,d,done,ctx)==0)r=1;
   }
  }
  if(v)a->release(v);
  if(d)a->release(d);
  return r;
+}
+int mu_inner_ap_send(void *ctx,const unsigned char *p,size_t n){
+ return mu_inner_ap_send_with_completion(ctx,p,n,NULL,NULL);
 }
 /* The OEM split callback and decoded wire envelope share the same parser.
  * A caller must independently prove that it owns the decoded control

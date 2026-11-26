@@ -1,0 +1,8 @@
+# R105.036 — 复用 MU1005 原厂 event HTTPClient 队列（NO INSTALL）
+原厂样本 SHA256 193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b5；本轮从现有私有 R9 样本重新核对哈希、ARM 反汇编和 .rel.plt，无 OEM 字节公开。
+- AirPlayReceiverSessionSendCommand @ 0x25200，0x25208 取 session+0x2c0，必须非 NULL。0x25240 HTTPMessageCreate，0x2526c HTTPHeader_InitRequest，0x25288 CFPropertyListCreateData，0x252c4 HTTPMessageSetBody。0x25320（有完成回调）和 0x253b4（无完成回调）都调用原厂 HTTPClientSendMessage PLT 0x16d10，GOT 0xaacc0，native 0x63b40。
+- 0x252e8 CFRetain(session)；0x252fc、0x25308、0x25310、0x2531c 写 message+0x9de0（caller completion）、+0x9de4（ctx）、+0x9dec（native thunk 0x25a90）、+0x9ddc（session）。0x25348 发送失败释放 session。
+- 0x25a90 完成 thunk 从 message+0x209c/+0x20a0 读 plist bytes/len，调用 CFCreateWithPlistBytes，随后 CFDictionaryGetInt64；0x25b28 回调 ABI r0=status, r1=成功时的 response 或 NULL, r2=ctx；返回后释放 session 与 response。response 仅借用，不能保存。未证明该 status 覆盖所有 HTTP/socket 错误。
+- HTTPClientSendMessage 0x63bc0/0x63bc8 retain message/client；0x63be0 读取 client+8，0x63be4 调 dispatch_async_f (PLT 0x162e4)。native thunk 0x6439c 从 message+0x9dd4 取 client；0x643b0 清 message+8，0x643bc 读 client+0x44 tail link，0x643c0 更新 tail，0x643c4 将 message 挂入链尾，0x643c8 进入 0x63fe0 原厂 HTTP 状态机。确认原厂已经有异步 FIFO，优先复用而不是另造 socket reader。尚未证明响应读取时序、所有异常退出、回调线程与控制线程是否相同，不能断言 congobg 的额外 pump 在 MU1005 上不需要。
+- 0x237b8–0x237dc teardown invalidates/releases client and clears session+0x2c0；+0x2c4 fd 随后关闭。未证明全部 callback 已 drain，不允许在此假定完成或释放 caller ctx。
+- 源码修改：纠正原始 send completion ABI，保留原有无回调接口，增加可选原厂完成回调入口；主机 fixture 验证异步回调、失败 status、unbind 后仍可能收到 completion。尚未接入运行中的 session owner，未改变现有默认发送路径，未验证 OEM runtime / MFi / RF。

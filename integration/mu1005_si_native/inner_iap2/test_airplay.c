@@ -69,13 +69,27 @@ unsigned char CFEqual(const void *p,const void *q){
 long CFDataGetLength(const void *p){return ((const Obj*)p)->n;}
 const unsigned char *CFDataGetBytePtr(const void *p){return ((const Obj*)p)->data;}
 void CFRelease(const void *p){assert(p);}
-int AirPlayReceiverSessionSendCommand(void *s,const void *d,void(*done)(void),void *ctx){
- assert(s==&session&&!done&&!ctx);
+static MuInnerAirplayCompletion pending_done;
+static void *pending_context;
+int AirPlayReceiverSessionSendCommand(void *s,const void *d,MuInnerAirplayCompletion done,void *ctx){
+ assert(s==&session&&(done||!ctx)&&!pending_done);
  Obj *o=(Obj*)d;assert(o->type==DICT);
  assert(!strcmp(o->field[0]->str,"iAPSendMessage"));
  Obj *v=o->field[1];assert(v&&v->type==DICT&&v->field[2]->type==DATA);
  assert(v->field[2]->n==6&&!memcmp(v->field[2]->data,marker,6));
- last=o;sends++;return fail_send?-1:0;
+ last=o;sends++;if(fail_send)return -1;
+ pending_done=done;pending_context=ctx;return 0;
+}
+static int completion_calls,completion_status;
+static void *completion_expected;
+static const void *completion_reply;
+static void completion(int status,const void *reply,void *ctx){
+ assert(ctx==completion_expected);
+ completion_calls++;completion_status=status;completion_reply=reply;
+}
+static void deliver_completion(int status,const void *reply){
+ MuInnerAirplayCompletion cb=pending_done;void *ctx=pending_context;
+ assert(cb);pending_done=NULL;pending_context=NULL;cb(status,reply,ctx);
 }
 static int library(void *p,void *h){(void)p;return h==handle;}
 static int owner(void *p,void *s,uint64_t e){(void)p;return owner_live&&s==&session&&e==owner_epoch;}
@@ -174,5 +188,24 @@ int main(void){
  owner_live=0;assert(mu_inner_ap_send(&a,marker,6)==-1&&sends==2);
  mu_inner_ap_unbind(&a);assert(!a.bound);
  joined_test(&proof);
+ /* Original send returns queue admission, not completion. The completion
+  * context belongs to the caller and must outlive unbind. */
+ MuInnerAirplay tracked={0};int cookie=42;
+ owner_live=1;used=0;fail_send=0;
+ assert(mu_inner_ap_bind(&tracked,handle,&session,8,&proof)==1);
+ completion_expected=&cookie;
+ assert(mu_inner_ap_send_with_completion(&tracked,marker,6,NULL,&cookie)==-1);
+ assert(mu_inner_ap_send_with_completion(&tracked,marker,6,completion,&cookie)==1);
+ assert(pending_done&&completion_calls==0);
+ Obj reply={.type=DICT};
+ deliver_completion(0,&reply);
+ assert(completion_calls==1&&completion_status==0&&completion_reply==&reply);
+ used=0;
+ assert(mu_inner_ap_send_with_completion(&tracked,marker,6,completion,&cookie)==1);
+ mu_inner_ap_unbind(&tracked);
+ assert(pending_done&&completion_calls==1);
+ deliver_completion(-1,NULL);
+ assert(completion_calls==2&&completion_status==-1&&!completion_reply);
+ puts("MU1005_NATIVE_EVENT_COMPLETION_ABI_HOST_PASS_NO_OEM");
  dlclose(handle);puts("MU1005_INNER_AIRPLAY_ENVELOPE_HOST_PASS_NO_OEM");return 0;
 }
