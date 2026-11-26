@@ -22,7 +22,8 @@ def test_seven_callback_slots_and_offsets_are_documented():
         "data_send":"0x28","data_recv":"0x2c",
     }
     for field,offset in expected.items():
-        assert re.search(rf"{field}\\s*;\\s*/\\*\\s*{re.escape(offset)}",SRC), field
+        assert f"uint32_t {field};" in SRC, field
+        assert f"/* +{offset}" in SRC, offset
 
 def test_arm32_layout_static_asserts_compile():
     source=r'''
