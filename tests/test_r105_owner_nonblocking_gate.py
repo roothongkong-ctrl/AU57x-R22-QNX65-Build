@@ -7,7 +7,7 @@ SRC=(ROOT/"project/source/legacy_mu1005/bluetooth/bt_iap2_owner_handoff.c").read
 HDR=(ROOT/"project/source/legacy_mu1005/bluetooth/bt_iap2_owner_handoff.h").read_text()
 
 def body(name):
-    m=re.search(r"\\b(?:static\\s+)?int\\s+"+re.escape(name)+r"\\s*\\([^;]*?\\)\\s*\\{",SRC,re.S)
+    m=re.search(r"\b(?:static\s+)?int\s+"+re.escape(name)+r"\s*\([^;]*?\)\s*\{",SRC,re.S)
     assert m, f"missing function {name}"
     start=m.end(); depth=1;i=start
     while i<len(SRC) and depth:
