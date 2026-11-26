@@ -70,3 +70,8 @@ Step 01 has mapped the MU1005 mm-ipod outer Transport loader and the seven OEM U
 ### 22-step execution — Step 02 driver internals
 
 Step 02 has now inspected the exact MU1005 `ipod-drvr-iap2.so` ELF from the user's prior private handoff archive (SHA-256 pinned). It maps the outer transport send/receive dispatch, Bluetooth iAP2 status/update handlers, Wi-Fi configuration message 0x5703, and transport-identification helpers. Crucially, `bt_*` status handlers are not RFCOMM byte callbacks; Bluetooth/Wi-Fi component constructors, vtables and the live BlueSDK-to-driver byte path remain unproven. [R105.012 Step 02 report](integration/mu1005_si_native/R105_012_STEP02_IPOD_IAP2_DRIVER_INTERNAL_MAP_CN.md) · [Static audit JSON](docs/R105_STEP02_DRIVER_STATIC_AUDIT.json).
+
+
+### 22-step execution — Step 03 plugin loader and USB ABI
+
+Step 03 has statically mapped the original `mm-ipod` dynamic transport loader and cross-checked its callback context against both stock USB Device and USB Host plugins. The inspected handoff archive contains only those two `ipod-transport-*` modules; it also contains Bluetooth iAP service-management evidence, but no proven raw RFCOMM-to-iAP2 transport. This archive-scoped absence is not proof of absence from all firmware partitions. [R105.013 Step 03 report](integration/mu1005_si_native/R105_013_STEP03_MM_IPOD_PLUGIN_LOADER_AND_STOCK_USB_ABI_CN.md) · [Audit JSON](docs/R105_STEP03_MM_IPOD_PLUGIN_LOADER_AUDIT.json).
