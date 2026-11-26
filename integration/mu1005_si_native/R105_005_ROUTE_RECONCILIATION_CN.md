@@ -127,7 +127,7 @@ R143 的 QEMU 合成调用点仅证明观察器逻辑能运行；不是车机真
 |---|---|---|---|
 | BlueSDK 线程观察 | 有 R142/R143 只读实现 | 未在 OEM btstack 验证 | 未验证 |
 | iAP2 LinkEngine | 已复用上游并有 host tests | 未接入 OEM RFCOMM owner | 未验证 |
-| ASI Bluetooth proxy | 9 个方法静态识别 | 实际调用链未闭环 | 未验证 |
+| ASI Bluetooth proxy | 70版 app.img 全盘扫描：仅代理壳、无服务端；裸数据桥路线关闭 | 不再追踪为数据面 | 不适用 |
 | SI 原厂注册/激活 | 有静态偏移和受控 adapter | 未证明 owner callback | 未验证 |
 | DIO/SI CPRX | 主机跨进程协议与回滚状态机 | OEM 生产回调未绑定 | 未验证 |
 | AirPlay 第二段 iAP2 | ABI 静态分析与 socket relay 源码 | dispatch hook 未定位 | 未验证 |
@@ -135,6 +135,6 @@ R143 的 QEMU 合成调用点仅证明观察器逻辑能运行；不是车机真
 | 5GHz/2.4GHz | 策略和编码接口 | 频段切换未验证 | 未验证 |
 | 最终安装 | 无可安装包 | 未安装 | 未验证 |
 
-**总状态：有多个可复用的源代码模块和静态证据，但无线 CarPlay 尚未实现。下一轮不再泛泛搜配置；优先完成 ASI proxy 的真实调用链与 AirPlay event/control dispatch owner 两条静态逆向，再用一次只读实车快照确认实际运行路径。**
+**总状态：有多个可复用的源代码模块和静态证据，但无线 CarPlay 尚未实现。下一轮优先完成 `iap2_connect`/`iap2_raw_msg_send`/`/dev/ipod0` 的真实设备通道调用链，以及 AirPlay session callback/event-control owner 的静态逆向；之后再用一次只读实车快照确认实际运行路径。ASI IapDeviceServices 裸数据桥不再作为研发路线。**
 
 `installable=false` / `safe_to_flash=false` / `vehicle_verified=false`。
