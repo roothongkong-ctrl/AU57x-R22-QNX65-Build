@@ -140,3 +140,13 @@ Bluetooth/Wi-Fi Identification helper 都通过 transport callback 的 `type_get
 - MFi/iPhone/runtime：NOT TESTED
 - vehicle verified：false
 - installable：false
+
+## 自动门禁实测（2026-11-26）
+
+R105 host-only run `45758703730` 已完成 SUCCESS：
+- 原有 upstream bridge Rust 与 C frame tests 通过；
+- 第 01 步 ABI 布局门禁通过；
+- 第 02 步五项静态审计门禁全部 PASS：原厂 ELF 指纹、send/receive callback slot、蓝牙状态消息与 RFCOMM 区分、Wi-Fi 配置消息与射频启动区分、组件选择规则未被过度推断；
+- workflow scope 明确为 HOST_ONLY / NO INSTALL / OEM runtime NOT TESTED。
+
+该 CI 是对提交的静态证据台账做自动检查，不会在 CI 中运行原厂 ELF，也不是实车验证。
