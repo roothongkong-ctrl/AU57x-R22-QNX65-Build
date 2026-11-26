@@ -21,3 +21,6 @@ R105.048 两条 CI 与 R105.049 两条 CI 均 success。现有 R44 stock MFi 绑
 
 ## R105.051 保留早到的真实 4300 通知
 在既有 R44 CONTROL dispatcher 内，已完成原厂 MFi/身份的 4300 先使用现有 cp_availability_wireless_4300 解析器记录真实手机可用状态，然后交给现有 pump；不再因 AP 暂未就绪或 pipeline 尚未启动而丢掉手机通知。4e0d 的可用状态也按真实认证帧记录。发送 4301 仍必须经过原厂认证、真实 live AP、receiver ready、独占 owner 与 TX slot，不伪造握手或就绪。复用原有测试，将 4300 放到 5703 ACK 未到且热点证明暂未就绪时，确认恢复后不需手机重发即可走原 4301 路径。生产 owner 尚未绑定，云端测试待查，NO INSTALL。
+
+## R105.052 真实 TCP 监听入口
+R105.051 unified 45908512907 与 SI 45908512904 success。既有 R98 btstack worker 连接 127.0.0.1:57342，C R44 socket_io 原只提供 adopt 已接受 fd，缺少对应 listener。新增实际 nonblocking bind/listen/accept（不启用 SO_REUSEPORT），在独立 peer proof 后交给原 socket_attach；只允许一个消费者，不与 LuKa daemon 并行占端口。复用 R90 真实 TCP→SYN/LSP/ACK→AA00-AA05 fixture，改用实际 listener API（不是测试手写监听），认证仍为测试桩。此接口尚无生产启动调用者，未执行原厂 RF 注册及真实手机握手，不计第1步完成，NO INSTALL。首次目标剩4项：BT/iAP2/MFi、2.4GHz、AirPlay/画面、联合及测试包。

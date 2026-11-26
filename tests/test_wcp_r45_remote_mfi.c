@@ -23,7 +23,11 @@ struct original {
 };
 static int allow(void *p,uint32_t e){struct original *o=p;return o->alive&&e==o->epoch;}
 static int sock_auth(void *p,int fd,uint32_t e){
- struct original *o=p;return o->alive&&o->fd==fd&&e==o->epoch;
+ struct original *o=p;
+ /* Fixture owns the one accepted descriptor; production must identify
+  * the original btstack peer independently, not adopt an arbitrary fd. */
+ if(o->fd<0&&o->alive&&e==o->epoch)o->fd=fd;
+ return o->alive&&o->fd==fd&&e==o->epoch;
 }
 static int o_owner(void *p,uint32_t e,uint32_t g){
  struct original *o=p;return o->alive&&e==o->epoch&&g==o->gen;
@@ -97,18 +101,15 @@ static void r90_send_data(int fd,struct cp_s4_socket_io *w,
  assert(send(fd,frame+3,n+5,0)==(ssize_t)(n+5));
  assert(cp_s4_socket_poll(w,now+1)==CP_LK_OK);
 }
-static void make_pair(int *listener,int *client,int *accepted){
+static int connect_client(void){
  struct sockaddr_in a;
- *listener=socket(AF_INET,SOCK_STREAM,0);assert(*listener>=0);
- int flag=1;assert(setsockopt(*listener,SOL_SOCKET,SO_REUSEADDR,&flag,sizeof flag)==0);
+ int fd=socket(AF_INET,SOCK_STREAM,0);assert(fd>=0);
+ int flag=1;
  memset(&a,0,sizeof a);a.sin_family=AF_INET;
  a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);a.sin_port=htons(CP_S4_LOCAL_PORT);
- assert(bind(*listener,(struct sockaddr*)&a,sizeof a)==0);
- assert(listen(*listener,1)==0);
- *client=socket(AF_INET,SOCK_STREAM,0);assert(*client>=0);
- assert(connect(*client,(struct sockaddr*)&a,sizeof a)==0);
- assert(setsockopt(*client,IPPROTO_TCP,TCP_NODELAY,&flag,sizeof flag)==0);
- *accepted=accept(*listener,NULL,NULL);assert(*accepted>=0);
+ assert(connect(fd,(struct sockaddr*)&a,sizeof a)==0);
+ assert(setsockopt(fd,IPPROTO_TCP,TCP_NODELAY,&flag,sizeof flag)==0);
+ return fd;
 }
 int main(void){
  struct original o={0};
@@ -123,7 +124,7 @@ int main(void){
  struct cp_wcp_r45_remote_owner ops;
  struct cp_wcp_bt_ops out;
  struct cp_wcp_autoconnect ac;
- int listener,client,server;
+ int listener,client;
  const uint8_t mac[6]={2,4,6,8,10,12};
  const uint8_t connect_frame[14]={1,0,6,0,7,0,0,0,2,4,6,8,10,12};
  const uint8_t syn_marker[6]={0xff,0x55,2,0,0xee,0x10};
@@ -139,8 +140,14 @@ int main(void){
   assert(!stock.bound&&!cert_calls&&!sig_calls);
  }
  assert(cp_s4_tcp_init(&t,&s,allow,&o)==CP_LK_OK);
- make_pair(&listener,&client,&server);o.fd=server;
- assert(cp_s4_socket_attach(&w,&t,server,sock_auth,&o)==CP_LK_OK);
+ o.fd=-1;
+ listener=cp_s4_listener_open();assert(listener>=0);
+ assert(cp_s4_listener_accept(listener,&w,&t,sock_auth,&o)==CP_LK_BACKPRESSURE);
+ client=connect_client();
+ assert(cp_s4_listener_accept(listener,&w,&t,sock_auth,&o)==CP_LK_OK);
+ assert(w.fd==o.fd&&w.attached);
+ close(listener);listener=-1;
+ puts("PASS real single-consumer 57342 listener and accepted RFCOMM transport (fixture)");
  ops=(struct cp_wcp_r45_remote_owner){&o,o_owner,o_server,o_paired,o_wired,o_transport};
  assert(cp_wcp_r45_remote_bind(&r,&w,&t,&ops)==-1); /* no CONNECT */
  /* Fragmented real TCP stream; same R14 normalized framing as R45. */
@@ -226,7 +233,7 @@ int main(void){
  assert(out.stock_iap2_connected(out.ctx,7)==0);
  assert(cp_wcp_r45_remote_ops(&r,&out)==-1);
  cp_wcp_r45_remote_unbind(&r);
- close(client);close(listener);dlclose(lib);
+ close(client);dlclose(lib);
  puts("R90 real TCP->R44 iAP2 SYN/LSP/ACK->fixture AA00-AA05->R87: PASS");
  return 0;
 }

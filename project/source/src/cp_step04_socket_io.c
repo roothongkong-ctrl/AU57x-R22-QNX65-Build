@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Exact R14 TCP bytes <-> R44 iAP2, using a real nonblocking socket.
- * No listener, no OEM process injection, no implicit ownership claims.
+ * Single-consumer loopback listener, no OEM process injection or implicit ownership claims.
  */
 #include "cp_step04_socket_io.h"
 #include <arpa/inet.h>
@@ -13,6 +13,41 @@
 
 static int retryable(int err){
  return err==EAGAIN||err==EWOULDBLOCK||err==EINTR;
+}
+int cp_s4_listener_open(void){
+ struct sockaddr_in a;
+ int fd=socket(AF_INET,SOCK_STREAM,0),flags,one=1;
+ if(fd<0)return -1;
+ flags=fcntl(fd,F_GETFL,0);
+ if(flags<0||fcntl(fd,F_SETFL,flags|O_NONBLOCK)<0||
+    fcntl(fd,F_SETFD,FD_CLOEXEC)<0||
+    setsockopt(fd,SOL_SOCKET,SO_REUSEADDR,&one,sizeof one)<0)goto bad;
+ memset(&a,0,sizeof a);a.sin_family=AF_INET;
+ a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+ a.sin_port=htons(CP_S4_LOCAL_PORT);
+ if(bind(fd,(struct sockaddr*)&a,sizeof a)<0||listen(fd,1)<0)goto bad;
+ return fd;
+bad:close(fd);return -1;
+}
+int cp_s4_listener_accept(int listener,struct cp_s4_socket_io *w,
+ struct cp_s4_tcp_bridge *t,int (*verified)(void*,int,uint32_t),void *opaque){
+ struct sockaddr_in a; socklen_t size=sizeof a;
+ int fd,r,flags;
+ if(listener<0||!w||w->attached||!t||t->closed||t->connected||
+    !t->epoch||!verified)return CP_LK_BAD;
+ flags=fcntl(listener,F_GETFL,0);
+ if(flags<0||!(flags&O_NONBLOCK))return CP_LK_BAD;
+ fd=accept(listener,(struct sockaddr*)&a,&size);
+ if(fd<0)return retryable(errno)?CP_LK_BACKPRESSURE:CP_LK_BAD;
+ /* Reject unrelated connections before attach can revoke the idle session. */
+ if(size!=sizeof a||a.sin_family!=AF_INET||
+    a.sin_addr.s_addr!=htonl(INADDR_LOOPBACK)||
+    fcntl(fd,F_SETFD,FD_CLOEXEC)<0||verified(opaque,fd,t->epoch)!=1){
+  close(fd);return CP_LK_OWNER;
+ }
+ r=cp_s4_socket_attach(w,t,fd,verified,opaque);
+ if(r!=CP_LK_OK)close(fd);
+ return r;
 }
 void cp_s4_socket_abort(struct cp_s4_socket_io *w){
  struct cp_s4_tcp_bridge *t;
