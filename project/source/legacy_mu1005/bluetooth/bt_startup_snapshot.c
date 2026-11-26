@@ -17,3 +17,17 @@ int mu_bt_sdk_started(uint32_t s,int(*r)(void*,uint32_t,void*,size_t),void*c){
  uint32_t x=le(a.os+4),y=le(a.os+8),z=le(a.os+12),t=le(a.os+16);
  return ptr(x)&&ptr(y)&&ptr(z)&&ptr(t)&&x!=y&&y!=z&&x!=z&&t!=x&&t!=y&&t!=z;
 }
+
+uint32_t mu_bt_sdk_service_address(int(*r)(void*,uint32_t,void*,size_t),void*c){
+ uint8_t b[4];uint32_t listener,service;
+ /* BtLinkKeys singleton +0xbe4 is BluetoothServices this+0x1c. */
+ if(!r||r(c,0x2c3d54u,b,4)!=1||!(le(b)&1u)||
+    r(c,0x2c3d48u,b,4)!=1)return 0;
+ listener=le(b);
+ if(!ptr(listener)||listener<=0x1cu)return 0;
+ service=listener-0x1cu;
+ if(r(c,listener,b,4)!=1||le(b)!=0x2be61cu||
+    !mu_bt_sdk_started(service,r,c)||
+    r(c,0x2c3d48u,b,4)!=1||le(b)!=listener)return 0;
+ return service;
+}

@@ -21,6 +21,8 @@ int mu_bt_queue_pulse_start(const MuBtQueuePulseBinding*);
 /* Start after original BluetoothServices returns initialized. The startup
  * witness certifies the caller's genuine startup context, not AO ownership.
  * First queued event binds the supplied notify context ON the actual AO.
+ * Set services_address=0 in both bindings to obtain the initialized
+ * original BluetoothServices instance from the stock listener under lease.
  * All referenced context storage must remain valid until retirement. */
 int mu_bt_queue_bootstrap(const MuBtQueuePulseBinding*,const MuBtNotifyBinding*,int(*startup_authorized)(void*),void*);
 int mu_bt_queue_pulse_stop(void);

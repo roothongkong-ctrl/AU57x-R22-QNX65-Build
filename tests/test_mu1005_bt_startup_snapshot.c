@@ -10,12 +10,16 @@ static int readmem(void*ctx,uint32_t a,void*p,size_t n){
  if(a==0x100000u&&n==4)memcpy(p,f->sv,n);
  else if(a==0x1001b0u&&n==1)memcpy(p,&f->started,n);
  else if(a==0x2d5644u&&n==24)memcpy(p,f->os,n);
+ else if(a==0x2c3d54u&&n==4)put(p,1);
+ else if(a==0x2c3d48u&&n==4)put(p,0x10001cu);
+ else if(a==0x10001cu&&n==4)put(p,0x2be61cu);
  else return 0;
  return 1;
 }
 static F fixture(void){F f={0};put(f.sv,0x2be500);f.started=1;put(f.os,0x2c10d8);for(unsigned i=1;i<=4;i++)put(f.os+i*4,0x400000+i*8);f.os[22]=1;return f;}
 int main(void){
- F f=fixture();assert(mu_bt_sdk_started(0x100000,readmem,&f)==1&&f.calls==6);
+ F f=fixture();assert(mu_bt_sdk_service_address(readmem,&f)==0x100000u);
+ f=fixture();assert(mu_bt_sdk_started(0x100000,readmem,&f)==1&&f.calls==6);
  f=fixture();f.os[22]=0;assert(!mu_bt_sdk_started(0x100000,readmem,&f));
  f=fixture();f.started=0;assert(!mu_bt_sdk_started(0x100000,readmem,&f));
  f=fixture();f.sv[0]^=1;assert(!mu_bt_sdk_started(0x100000,readmem,&f));

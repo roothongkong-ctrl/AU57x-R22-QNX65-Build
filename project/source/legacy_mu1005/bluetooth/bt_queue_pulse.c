@@ -83,6 +83,7 @@ static void*producer(void*p){
 }
 static int begin(const MuBtQueuePulseBinding*b,const MuBtNotifyBinding*boot,int(*startup)(void*),void*ctx){
  MuBtThreadIdentity id;uint8_t f[16];const MuBtOwner*o;
+ MuBtQueuePulseBinding discovered;MuBtNotifyBinding discovered_boot;
  if(!b||q.attempted||!b->enter||!b->leave)return -1;
  o=&b->owner;
  if(!o->owner_ready||!o->read_live)return -1;
@@ -94,6 +95,15 @@ static int begin(const MuBtQueuePulseBinding*b,const MuBtNotifyBinding*boot,int(
     au100_route_select(boot->proof.route_evidence)!=AU100_GRAFT_RFCOMM_ROUTE))return -1;
  if(!boot&&o->owner_ready(o->opaque)!=1)return -1;
  if(b->enter(b->lease_context)!=1)return -1;
+ /* Use the actual initialized stock instance instead of requiring an
+  * externally guessed pointer. Resolve under the existing lifetime lease.
+  * Copy both bindings; q stores them by value before this call returns. */
+ if(!o->services_address){
+  uint32_t s=mu_bt_sdk_service_address(o->read_live,o->opaque);
+  if(!s){b->leave(b->lease_context);return -1;}
+  discovered=*b;discovered.owner.services_address=s;b=&discovered;o=&b->owner;
+  if(boot){discovered_boot=*boot;discovered_boot.owner.services_address=s;boot=&discovered_boot;}
+ }
  if(!resolve(b)||!mu_bt_sdk_started(o->services_address,o->read_live,o->opaque)||
     !(boot?mu_bt_osapi_target(o->comm_load_bias,o->read_live,o->opaque,&id):
       mu_bt_osapi_identity(o->comm_load_bias,tid(),o->read_live,o->opaque,&id))||
