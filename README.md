@@ -55,3 +55,8 @@ Clarified that DIO passes a caller-supplied device path to libiap2client; /dev/i
 ### R105.008 — transport layer reconciliation and R103 host gate
 
 The current route separates (1) mm-ipod physical Transport plugins, (2) internal iAP2 TransportComponents in ipod-drvr-iap2.so, and (3) the btstack RFCOMM producer/owner. The R103 upstream LinkEngine is retained for protocol handling; R98/R45 remain the candidate OEM integration layer. The factory usbdevice path is preserved. A dedicated current-branch HOST-ONLY regression workflow now checks the upstream source hash, Rust bridge/TCP tests, and C framing tests. [R105.008 report](integration/mu1005_si_native/R105_008_ROUTE_LAYER_RECONCILIATION_CN.md). NO INSTALL.
+
+
+### R105.009–R105.010 — owner nonblocking fix and classic MHI2 donor comparison
+
+R105.009 makes the legacy native bind entry fail-closed so the BlueSDK/iAP2 owner callback cannot accidentally perform a blocking TCP connect; only a worker-prepared nonblocking/CLOEXEC fd may be adopted on the proven owner thread. R105.010 compares classic MHI2 MU1440, MHI2Q MU1316 and MH2p donors. It elevates the stock Type-3 transport path for investigation before duplicating the iAP2 link layer; R103 remains the fallback. No donor binary is transplanted and no vehicle install is authorized. [R105.009](integration/mu1005_si_native/R105_009_OWNER_NONBLOCKING_BOUNDARY_CN.md) · [R105.010](integration/mu1005_si_native/R105_010_CLASSIC_MHI2_DONOR_COMPARISON_CN.md).
