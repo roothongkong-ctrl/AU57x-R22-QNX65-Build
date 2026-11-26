@@ -138,3 +138,10 @@ R143 的 QEMU 合成调用点仅证明观察器逻辑能运行；不是车机真
 **总状态：有多个可复用的源代码模块和静态证据，但无线 CarPlay 尚未实现。下一轮优先完成 `iap2_connect`/`iap2_raw_msg_send`/`/dev/ipod0` 的真实设备通道调用链，以及 AirPlay session callback/event-control owner 的静态逆向；之后再用一次只读实车快照确认实际运行路径。ASI IapDeviceServices 裸数据桥不再作为研发路线。**
 
 `installable=false` / `safe_to_flash=false` / `vehicle_verified=false`。
+
+
+## R105.006 补充：/dev/ipod0 的 Resource Manager 所属链
+
+新一轮静态交叉核验已将 `/dev/ipod0` 的提供者收敛到 `mm-ipod` 宿主内动态加载的 `ipod-drvr-iap2.so`：mm-ipod 具有 `ipod-drvr-%s.so` 的 dlopen/dlsym 模块加载路径；driver 导出 `ipod_module`，并导入 `ipod_resmgr_mount`、QNX `iofunc_*`、`MsgReply/MsgWrite` 等 Resource Manager 相关接口；R44 又通过 OEM 机器指令验证了 mm-ipod 向模块注入 owner 并调用 init。DIO 只是通过 `libiap2client.so.1` 以 `/dev/ipod0` 为路径连接 client。
+
+目前精确 mount path 的 driver 调用点和车辆运行 PID 尚未闭环，因此结论为“高置信架构推导”，不是车机实测。详见 [R105.006 /dev/ipod0 Resource Manager 所属链报告](R105_006_IPOD0_RESOURCE_OWNER_CN.md)。保留原厂 `-t usbdevice`，不改配置、不装车。
