@@ -17,7 +17,7 @@ int mu38_resolve_peer(void *ctx,const void *ch,const void *raw,uint8_t out[6]){
 }
 int mu38_dispatch(InboundR5 *b,const Mu38PeerOps *o,void *ch,const void *raw){
  uint8_t e[16]; unsigned code,status,n=0;uint32_t p;int r;
- if(!b||!b->initialized||!o||o!=b->vendor.opaque||!raw||ch!=&b->service.rf||!b->vendor.certify||b->vendor.certify(b->vendor.opaque)!=1)return -1;
+ if(!b||!b->initialized||!o||o->opaque!=b->vendor.opaque||!raw||ch!=&b->service.rf||!b->vendor.certify||b->vendor.certify(b->vendor.opaque)!=1)return -1;
  memcpy(e,raw,sizeof e);code=e[0];status=le16(e+2);p=le32(e+12);
  switch(code){
  case 1:case 2:case 4:return ir5_event(b,ch,e,code,status,NULL,0,0);
