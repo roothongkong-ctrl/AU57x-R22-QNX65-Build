@@ -80,11 +80,11 @@ jobs:
       - name: Exercise AirPlay iAP2 envelope adapter (host fake only)
         run: |
           set -euxo pipefail
-          cc -std=c11 -Wall -Wextra -Werror -rdynamic \\
-            -I integration/mu1005_si_native/inner_iap2 \\
-            integration/mu1005_si_native/inner_iap2/inner_airplay.c \\
-            integration/mu1005_si_native/inner_iap2/inner_iap2.c \\
-            integration/mu1005_si_native/inner_iap2/test_airplay.c \\
+          cc -std=c11 -Wall -Wextra -Werror -rdynamic \
+            -I integration/mu1005_si_native/inner_iap2 \
+            integration/mu1005_si_native/inner_iap2/inner_airplay.c \
+            integration/mu1005_si_native/inner_iap2/inner_iap2.c \
+            integration/mu1005_si_native/inner_iap2/test_airplay.c \
             -ldl -o /tmp/r105-airplay-envelope-host
           /tmp/r105-airplay-envelope-host
       - name: Record scope boundary
