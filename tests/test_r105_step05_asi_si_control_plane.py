@@ -22,7 +22,7 @@ def test_smartphone_integration_contracts_are_control_plane():
     s=D["smartphone_integration_contracts"]
     assert s["BluetoothSmartphoneIntegration"]["method_count"]==9
     assert s["dsi.smartphoneintegration"]["method_count"]==46
-    assert "CONTROL_PLANE" in s["BluetoothSmartphoneIntegration"]["classification"]
+    assert "pairing" in s["BluetoothSmartphoneIntegration"]["classification"]
     assert "UI/input/metadata" in s["dsi.smartphoneintegration"]["classification"]
 
 def test_libirc_identity_is_full_sha_and_not_transport_claim():
