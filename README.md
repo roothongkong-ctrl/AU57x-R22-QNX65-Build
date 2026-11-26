@@ -40,3 +40,8 @@ The result `r100_result/R100_ORIGINAL_MU1005_ROUTE_AUDIT.json` contains hashes a
 ## R105.005 — unified MU1005 wireless route review
 
 Reconciles R88–R103 with the newer R142/R143 owner observers, ASI Bluetooth iAP proxy, SI/DIO CPRX, AirPlay second-stage iAP2 relay and read-only AP discovery. Corrects the older R99 assumption: do not enable the commented `iap2.cfg [bluetooth]` status section. The ASI IapDeviceServices raw-byte bridge is closed based on the prior 778-ELF app.img scan (proxy stub only, no server implementation). The next static target is the native `dio_manager → libiap2client.so.1 → /dev/ipod0` bidirectional path and the OEM AirPlay session callback/event-control owner. User band policy remains 5GHz preferred with 2.4GHz fallback. See [R105.005 route reconciliation](integration/mu1005_si_native/R105_005_ROUTE_RECONCILIATION_CN.md). NO INSTALL.
+
+
+### R105.006 — `/dev/ipod0` Resource Manager owner trace
+
+Static evidence narrows the likely provider to `ipod-drvr-iap2.so` dynamically hosted by `mm-ipod`: driver exports `ipod_module` and imports `ipod_resmgr_mount` plus QNX `iofunc_*`/message APIs; OEM loader instructions show mm-ipod injecting module owner and invoking init. DIO is the client using `libiap2client.so.1` with `/dev/ipod0`. Exact mount-path callsite and live vehicle PID remain unverified. Keep `-t usbdevice`; NO INSTALL. [R105.006 report](integration/mu1005_si_native/R105_006_IPOD0_RESOURCE_OWNER_CN.md).
