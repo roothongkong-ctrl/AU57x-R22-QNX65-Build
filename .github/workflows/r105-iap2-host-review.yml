@@ -11,6 +11,8 @@ on:
       - 'project/source/legacy_mu1005/bluetooth/bt_iap2_owner_handoff.*'
       - 'tests/test_r105_owner_nonblocking_gate.py'
       - 'tests/test_r105_step01_plugin_abi_layout.py'
+      - 'tests/test_r105_step02_driver_static_audit.py'
+      - 'docs/R105_STEP02_DRIVER_STATIC_AUDIT.json'
       - 'project/source/src/cp_ipod_module_layout.h'
       - 'docs/STEP05_MU1005_USB_PLUGIN_ABI_AUDIT.json'
   pull_request:
@@ -46,6 +48,10 @@ jobs:
         run: |
           set -euxo pipefail
           python3 tests/test_r105_step01_plugin_abi_layout.py
+      - name: Verify Step 02 MU1005 iAP2 driver static audit (metadata only)
+        run: |
+          set -euxo pipefail
+          python3 tests/test_r105_step02_driver_static_audit.py
       - name: Record scope boundary
         run: |
           printf '%s\n' 'HOST_ONLY=1' 'QNX_TARGET_RUNTIME=NOT_TESTED' 'OEM_RFCOMM_OWNER=NOT_PROVEN' 'MFI=NOT_TESTED' 'VEHICLE_VERIFIED=0' 'INSTALLABLE=0' | tee r105-host-scope.txt
