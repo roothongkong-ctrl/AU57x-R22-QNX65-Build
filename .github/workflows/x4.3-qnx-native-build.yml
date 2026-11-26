@@ -1,0 +1,46 @@
+name: X4.3 full native binding QNX 6.5 ARM32 build (NO INSTALL)
+on:
+  push:
+    branches: [x4.3-integration-plan-20261126]
+    paths:
+      - 'src/bluetooth/native_binding.c'
+      - 'src/bluetooth/native_binding.h'
+      - 'src/bluetooth/bt_route_gate.c'
+      - 'src/bluetooth/bt_route_gate.h'
+      - 'x3/src/**'
+      - 'project/source/legacy_mu1005/bluetooth/**'
+      - 'project/tools/qnx_elf_gate.py'
+      - 'ci/compile_x43_native_qnx.sh'
+      - '.github/workflows/x4.3-qnx-native-build.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qnx-native-binding:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned QNX 6.5 ARMv7 compiler image
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git init -q /tmp/qnx65
+          git -C /tmp/qnx65 remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C /tmp/qnx65 fetch -q --depth=1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C /tmp/qnx65 checkout -q FETCH_HEAD
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t au57x-x43-qnx65:8.5 /tmp/qnx65
+      - name: Compile and link complete X4.3 native binding dependency graph
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          docker run --rm --platform linux/amd64 -v "$GITHUB_WORKSPACE":/src -w /src au57x-x43-qnx65:8.5 bash /src/ci/compile_x43_native_qnx.sh
+          sudo chown -R "$(id -u):$(id -g)" qnx_build_result
+      - name: Preserve target ELF evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AU57x-X4.3-QNX65-NATIVE-REVIEW_ONLY
+          path: qnx_build_result/x43_native/
+          if-no-files-found: warn
+          retention-days: 14
