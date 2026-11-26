@@ -9,3 +9,10 @@ MU1005 SI registration adapter (NO INSTALL). Based on private target SI SHA256 2
 
 - [R105.009](R105_009_OWNER_NONBLOCKING_BOUNDARY_CN.md)：封闭阻塞式 native bind 入口，只允许 worker 预建 fd 后由 owner 接管。
 - [R105.010](R105_010_CLASSIC_MHI2_DONOR_COMPARISON_CN.md)：对照 classic MHI2 MU1440、MHI2Q MU1316、MH2p，优先核查本车原厂 Type-3 transport 是否能复用 stock iAP2/MFi；R103 保留备用。
+
+
+## 22 步执行进度：第 01 步
+
+- [R105.011：mm-ipod 外层 Transport 插件 ABI 静态解析](R105_011_STEP01_MM_IPOD_PLUGIN_ABI_CN.md)
+- 已完成 loader 结构与七个 callback 槽位映射；新增 host C layout gate。
+- 函数签名、生命周期、运行时实际加载插件尚未证明；不安装。
