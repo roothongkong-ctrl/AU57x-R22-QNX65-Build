@@ -162,3 +162,7 @@ Unified plan and branch created; source code has NOT yet been merged into one pr
 
 ## R108 — latest integration checkpoint
 The X4.3 branch now contains the X4.2 owner gate/pre-TCP snapshot contract and the R113 inbound SCN 1..30 source update. The archived X4.2 host fixture suite passed locally (R98 loopback, X3 17/17, host stub compile). The R113 QNX/QEMU run remains separate; the combined X4.3 native_binding QNX build and production OEM owner provider are still blocked. See `docs/X4_3_R108_X42_OWNER_GATE_PORT_AND_R113_SCN_UPGRADE_CN.md`.
+
+
+## R109 — QNX target build gate
+A full X4.3 native-binding QNX 6.5 ARM32 compile/link script and workflow have been added (`ci/compile_x43_native_qnx.sh`, `.github/workflows/x4.3-qnx-native-build.yml`). It intentionally stops at ELF/NEEDED validation and does not execute fixed-address OEM callbacks under QEMU. The workflow result is pending; no combined QNX PASS is claimed yet.
