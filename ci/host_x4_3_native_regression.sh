@@ -14,4 +14,9 @@ cc -std=c11 -Wall -Wextra -Werror -pedantic -O2 -DAU57X_R98_HOST_TEST=1 $INC \
 cc -std=c11 -Wall -Wextra -Werror -pedantic -O2 $INC -c \
   "$ROOT/src/bluetooth/native_binding.c" -o "$TMP/native_binding_host_stub.o"
 echo "NATIVE_BINDING_HOST_STUB_COMPILE_PASS (QNX ARM32 branch NOT compiled)"
+cc -std=c11 -Wall -Wextra -Werror -pedantic -O2 \
+  -I"$ROOT/project/source/legacy_mu1005/bluetooth" \
+  "$ROOT/project/source/legacy_mu1005/bluetooth/native_event.c" \
+  "$ROOT/tests/test_native_event_context.c" -o "$TMP/test_native_event_context"
+"$TMP/test_native_event_context"
 bash "$ROOT/ci/host_mu1005_rf_scn_extended.sh"
