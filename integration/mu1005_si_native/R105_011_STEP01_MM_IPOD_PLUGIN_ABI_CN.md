@@ -85,3 +85,16 @@ module object：
 - Bluetooth RFCOMM linkage：NOT PROVEN
 - vehicle verified：false
 - installable：false
+
+## 第 01 步自动门禁实测（2026-11-26）
+
+R105 workflow run `45757541072` 已完成 SUCCESS：
+- R103 上游协议层和 AU57x bridge host 回归通过；
+- C RFCOMM frame framing/disconnect 测试通过；
+- R105 owner nonblocking 五项源码门禁通过；
+- 本步 ABI 布局四项门禁通过，其中宿主机 C 编译器实际编译并执行了结构断言；
+- scope artifact 明确为 HOST_ONLY / OEM runtime NOT TESTED / installable=0。
+
+本轮曾因测试脚本的字段匹配表达式过严而出现一次失败；已修正为直接字段/偏移断言，随后同一工作流完整通过。最终验收以成功 run 为准。
+
+**固定 22 步进度：01/22 的结构映射验收完成。** 七个函数的真实参数签名、返回值和完整 loader lifecycle 尚未闭环，不会写成已知 ABI；它们在第 02 步与原厂 driver 交叉引用时继续确认。
