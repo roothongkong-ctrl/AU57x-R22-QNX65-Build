@@ -1,24 +1,30 @@
-name: X4.3 MU1005 native inbound regression (NO INSTALL)
+name: X4.3 MU1005 owner gate + native inbound regression (NO INSTALL)
 on:
   push:
     branches: [x4.3-integration-plan-20261126]
     paths:
+      - 'src/bluetooth/native_binding.c'
+      - 'src/bluetooth/native_binding.h'
+      - 'project/source/legacy_mu1005/bluetooth/bt_iap2_owner_handoff.c'
+      - 'project/source/legacy_mu1005/bluetooth/bt_iap2_owner_handoff.h'
       - 'project/source/legacy_mu1005/bluetooth/inbound.c'
       - 'project/source/legacy_mu1005/bluetooth/inbound.h'
+      - 'x3/**'
+      - 'tests/test_r98_iap2_owner_handoff.c'
       - 'tests/test_mu1005_rf_scn_extended.c'
-      - 'ci/host_mu1005_rf_scn_extended.sh'
+      - 'ci/host_x4_3_native_regression.sh'
       - '.github/workflows/x4.3-host-regression.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  scn-regression:
+  host-regression:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Compile and run MU1005 SCN 1..30 regression
-        run: bash ci/host_mu1005_rf_scn_extended.sh
-      - name: Verify NO_INSTALL guard
+      - name: Run R98 X3 gate, snapshot and SCN regression
+        run: bash ci/host_x4_3_native_regression.sh
+      - name: Confirm source-only safety boundary
         run: |
           test ! -e install
-          echo "HOST_ONLY / NO_INSTALL / safe_to_flash=false"
+          echo "SOURCE_ONLY / NO_INSTALL / safe_to_flash=false"
