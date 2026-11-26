@@ -34,3 +34,17 @@ NO_INSTALL / safe_to_flash=false / vehicle_verified=false.
 
 ## R109 update — target build gate created
 The full X4.3 QNX ARM32 build script and workflow are now in the branch. Pending evidence: a successful workflow run ID plus the uploaded ELF gate/readelf artifact. Until then, do not claim combined QNX compile PASS.
+
+## R110 — QNX/host build gate static audit corrections
+Before relying on the new workflow, a source-path audit found that both build scripts referenced `src/bluetooth/bt_route_gate.c`, but the real source lives at `project/source/legacy_mu1005/bluetooth/bt_route_gate.c`. Both `ci/compile_x43_native_qnx.sh` and `ci/host_x4_3_native_regression.sh` now reference the real source.
+A second integration defect was found in `mu38_dispatch`: it compared the `Mu38PeerOps *` structure address with `b->vendor.opaque`, although the intended relation is `o->opaque == b->vendor.opaque` (Resident embeds Mu38PeerOps as its first member). The check is corrected, and `tests/test_native_event_context.c` was added to guard the owner-context contract.
+The isolated native-event context regression compiled and passed with a local host fixture. This is a focused test only; it is not the complete branch host workflow and does not imply QNX compilation.
+
+## Current gate status after R110
+- Source-path corrections: DONE.
+- Native-event resolver context correction: DONE.
+- Focused isolated host regression: PASS.
+- Full X4.3 host workflow: PENDING / no verified run result in this review.
+- Full X4.3 QNX 6.5 ARM32 compile/link + ELF gate: PENDING / no verified run result in this review.
+- Production OEM btstack owner provider, MFi, AirPlay and vehicle validation: NOT PROVEN.
+NO_INSTALL / safe_to_flash=false.
