@@ -7,6 +7,7 @@ on:
       - 'Cargo.toml'
       - 'third_party/luka-dev/mib2q-carplay-rgi/wireless/daemon/vendor/iap2-link/**'
       - 'integration/r103_iap2_bridge/**'
+      - 'integration/mu1005_si_native/inner_iap2/**'
       - 'ci/host_r103_*.sh'
       - 'project/source/legacy_mu1005/bluetooth/bt_iap2_owner_handoff.*'
       - 'tests/test_r105_owner_nonblocking_gate.py'
@@ -76,6 +77,16 @@ jobs:
         run: |
           set -euxo pipefail
           python3 tests/test_r105_step06_resmgr_mount_audit.py
+      - name: Exercise AirPlay iAP2 envelope adapter (host fake only)
+        run: |
+          set -euxo pipefail
+          cc -std=c11 -Wall -Wextra -Werror -rdynamic \\
+            -I integration/mu1005_si_native/inner_iap2 \\
+            integration/mu1005_si_native/inner_iap2/inner_airplay.c \\
+            integration/mu1005_si_native/inner_iap2/inner_iap2.c \\
+            integration/mu1005_si_native/inner_iap2/test_airplay.c \\
+            -ldl -o /tmp/r105-airplay-envelope-host
+          /tmp/r105-airplay-envelope-host
       - name: Record scope boundary
         run: |
           printf '%s\n' 'HOST_ONLY=1' 'QNX_TARGET_RUNTIME=NOT_TESTED' 'OEM_RFCOMM_OWNER=NOT_PROVEN' 'MFI=NOT_TESTED' 'VEHICLE_VERIFIED=0' 'INSTALLABLE=0' | tee r105-host-scope.txt
