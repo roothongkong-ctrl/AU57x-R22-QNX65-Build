@@ -175,9 +175,14 @@ int main(void){
  static const uint8_t available[]={0x40,0x40,0,15,0x43,0x00,
                                     0,9,0,1,0,5,0,0,1};
  airplay_up=1;
+ /* Hotspot evidence can also be temporarily unavailable at this point.
+  * A genuine, already authenticated offer must survive until AP and
+  * original AirPlay are ready, even without another phone offer. */
+ proof.live_hotspot=0;
  n=frame(b,0x40,49,102,10,available,sizeof available);
  feed(b,n,13);flush();
  assert(s.wireless.availability_seen&&s.wireless.wireless_available==1);
+ proof.live_hotspot=1;
  assert(s.wireless.start_sent==0&&s.wireless_pending);
  /* Receiver loses readiness while the 5703 ACK is in flight. */
  airplay_up=0;

@@ -97,6 +97,24 @@ static int link_control(void *opaque,const uint8_t *frame,size_t n){
      wr=cp_s4_wireless_pump(s);
      return wr==CP_WL_BAD_FRAME?-1:0;
     }
+    /* An authenticated phone offer can precede the owner AP/receiver
+     * setup tick. Preserve only its parsed availability, never grant
+     * readiness or send 4301 until the existing live proof permits it.
+     * A later unavailable offer replaces the earlier one. */
+    if(event.type==CP_EVENT_CARPLAY_AVAILABLE){
+     int state=-1;
+     if(!cp_s4_authenticated(s))return 0;
+     int parsed=cp_availability_wireless_4300(frame,n,&state);
+     if(parsed<0)return -1;
+     s->wireless.wireless_available=parsed==1?state:-1;
+     s->wireless.availability_seen=parsed==1&&state==1;
+     (void)cp_s4_wireless_pump(s);
+     return 0;
+    }
+    if(event.type==CP_EVENT_WIRELESS_STATUS){
+     if(cp_s4_authenticated(s))s->wireless.wireless_available=event.available;
+     return 0;
+    }
     if(s->wireless_proof(s->wireless_ctx,s->epoch,
                          s->link.generation,&proof)!=1)return 0;
     wr=cp_step04_dispatch(&s->auth,&s->wireless,&proof,frame,n);

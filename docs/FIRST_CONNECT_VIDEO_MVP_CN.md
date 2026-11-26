@@ -18,3 +18,6 @@ R105.047 unified run 45907707475 九个 jobs 全部 success（authentication 140
 
 ## R105.050 MFi 与真实 RF generation 接入
 R105.048 两条 CI 与 R105.049 两条 CI 均 success。现有 R44 stock MFi 绑定必须提前给出 epoch/generation，真实首连无法依赖调用方在 RF CONNECT 前猜测 generation；本轮在现有 cp_step04_session 增加可选 prepare_stock_mfi，保存借用的已验证原厂库与 owner，在真实 R14 CONNECT→iAP2 SYN/LSP/ACK→首个 CONTROL 数据到达后，使用实际 link.generation 调用既有 cp_stock_mfi_bind / cp_auth_init。必须通过既有原厂库/当前 owner/控制链路/有线空闲及真实 AA00-AA05 认证，未跳过任何必要认证。旧显式绑定仍可用。修改 R90 真实 TCP fixture 走该正常延迟绑定路径，证书和签名是测试桩，非 Apple 真认证；没有生产调用者与真实 RF 绑定，NO INSTALL。最新 CI 待查。
+
+## R105.051 保留早到的真实 4300 通知
+在既有 R44 CONTROL dispatcher 内，已完成原厂 MFi/身份的 4300 先使用现有 cp_availability_wireless_4300 解析器记录真实手机可用状态，然后交给现有 pump；不再因 AP 暂未就绪或 pipeline 尚未启动而丢掉手机通知。4e0d 的可用状态也按真实认证帧记录。发送 4301 仍必须经过原厂认证、真实 live AP、receiver ready、独占 owner 与 TX slot，不伪造握手或就绪。复用原有测试，将 4300 放到 5703 ACK 未到且热点证明暂未就绪时，确认恢复后不需手机重发即可走原 4301 路径。生产 owner 尚未绑定，云端测试待查，NO INSTALL。
