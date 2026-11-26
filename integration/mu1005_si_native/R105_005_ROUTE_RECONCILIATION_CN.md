@@ -150,3 +150,8 @@ R143 的 QEMU 合成调用点仅证明观察器逻辑能运行；不是车机真
 ## R105.007 补充：iAP2 client 路径与消息边界
 
 已把 DIO client 的设备路径参数、libiap2client 的 QNX MsgSend-family IPC、driver 内部物理 Transport 回调分层。/dev/ipod0 很可能来自原厂 dio_manager 配置的 iap2.device，但配置解析到 0x17a614 callsite 的数据流尚未闭环。iap2_raw_msg_send 不能仅凭名字视为任意 RFCOMM 帧注入接口；需先恢复参数、消息封装和服务端 dispatch ABI。详见 [R105.007 报告](R105_007_IAP2_CLIENT_DEVICE_PATH_AND_MESSAGE_BOUNDARY_CN.md)。不改配置、不装车。
+
+
+## R105.008｜传输层路线复核
+
+明确区分 mm-ipod 外层物理 Transport、ipod-drvr-iap2.so 内部 TransportComponent、btstack RFCOMM owner 三层；保留原厂 usbdevice，不把内部 BluetoothTransportComponent 字符串当作已存在的外层蓝牙插件。R103 上游 iAP2 LinkEngine 作为协议层复用，R98/R45 作为原厂接入层候选。当前分支增加 HOST-ONLY Rust/C 回归门禁。详见 [R105.008](R105_008_ROUTE_LAYER_RECONCILIATION_CN.md)。仍不可安装。
