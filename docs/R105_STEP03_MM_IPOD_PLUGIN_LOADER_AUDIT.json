@@ -1,0 +1,80 @@
+{
+  "step": 3,
+  "target": "MHI2_CN_AU57x_K1006_2/MU1005 QNX6.5 ARM32",
+  "source_archive": "AU57x_C7_无线CarPlay_交给其他AI_一包全资料_20261112.zip",
+  "artifacts": {
+    "mm-ipod": {"size_bytes": 40297, "sha256": "4b87cd2d41ddcee2f38800feafe8b4b340e4f23e1d86c7e97af303522aa15d09"},
+    "ipod-transport-usbdevice.so": {"size_bytes": 19338, "sha256": "e1743821b166fcd93992b45fc7064ad14763ee8a4445478e9aa36e696f2f6e95"},
+    "ipod-transport-usbhost.so": {"size_bytes": 20912, "sha256": "be3d8f4076d03408624415b8e324ca70ccc437dc7d0894f0eadbd356e5b410a0"},
+    "bluetooth": {"size_bytes": 1410944, "sha256": "7d5ae31396f016f811e18a7255bf1311e0bfa471b2a3252a6f2eb4bd3ad04272"},
+    "btstack": {"size_bytes": 1846436, "sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566"},
+    "libasimmxconnectivity_bluetooth_iapproxy.so": {"size_bytes": 48248, "sha256": "44883ed28e44a8f06b5308266510981e17b3ee59d737f73208cd76e11ffc1c80"}
+  },
+  "mm_ipod_loader": {
+    "device_transport_init": {"va": "0x103510", "size": 228},
+    "device_drvr_init": {"va": "0x1035f4", "size": 200},
+    "iface_find": {"va": "0x1033a4", "size": 364},
+    "ipod_resmgr_mount": {"va": "0x103ad0", "size": 512},
+    "loader_evidence": [
+      "constructs ipod-transport-%s.so from transport name",
+      "resolves ipod_transport interface",
+      "iface_find resolves exported ipod_module with dlsym",
+      "validates module ABI major field (descriptor word +0x04, high byte == 2)",
+      "follows descriptor pointer at +0x20 to transport context",
+      "device_transport_init stores owner pointer and calls context init at +0x14"
+    ],
+    "driver_module_name_pattern": "ipod-drvr-%s.so",
+    "transport_module_name_pattern": "ipod-transport-%s.so",
+    "default_mount_prefix": "/dev/ipod"
+  },
+  "usbdevice_plugin": {
+    "ipod_module_symbol": {"va": "0x3ec0", "size": 36},
+    "transport_context_symbol": {"va": "0x40b8", "size": 168},
+    "context_slots": {
+      "init": {"offset": "0x14", "va": "0x1934"},
+      "get_link_params": {"offset": "0x18", "va": "0x1874"},
+      "type_get": {"offset": "0x1c", "va": "0x18bc"},
+      "caps_get": {"offset": "0x20", "va": "0x18cc"},
+      "audiopath_get": {"offset": "0x24", "va": "0x1910"},
+      "data_send": {"offset": "0x28", "va": "0x1560"},
+      "data_recv": {"offset": "0x2c", "va": "0x1228"}
+    },
+    "data_send_backend": "QNX usbd bulk/interrupt endpoints",
+    "data_recv_backend": "QNX USB URB/circular buffer",
+    "descriptor_type_major": 2
+  },
+  "usbhost_plugin": {
+    "ipod_module_symbol": {"va": "0x4488", "size": 36},
+    "transport_context_symbol": {"va": "0x4680", "size": 180},
+    "context_slots": {
+      "init": {"offset": "0x14", "va": "0x2a7c"},
+      "get_link_params": {"offset": "0x18", "va": "0x1810"},
+      "type_get": {"offset": "0x1c", "va": "0x1858"},
+      "audiopath_get": {"offset": "0x24", "va": "0x1868"},
+      "data_send": {"offset": "0x28", "va": "0x1534"},
+      "data_recv": {"offset": "0x2c", "va": "0x11d8"}
+    }
+  },
+  "stock_bluetooth_evidence": {
+    "bluetooth_elf_contains": ["SERVICETYPE_IAP2", "RFCOMM channel error handling", "BluetoothSmartphoneIntegration symbols"],
+    "proxy_elf_contains": ["asi.connectivity.bluetooth.iap.IapDeviceServices", "IapDeviceServicesRPCStub"],
+    "interpretation": "Stock Bluetooth application and ASI proxy expose iAP service management evidence, but do not establish an mm-ipod transport plugin implementation or a raw RFCOMM-to-ipod-drvr callback bridge."
+  },
+  "archive_inventory": {
+    "ipod_transport_modules_found": ["ipod-transport-usbdevice.so", "ipod-transport-usbhost.so"],
+    "bluetooth_transport_module_found": false,
+    "wifi_transport_module_found": false,
+    "scope": "Only the inspected private handoff archive inventory; absence here does not prove absence from every firmware partition or runtime filesystem."
+  },
+  "verdict": {
+    "mm_ipod_dynamic_plugin_loader": "PROVEN_STATIC",
+    "stock_usb_plugin_context_abi": "PROVEN_STATIC",
+    "resmgr_mount_entry": "PROVEN_STATIC",
+    "stock_bluetooth_iap_service_management": "PROVEN_STATIC",
+    "mm_ipod_bluetooth_transport_plugin": "NOT_FOUND_IN_INSPECTED_ARCHIVE",
+    "raw_rfcomm_to_iap2_driver_bridge": "NOT_PROVEN",
+    "wifi_transport_plugin": "NOT_FOUND_IN_INSPECTED_ARCHIVE",
+    "vehicle_runtime": "NOT_TESTED",
+    "installable": false
+  }
+}
