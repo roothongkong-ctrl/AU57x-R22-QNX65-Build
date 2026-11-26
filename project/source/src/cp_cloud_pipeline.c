@@ -390,6 +390,8 @@ int cp_cloud_radio_start(struct cp_cloud_pipeline *s){
  enum cp_radio_band band=CP_RADIO_NONE;
  if(!eligible(s,1))return stop(s);
  if(s->handoff.phase!=CP_HO_BOOTSTRAP_AUTH)return CP_CLOUD_ORDER;
+ /* Recheck live MFi immediately before requesting a physical AP. */
+ if(!s->bootstrap||!cp_s4_authenticated(s->bootstrap))return stop(s);
  if(cp_radio_select(&s->radio,s->epoch,1,&band)!=CP_RADIO_OK)
   return CP_CLOUD_ORDER;
  if(s->owner.ap_prepare(s->owner.ctx,s->epoch,band)!=1)return stop(s);
@@ -411,7 +413,7 @@ int cp_cloud_refresh_ap_config(struct cp_cloud_pipeline *s,const struct cp_sessi
     b->wireless_proof!=actual_wireless_proof||!cp_s4_authenticated(b)||
     !b->identity||!b->identity->wireless_ssid||!cfg->wifi.ssid||
     strcmp(b->identity->wireless_ssid,cfg->wifi.ssid)||
-    b->wireless.start_sent||
+    b->wireless.start_sent||s->radio_failure_pending||
     s->handoff.phase!=CP_HO_BOOTSTRAP_AUTH||
     s->radio.phase!=CP_RADIO_CONNECTING||
     s->radio.selected!=s->band||
@@ -446,6 +448,7 @@ int cp_cloud_radio_result(struct cp_cloud_pipeline *s,int success,int disconnect
     s->radio.phase!=CP_RADIO_CONNECTING)return CP_CLOUD_ORDER;
  if((success!=0&&success!=1)||(disconnected!=0&&disconnected!=1))return CP_CLOUD_BAD;
  if(success){
+  if(!s->bootstrap||!cp_s4_authenticated(s->bootstrap))return stop(s);
   if(s->radio_failure_pending)return CP_CLOUD_PROOF;
   if(disconnected!=0||s->owner.ap_association(s->owner.ctx,s->epoch,s->band)!=1)
     return CP_CLOUD_PROOF;

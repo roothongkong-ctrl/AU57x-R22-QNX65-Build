@@ -185,6 +185,23 @@ static void successful_dual_fallback(void){
  assert(cp_cloud_end(&s)==CP_CLOUD_OK);
  assert(cp_cloud_begin(&s,&b,&ops,8,4)==CP_CLOUD_ORDER);
 }
+static void revoked_mfi_no_new_ap(void){
+ struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
+ reset_fixture();mocked_oem(&b,&stock,1);cp_cloud_init(&p);
+ assert(cp_cloud_begin(&p,&b,&ops,8,4)==CP_CLOUD_OK);
+ assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
+ b.auth.stage=CP_AUTH_AWAIT_CERT;
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_PROOF);
+ assert(ap_calls==0&&p.stopped);
+ reset_fixture();mocked_oem(&b,&stock,1);cp_cloud_init(&p);
+ assert(cp_cloud_begin(&p,&b,&ops,8,4)==CP_CLOUD_OK);
+ assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK);
+ b.auth.stage=CP_AUTH_AWAIT_CERT;
+ assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_PROOF);
+ assert(p.stopped&&ap_calls==1);
+ puts("PASS revoked MFi cannot start AP or commit association");
+}
 static void only_24(void){
  struct cp_cloud_pipeline s;struct cp_step04_session b;struct cp_stock_mfi stock;
  reset_fixture();cap5=0;mocked_oem(&b,&stock,1);cp_cloud_init(&s);
@@ -269,6 +286,8 @@ static void radio_to_airplay_direction(enum cp_radio_band first){
  assert(cp_cloud_radio_report_failure(&p,8,4,next)==CP_CLOUD_STALE);
  assert(cp_cloud_radio_report_failure(&p,8,4,first)==CP_CLOUD_OK);
  assert(p.radio_failure_pending);
+ int old_verify=1;
+ assert(cp_cloud_refresh_ap_config(&p,&config,ap_config_fixture,&old_verify)==CP_CLOUD_PROOF);
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1&&!proof.live_hotspot);
  assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_PROOF);
  assert(cp_cloud_radio_result(&p,0,-1)==CP_CLOUD_BAD);
@@ -1613,5 +1632,5 @@ static void r87_cloud_bootstrap(void){
  reset_fixture();
 }
 
-int main(void){r87_cloud_bootstrap();successful_dual_fallback();only_24();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();native_si_owner_loss_recovery();native_abandoned_mutation_rollback();native_remote_process_boundary();native_r83_corrupt_session_snapshot();native_remote_owner_cloud_pipeline();native_r85_wired_remote_rollback();
+int main(void){r87_cloud_bootstrap();successful_dual_fallback();only_24();revoked_mfi_no_new_ap();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();native_si_owner_loss_recovery();native_abandoned_mutation_rollback();native_remote_process_boundary();native_r83_corrupt_session_snapshot();native_remote_owner_cloud_pipeline();native_r85_wired_remote_rollback();
  puts("AU57X_R47_CLOUD_04_05_06_07_08_09_OWNER_GATES_PASS");return 0;}
