@@ -153,9 +153,12 @@ Unified plan and branch created; source code has NOT yet been merged into one pr
 
 ## R107 — current source integration gate
 1. R113 native_event / InboundR5 / socket-pump dependencies were already present in the X4.3 branch and their blobs match the R113 branch. X4.3 inbound.c/h have now been upgraded to R113's SCN 1..30 implementation; a focused regression and host workflow were added (new branch workflow run still pending).
-2. Port X4.2's native_binding.c/h, X3 owner gate and rf_arg_experiment into X4.3, then upgrade bt_iap2_owner_handoff to the X4.2 pre-TCP snapshot/gate version.
-3. Compile the complete X4.2 native_binding QNX ARM32 branch using production headers/sources. The existing R113 QNX pass only covers its owner publication layer; the X4.2 host stub compile is not a substitute.
+2. X4.2 native_binding.c/h, X3 owner gate, rf_arg_experiment and pre-TCP R98 snapshot handoff are now ported into X4.3. Host fixture sources and a new branch workflow are added.
+3. Compile the complete X4.3 native_binding QNX ARM32 branch using production headers/sources. The existing R113 QNX pass only covers its owner publication layer; the X4.2 host fixture/stub compile is not a substitute. The new X4.3 workflow has no completed run status yet.
 4. Reconcile R116 SUSPENDED/withdrawal lifecycle with X4.2 owner gate and generation/SCN freeze.
 5. Trace the real MU1005 btstack iAP2 owner and registration callback. No production provider means fail-closed; no fixed-address attach is permitted.
 6. Map genuine SI/DIO callbacks and same-iPhone session identity separately from the Bluetooth transport work.
 7. Keep native Wi-Fi 0x5703 as an OEM candidate path; do not introduce a second 0x5703 sender until the single iAP2 session owner is proven.
+
+## R108 — latest integration checkpoint
+The X4.3 branch now contains the X4.2 owner gate/pre-TCP snapshot contract and the R113 inbound SCN 1..30 source update. The archived X4.2 host fixture suite passed locally (R98 loopback, X3 17/17, host stub compile). The R113 QNX/QEMU run remains separate; the combined X4.3 native_binding QNX build and production OEM owner provider are still blocked. See `docs/X4_3_R108_X42_OWNER_GATE_PORT_AND_R113_SCN_UPGRADE_CN.md`.
