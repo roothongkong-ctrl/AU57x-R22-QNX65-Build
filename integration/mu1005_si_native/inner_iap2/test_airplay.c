@@ -125,9 +125,9 @@ static void joined_test(const MuInnerAirplayProof *proof){
  Obj ordinary={.type=STR,.str="requestUI"};
  assert(mu_inner_session_http_command(&joined,7,&session,1,&ordinary,NULL,NULL,&response,&status)==0&&status==123);
  stock_expected=&ordinary;
- assert(mu_inner_session_dispatch_command(&joined,7,stock_control,&session,1,&ordinary,NULL,NULL,&response)==-42&&stock_calls==1);
+ assert(mu_inner_session_dispatch_at(&joined,7,stock_control,0x10000000u,0x1002ccc8u,&session,1,&ordinary,NULL,NULL,&response)==-42&&stock_calls==1);
  assert(mu_inner_session_http_command(&joined,7,&session,0,last->field[0],NULL,last->field[1],&response,&status)==0&&status==123);
- assert(mu_inner_session_dispatch_command(&joined,7,stock_control,&session,1,last->field[0],NULL,last->field[1],&response)==0&&!response&&stock_calls==1);
+ assert(mu_inner_session_dispatch_at(&joined,7,stock_control,0x10000000u,0x1002cadcu,&session,1,last->field[0],NULL,last->field[1],&response)==0&&!response&&stock_calls==1);
  assert(mu_inner_session_http_command(&joined,7,&session,1,last->field[0],NULL,last->field[1],&response,&status)==1&&status!=0&&!response);
  assert(mu_inner_session_control(&joined,7,&session,last->field[0],last->field[1])==0);
  assert(mu_inner_session_tick(&joined,7)==1);
@@ -146,6 +146,24 @@ static void joined_test(const MuInnerAirplayProof *proof){
  assert(mu_inner_session_tick(&joined,7)==-1&&joined.active);
  close(f[1]);assert(mu_inner_session_tick(&joined,8)==-1&&!joined.active);
  assert(fcntl(f[0],F_GETFD)==-1&&errno==EBADF);
+ /* A real socket drives the optional native completion mailbox. */
+ static MuInnerEventFlight flight;
+ owner_epoch=9;used=0;sends=0;
+ assert(socketpair(AF_UNIX,SOCK_STREAM,0,f)==0);
+ for(int i=0;i<2;i++)assert(fcntl(f[i],F_SETFL,O_NONBLOCK)==0);
+ assert(mu_inner_session_start(&joined,handle,&session,9,proof,f[0],&joined,peer_proof)==1);
+ assert(mu_inner_session_track_events(&joined,&flight)==1);
+ assert(write(f[1],marker,6)==6&&mu_inner_session_tick(&joined,9)==1);
+ assert(mu_inner_session_tick(&joined,9)==1&&pending_done&&sends==1);
+ assert(write(f[1],marker,6)==6&&mu_inner_session_tick(&joined,9)==1);
+ assert(mu_inner_session_tick(&joined,9)==1&&sends==1);
+ deliver_completion(0,NULL);
+ assert(mu_inner_session_tick(&joined,9)==1&&sends==2&&pending_done);
+ mu_inner_session_stop(&joined);
+ assert(mu_inner_event_reclaim(&flight,0)==-1);
+ deliver_completion(-1,NULL); /* late callback must not touch closed session */
+ assert(mu_inner_event_reclaim(&flight,1)==1);
+ close(f[1]);
  puts("MU1005_INNER_COMPOSED_SOCKET_AIRPLAY_PASS_HOST_FAKE_NO_OEM");
 }
 int main(void){

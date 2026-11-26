@@ -1,0 +1,3 @@
+# R105.038 — 定位精确调用点、事件队列回调生命周期（NO INSTALL）
+实测私有 R9 原始 libairplay.so SHA256 193a4fd9101ec2aa05e7159cfa307b96500810d379ca74a194f172adc13a46b5。readelf -rW: 0xab430 R_ARM_JUMP_SLOT AirPlayReceiverSessionControl; dynsym 0x25c80 size 1660。llvm-objdump: PLT 0x18360/64/68，两个 BL 调用点 0x2cad8、0x2ccc4；ARM 返回 VA 分别 0x2cadc、0x2ccc8。仅前者为已核实的 _requestProcessCommand，后者原样交还 stock。未写 GOT，尚无原厂运行时 load bias、原始函数和线程绑定。
+新增 scoped dispatcher；新增可选单请求 in-flight completion mailbox，复用原厂 HTTPClient FIFO。HTTP completion 只写独立存储，不操作 OEM session/socket；停用后保留邮箱，须证明旧 callback 已 drain 才能重用。status=0 不等于 HTTP 或 iAP2 ACK；未证实所有完成回调一定到达，生产必须另接超时及真实队列生命周期。默认 sender 保留不变。新增 host fixture 模拟 socket 双包、等待原厂完成回调、断开及迟到回调。未实车执行、未安装。

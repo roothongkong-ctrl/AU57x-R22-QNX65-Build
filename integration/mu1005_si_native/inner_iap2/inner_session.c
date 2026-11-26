@@ -10,12 +10,41 @@ static int peer_live(void *ctx,int fd,uint64_t e){
  MuInnerSession *s=ctx;
  return ap_live(s,e)&&s->peer&&s->peer(s->ctx,fd,e)==1;
 }
+enum { FL_IDLE=0, FL_PENDING=1, FL_DONE=2, FL_RETIRED=3 };
+static int flight_state(MuInnerEventFlight *f){
+ return __sync_val_compare_and_swap(&f->state,0,0);
+}
+static void event_completed(int status,const void *reply,void *ctx){
+ MuInnerEventFlight *f=ctx;
+ (void)reply;
+ /* OEM must call once. Do not access session, CF objects, or sockets
+  * from the HTTPClient queue. A retired mailbox stays allocated. */
+ if(flight_state(f)!=FL_PENDING)return;
+ f->status=status;
+ (void)__sync_bool_compare_and_swap(&f->state,FL_PENDING,FL_DONE);
+}
 static int send_event(void *ctx,const unsigned char *p,size_t n){
- MuInnerSession *s=ctx;
- return mu_inner_ap_send(&s->airplay,p,n);
+ MuInnerSession *s=ctx;MuInnerEventFlight *f=s->flight;
+ if(!f)return mu_inner_ap_send(&s->airplay,p,n);
+ if(!__sync_bool_compare_and_swap(&f->state,FL_IDLE,FL_PENDING))return 0;
+ if(mu_inner_ap_send_with_completion(&s->airplay,p,n,event_completed,f)!=1){
+  /* Do not reuse storage on uncertain enqueue failure. */
+  (void)__sync_lock_test_and_set(&f->state,FL_RETIRED);return -1;
+ }
+ return 1;
+}
+int mu_inner_session_track_events(MuInnerSession *s,MuInnerEventFlight *f){
+ if(!s||!s->active||s->flight||!f||flight_state(f)!=FL_IDLE||
+    s->socket.relay.tx_len||s->socket.relay.rx_len)return -1;
+ s->flight=f;return 1;
+}
+int mu_inner_event_reclaim(MuInnerEventFlight *f,int drained){
+ if(!f||drained!=1||flight_state(f)!=FL_RETIRED)return -1;
+ f->status=0;(void)__sync_lock_test_and_set(&f->state,FL_IDLE);return 1;
 }
 void mu_inner_session_stop(MuInnerSession *s){
  if(!s)return;
+ if(s->flight){(void)__sync_lock_test_and_set(&s->flight->state,FL_RETIRED);s->flight=NULL;}
  mu_inner_socket_close(&s->socket);
  mu_inner_ap_unbind(&s->airplay);
  s->active=0;s->ctx=NULL;s->peer=NULL;
@@ -32,6 +61,10 @@ int mu_inner_session_start(MuInnerSession *s,void *h,void *session,uint64_t e,
 }
 int mu_inner_session_tick(MuInnerSession *s,uint64_t e){
  if(!s||!s->active||e!=s->airplay.epoch)return -1;
+ if(s->flight&&flight_state(s->flight)==FL_DONE){
+  if(s->flight->status!=0){mu_inner_session_stop(s);return -1;}
+  (void)__sync_lock_test_and_set(&s->flight->state,FL_IDLE);
+ }
  if(!ap_live(s,e)||mu_inner_socket_tick(&s->socket,e)!=1){
   mu_inner_session_stop(s);return -1;
  }
@@ -77,4 +110,15 @@ int mu_inner_session_dispatch_command(MuInnerSession *s,uint64_t e,MuInnerStockC
  if(mu_inner_session_http_command(s,e,session,flags,command,qualifier,params,response,&status))
   return status;
  return stock(session,flags,command,qualifier,params,response);
+}
+
+/* R105.035 / R105.037: actual original return VA 0x2cadc.
+ * Other stock call at 0x2ccc4 returns 0x2ccc8 and is never intercepted. */
+int mu_inner_session_dispatch_at(MuInnerSession *s,uint64_t e,MuInnerStockControl stock,
+ uintptr_t bias,uintptr_t lr,void *session,unsigned flags,const void *command,
+ const void *qualifier,const void *params,void **response){
+ if(!stock)return -1;
+ if(!bias||(bias&0xfffu)||bias>UINTPTR_MAX-0x2cadcu||lr!=bias+0x2cadcu)
+  return stock(session,flags,command,qualifier,params,response);
+ return mu_inner_session_dispatch_command(s,e,stock,session,flags,command,qualifier,params,response);
 }

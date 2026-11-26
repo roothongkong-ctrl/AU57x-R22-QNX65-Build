@@ -9,12 +9,18 @@
  * Zero initialize before first use. Successful start transfers fd ownership;
  * failure leaves it with caller. Library remains mapped through stop.
  * Keep this object across reconnects; each successful epoch must increase. */
+/* One caller-owned mailbox, stable storage until OEM callback drain.
+ * Only the completion callback writes pending -> completed; owner loop
+ * consumes it. No response object is retained. GCC atomic word operations
+ * allow different HTTPClient and control queues. */
+typedef struct { volatile int state; int status; } MuInnerEventFlight;
 typedef struct {
  MuInnerAirplay airplay;
  MuInnerSocket socket;
  void *ctx;
  int (*peer)(void *,int,uint64_t);
  uint64_t last_epoch;
+ MuInnerEventFlight *flight;
  int active;
 } MuInnerSession;
 int mu_inner_session_start(MuInnerSession *,void *,void *,uint64_t,
@@ -36,4 +42,16 @@ int mu_inner_session_http_command(MuInnerSession *,uint64_t,void *,
 typedef int (*MuInnerStockControl)(void *,unsigned,const void *,const void *,const void *,void **);
 int mu_inner_session_dispatch_command(MuInnerSession *,uint64_t,MuInnerStockControl,
  void *,unsigned,const void *,const void *,const void *,void **);
+/* Optional tracked sender, enabled before any packet is queued.
+ * A completion is not an iAP2 ACK. At most one OEM request outstanding.
+ * Mailbox must be zero-initialized and remain live after stop; reattach
+ * only after independently confirmed old callback drain. */
+int mu_inner_session_track_events(MuInnerSession *,MuInnerEventFlight *);
+int mu_inner_event_reclaim(MuInnerEventFlight *,int original_drain_confirmed);
+/* Only the exact ARM BL return address of the original HTTP command
+ * handler may intercept; all other calls use the original target.
+ * The load bias must come from an independently verified mapped image. */
+int mu_inner_session_dispatch_at(MuInnerSession *,uint64_t,MuInnerStockControl,
+ uintptr_t load_bias,uintptr_t caller_return,void *,unsigned,const void *,
+ const void *,const void *,void **);
 #endif
