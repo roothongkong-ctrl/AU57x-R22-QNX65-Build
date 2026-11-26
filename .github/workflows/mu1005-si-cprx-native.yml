@@ -22,7 +22,11 @@ jobs:
           test "$(git rev-parse FETCH_HEAD)" = 7f595231394d97091ec0fee209677b6e45fd50dc
           mkdir r85
           git archive FETCH_HEAD project/source/legacy_mu1005/airplay | tar -x -C r85
-          cp -R r85/project/source/legacy_mu1005/airplay review/source/
+          # Keep the original R85 reference for provenance, but compile the
+          # exact current receiver source tested by the first-video host lane.
+          diff -qr r85/project/source/legacy_mu1005/airplay project/source/legacy_mu1005/airplay > review/evidence/receiver-baseline-diff.txt || test "$?" -eq 1
+          cp -R project/source/legacy_mu1005/airplay review/source/
+          (cd review/source/airplay && sha256sum *.c *.h) > review/evidence/receiver-source.sha256
           cp -R integration/mu1005_si_native review/source/si
           cp -R project/source/legacy_mu1005/bluetooth review/source/bluetooth
           cp third_party/luka-dev/mib2q-carplay-rgi/wireless/graft/eir.c review/source/bluetooth/upstream_eir.c
@@ -183,7 +187,7 @@ jobs:
           for sym in mu_si_cprx_init mu_si_cprx_tick mu_si_cprx_cleanup mu_owner_tick mu_cprx_client_begin_remote mu_cprx_client_tick; do
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/native-elf.log
           done
-          printf '%s\n' "source=$(git rev-parse HEAD)" "receiver=7f595231394d97091ec0fee209677b6e45fd50dc" "toolchain=baa45224f18ae6b13c2e9c77c6663bb8181eb6a1" > review/evidence/revisions.txt
+          printf '%s\n' "source=$(git rev-parse HEAD)" "receiver=$(git rev-parse HEAD)" "receiver_baseline=7f595231394d97091ec0fee209677b6e45fd50dc" "toolchain=baa45224f18ae6b13c2e9c77c6663bb8181eb6a1" > review/evidence/revisions.txt
           printf '%s\n' 'NO INSTALL: native cross-compiled review library only' 'Original owner attachment, MFi authentication, real Wi-Fi and physical media not verified.' 'No firmware or installation instructions.' > review/README.txt
           echo QNX_ARM_SI_CPRX_LINK_AND_EXPORT_CHECK_OK_NO_OEM_NO_INSTALL | tee review/evidence/result.txt
           (cd review && find source payload evidence -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS && sha256sum -c SHA256SUMS)
