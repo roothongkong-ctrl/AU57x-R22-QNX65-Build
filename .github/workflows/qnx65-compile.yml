@@ -158,12 +158,12 @@ jobs:
             -v "$GITHUB_WORKSPACE":/src -w /src \
             qnx65-armv7-toolchain:8.5-rust \
             /opt/rust/qnx-cargo build --manifest-path \
-            /src/integration/r103_iap2_bridge/Cargo.toml --bin au57x-r103-qnx-smoke
+            /src/au57x/integration/r103_iap2_bridge/Cargo.toml --bin au57x-r103-qnx-smoke
 
       - name: Verify AU57x R103 QNX ARMv7 ELF
         run: |
           set -euo pipefail
-          BIN="au57x/integration/r103_iap2_bridge/target/armv7-unknown-nto-qnx650/release/au57x-r103-qnx-smoke"
+          BIN="au57x/target/armv7-unknown-nto-qnx650/release/au57x-r103-qnx-smoke"
           test -s "$BIN"
           file "$BIN" | tee qnx-r103-elf.txt
           file "$BIN" | grep -q "ELF 32-bit.*ARM"
@@ -232,7 +232,7 @@ jobs:
         with:
           name: R103-QNX-Rust-Bridge-and-Daemon-REVIEW-ONLY
           path: |
-            au57x/integration/r103_iap2_bridge/target/armv7-unknown-nto-qnx650/release/au57x-r103-qnx-smoke
+            au57x/target/armv7-unknown-nto-qnx650/release/au57x-r103-qnx-smoke
             qnx-r103-elf.txt
             qnx-r103-qemu.log
             qnx-r103-build-info.txt
