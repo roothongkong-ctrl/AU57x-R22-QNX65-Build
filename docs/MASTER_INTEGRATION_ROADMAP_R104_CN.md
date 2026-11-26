@@ -140,3 +140,15 @@ R105.002 对照既有 USB 插件 ABI、R104 iAP2 驱动反汇编和 R106/001 实
 二者不是同一个插件/接口。R106 证明 USB 有线路径成功和 2.4GHz AP 有客户端关联；不能证明无线 iAP2/MFi 成功，也不能据此否定驱动内部 BluetoothTransportComponent。R105.002 是当前最新的边界核对文件，后续先复用已有 app.img/固件与 USB 插件样本，分别审计 mm-ipod loader 和 BluetoothTransportComponent producer，不再重做 HFP/PPS/packet parser/USB ABI。
 
 详见 [R105.002 双层 Transport 边界核对](R105_002_TRANSPORT_LAYER_BOUNDARY_AUDIT_CN.md)。已知 mm-ipod 静态样本的预期 SHA256 为 4b87cd2d41ddcee2f38800feafe8b4b340e4f23e1d86c7e97af303522aa15d09；对应只读审计脚本为 tools/verify_mu1005_ipod_loader.py。该样本仍需与原始 app.img/车机实际版本核对，不能只凭字符串或旧报告宣称生产运行已验证。
+
+
+## R105.003 补充：原厂 iAP2 路线复核与优先级（2026-11-26）
+
+复核 R88/R99/R100/R104/R106 和历史交接后，当前主攻点调整为：
+1. `bluetooth.enableIap` 的真实配置路径/schema/代码消费者/服务注册条件；
+2. `ipod-drvr-iap2.so` 的 `iap2_init` → INI parser → TransportComponentIdentifier 映射 → BluetoothTransportComponent factory/vtable；
+3. 该 component 的真实 BlueSDK/ASI/IPC producer 与双向 send/receive 关系。
+
+R88 已有 RFCOMM server-first host adapter 与原厂 btstack 静态样本指纹；不重复重写。R100 的 `route_eligible_for_auto_activation=false`、stock iAP endpoint/service 未观察到、真实 owner 未证明仍是硬门禁。R99 配置暂存工具只证明受控离线生成，不证明配置可运行；其 `mac` 字段语义、transport ID/name 作用域、同时声明多 transport 的行为必须先查明。
+
+R105.003 同时纠正研发优先级：mm-ipod 的 `-t usbdevice` 是 R106 证实的有线物理插件路径，不应先假设它就是蓝牙 iAP2 必经接口。详见 [R105.003 原厂 iAP2 路线复核](R105_003_FACTORY_IAP2_ROUTE_REVIEW_CN.md)。状态保持 NO_INSTALL。
