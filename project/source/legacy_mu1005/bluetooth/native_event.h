@@ -19,4 +19,11 @@ int mu38_resolve_peer(void *,const void *,const void *,uint8_t[6]);
 /* Decode native callback; RX fetched into owned snapshot, event6 token passed
  * through (never dereferenced). Called only from certified native owner. */
 int mu38_dispatch(InboundR5 *,const Mu38PeerOps *,void *channel,const void *event16);
+/* Pinned MU1005 bt registry identity, equivalent membership/association
+ * reads to 0x202610, 0x202640 and 0x276f74 without taking the vendor mutex.
+ * Caller MUST independently hold the existing owner/lifetime/serialization
+ * contract; stable snapshots do not establish lock exclusion or pairing.
+ * No arbitrary process access, no native function call. */
+int mu38_registry_association(uint32_t channel,uint32_t association,
+ int (*read_live)(void *,uint32_t,void *,size_t),void *);
 #endif

@@ -33,3 +33,31 @@ int mu38_dispatch(InboundR5 *b,const Mu38PeerOps *o,void *ch,const void *raw){
  default:return -1;
  }
 }
+
+/* Original ET_EXEC bt symbol 0x2d58d4, size 0x1bf26c;
+ * GOT 0x2c1964 resolves to bt. See STEP01 native registry evidence. */
+typedef struct { uint32_t base,member,association; uint8_t link,slot,flags; } Mu38Registry;
+static int registry_read(uint32_t ch,int (*r)(void*,uint32_t,void*,size_t),void *ctx,Mu38Registry *v){
+ uint8_t b[4],indices[2];
+ if(!ch||(ch&3u)||ch>UINT32_MAX-0x5eu||
+    r(ctx,0x2c1964u,b,4)!=1||le32(b)!=0x2d58d4u||
+    r(ctx,ch+0x5du,indices,2)!=1||indices[0]>3u||indices[1]>16u)return 0;
+ v->base=le32(b);v->link=indices[0];v->slot=indices[1];
+ uint32_t link=v->base+(uint32_t)v->link*0xaf8u;
+ uint32_t row=link+((uint32_t)v->slot+1u)*16u;
+ if(r(ctx,row+0x1bc5ccu,b,4)!=1||le32(b)!=ch)return 0;
+ v->member=le32(b);
+ if(r(ctx,row+0x1bc5c8u,&v->flags,1)!=1||!(v->flags&1u)||
+    r(ctx,link+0x1bc6ecu,b,4)!=1)return 0;
+ v->association=le32(b);
+ return v->association!=0;
+}
+int mu38_registry_association(uint32_t ch,uint32_t association,
+ int (*r)(void*,uint32_t,void*,size_t),void *ctx){
+ Mu38Registry a,b;
+ if(!r||!association||(association&3u)||
+    !registry_read(ch,r,ctx,&a)||!registry_read(ch,r,ctx,&b))return 0;
+ return a.base==b.base&&a.link==b.link&&a.slot==b.slot&&
+  a.member==b.member&&(a.flags&1u)==(b.flags&1u)&&
+  a.association==association&&b.association==association;
+}

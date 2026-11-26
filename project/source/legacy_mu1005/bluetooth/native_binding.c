@@ -20,9 +20,10 @@ static int ready(void *p){Resident *r=p;return cert(p)&&r->owner.transport_ready
 static uint32_t addr(const void *p){return (uint32_t)(uintptr_t)p;}
 static int assoc(void *p,const void *ch,uint32_t a,unsigned code){
  Resident*r=p;if(!cert(r)||ch!=&r->bridge.service.rf||(code!=1&&code!=2)||!a)return 0;
- /* Native SDK association lookup, used by stock HFP callback on other event
-  * types. Owner must certify lock/re-entry for this particular event path. */
- return (uintptr_t)((void *(*)(const void *))(uintptr_t)0x276f74u)(ch)==a;
+ /* Read the same original registry under the independently certified
+  * owner/lifetime contract. Avoid reacquiring SDK mutex in this callback.
+  * The independent paired_authorized provider remains mandatory. */
+ return mu38_registry_association((uint32_t)(uintptr_t)ch,a,r->owner.read_live,r->owner.opaque);
 }
 static int rd(void*p,uint32_t a,void*out,size_t n){Resident*r=p;return cert(r)&&r->owner.read_live(r->owner.opaque,a,out,n)==1;}
 static int auth(void*p,uint32_t a,const uint8_t mac[6]){Resident*r=p;return cert(r)&&r->owner.paired_authorized(r->owner.opaque,a,mac)==1;}

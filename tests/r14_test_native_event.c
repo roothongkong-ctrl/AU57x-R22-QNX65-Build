@@ -34,7 +34,35 @@ static int event(const uint8_t*peer,unsigned code,unsigned status,const uint8_t*
  for(unsigned i=0;i<4;i++)e[12+i]=(uint8_t)(token>>(8*i));
  int r=mu38_dispatch(&b,&peerops,&b.service.rf,e);live_data=NULL;live_len=0;return r;
 }
+/* Exact target registry offsets, fixture memory only. */
+typedef struct { uint32_t channel,association; unsigned reads; int bad_got,bad_member,bad_flags,bad_index,change; } RegFixture;
+static int reg_read(void *p,uint32_t a,void *out,size_t n){
+ RegFixture *f=p;
+ const uint32_t base=0x2d58d4u,link=base+2u*0xaf8u,row=link+6u*16u;
+ uint32_t v;
+ if(a==f->channel+0x5du&&n==2){uint8_t ix[2]={2,(uint8_t)(f->bad_index?17:5)};memcpy(out,ix,2);return 1;}
+ if(a==row+0x1bc5c8u&&n==1){*(uint8_t*)out=f->bad_flags?0:1;return 1;}
+ if(n!=4)return 0;
+ if(a==0x2c1964u)v=f->bad_got?base+4:base;
+ else if(a==row+0x1bc5ccu)v=f->bad_member?f->channel+4:f->channel;
+ else if(a==link+0x1bc6ecu){v=f->association;if(f->change&&f->reads++)v+=4;}
+ else return 0;
+ for(unsigned i=0;i<4;i++)((uint8_t*)out)[i]=(uint8_t)(v>>(8*i));
+ return 1;
+}
+static void registry_test(void){
+ RegFixture f={0x700000u,0x710000u,0,0,0,0,0,0};
+ assert(mu38_registry_association(f.channel,f.association,reg_read,&f)==1);
+ assert(mu38_registry_association(f.channel,f.association+4,reg_read,&f)==0);
+ f.bad_got=1;assert(!mu38_registry_association(f.channel,f.association,reg_read,&f));f.bad_got=0;
+ f.bad_member=1;assert(!mu38_registry_association(f.channel,f.association,reg_read,&f));f.bad_member=0;
+ f.bad_flags=1;assert(!mu38_registry_association(f.channel,f.association,reg_read,&f));f.bad_flags=0;
+ f.bad_index=1;assert(!mu38_registry_association(f.channel,f.association,reg_read,&f));f.bad_index=0;
+ f.change=1;assert(!mu38_registry_association(f.channel,f.association,reg_read,&f));
+ puts("PASS MU1005 native channel registry membership and association without SDK re-lock (fixture)");
+}
 int main(int argc,char **argv){
+ registry_test();
  trace_mode=argc==3&&!strcmp(argv[1],"native-trace");
  int server=socket(AF_INET,SOCK_STREAM,0),fd=socket(AF_INET,SOCK_STREAM,0);assert(server>=0&&fd>=0);int reuse=1;assert(!setsockopt(server,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof reuse));struct sockaddr_in a={0};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);a.sin_port=htons(57342);assert(!bind(server,(struct sockaddr*)&a,sizeof a)&&!listen(server,1));assert(!connect(fd,(struct sockaddr*)&a,sizeof a));int remote=accept(server,NULL,NULL);assert(remote>=0);
  InboundOps ops={0};ops.reg=reg;ops.unreg=unreg;ops.add=rec;ops.remove=rec;ops.accept=accept_rf;ops.limit=limit;ops.send=send_rf;ops.disconnect=disconnect_rf;ops.credit=credit;ops.addr=addr;ops.certify=yes;ops.ready=yes;ops.opaque=&peerops;
