@@ -166,3 +166,7 @@ The X4.3 branch now contains the X4.2 owner gate/pre-TCP snapshot contract and t
 
 ## R109 — QNX target build gate
 A full X4.3 native-binding QNX 6.5 ARM32 compile/link script and workflow have been added (`ci/compile_x43_native_qnx.sh`, `.github/workflows/x4.3-qnx-native-build.yml`). It intentionally stops at ELF/NEEDED validation and does not execute fixed-address OEM callbacks under QEMU. The workflow result is pending; no combined QNX PASS is claimed yet.
+
+
+## R110 — build-gate corrections
+Static audit corrected both host and QNX build scripts to compile the actual `project/source/legacy_mu1005/bluetooth/bt_route_gate.c` path. It also fixed the native event resolver owner-context comparison (`o->opaque` vs the owner context) and added a focused regression test. The isolated host fixture passed; full branch host CI and combined QNX ARM32 workflow results are still pending. No runtime or vehicle claim is made.
