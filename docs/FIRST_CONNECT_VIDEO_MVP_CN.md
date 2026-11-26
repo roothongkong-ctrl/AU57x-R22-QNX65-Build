@@ -1,0 +1,8 @@
+# 第一阶段：先连上、先显示（R105.046，NO INSTALL）
+用户决定首连只要求 iPhone 无线 CarPlay 建连并显示，2.4GHz 优先；音频、电话、Siri、完整控制、重连、5GHz 优化后置。最终10步不变。R105.045 SI run 45907011058、unified run 45907011075 均 success。
+本轮复用现有 R84 SI/DIO AF_UNIX、iAP2 4301 ACK、原厂 AirPlay 及 MFi，不另建协议。
+* 修正原 pipeline 将 START_REQUESTED、AIRPLAY_SESSION、INNER_IAP_AUTH、MEDIA_ACTIVE 全部绑在 media==7、四路 mask==15 的错误顺序。分阶段独立确认 4301 ACK+listener/Bonjour、实际会话、真实内层 MFi；内层认证完成后才允许实际 BT close，后续无需等音频/MMI/方向盘。未伪造任何认证。
+* 新增独立 first-video observation，仍使用同会话原厂 op11 video bit 和 SI video 证据，既有全功能 MEDIA_ACTIVE 判据不变。暂保留现有原厂媒体 flag=7 的协议约定，不猜测 0/4/5 的物理含义；不代表实际 LCD 已显示。
+* 现有 cp_cloud_confirm_bootstrap_auth 已按真实绑定 AP channel 选择首连频段（channel 1..14 为2.4GHz），无需重复修改双频逻辑。实际 AP/owner 启动尚未绑定。
+* 修改现有真实 Unix socket host fixture 的正常主链：4301 ACK→内层认证→BT close→仅 video→完整媒体。其 OEM/手机证据均为 fixture；QNX ARM 编译并不证明车辆连接。
+未新增通用安全模块；真实蓝牙启动和授权、原厂 MFi signer/daemon 绑定、Wi-Fi association、原厂 SI/DIO AirPlay 与 video 回调尚未实际运行；不可安装，固定10步未验收。首连四线并行，以这些真实接点为优先。

@@ -585,30 +585,53 @@ static void remote_revoke_snapshot(struct cp_cloud_pipeline *p){
  p->remote_snapshot_fresh=0;p->remote_channels=0;
  p->remote_media=p->remote_inner=-1;
 }
+/* First connection milestones: Bluetooth bootstraps the authenticated
+ * Wi-Fi session; do not require audio, steering or video to confirm the
+ * preceding protocol stages. Preserve all independent OEM witnesses. */
+static int remote_start_proof(struct cp_cloud_pipeline *p){
+ return remote_owner_valid(p)&&p->remote_start_confirmed&&
+    (remote_bt_released(p)||
+     (p->bootstrap->wireless.start_sent&&!p->bootstrap->wireless_pending&&
+      !p->bootstrap->link.outbound_pending&&
+      p->bootstrap->wireless.session&&
+      p->bootstrap->wireless.session->airplay_port==CP_CLOUD_PORT&&
+      p->owner.carplay_request_sent&&
+      p->owner.carplay_request_sent(p->owner.ctx,p->epoch)==1))&&
+    p->owner.bonjour_identity_verified&&
+    p->owner.bonjour_identity_verified(p->owner.ctx,p->epoch,p->iface)==1&&
+    p->owner.airplay_listener_verified&&
+    p->owner.airplay_listener_verified(p->owner.ctx,p->epoch,p->iface,CP_CLOUD_PORT)==1;
+}
+static int remote_session_proof(struct cp_cloud_pipeline *p){
+ return remote_start_proof(p)&&p->owner.airplay_session_connected&&
+    p->owner.airplay_session_connected(p->owner.ctx,p->epoch,p->iface,CP_CLOUD_PORT)==1;
+}
+static int remote_inner_proof(struct cp_cloud_pipeline *p){
+ return remote_session_proof(p)&&p->remote_inner==1&&
+    p->owner.inner_iap2_mfi_verified&&
+    p->owner.inner_iap2_mfi_verified(p->owner.ctx,p->epoch)==1;
+}
 static int remote_steady_proof(struct cp_cloud_pipeline *p){
- if(!remote_owner_valid(p)||!p->remote_start_confirmed||
-    p->remote_media!=7||p->remote_inner!=1||p->remote_channels!=15||
-    (!remote_bt_released(p)&&
-     (!p->bootstrap->wireless.start_sent||p->bootstrap->wireless_pending||
-      p->bootstrap->link.outbound_pending||
-      !p->bootstrap->wireless.session||
-      p->bootstrap->wireless.session->airplay_port!=CP_CLOUD_PORT||
-      !p->owner.carplay_request_sent||
-      p->owner.carplay_request_sent(p->owner.ctx,p->epoch)!=1))||
-    !p->owner.bonjour_identity_verified||
-    p->owner.bonjour_identity_verified(p->owner.ctx,p->epoch,p->iface)!=1||
-    !p->owner.airplay_listener_verified||
-    p->owner.airplay_listener_verified(p->owner.ctx,p->epoch,p->iface,CP_CLOUD_PORT)!=1||
-    !p->owner.airplay_session_connected||
-    p->owner.airplay_session_connected(p->owner.ctx,p->epoch,p->iface,CP_CLOUD_PORT)!=1||
-    !p->owner.inner_iap2_mfi_verified||
-    p->owner.inner_iap2_mfi_verified(p->owner.ctx,p->epoch)!=1)return 0;
+ if(!remote_inner_proof(p)||p->remote_media!=7||p->remote_channels!=15)return 0;
  for(int ch=1;ch<=4;ch++){
   if(!p->owner.media_verified||
      p->owner.media_verified(p->owner.ctx,p->epoch,(enum cp_cloud_media)ch)!=1)
    return 0;
  }
  return 1;
+}
+/* First-video observation, not full media or an assertion that pixels
+ * appeared on the physical LCD. Keep the existing op11 media=7 contract
+ * until the original meanings of 0/4/5 are known. */
+int cp_cloud_remote_video_at(const struct cp_cloud_pipeline *s,uint64_t now){
+ struct cp_cloud_pipeline *p=(struct cp_cloud_pipeline *)s;
+ if(!p||p->remote_phase!=2||!p->remote_snapshot_fresh||
+    !p->remote_bootstrap_committed||
+    (p->handoff.phase!=CP_HO_INNER_IAP_AUTH&&p->handoff.phase!=CP_HO_MEDIA_ACTIVE)||
+    now<p->remote_sample_ms||now-p->remote_sample_ms>500||
+    !remote_inner_proof(p)||p->remote_media!=7||!(p->remote_channels&1u)||
+    !p->owner.media_verified)return 0;
+ return p->owner.media_verified(p->owner.ctx,p->epoch,CP_CLOUD_VIDEO)==1;
 }
 /* A session sampled before its last transaction, before iPhone 4301 ACK,
  * or more than 500ms ago must not report media active. */
@@ -698,25 +721,27 @@ int cp_cloud_drive_remote_dio(struct cp_cloud_pipeline *p,uint64_t now){
  p->remote_channels=p->remote_client.observed_channels;
  mu_cprx_client_close(&p->remote_client);
  p->remote_sample_ms=now;p->remote_snapshot_fresh=1;
- if(!remote_steady_proof(p))return CP_CLOUD_RETRY;
- /* An actual 4301 ACK + remote DIO session + live OEM callbacks justify
-  * only the CURRENT sampled state-machine transition. */
+ if(!remote_start_proof(p))return CP_CLOUD_RETRY;
  if(p->handoff.phase==CP_HO_WIFI_ASSOCIATED&&
     cp_ho_signal(&p->handoff,p->epoch,CP_HO_EV_CARPLAY_START_SENT,1)!=CP_HO_OK)
   return CP_CLOUD_PROOF;
+ if(!remote_session_proof(p))return CP_CLOUD_RETRY;
  if(p->handoff.phase==CP_HO_START_REQUESTED&&
     cp_ho_signal(&p->handoff,p->epoch,CP_HO_EV_AIRPLAY_SESSION_CREATED,1)!=CP_HO_OK)
   return CP_CLOUD_PROOF;
+ if(!remote_inner_proof(p))return CP_CLOUD_RETRY;
  if(p->handoff.phase==CP_HO_AIRPLAY_SESSION&&
     cp_ho_signal(&p->handoff,p->epoch,CP_HO_EV_IN_SESSION_IAP2_AUTHENTICATED,1)!=CP_HO_OK)
   return CP_CLOUD_PROOF;
+ /* Real inner MFi, not all four media channels, ends Bluetooth bootstrap.
+  * Only an explicit native BT close event retires the physical link. */
+ if(p->handoff.phase==CP_HO_INNER_IAP_AUTH||p->handoff.phase==CP_HO_MEDIA_ACTIVE)
+  p->remote_bootstrap_committed=1;
+ if(!remote_steady_proof(p))return CP_CLOUD_RETRY;
  if(p->handoff.phase==CP_HO_INNER_IAP_AUTH&&
     cp_ho_signal(&p->handoff,p->epoch,CP_HO_EV_MEDIA_CONFIRMED,1)!=CP_HO_OK)
   return CP_CLOUD_PROOF;
- if(p->handoff.phase==CP_HO_MEDIA_ACTIVE){
-  p->remote_bootstrap_committed=1;return CP_CLOUD_OK;
- }
- return CP_CLOUD_RETRY;
+ return p->handoff.phase==CP_HO_MEDIA_ACTIVE?CP_CLOUD_OK:CP_CLOUD_RETRY;
 }
 int cp_cloud_remote_graceful_end(struct cp_cloud_pipeline *p,uint64_t now){
  int r;

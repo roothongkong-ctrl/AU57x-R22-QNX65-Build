@@ -1293,10 +1293,44 @@ static void native_remote_owner_cloud_pipeline(void){
  ack[6]=(uint8_t)seq;ack[7]=(uint8_t)(seq>>8);ack[8]=sum8(ack,8);
  assert(cp_lk_feed_bytes(&b.link,ack,sizeof ack,360)==CP_LK_OK);
  assert(!b.wireless_pending&&!b.link.outbound_pending);
+ /* First-connect normal path: inner MFi completes before media. The
+  * remote bootstrap can retire Bluetooth without waiting for audio/HMI. */
+ int handoff_ready=0;
+ for(unsigned i=0;i<100&&!handoff_ready;i++){
+  uint64_t now=361+i;
+  int r=cp_cloud_drive_remote_dio(&p,now);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
+  assert(mu_cprx_tick(&rx,now)==0);
+  r=cp_cloud_drive_remote_dio(&p,now);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
+  handoff_ready=p.remote_bootstrap_committed;
+ }
+ assert(handoff_ready&&p.handoff.phase==CP_HO_INNER_IAP_AUTH);
+ assert(!cp_cloud_remote_video_at(&p,p.remote_sample_ms));
+ assert(cp_cloud_bt_closed(&p,4)==CP_CLOUD_PROOF);
+ bt=0;inner=0;
+ assert(cp_cloud_bt_closed(&p,4)==CP_CLOUD_PROOF);
+ inner=1;
+ assert(cp_cloud_bt_closed(&p,4)==CP_CLOUD_OK&&!p.handoff.bt_connected);
  native_media_flag=7;
+ for(int ch=2;ch<=4;ch++)native_channel[ch]=media[ch]=0;
+ int video=0;uint64_t video_at=0;
+ for(unsigned i=0;i<100&&!video;i++){
+  uint64_t now=470+i;
+  int r=cp_cloud_drive_remote_dio(&p,now);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
+  assert(mu_cprx_tick(&rx,now)==0);
+  r=cp_cloud_drive_remote_dio(&p,now);
+  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
+  video=cp_cloud_remote_video_at(&p,now);if(video)video_at=now;
+ }
+ assert(video&&!cp_cloud_remote_live_at(&p,video_at));
+ assert(p.handoff.phase==CP_HO_INNER_IAP_AUTH&&p.remote_channels==1);
+ for(int ch=2;ch<=4;ch++)native_channel[ch]=media[ch]=1;
+ puts("PASS first-connect remote AirPlay: inner auth, BT release, video before optional channels");
  int got=0;uint64_t when=0;
  for(unsigned i=0;i<140&&!got;i++){
-  uint64_t now=370+i;
+  uint64_t now=580+i;
   int r=cp_cloud_drive_remote_dio(&p,now);
   assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF||r==CP_CLOUD_OK);
   if(r==CP_CLOUD_OK){got=1;when=now;break;}
@@ -1309,15 +1343,8 @@ static void native_remote_owner_cloud_pipeline(void){
  assert(got&&p.handoff.phase==CP_HO_MEDIA_ACTIVE);
  assert(p.remote_bootstrap_committed);
  assert(cp_cloud_remote_live_at(&p,when));
- /* The first BT bootstrap must retire only after independently verified
-  * inner MFi and actual disconnection; the original session stays live. */
- assert(cp_cloud_bt_closed(&p,4)==CP_CLOUD_PROOF);
- bt=0;
- assert(!cp_cloud_remote_live_at(&p,when));
- inner=0;
- assert(cp_cloud_bt_closed(&p,4)==CP_CLOUD_PROOF);
- inner=1;
- assert(cp_cloud_bt_closed(&p,4)==CP_CLOUD_OK&&!p.handoff.bt_connected);
+ /* Already retired during inner auth: original media remains live. */
+ assert(!p.handoff.bt_connected&&cp_cloud_remote_video_at(&p,when));
  assert(cp_cloud_remote_live_at(&p,when));
  inner=0;assert(!cp_cloud_remote_live_at(&p,when));inner=1;
  assert(!cp_cloud_remote_live_at(&p,when+501)); /* stale status */
@@ -1335,7 +1362,7 @@ static void native_remote_owner_cloud_pipeline(void){
  native_media_flag=0;
  int idle=0;uint64_t idle_when=0;
  for(unsigned i=0;i<130&&!idle;i++){
-  uint64_t now=600+i;
+  uint64_t now=730+i;
   int r=cp_cloud_drive_remote_dio(&p,now);
   assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF||r==CP_CLOUD_OK);
   idle=p.remote_snapshot_fresh&&p.remote_media==0;

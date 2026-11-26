@@ -113,6 +113,10 @@ int cp_cloud_drive_remote_dio(struct cp_cloud_pipeline *,uint64_t now_ms);
 /* Caller supplies a monotonic time; this is a time-bounded observation,
  * not permanently granted streaming media. */
 int cp_cloud_remote_live_at(const struct cp_cloud_pipeline *,uint64_t now_ms);
+/* First-video observation independent of optional audio/control channels.
+ * Still requires the actual same-session OEM video and inner MFi witnesses.
+ * Not an assertion of LCD output or full CarPlay feature completion. */
+int cp_cloud_remote_video_at(const struct cp_cloud_pipeline *,uint64_t now_ms);
 /* Normal idle STOP only; preserves R79 streaming BUSY semantics and waits
  * for DIO's actual original restore ACK. For wired takeover, the owner first
  * calls cp_cloud_wired_preempt(), then repeatedly calls drive_remote_dio()
