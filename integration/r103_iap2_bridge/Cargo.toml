@@ -5,3 +5,7 @@ edition.workspace = true
 publish = false
 [dependencies]
 iap2-link = { path = "../../third_party/luka-dev/mib2q-carplay-rgi/wireless/daemon/vendor/iap2-link" }
+
+[[bin]]
+name = "au57x-r103-qnx-smoke"
+path = "src/bin/qnx_smoke.rs"
