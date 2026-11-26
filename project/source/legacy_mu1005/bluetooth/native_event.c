@@ -61,3 +61,29 @@ int mu38_registry_association(uint32_t ch,uint32_t association,
   a.member==b.member&&(a.flags&1u)==(b.flags&1u)&&
   a.association==association&&b.association==association;
 }
+
+/* Original BtLinkKeys singleton is inline storage at 0x2c3164;
+ * guard at 0x2c3d54, 40 x 76-byte records, count at +0.
+ * Address kind 0x20 and record kind 0 are passed by stock BR/EDR
+ * security lookup at 0x1dc230. Read metadata only. */
+static int bond_scan(const uint8_t mac[6],int (*r)(void*,uint32_t,void*,size_t),
+ void *ctx,uint8_t records[40][8],unsigned *count){
+ uint8_t guard[4],n[2],after[2];
+ if(r(ctx,0x2c3d54u,guard,4)!=1||!(le32(guard)&1u)||
+    r(ctx,0x2c3164u,n,2)!=1)return 0;
+ *count=le16(n);
+ if(!*count||*count>40u)return 0;
+ unsigned hits=0;
+ for(unsigned i=0;i<*count;i++){
+  if(r(ctx,0x2c3168u+76u*i,records[i],8)!=1)return 0;
+  if(!memcmp(records[i],mac,6)&&records[i][6]==0x20&&records[i][7]==0)hits++;
+ }
+ return hits==1u&&r(ctx,0x2c3164u,after,2)==1&&!memcmp(n,after,2)&&
+  r(ctx,0x2c3d54u,guard,4)==1&&(le32(guard)&1u);
+}
+int mu38_stock_bond_present(const uint8_t mac[6],int (*r)(void*,uint32_t,void*,size_t),void *ctx){
+ uint8_t a[40][8],b[40][8];unsigned na=0,nb=0;
+ if(!mac||!mac_ok(mac)||!r)return 0;
+ return bond_scan(mac,r,ctx,a,&na)&&bond_scan(mac,r,ctx,b,&nb)&&
+  na==nb&&!memcmp(a,b,na*8u);
+}

@@ -26,7 +26,13 @@ static int assoc(void *p,const void *ch,uint32_t a,unsigned code){
  return mu38_registry_association((uint32_t)(uintptr_t)ch,a,r->owner.read_live,r->owner.opaque);
 }
 static int rd(void*p,uint32_t a,void*out,size_t n){Resident*r=p;return cert(r)&&r->owner.read_live(r->owner.opaque,a,out,n)==1;}
-static int auth(void*p,uint32_t a,const uint8_t mac[6]){Resident*r=p;return cert(r)&&r->owner.paired_authorized(r->owner.opaque,a,mac)==1;}
+static int auth(void*p,uint32_t a,const uint8_t mac[6]){
+ Resident*r=p;
+ /* Original persistent pairing record is additional evidence only.
+  * Retain external current association/service authorization and owner. */
+ return cert(r)&&mu38_stock_bond_present(mac,r->owner.read_live,r->owner.opaque)&&
+  r->owner.paired_authorized(r->owner.opaque,a,mac)==1&&cert(r);
+}
 /* MU1005 arg3 is initial RX credit budget; allocated SCN is *slot. */
 static int register_verified(void *channel,uint8_t *slot,uint16_t ignored){
  Resident *r=&res;

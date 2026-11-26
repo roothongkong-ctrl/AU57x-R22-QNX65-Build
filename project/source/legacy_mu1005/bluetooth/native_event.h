@@ -26,4 +26,10 @@ int mu38_dispatch(InboundR5 *,const Mu38PeerOps *,void *channel,const void *even
  * No arbitrary process access, no native function call. */
 int mu38_registry_association(uint32_t channel,uint32_t association,
  int (*read_live)(void *,uint32_t,void *,size_t),void *);
+/* Read only eight identity bytes per original BtLinkKeys record.
+ * Caller must establish exact original image and serialization/lifetime
+ * independently. Record presence is NOT current link authentication,
+ * service authorization, or MFi. No link key bytes are read. */
+int mu38_stock_bond_present(const uint8_t mac[6],
+ int (*read_live)(void *,uint32_t,void *,size_t),void *);
 #endif

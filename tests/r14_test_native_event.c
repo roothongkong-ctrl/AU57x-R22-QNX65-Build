@@ -61,8 +61,33 @@ static void registry_test(void){
  f.change=1;assert(!mu38_registry_association(f.channel,f.association,reg_read,&f));
  puts("PASS MU1005 native channel registry membership and association without SDK re-lock (fixture)");
 }
+typedef struct {uint8_t data[3][8];unsigned count,reads;int initialized,change,deny;} BondFixture;
+static int bond_read(void *p,uint32_t a,void *out,size_t n){
+ BondFixture *f=p;
+ if(f->deny)return 0;
+ if(a==0x2c3d54u&&n==4){uint8_t guard[4]={(uint8_t)f->initialized,0,0,0};memcpy(out,guard,4);return 1;}
+ if(a==0x2c3164u&&n==2){uint8_t count[2]={(uint8_t)f->count,0};memcpy(out,count,2);return 1;}
+ if(n!=8||a<0x2c3168u||(a-0x2c3168u)%76u)return 0;
+ unsigned i=(a-0x2c3168u)/76u;
+ if(i>=3)return 0;
+ memcpy(out,f->data[i],8);
+ if(f->change&&f->reads++>=f->count)((uint8_t*)out)[0]^=1u;
+ return 1;
+}
+static void bond_test(void){
+ uint8_t mac[6]={1,2,3,4,5,6};
+ BondFixture f={{{1,2,3,4,5,6,0x20,0},{2,3,4,5,6,7,0x20,0},{1,2,3,4,5,6,0x20,1}},3,0,1,0,0};
+ assert(mu38_stock_bond_present(mac,bond_read,&f)==1);
+ f.initialized=0;assert(!mu38_stock_bond_present(mac,bond_read,&f));f.initialized=1;
+ f.count=41;assert(!mu38_stock_bond_present(mac,bond_read,&f));f.count=3;
+ f.data[0][6]=0;assert(!mu38_stock_bond_present(mac,bond_read,&f));f.data[0][6]=0x20;
+ f.data[2][7]=0;assert(!mu38_stock_bond_present(mac,bond_read,&f));f.data[2][7]=1;
+ f.change=1;assert(!mu38_stock_bond_present(mac,bond_read,&f));f.change=0;
+ f.deny=1;assert(!mu38_stock_bond_present(mac,bond_read,&f));
+ puts("PASS original BR/EDR bond metadata presence (fixture, no key read or current authentication claim)");
+}
 int main(int argc,char **argv){
- registry_test();
+ registry_test();bond_test();
  trace_mode=argc==3&&!strcmp(argv[1],"native-trace");
  int server=socket(AF_INET,SOCK_STREAM,0),fd=socket(AF_INET,SOCK_STREAM,0);assert(server>=0&&fd>=0);int reuse=1;assert(!setsockopt(server,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof reuse));struct sockaddr_in a={0};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);a.sin_port=htons(57342);assert(!bind(server,(struct sockaddr*)&a,sizeof a)&&!listen(server,1));assert(!connect(fd,(struct sockaddr*)&a,sizeof a));int remote=accept(server,NULL,NULL);assert(remote>=0);
  InboundOps ops={0};ops.reg=reg;ops.unreg=unreg;ops.add=rec;ops.remove=rec;ops.accept=accept_rf;ops.limit=limit;ops.send=send_rf;ops.disconnect=disconnect_rf;ops.credit=credit;ops.addr=addr;ops.certify=yes;ops.ready=yes;ops.opaque=&peerops;
