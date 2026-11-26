@@ -18,7 +18,7 @@ def body(name):
     return SRC[start:i-1]
 
 def code_only(s):
-    return re.sub(r"/\\*.*?\\*/|//[^\\n]*", "", s, flags=re.S)
+    return re.sub(r"/\*.*?\*/|//[^\n]*", "", s, flags=re.S)
 
 def test_legacy_native_bind_is_fail_closed():
     b=code_only(body("au98_bind_stock_native"))
