@@ -6,7 +6,7 @@ mkdir -p "$TMP"
 INC="-I$ROOT/src/bluetooth -I$ROOT/project/source/legacy_mu1005/bluetooth -I$ROOT/x3/src"
 cc -std=c11 -Wall -Wextra -Werror -pedantic -O2 -DAU57X_R98_HOST_TEST=1 $INC \
   "$ROOT/x3/src/mu1005_owner_gate.c" \
-  "$ROOT/src/bluetooth/bt_route_gate.c" \
+  "$ROOT/project/source/legacy_mu1005/bluetooth/bt_route_gate.c" \
   "$ROOT/project/source/legacy_mu1005/bluetooth/rf_arg_experiment.c" \
   "$ROOT/project/source/legacy_mu1005/bluetooth/bt_iap2_owner_handoff.c" \
   "$ROOT/tests/test_r98_iap2_owner_handoff.c" -o "$TMP/test_r98_gate"
