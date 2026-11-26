@@ -50,7 +50,7 @@ static int actual_wireless_proof(void *opaque,uint32_t epoch,uint32_t generation
  out->wired_active=0;
  /* A live AP in a different band must not cause 5703/4301 to
   * advertise the stale channel in the previously bound configuration. */
- out->live_hotspot=(p->bootstrap->wireless.session&&
+ out->live_hotspot=(!p->radio_failure_pending&&p->bootstrap->wireless.session&&
      cp_radio_channel_band(p->bootstrap->wireless.session->wifi.channel)==p->band&&
      p->radio.epoch==epoch&&p->band!=CP_RADIO_NONE&&
      p->radio.selected==p->band&&
@@ -394,7 +394,7 @@ int cp_cloud_radio_start(struct cp_cloud_pipeline *s){
   return CP_CLOUD_ORDER;
  if(s->owner.ap_prepare(s->owner.ctx,s->epoch,band)!=1)return stop(s);
  if(cp_radio_connect_requested(&s->radio,s->epoch,1)!=CP_RADIO_OK)return stop(s);
- s->band=band;
+ s->band=band;s->radio_failure_pending=0;
  return CP_CLOUD_OK;
 }
 /* Called only by original owner with current AP config after band switch.
@@ -427,13 +427,26 @@ int cp_cloud_refresh_ap_config(struct cp_cloud_pipeline *s,const struct cp_sessi
  b->wireless.session=cfg;
  return CP_CLOUD_OK;
 }
+int cp_cloud_radio_report_failure(struct cp_cloud_pipeline*s,uint32_t epoch,
+ uint32_t generation,enum cp_radio_band band){
+ if(!s||!s->started||s->stopped)return CP_CLOUD_BAD;
+ if(epoch!=s->epoch||generation!=s->bt_generation||band!=s->band)
+  return CP_CLOUD_STALE;
+ if(!eligible(s,1))return stop(s);
+ if(s->handoff.phase!=CP_HO_BOOTSTRAP_AUTH||
+    s->radio.phase!=CP_RADIO_CONNECTING||s->radio.selected!=band)
+  return CP_CLOUD_ORDER;
+ s->radio_failure_pending=1;
+ return CP_CLOUD_OK;
+}
 int cp_cloud_radio_result(struct cp_cloud_pipeline *s,int success,int disconnected){
  int r;
  if(!eligible(s,1))return stop(s);
  if(s->handoff.phase!=CP_HO_BOOTSTRAP_AUTH||
     s->radio.phase!=CP_RADIO_CONNECTING)return CP_CLOUD_ORDER;
- if(success!=0&&success!=1)return CP_CLOUD_BAD;
+ if((success!=0&&success!=1)||(disconnected!=0&&disconnected!=1))return CP_CLOUD_BAD;
  if(success){
+  if(s->radio_failure_pending)return CP_CLOUD_PROOF;
   if(disconnected!=0||s->owner.ap_association(s->owner.ctx,s->epoch,s->band)!=1)
     return CP_CLOUD_PROOF;
   /* The canonical bootstrap must publish a current AP snapshot before
@@ -457,7 +470,7 @@ int cp_cloud_radio_result(struct cp_cloud_pipeline *s,int success,int disconnect
  if(!disconnected||s->owner.ap_disconnected(s->owner.ctx,s->epoch,s->band)!=1)
   return CP_CLOUD_RETRY; /* do not retry until actual disconnect */
  r=cp_radio_association_result(&s->radio,s->epoch,1,0,s->band,1);
- if(r==CP_RADIO_PENDING)return CP_CLOUD_RETRY;
+ if(r==CP_RADIO_PENDING){s->radio_failure_pending=0;return CP_CLOUD_RETRY;}
  return stop(s);
 }
 int cp_cloud_prepare_receiver(struct cp_cloud_pipeline *s,const void *iface_cf){
@@ -764,6 +777,9 @@ int cp_cloud_drive_first_connect(struct cp_cloud_pipeline *p,const MuCprxRemoteE
  if(!eligible(p,1))return stop(p);
  if(!p->bootstrap->wireless_bound||p->bootstrap->wireless_ctx!=p||
     p->bootstrap->wireless_proof!=actual_wireless_proof)return CP_CLOUD_ORDER;
+ /* An explicit OEM failure is different from a phone still associating.
+  * Do not send stale AP credentials while awaiting physical teardown.
+  * Keep iAP2 alive via the existing tick; proof now blocks Wi-Fi messages. */
  /* The radio is not yet associated: do NOT wait for DIO to pump 5702/5703.
   * The existing iAP2 owner must continue receiving and transmitting. */
  r=cp_s4_tick(p->bootstrap,now);
@@ -779,6 +795,7 @@ int cp_cloud_drive_first_connect(struct cp_cloud_pipeline *p,const MuCprxRemoteE
    return r==CP_CLOUD_OK?CP_CLOUD_RETRY:r;
   }
   if(p->radio.phase!=CP_RADIO_CONNECTING)return CP_CLOUD_ORDER;
+  if(p->radio_failure_pending)return cp_cloud_radio_result(p,0,1);
   if(p->owner.ap_association(p->owner.ctx,p->epoch,p->band)!=1)
    return CP_CLOUD_RETRY;
   r=cp_cloud_radio_result(p,1,0);

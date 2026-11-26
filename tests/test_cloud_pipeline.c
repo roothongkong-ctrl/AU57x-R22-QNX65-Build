@@ -264,10 +264,18 @@ static void radio_to_airplay_direction(enum cp_radio_band first){
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
  assert(proof.verified_mfi&&proof.live_hotspot&&!proof.network_airplay_ready);
  /* First attempt failed; verify actual disconnect before switching bands. */
+ assert(cp_cloud_radio_report_failure(&p,9,4,first)==CP_CLOUD_STALE);
+ assert(cp_cloud_radio_report_failure(&p,8,3,first)==CP_CLOUD_STALE);
+ assert(cp_cloud_radio_report_failure(&p,8,4,next)==CP_CLOUD_STALE);
+ assert(cp_cloud_radio_report_failure(&p,8,4,first)==CP_CLOUD_OK);
+ assert(p.radio_failure_pending);
+ assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1&&!proof.live_hotspot);
+ assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_PROOF);
+ assert(cp_cloud_radio_result(&p,0,-1)==CP_CLOUD_BAD);
  assert(cp_cloud_radio_result(&p,0,0)==CP_CLOUD_RETRY);
  assert(cp_cloud_radio_start(&p)==CP_CLOUD_ORDER);
  assert(cp_cloud_radio_result(&p,0,1)==CP_CLOUD_RETRY);
- assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK&&p.band==next);
+ assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK&&p.band==next&&!p.radio_failure_pending);
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1&&!proof.live_hotspot);
  assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_PROOF);
  assert(p.radio.phase==CP_RADIO_CONNECTING&&p.handoff.phase==CP_HO_BOOTSTRAP_AUTH);

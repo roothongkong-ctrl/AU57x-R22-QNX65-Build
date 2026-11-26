@@ -79,6 +79,7 @@ struct cp_cloud_pipeline {
  struct cp_cloud_owner owner;
  uint32_t epoch,bt_generation;
  enum cp_radio_band band;
+ int radio_failure_pending; /* explicit current attempt failure; await physical teardown */
  char iface[CP_CLOUD_IFACE_MAX+1];
  int started,stopped;
 };
@@ -153,6 +154,11 @@ int cp_cloud_radio_start(struct cp_cloud_pipeline *);
  * change, before association/start. No credential generation or radio I/O. */
 int cp_cloud_refresh_ap_config(struct cp_cloud_pipeline *,const struct cp_session *,
  int (*verify)(void *,uint32_t,enum cp_radio_band,const struct cp_session *),void *);
+/* OEM owner reports a terminal failure for the current physical attempt.
+ * Absence of association alone is NOT failure. The normal first-connect
+ * loop will wait for independent teardown, then select the other band. */
+int cp_cloud_radio_report_failure(struct cp_cloud_pipeline *,uint32_t epoch,
+ uint32_t bt_generation,enum cp_radio_band);
 int cp_cloud_radio_result(struct cp_cloud_pipeline *,int association_succeeded,
                           int physical_disconnect_verified);
 /* Drive the ACTUAL already-bound OEM AirPlay server on the original owner
