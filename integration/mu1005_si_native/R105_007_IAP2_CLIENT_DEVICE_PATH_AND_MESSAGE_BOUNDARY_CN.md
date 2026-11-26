@@ -53,7 +53,7 @@ libiap2client.so.1 : iap2_connect (0x2cec)
             |
             | QNX MsgSend-family IPC (client/server request protocol)
             v
-QNX Resource Manager device endpoint (likely hosted by mm-ipod + ipod-drvr-iap2.so)
+QNX Resource Manager device endpoint (driver module hosted by mm-ipod; runtime PID/path not verified)
             |
             v
 ipod-drvr-iap2.so iAP2 state / transport component dispatch
@@ -93,3 +93,4 @@ ipod-drvr-iap2.so iAP2 state / transport component dispatch
 **结论：client 设备路径与 API 分层更清楚了；真正缺的不是再造一个 bridge，而是把 QNX client IPC request 和 driver Resource Manager handler 的 ABI 对上。**
 
 installable=false / safe_to_flash=false / vehicle_verified=false。
+\n\n## R105.008 架构分层复核\n\n后续交叉核对已明确区分：mm-ipod 外层物理 Transport 插件、ipod-drvr-iap2.so 内部 iAP2 TransportComponent、btstack 的 RFCOMM producer/owner 三个层级。driver 内部出现 BluetoothTransportComponent 不等于存在可直接选择的外层 bluetooth 插件。当前研发策略为复用 R103 的 iAP2 LinkEngine、沿用 R98/R45 原厂接入层，保留原厂 usbdevice 和有线功能。详见 [R105.008 路线分层复核](R105_008_ROUTE_LAYER_RECONCILIATION_CN.md)。\n
