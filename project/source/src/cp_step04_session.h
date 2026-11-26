@@ -18,6 +18,10 @@ struct cp_step04_session {
  struct cp_step04_link link;
  struct cp_step04_auth auth;
  struct cp_stock_mfi *stock;
+ /* Borrow existing OEM library until first real CONTROL packet; its
+  * verified owner determines permission for the actual RF generation. */
+ void *pending_stock_library;
+ struct cp_stock_owner pending_stock_owner;
  struct cp_s4_external ext;
  struct cp_lk_owner link_owner;
  struct cp_auth_owner auth_owner;
@@ -35,6 +39,10 @@ struct cp_step04_session {
 };
 int cp_s4_init(struct cp_step04_session *,struct cp_stock_mfi *,
                uint32_t epoch,const struct cp_s4_external *);
+/* Prepare before RF CONNECT, bind original MFi at first CONTROL packet
+ * using the actual negotiated generation. Caller keeps original library
+ * mapped and storage valid. No new dlopen or auth bypass. */
+int cp_s4_prepare_stock_mfi(struct cp_step04_session *,void *,const struct cp_stock_owner *);
 int cp_s4_accept_rf(struct cp_step04_session *,const AuRfWire *,uint64_t now);
 int cp_s4_flush_rf(struct cp_step04_session *,AuRfIngress *);
 int cp_s4_tick(struct cp_step04_session *,uint64_t now);

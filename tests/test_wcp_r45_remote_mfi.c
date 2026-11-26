@@ -134,8 +134,9 @@ int main(void){
  {
   const struct cp_stock_owner owner={&o,o_owner,o_stock_alive,o_owner,o_wired,o_free};
   const struct cp_s4_external ext={&o,o_owner,o_owner,o_wired,o_peer_auth,o_other};
-  assert(cp_stock_mfi_bind(&stock,lib,&owner,o.epoch,o.gen)==CP_STOCK_OK);
   assert(cp_s4_init(&s,&stock,o.epoch,&ext)==CP_LK_OK);
+  assert(cp_s4_prepare_stock_mfi(&s,lib,&owner)==CP_LK_OK);
+  assert(!stock.bound&&!cert_calls&&!sig_calls);
  }
  assert(cp_s4_tcp_init(&t,&s,allow,&o)==CP_LK_OK);
  make_pair(&listener,&client,&server);o.fd=server;
@@ -185,7 +186,9 @@ int main(void){
  r90_control_msg(msg,0xaa00,NULL,0);
  iap_len=r90_packet(iap_frame,0x40,43,99,10,msg,6);
  r90_send_data(client,&w,iap_frame,iap_len,113);
- assert(cert_calls==1&&s.auth.stage==CP_AUTH_CERT_PENDING);
+ assert(stock.bound&&stock.bt_generation==t.generation&&stock.epoch==t.epoch);
+ assert(!s.pending_stock_library&&cert_calls==1&&s.auth.stage==CP_AUTH_CERT_PENDING);
+ puts("PASS deferred OEM MFi binding on negotiated RFCOMM generation (fixture)");
  assert(!cp_s4_authenticated(&s));
  iap_len=r90_packet(iap_frame,0x40,43,100,0,NULL,0);
  r90_send_data(client,&w,iap_frame,iap_len,115);

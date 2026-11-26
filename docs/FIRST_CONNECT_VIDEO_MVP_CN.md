@@ -15,3 +15,6 @@ R105.047 unified run 45907707475 九个 jobs 全部 success（authentication 140
 
 ## R105.049 正常连接 owner 循环合并
 在现有 cp_cloud_pipeline.c 增加首连入口 cp_cloud_drive_first_connect，串联 cp_s4_tick、真实认证确认、已验证热点的 band 选择/准备、真实手机 association、原 DIO endpoint bind、同一 CPRX START/status、首视频判定。此前调用方必须在 association 前自行保持 5702/5703 pump，且逐项驱动多个状态；现在连接中也持续处理原 iAP2，等待真实 AP 状态，不自动制造 association、不重复启动 DIO。保留原有完整媒体模式、MFi、原厂有线优先与所有权，实际 RF bytes 仍须由真实传输生产者处理；不新增线程、不启动硬件。已有 R84 fixture 改用同一入口驱动 2.4GHz 等待关联→DIO START→首视频，确认无音频/控制也能报告 first-video；实际 OEM/手机仍是 fixture。R105.048/049 云端结果待查，NO INSTALL。真实启动调用者与车载原厂接口仍缺，不计固定10步完成。
+
+## R105.050 MFi 与真实 RF generation 接入
+R105.048 两条 CI 与 R105.049 两条 CI 均 success。现有 R44 stock MFi 绑定必须提前给出 epoch/generation，真实首连无法依赖调用方在 RF CONNECT 前猜测 generation；本轮在现有 cp_step04_session 增加可选 prepare_stock_mfi，保存借用的已验证原厂库与 owner，在真实 R14 CONNECT→iAP2 SYN/LSP/ACK→首个 CONTROL 数据到达后，使用实际 link.generation 调用既有 cp_stock_mfi_bind / cp_auth_init。必须通过既有原厂库/当前 owner/控制链路/有线空闲及真实 AA00-AA05 认证，未跳过任何必要认证。旧显式绑定仍可用。修改 R90 真实 TCP fixture 走该正常延迟绑定路径，证书和签名是测试桩，非 Apple 真认证；没有生产调用者与真实 RF 绑定，NO INSTALL。最新 CI 待查。

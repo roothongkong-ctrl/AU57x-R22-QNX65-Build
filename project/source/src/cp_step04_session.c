@@ -56,6 +56,14 @@ static int link_control(void *opaque,const uint8_t *frame,size_t n){
  struct cp_step04_session *s=opaque;
  if(!s||s->link.phase!=CP_LK_NORMAL)return -1;
  if(!s->auth_ready){
+  if(s->pending_stock_library){
+   void *lib=s->pending_stock_library;
+   struct cp_stock_owner proof=s->pending_stock_owner;
+   s->pending_stock_library=NULL;
+   memset(&s->pending_stock_owner,0,sizeof s->pending_stock_owner);
+   if(cp_stock_mfi_bind(s->stock,lib,&proof,s->epoch,s->link.generation)!=CP_STOCK_OK)
+    return -1;
+  }
   if(cp_auth_init(&s->auth,s->stock,&s->auth_owner,
                   s->epoch,s->link.generation)!=CP_AUTH_OK)return -1;
   s->auth_ready=1;
@@ -134,6 +142,16 @@ int cp_s4_init(struct cp_step04_session *s,struct cp_stock_mfi *stock,
  s->auth_owner.tx_committed=committed;
  s->auth_owner.peer_auth_succeeded=peer_authenticated;
  cp_lk_init(&s->link);return CP_LK_OK;
+}
+int cp_s4_prepare_stock_mfi(struct cp_step04_session *s,void *lib,const struct cp_stock_owner *o){
+ if(!s||!s->stock||s->stock->bound||!s->epoch||s->auth_ready||
+    s->link.phase!=CP_LK_IDLE||s->pending_stock_library||!lib||!o||
+    !o->owner_verified||!o->stock_image_verified||!o->control_session_live||
+    !o->wired_idle||!o->release_oem||
+    o->stock_image_verified(o->opaque)!=1||o->wired_idle(o->opaque)!=1)
+  return CP_LK_BAD;
+ s->pending_stock_library=lib;s->pending_stock_owner=*o;
+ return CP_LK_OK;
 }
 int cp_s4_accept_rf(struct cp_step04_session *s,const AuRfWire *w,uint64_t now){
  if(!s||!w)return CP_LK_BAD;
@@ -225,6 +243,8 @@ void cp_s4_revoke(struct cp_step04_session *s){
  if(!s)return;
  cp_lk_revoke(&s->link);
  if(s->auth_ready)cp_auth_revoke(&s->auth);
+ s->pending_stock_library=NULL;
+ memset(&s->pending_stock_owner,0,sizeof s->pending_stock_owner);
  s->ack_in_progress=0;s->acked_token=0;
  s->wireless_pending=0;s->wireless_token=0;
  s->wireless_bound=0;s->wifi_request_pending=0;
