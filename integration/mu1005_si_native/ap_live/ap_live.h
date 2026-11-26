@@ -17,4 +17,18 @@ int mu_ap_live_session(struct cp_session*,const struct mu_ap_live*,const struct 
  * Never infer a free slot or write driver state from this result. */
 int mu_ap_device_ie_verify(const char *,unsigned,const uint8_t[6],const uint8_t[6]);
 int mu_ap_live_verify_device_ie(const struct mu_ap_live*,mu_ap_query,void*,unsigned,const uint8_t[6],const uint8_t[6]);
+/* Worker-only, exclusive original AP/slot owner required for every mutation.
+ * Caller must retain lease storage and uncertain capture marker across the
+ * entire radio lifetime; state 2 requires independent recovery, no retry.
+ * No automatic write, no 5GHz assumption, no OEM owner discovery. */
+struct mu_ap_ie_lease { unsigned slot; uint8_t bt[6],id[6],bssid[6]; int state; };
+struct mu_ap_ie_ops {
+ void *ctx;
+ mu_ap_query query;
+ int (*write)(void*,unsigned,const uint8_t[6],const uint8_t[6],int);
+ int (*exclusive)(void*,const uint8_t[6],unsigned);
+};
+int mu_ap_stock_ie_write(void*,unsigned,const uint8_t[6],const uint8_t[6],int);
+int mu_ap_ie_install(struct mu_ap_ie_lease*,const struct mu_ap_ie_ops*,const struct mu_ap_live*,unsigned,const uint8_t[6],const uint8_t[6]);
+int mu_ap_ie_restore(struct mu_ap_ie_lease*,const struct mu_ap_ie_ops*);
 #endif

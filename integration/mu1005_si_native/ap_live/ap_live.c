@@ -89,9 +89,9 @@ static int ie_identity(const uint8_t *a){
  for(unsigned i=0;i<6;i++)any|=a[i];
  return any!=0;
 }
-int mu_ap_device_ie_verify(const char *out,unsigned slot,const uint8_t bt[6],const uint8_t id[6]){
+static int ie_verify(const char *out,unsigned slot,const uint8_t bt[6],const uint8_t id[6],int require_slot){
  uint8_t expected[26]={0xdd,0x18,0,0xa0,0x40,0,0,2,0x80,0x22,6,6,0,0,0,0,0,0,7,6};
- char label[16];const char *p,*e;unsigned found=0;
+ char label[16];const char *p,*e,*match=NULL;unsigned found=0;
  if(!out||slot>3||!ie_identity(bt)||!ie_identity(id))return -1;
  if(!strstr(out,"Querying custom IE successful")||strstr(out,"ERR:"))return -1;
  memcpy(expected+12,bt,6);memcpy(expected+20,id,6);
@@ -101,12 +101,12 @@ int mu_ap_device_ie_verify(const char *out,unsigned slot,const uint8_t bt[6],con
  while(*p){
   e=strchr(p,'\n');size_t n=e?(size_t)(e-p):strlen(p);
   if(n&&p[n-1]=='\r')--n;
-  if(n==9&&!memcmp(p,label,9)){if(found++)return -1;}
+  if(n==9&&!memcmp(p,label,9)){if(found++)return -1;match=p;}
   if(!e)break;
   p=e+1;
  }
- if(!found)return 0;
- p=strstr(out,label);if(!p)return -1;
+ if(!found)return require_slot?-1:0;
+ p=match;
  p=strchr(p,'\n');if(!p)return -1;++p;
  const char *mask="Management Subtype Mask = 0x";size_t ml=strlen(mask);
  if(strncmp(p,mask,ml))return -1;
@@ -122,7 +122,10 @@ int mu_ap_device_ie_verify(const char *out,unsigned slot,const uint8_t bt[6],con
  if(!digits||z>256)return -1;
  if(*p=='\r')++p;
  if(*p++!='\n')return -1;
- if(!z)return 0;
+ if(!z){
+  while(*p==' '||*p=='\t'||*p=='\r'||*p=='\n')++p;
+  return !m&&(!*p||!strncmp(p,"Index [",7))?0:-1;
+ }
  if(z!=sizeof expected||m!=0x12au)return -1;
  for(unsigned i=0;i<z;i++){
   while(*p==' '||*p=='\t'||*p=='\r'||*p=='\n')++p;
@@ -136,9 +139,59 @@ int mu_ap_device_ie_verify(const char *out,unsigned slot,const uint8_t bt[6],con
  if(*p&&strncmp(p,"Index [",7))return -1;
  return 1;
 }
+int mu_ap_device_ie_verify(const char *out,unsigned slot,const uint8_t bt[6],const uint8_t id[6]){
+ return ie_verify(out,slot,bt,id,0);
+}
 int mu_ap_live_verify_device_ie(const struct mu_ap_live *ap,mu_ap_query q,void *ctx,unsigned slot,const uint8_t bt[6],const uint8_t id[6]){
  char buf[4096]={0};int r=-1;
  if(!ap_valid(ap)||ap->channel>14||!q||slot>3)return -1;
  if(!q(ctx,6,buf,sizeof buf)&&memchr(buf,0,sizeof buf))r=mu_ap_device_ie_verify(buf,slot,bt,id);
  mu_ap_live_clear(buf,sizeof buf);return r;
+}
+
+/* Adapt upstream install/remove arguments to the already-used stock capture
+ * helper. No automatic invocation; worker must hold exclusive radio lease. */
+int mu_ap_stock_ie_write(void *ctx,unsigned slot,const uint8_t bt[6],const uint8_t id[6],int enable){
+ int *uncertain=ctx,incomplete=0,n;char buf[4096]={0};
+ char index[2]={(char)('0'+slot),0},value[55]="0x";
+ uint8_t ie[26]={0xdd,0x18,0,0xa0,0x40,0,0,2,0x80,0x22,6,6,0,0,0,0,0,0,7,6};
+ static const char digits[]="0123456789abcdef";
+ if(!uncertain||*uncertain||slot>3||!ie_identity(bt)||!ie_identity(id)||(enable!=0&&enable!=1))return -1;
+ memcpy(ie+12,bt,6);memcpy(ie+20,id,6);
+ for(unsigned i=0;i<sizeof ie;i++){value[2+2*i]=digits[ie[i]>>4];value[3+2*i]=digits[ie[i]&15];}
+ char *argv[]={"/mnt/app/armle/sbin/uaputl","-i","uap0","sys_cfg_custom_ie",index,enable?"0x12a":"0",enable?value:NULL,NULL};
+ n=mhi2q_qnx_capture(argv[0],argv,buf,sizeof buf,&incomplete);
+ if(incomplete||n<=0||(size_t)n>=sizeof buf||memchr(buf,0,(size_t)n)||
+    !strstr(buf,"custom IE setting successful")||strstr(buf,"ERR:")){
+  *uncertain=1;mu_ap_live_clear(buf,sizeof buf);return -1;
+ }
+ mu_ap_live_clear(buf,sizeof buf);return 0;
+}
+static int read_slot(const struct mu_ap_ie_lease *s,const struct mu_ap_ie_ops *o,int strict){
+ char out[4096]={0};int r=-1;
+ if(!o->query(o->ctx,6,out,sizeof out)&&memchr(out,0,sizeof out))
+  r=ie_verify(out,s->slot,s->bt,s->id,strict);
+ mu_ap_live_clear(out,sizeof out);return r;
+}
+int mu_ap_ie_install(struct mu_ap_ie_lease *s,const struct mu_ap_ie_ops *o,
+ const struct mu_ap_live *ap,unsigned slot,const uint8_t bt[6],const uint8_t id[6]){
+ if(!s||s->state||!o||!o->query||!o->write||!o->exclusive||!ap_valid(ap)||ap->channel>14||
+    slot>3||!ie_identity(bt)||!ie_identity(id)||o->exclusive(o->ctx,ap->bssid,slot)!=1)return -1;
+ s->slot=slot;memcpy(s->bt,bt,6);memcpy(s->id,id,6);memcpy(s->bssid,ap->bssid,6);
+ int r=read_slot(s,o,1);
+ /* Never claim or clear pre-existing entries, even if bytes match. */
+ if(r!=0||o->exclusive(o->ctx,s->bssid,slot)!=1){memset(s,0,sizeof *s);return -1;}
+ s->state=2; /* uncertain until the exact readback and owner both confirm */
+ if(o->write(o->ctx,slot,s->bt,s->id,1)!=0||read_slot(s,o,1)!=1||
+    o->exclusive(o->ctx,s->bssid,slot)!=1)return -1;
+ s->state=1;return 0;
+}
+int mu_ap_ie_restore(struct mu_ap_ie_lease *s,const struct mu_ap_ie_ops *o){
+ if(!s||s->state!=1||!o||!o->query||!o->write||!o->exclusive||
+    o->exclusive(o->ctx,s->bssid,s->slot)!=1)return -1;
+ if(read_slot(s,o,1)!=1||o->exclusive(o->ctx,s->bssid,s->slot)!=1){s->state=2;return -1;}
+ s->state=2;
+ if(o->write(o->ctx,s->slot,s->bt,s->id,0)!=0||read_slot(s,o,1)!=0||
+    o->exclusive(o->ctx,s->bssid,s->slot)!=1)return -1;
+ memset(s,0,sizeof *s);return 0;
 }

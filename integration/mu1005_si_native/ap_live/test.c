@@ -13,12 +13,40 @@ static const char ie_ok[]="Querying custom IE successful\nIndex [2]\nManagement 
 static int ie_query(void *ctx,unsigned id,char *out,size_t cap){
  (void)ctx;assert(id==6&&sizeof ie_ok<=cap);memcpy(out,ie_ok,sizeof ie_ok);return 0;
 }
+static const char ie_empty[]="Querying custom IE successful\nIndex [2]\nManagement Subtype Mask = 0x00\nIE Buffer: len=0\n";
+struct ie_fixture {int installed,writes,allowed,fail;};
+static int ie_state_query(void *v,unsigned id,char *out,size_t cap){
+ struct ie_fixture *f=v;const char *p=f->installed?ie_ok:ie_empty;
+ assert(id==6&&strlen(p)<cap);strcpy(out,p);return 0;
+}
+static int ie_write(void *v,unsigned slot,const uint8_t *bt,const uint8_t *id,int enable){
+ struct ie_fixture *f=v;assert(slot==2&&!memcmp(bt,bt_id,6)&&!memcmp(id,device_id,6));
+ f->writes++;if(f->fail)return -1;f->installed=enable;return 0;
+}
+static int exclusive(void *v,const uint8_t *bssid,unsigned slot){
+ struct ie_fixture *f=v;return f->allowed&&slot==2&&bssid[0]==2;
+}
+static void ie_lifecycle(const struct mu_ap_live *ap){
+ struct ie_fixture f={0};struct mu_ap_ie_lease lease={0};
+ struct mu_ap_ie_ops o={&f,ie_state_query,ie_write,exclusive};
+ assert(mu_ap_ie_install(&lease,&o,ap,2,bt_id,device_id)==-1&&!f.writes);
+ f.allowed=1;f.installed=1;
+ assert(mu_ap_ie_install(&lease,&o,ap,2,bt_id,device_id)==-1&&!f.writes);
+ f.installed=0;
+ assert(mu_ap_ie_install(&lease,&o,ap,2,bt_id,device_id)==0&&lease.state==1&&f.writes==1);
+ assert(mu_ap_ie_restore(&lease,&o)==0&&!lease.state&&!f.installed&&f.writes==2);
+ f.fail=1;
+ assert(mu_ap_ie_install(&lease,&o,ap,2,bt_id,device_id)==-1&&lease.state==2);
+ assert(mu_ap_ie_restore(&lease,&o)==-1&&f.writes==3);
+ assert(mu_ap_ie_install(&lease,&o,ap,2,bt_id,device_id)==-1&&f.writes==3);
+}
 int main(void){
  struct mu_ap_live ap;struct cp_session s;
  const char*const ip[]={"10.0.0.1"};
  struct cp_session receiver={.ip_addresses=ip,.ip_address_count=1,.airplay_port=5000,.public_key="fixture",.source_version="fixture"};
  int calls=0;assert(mu_ap_live_read(&ap,q,&calls)==0&&calls==12&&ap.channel==6);
  assert(mu_ap_live_session(&s,&ap,&receiver)==0&&s.wifi.channel==6&&s.wifi.ssid==ap.ssid&&s.wifi.passphrase==ap.key&&s.wifi.bssid6==ap.bssid);
+ ie_lifecycle(&ap);
  assert(mu_ap_live_verify_device_ie(&ap,ie_query,NULL,2,bt_id,device_id)==1);
  assert(mu_ap_device_ie_verify(ie_ok,1,bt_id,device_id)==0);
  assert(mu_ap_device_ie_verify(ie_ok,4,bt_id,device_id)==-1);
