@@ -45,3 +45,8 @@ Reconciles R88–R103 with the newer R142/R143 owner observers, ASI Bluetooth iA
 ### R105.006 — `/dev/ipod0` Resource Manager owner trace
 
 Static evidence narrows the likely provider to `ipod-drvr-iap2.so` dynamically hosted by `mm-ipod`: driver exports `ipod_module` and imports `ipod_resmgr_mount` plus QNX `iofunc_*`/message APIs; OEM loader instructions show mm-ipod injecting module owner and invoking init. DIO is the client using `libiap2client.so.1` with `/dev/ipod0`. Exact mount-path callsite and live vehicle PID remain unverified. Keep `-t usbdevice`; NO INSTALL. [R105.006 report](integration/mu1005_si_native/R105_006_IPOD0_RESOURCE_OWNER_CN.md).
+
+
+### R105.007 — iAP2 client path/message boundary
+
+Clarified that DIO passes a caller-supplied device path to libiap2client; /dev/ipod0 in the factory config is the likely source, but the config parse-to-callsite dataflow is not yet closed. Also separated iap2_connect/client MsgSend IPC from iap2_raw_msg_send and the driver's physical transport callbacks: raw_msg_send is not proven to be an arbitrary RFCOMM injection API. [R105.007 report](integration/mu1005_si_native/R105_007_IAP2_CLIENT_DEVICE_PATH_AND_MESSAGE_BOUNDARY_CN.md). NO INSTALL.
