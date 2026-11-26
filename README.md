@@ -40,3 +40,8 @@ The result `r100_result/R100_ORIGINAL_MU1005_ROUTE_AUDIT.json` contains hashes a
 ## R104 — unified integration roadmap
 
 The single consolidated architecture and remaining-gate plan is now documented in [docs/MASTER_INTEGRATION_ROADMAP_R104_CN.md](docs/MASTER_INTEGRATION_ROADMAP_R104_CN.md). It consolidates R41–R103, assigns each existing module one responsibility, treats R87 as the existing Congo reference adaptation, keeps R103 as the upstream iAP2 link-layer component, and makes the missing MU1005 iAP2 client-owner ABI the next priority. No duplicate R111 implementation line is created. Research only; NO_INSTALL / safe_to_flash=false.
+
+
+## R105.002 — transport-layer boundary audit
+
+Clarifies the separate mm-ipod physical plugin and ipod-drvr-iap2 internal component/link transport layers. See [docs/R105_002_TRANSPORT_LAYER_BOUNDARY_AUDIT_CN.md](docs/R105_002_TRANSPORT_LAYER_BOUNDARY_AUDIT_CN.md). Research only; NO_INSTALL.
