@@ -10,6 +10,9 @@ on:
       - 'ci/host_r103_*.sh'
       - 'project/source/legacy_mu1005/bluetooth/bt_iap2_owner_handoff.*'
       - 'tests/test_r105_owner_nonblocking_gate.py'
+      - 'tests/test_r105_step01_plugin_abi_layout.py'
+      - 'project/source/src/cp_ipod_module_layout.h'
+      - 'docs/STEP05_MU1005_USB_PLUGIN_ABI_AUDIT.json'
   pull_request:
     paths:
       - '.github/workflows/r105-iap2-host-review.yml'
@@ -39,6 +42,10 @@ jobs:
         run: |
           set -euxo pipefail
           python3 tests/test_r105_owner_nonblocking_gate.py
+      - name: Verify Step 01 OEM plugin ABI layout (host structural check only)
+        run: |
+          set -euxo pipefail
+          python3 tests/test_r105_step01_plugin_abi_layout.py
       - name: Record scope boundary
         run: |
           printf '%s\n' 'HOST_ONLY=1' 'QNX_TARGET_RUNTIME=NOT_TESTED' 'OEM_RFCOMM_OWNER=NOT_PROVEN' 'MFI=NOT_TESTED' 'VEHICLE_VERIFIED=0' 'INSTALLABLE=0' | tee r105-host-scope.txt
