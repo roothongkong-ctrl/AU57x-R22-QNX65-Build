@@ -62,7 +62,7 @@
   "libirc_adapter": {
     "name": "libirc_mmx_adapter.so",
     "size_bytes": 296740,
-    "sha256": "3277e0c4ba9b2",
+    "sha256": "3277e0c410ef3be3ea8d752ccd142c706e156e7a621f69ea95e6dd174b2ba9b2",
     "source": "app.img QNX6fs named extraction (70 variant); earlier R25 app.img full-ELF scan conclusion superseded",
     "defines_smartphone_integrator_missing_irc_symbols": true,
     "interpretation": "Required adapter resolves the three SmartphoneIntegration_irc methods and related dumper vtables; its presence does not create an iAP2 raw-data service."
