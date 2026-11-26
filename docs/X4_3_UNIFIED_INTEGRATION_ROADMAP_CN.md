@@ -170,3 +170,9 @@ A full X4.3 native-binding QNX 6.5 ARM32 compile/link script and workflow have b
 
 ## R110 — build-gate corrections
 Static audit corrected both host and QNX build scripts to compile the actual `project/source/legacy_mu1005/bluetooth/bt_route_gate.c` path. It also fixed the native event resolver owner-context comparison (`o->opaque` vs the owner context) and added a focused regression test. The isolated host fixture passed; full branch host CI and combined QNX ARM32 workflow results are still pending. No runtime or vehicle claim is made.
+
+
+## R111 — new upstream working reference and AU57x pivot
+A new reference project, congobg/MHI2Q_WiFi_CarPlay (reference commit 223b42f90bf7c15fbbbef23259da36caa9bd4994), reports wireless CarPlay operating on MHI2Q QC / QNX 6.5 ARMv7 / firmware 5092 and initially 3638. Its design uses stock btstack + a library-call RFCOMM/SDP hook, Bluetooth iAP2 bootstrap with genuine MFi, Wi-Fi handoff to the stock AirPlay receiver, session-side iAP2 tunneled through AirPlay, on-demand dio_manager and explicit USB priority. This is a stronger architecture reference than continuing to treat the current fixed-address native graft as the only path.
+
+Portability is not established: MHI2Q QC/APQ8064/5092 is not the target MHI2_CN_AU57x/K1006_2/MU1005. No binaries, addresses, fingerprints, hook words, HMI jars or install packs may be copied. The new R111 document records the architecture, portability matrix and next target-specific gates. Immediate priority changes from peripheral CI expansion to AU57x btstack/DIO/iAP2 binary and process mapping, then a source-evidence comparison of the LD_PRELOAD library-call hook against the X4.3 native callback graft. Keep both non-installable until the real target owner/MFi/session handoff is proven.
