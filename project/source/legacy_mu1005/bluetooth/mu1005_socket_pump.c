@@ -19,7 +19,21 @@ AuSocketResult au_socket_step(AuIpcStream *stream, int fd, int timeout_ms) {
     size_t ready_length = 0;
     int ready = au_ipc_peek(stream, &ready_bytes, &ready_length);
     if (ready < 0) return lost(stream, AU_SOCKET_IO_ERROR);
-    struct pollfd pfd = { fd, (short)(POLLIN |
+    /* TCP can coalesce arbitrarily many small DATA records. While BlueSDK
+     * owns an asynchronous TX descriptor, stop reading before the bounded
+     * pending queue fills. TCP supplies the backpressure; do not drop a
+     * valid record just because the daemon is faster than RFCOMM.
+     * Minimum normalized record is 8-byte header + 1 payload byte.
+     * An existing partial record consumes one of the remaining slots. */
+    size_t capacity = 0;
+    if (stream->pending_count < AU_RF_QSIZE) {
+        size_t slots = AU_RF_QSIZE - stream->pending_count;
+        size_t total = stream->expected ? stream->expected : 9u;
+        if (stream->used >= total)
+            return lost(stream, AU_SOCKET_IO_ERROR);
+        capacity = total - stream->used + (slots - 1u) * 9u;
+    }
+    struct pollfd pfd = { fd, (short)((capacity ? POLLIN : 0) |
         ((ready > 0 && ready_length) ? POLLOUT : 0)), 0 };
     int pr;
     do { pr = poll(&pfd, 1, timeout_ms); } while (pr < 0 && errno == EINTR);
@@ -32,7 +46,8 @@ AuSocketResult au_socket_step(AuIpcStream *stream, int fd, int timeout_ms) {
     if (pfd.revents & POLLIN) {
         unsigned char buf[2048];
         ssize_t n;
-        do { n = recv(fd, buf, sizeof(buf), 0); } while (n < 0 && errno == EINTR);
+        size_t limit = capacity < sizeof(buf) ? capacity : sizeof(buf);
+        do { n = recv(fd, buf, limit, 0); } while (n < 0 && errno == EINTR);
         if (n == 0) return lost(stream, AU_SOCKET_CLOSED);
         if (n < 0) {
             if (errno != EAGAIN && errno != EWOULDBLOCK)

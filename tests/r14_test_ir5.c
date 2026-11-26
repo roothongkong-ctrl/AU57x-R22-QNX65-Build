@@ -11,7 +11,7 @@
 #define EXTRA_RX (INITIAL_RX ? 0 : 4)
 static InboundR5 b;
 static int sent,credits,decision,peer_allowed=1,disconnect_count;
-static unsigned lengths[8];static uint8_t bytes[32];static unsigned used;
+static unsigned lengths[64];static uint8_t bytes[128];static unsigned used;
 static int yes(void*p){(void)p;return 1;}
 static int retire_barrier(void*p,const Inbound*s){return *(int*)p && s==&b.service;}
 static uint32_t addr(const void*p){return (uint32_t)(0x10000+(const uint8_t*)p-(const uint8_t*)&b);}
@@ -46,6 +46,23 @@ int main(void){
  for(int i=0;i<4;i++){tick();read_full(remote,r,9);assert(r[0]==2&&r[2]==1&&r[8]=='x');assert(credits==EXTRA_RX+2+i);}
  uint8_t wire[]={2,0,5,0,1,0,0,0,'a','b','c','d','e'};assert(send(remote,wire,3,0)==3);tick();assert(!sent);assert(send(remote,wire+3,sizeof wire-3,0)==(ssize_t)(sizeof wire-3));for(int i=0;i<500&&!sent;i++){tick();struct pollfd x={fd,POLLIN,0};(void)poll(&x,1,1);}assert(sent==1&&lengths[0]==2&&b.service.busy);
  assert(event(peer,6,0,NULL,0,addr(&b.service.packet)+4)<0);assert(sent==1);assert(!event(peer,6,0,NULL,0,addr(&b.service.packet)));assert(sent==1);tick();assert(sent==2);assert(!event(peer,6,0,NULL,0,addr(&b.service.packet)));tick();assert(sent==3&&lengths[2]==1);assert(!event(peer,6,0,NULL,0,addr(&b.service.packet)));tick();assert(!b.rf.tx_busy&&!memcmp(bytes,"abcde",5));
+ /* More coalesced records than the pending queue can hold. Stall native
+  * event6, then release each send in order. No queue overflow or drop. */
+ uint8_t burst[12*9];
+ for(unsigned i=0;i<12;i++){uint8_t frame[]={2,0,1,0,1,0,0,0,(uint8_t)('A'+i)};memcpy(burst+9*i,frame,9);}
+ assert(send(remote,burst,sizeof burst,0)==(ssize_t)sizeof burst);
+ for(int i=0;i<500&&sent==3;i++){tick();struct pollfd x={fd,POLLIN,0};(void)poll(&x,1,1);}
+ assert(sent==4&&b.service.busy);
+ for(int i=0;i<8;i++)tick();
+ assert(sent==4&&!b.dead&&b.ipc.pending_count<=AU_RF_QSIZE);
+ for(unsigned i=0;i<12;i++){
+  assert(sent==4+(int)i&&b.service.busy);
+  assert(!event(peer,6,0,NULL,0,addr(&b.service.packet)));
+  tick();
+  if(i<11)for(int k=0;k<500&&sent==4+(int)i;k++){tick();struct pollfd x={fd,POLLIN,0};(void)poll(&x,1,1);}
+ }
+ assert(!b.rf.tx_busy&&!b.dead&&sent==15&&used==17&&!memcmp(bytes+5,"ABCDEFGHIJKL",12));
+ puts("PASS TCP burst > RF queue capacity; asynchronous BlueSDK completion preserves all bytes");
  assert(!event(peer,4,0,NULL,0,0));assert(ir5_tick(&b)<0);read_full(remote,r,8);assert(r[0]==3&&r[2]==0&&r[4]==1);assert(b.dead);assert(!ir5_discovery_ready(&b));int barrier_ready=0;
  assert(ir5_withdraw(&b,retire_barrier,&barrier_ready)==-1);
  assert(b.service.published_mask==(IN_RF|IN_IAP_SDP|IN_CP_SDP));
