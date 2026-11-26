@@ -24,3 +24,6 @@ R105.048 两条 CI 与 R105.049 两条 CI 均 success。现有 R44 stock MFi 绑
 
 ## R105.052 真实 TCP 监听入口
 R105.051 unified 45908512907 与 SI 45908512904 success。既有 R98 btstack worker 连接 127.0.0.1:57342，C R44 socket_io 原只提供 adopt 已接受 fd，缺少对应 listener。新增实际 nonblocking bind/listen/accept（不启用 SO_REUSEPORT），在独立 peer proof 后交给原 socket_attach；只允许一个消费者，不与 LuKa daemon 并行占端口。复用 R90 真实 TCP→SYN/LSP/ACK→AA00-AA05 fixture，改用实际 listener API（不是测试手写监听），认证仍为测试桩。此接口尚无生产启动调用者，未执行原厂 RF 注册及真实手机握手，不计第1步完成，NO INSTALL。首次目标剩4项：BT/iAP2/MFi、2.4GHz、AirPlay/画面、联合及测试包。
+
+## R105.053 首连蓝牙/iAP2 调度合并
+R105.052 SI 45909012960 success；unified 45909012956 在本轮检查时 in_progress。现有 R89/R87/R44 已能处理真实 TCP bytes，之前需要调用方在 CONNECT 后分别 bind/ops/init/acl_up/tick。新增原 remote 模块的 cp_wcp_r45_bootstrap_tick：同一 socket owner poll，等待实际 CONNECT，使用真实 generation 初始化已有 R87，继续原 SYN/LSP/ACK、MFi AA00-AA05；只有 cp_s4_authenticated 才返回 OK 供既有 cp_wcp_begin_cloud 接管。复用现有 R90 真实 TCP fixture 验证调度，不另建协议和安全模块。保留既有真实 OEM proof，不伪造手机认证。尚未绑定原厂生产启动器/配对授权及真实 MFi signer，NO INSTALL，第1步未完成，固定剩余4大步。

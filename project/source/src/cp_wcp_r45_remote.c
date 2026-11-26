@@ -98,6 +98,33 @@ int cp_wcp_r45_remote_ops(struct cp_wcp_r45_remote *r,struct cp_wcp_bt_ops *out)
  out->stock_cancel_iap2=cancel_client;
  return 0;
 }
+int cp_wcp_r45_bootstrap_tick(struct cp_wcp_r45_remote *r,
+ struct cp_s4_socket_io *w,struct cp_s4_tcp_bridge *t,
+ const struct cp_wcp_r45_remote_owner *o,struct cp_wcp_autoconnect *ac,
+ uint64_t now){
+ struct cp_wcp_bt_ops ops;
+ int rc;
+ if(!r||!w||!t||!o||!ac||!w->attached||w->bridge!=t||!t->session)
+  return CP_WCP_INVALID;
+ if(r->bound&&(r->worker!=w||r->bridge!=t||ac->ops.ctx!=r||
+              ac->generation!=r->generation))return CP_WCP_DENIED;
+ if(!r->bound&&(ac->state!=CP_WCP_IDLE||ac->generation||ac->requested))
+  return CP_WCP_DENIED;
+ rc=cp_s4_socket_poll(w,now);
+ if(rc!=CP_LK_OK)return CP_WCP_DENIED;
+ if(!t->connected)return CP_WCP_WAIT;
+ if(!r->bound){
+  if(cp_wcp_r45_remote_bind(r,w,t,o)!=0)return CP_WCP_DENIED;
+  if(cp_wcp_r45_remote_ops(r,&ops)!=0||
+     cp_wcp_bt_init(ac,&ops)!=CP_WCP_OK||
+     cp_wcp_bt_acl_up(ac,r->generation,now)!=CP_WCP_OK)
+   return CP_WCP_DENIED;
+ }
+ rc=cp_wcp_bt_tick(ac,r->generation,now);
+ if(rc<0)return rc;
+ if(rc!=CP_WCP_LINK_READY)return CP_WCP_WAIT;
+ return cp_s4_authenticated(t->session)?CP_WCP_OK:CP_WCP_WAIT;
+}
 void cp_wcp_r45_remote_unbind(struct cp_wcp_r45_remote *r){
  if(r)memset(r,0,sizeof *r);
 }

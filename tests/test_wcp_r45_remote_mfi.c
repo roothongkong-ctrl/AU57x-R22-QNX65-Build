@@ -123,7 +123,7 @@ int main(void){
  struct cp_wcp_r45_remote r={0};
  struct cp_wcp_r45_remote_owner ops;
  struct cp_wcp_bt_ops out;
- struct cp_wcp_autoconnect ac;
+ struct cp_wcp_autoconnect ac={0};
  int listener,client;
  const uint8_t mac[6]={2,4,6,8,10,12};
  const uint8_t connect_frame[14]={1,0,6,0,7,0,0,0,2,4,6,8,10,12};
@@ -152,20 +152,17 @@ int main(void){
  assert(cp_wcp_r45_remote_bind(&r,&w,&t,&ops)==-1); /* no CONNECT */
  /* Fragmented real TCP stream; same R14 normalized framing as R45. */
  assert(send(client,connect_frame,3,0)==3);
- assert(cp_s4_socket_poll(&w,100)==CP_LK_OK);
- assert(cp_wcp_r45_remote_bind(&r,&w,&t,&ops)==-1);
+ assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,100)==CP_WCP_WAIT&&!r.bound);
  assert(send(client,connect_frame+3,11,0)==11);
- assert(cp_s4_socket_poll(&w,101)==CP_LK_OK);
- assert(cp_wcp_r45_remote_bind(&r,&w,&t,&ops)==0);
+ assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,101)==CP_WCP_WAIT&&r.bound);
+ assert(ac.generation==7&&ac.state==CP_WCP_DELAY);
  assert(cp_wcp_r45_remote_ops(&r,&out)==0);
  assert(out.stock_open_iap2(out.ctx,7)<0); /* unverified original client ABI */
  assert(out.phone_iap2_sdp(out.ctx,7)<0);
- assert(cp_wcp_bt_init(&ac,&out)==CP_WCP_OK);
- assert(cp_wcp_bt_acl_up(&ac,7,102)==CP_WCP_OK);
  /* Original R89 bug: a plain R45 CONNECT previously reported LINK_READY
   * even though ZERO iAP2 bytes had arrived. Must remain WAIT. */
  assert(out.stock_iap2_connected(out.ctx,7)==0);
- assert(cp_wcp_bt_tick(&ac,7,103)==CP_WCP_WAIT);
+ assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,103)==CP_WCP_WAIT);
  assert(ac.state==CP_WCP_DELAY);
  assert(cp_s4_authenticated(&s)==0);
  /* Marker only: R44 has NOT verified a peer SYN or control session. */
@@ -173,19 +170,19 @@ int main(void){
  assert(s.link.phase==CP_LK_NEGOTIATE);
  assert(!s.link.have_peer_syn);
  assert(out.stock_iap2_connected(out.ctx,7)==0);
- assert(cp_wcp_bt_tick(&ac,7,106)==CP_WCP_WAIT);
+ assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,106)==CP_WCP_WAIT);
  /* Valid LSP/SYN still needs an ACK of our original SYN sequence 99. */
  iap_len=r90_packet(iap_frame,0x80,42,99,0,lsp,sizeof lsp);
  r90_send_data(client,&w,iap_frame,iap_len,107);
  assert(s.link.have_peer_syn&&s.link.phase==CP_LK_NEGOTIATE);
  assert(out.stock_iap2_connected(out.ctx,7)==0);
- assert(cp_wcp_bt_tick(&ac,7,109)==CP_WCP_WAIT);
+ assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,109)==CP_WCP_WAIT);
  /* Only a valid peer ACK transitions the R44 iAP2 link to NORMAL. */
  iap_len=r90_packet(iap_frame,0x40,42,99,0,NULL,0);
  r90_send_data(client,&w,iap_frame,iap_len,110);
  assert(s.link.phase==CP_LK_NORMAL);
  assert(out.stock_iap2_connected(out.ctx,7)==1);
- assert(cp_wcp_bt_tick(&ac,7,112)==CP_WCP_LINK_READY);
+ assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,112)==CP_WCP_WAIT);
  assert(ac.state==CP_WCP_READY);
  /* Finished iAP2 LINK does not equal original Apple MFi success. */
  assert(cp_s4_authenticated(&s)==0);
@@ -215,6 +212,8 @@ int main(void){
  iap_len=r90_packet(iap_frame,0x40,45,101,10,msg,6);
  r90_send_data(client,&w,iap_frame,iap_len,121);
  assert(cp_s4_authenticated(&s));
+ assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,123)==CP_WCP_OK);
+ puts("PASS unified TCP owner tick reaches authenticated bootstrap handoff (fixture)");
  /* Unlike the original R89 test, this is a synthetic OEM certificate/MFi
   * used only to prove C code ordering, NOT an Apple authentication. */
  assert(out.stock_iap2_connected(out.ctx,6)==0);
