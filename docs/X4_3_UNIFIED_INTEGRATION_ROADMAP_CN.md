@@ -149,4 +149,12 @@ H0-H3 are development evidence only. Wireless CarPlay is not end-to-end complete
 6. Continue Wi-Fi, AirPlay, SI/DIO and cluster-display evidence work in parallel; do not let the Bluetooth critical path prevent independent static work.
 
 ## Current status
-Unified plan and branch created; source code has NOT yet been merged into one production-ready implementation. R103 is the selected technical base because its pinned upstream iAP2 bridge and build evidence are available. X4.2 must be reconciled before its patch is imported. R143 remains an optional observer branch. R99 config staging was synthetic-only and does not validate genuine OEM config. No real wireless CarPlay session, MFi success, or vehicle validation is claimed. NO_INSTALL / safe_to_flash=false.
+Unified plan and branch created; source code has NOT yet been merged into one production-ready implementation. R103 remains the pinned protocol-link core, but is no longer the only source baseline. R113/R116 is the newest QNX/QEMU-tested native inbound/publication layer; X4.2 contributes the X3 owner gate and pre-TCP arg3/SCN snapshot contract. Reconcile these selectively: the R113 branch is diverged from R103 (37 ahead / 68 behind), so do not merge wholesale. R99 config staging was synthetic-only and does not validate genuine OEM config. No real btstack owner, MFi success, wireless CarPlay session, or vehicle validation is claimed. NO_INSTALL / safe_to_flash=false.
+
+## R107 — current source integration gate
+1. Restore R113's complete native_event / InboundR5 / socket-pump dependency set by exact hash, while retaining X4.2's newer native_binding and R98 owner handoff.
+2. Compile the complete X4.2 native_binding QNX ARM32 branch using production headers/sources. The existing R113 QNX pass only covers its owner publication layer; the X4.2 host stub compile is not a substitute.
+3. Reconcile R116 SUSPENDED/withdrawal lifecycle with X4.2 owner gate and generation/SCN freeze.
+4. Trace the real MU1005 btstack iAP2 owner and registration callback. No production provider means fail-closed; no fixed-address attach is permitted.
+5. Map genuine SI/DIO callbacks and same-iPhone session identity separately from the Bluetooth transport work.
+6. Keep native Wi-Fi 0x5703 as an OEM candidate path; do not introduce a second 0x5703 sender until the single iAP2 session owner is proven.
