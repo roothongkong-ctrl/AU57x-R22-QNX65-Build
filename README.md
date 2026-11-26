@@ -65,3 +65,8 @@ R105.009 makes the legacy native bind entry fail-closed so the BlueSDK/iAP2 owne
 ### 22-step execution — Step 01 ABI map
 
 Step 01 has mapped the MU1005 mm-ipod outer Transport loader and the seven OEM USB donor callback slots (ABI v2 / 0x200), reusing the prior 22/22 OEM static audit. A new host C layout gate verifies the documented ARM32 48-byte callback prefix and 36-byte module object; callback prototypes, loader lifecycle and runtime selected plugin remain explicitly unresolved. [R105.011 Step 01 report](integration/mu1005_si_native/R105_011_STEP01_MM_IPOD_PLUGIN_ABI_CN.md). No install.
+
+
+### 22-step execution — Step 02 driver internals
+
+Step 02 has now inspected the exact MU1005 `ipod-drvr-iap2.so` ELF from the user's prior private handoff archive (SHA-256 pinned). It maps the outer transport send/receive dispatch, Bluetooth iAP2 status/update handlers, Wi-Fi configuration message 0x5703, and transport-identification helpers. Crucially, `bt_*` status handlers are not RFCOMM byte callbacks; Bluetooth/Wi-Fi component constructors, vtables and the live BlueSDK-to-driver byte path remain unproven. [R105.012 Step 02 report](integration/mu1005_si_native/R105_012_STEP02_IPOD_IAP2_DRIVER_INTERNAL_MAP_CN.md) · [Static audit JSON](docs/R105_STEP02_DRIVER_STATIC_AUDIT.json).
