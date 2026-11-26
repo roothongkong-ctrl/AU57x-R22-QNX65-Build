@@ -38,6 +38,11 @@ static int dispatch(void*p){
  if(tid()!=q.thread.tid||!q.b.owner.owner_ready||
     q.b.owner.owner_ready(q.b.owner.opaque)!=1||
     !mu_bt_osapi_identity_matches(&q.thread,tid(),q.b.owner.read_live,q.b.owner.opaque))return 0;
+ /* The original owner must still belong to the same started service.
+  * A stop/replacement latches the producer off; do not auto-rearm. */
+ if(mu_bt_sdk_service_address(q.b.owner.read_live,q.b.owner.opaque)!=q.b.owner.services_address){
+  mu_bt_pulse_disable(&q.pulse);return 0;
+ }
  if(q.bootstrap_needed){
   if(mu_bt_notify_bind_queue_only(&q.bootstrap)!=0)return 0;
   q.bootstrap_needed=0;
@@ -70,10 +75,19 @@ static void*producer(void*p){
   if(mu_bt_pulse_request(&q.pulse)){
    if(q.b.enter(q.b.lease_context)!=1)mu_bt_pulse_release(&q.pulse);
    else {
-    Share s={0};q.construct(&s,(void*)&event,released,&q);
-    if(!s.control||!s.counter||s.object!=(uint32_t)(uintptr_t)&event)
-     mu_bt_pulse_disable(&q.pulse); /* uncertain allocation: no reuse */
-    else {q.enque((void*)(uintptr_t)q.ao.object,&s);q.destroy(&s);}
+    /* Existing lifetime lease is mandatory: the original stop routines
+     * clear started only AFTER stopping OSAPI. Snapshot is an additional
+     * stale-object guard, not a replacement for that lease. */
+    if(load(&q.pulse.active)!=1u||
+       mu_bt_sdk_service_address(q.b.owner.read_live,q.b.owner.opaque)!=q.b.owner.services_address||
+       !mu_bt_osapi_identity_matches(&q.thread,q.thread.tid,q.b.owner.read_live,q.b.owner.opaque)){
+     mu_bt_pulse_disable(&q.pulse);mu_bt_pulse_release(&q.pulse);
+    }else{
+     Share s={0};q.construct(&s,(void*)&event,released,&q);
+     if(!s.control||!s.counter||s.object!=(uint32_t)(uintptr_t)&event)
+      mu_bt_pulse_disable(&q.pulse); /* uncertain allocation: no reuse */
+     else {q.enque((void*)(uintptr_t)q.ao.object,&s);q.destroy(&s);}
+    }
     q.b.leave(q.b.lease_context);
    }
   }
@@ -118,7 +132,7 @@ static int begin(const MuBtQueuePulseBinding*b,const MuBtNotifyBinding*boot,int(
    discovered_boot.owner.comm_load_bias=m;boot=&discovered_boot;
   }
  }
- if(!resolve(b)||!mu_bt_sdk_started(o->services_address,o->read_live,o->opaque)||
+ if(!mu_bt_sdk_lifecycle_sites(o->read_live,o->opaque)||!resolve(b)||!mu_bt_sdk_started(o->services_address,o->read_live,o->opaque)||
     !(boot?mu_bt_osapi_target(o->comm_load_bias,o->read_live,o->opaque,&id):
       mu_bt_osapi_identity(o->comm_load_bias,tid(),o->read_live,o->opaque,&id))||
     o->read_live(o->opaque,id.factory,f,sizeof f)!=1||le(f+4)!=id.shared_control||

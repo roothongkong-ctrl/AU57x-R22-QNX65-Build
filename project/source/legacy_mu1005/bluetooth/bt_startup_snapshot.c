@@ -31,3 +31,20 @@ uint32_t mu_bt_sdk_service_address(int(*r)(void*,uint32_t,void*,size_t),void*c){
     r(c,0x2c3d48u,b,4)!=1||le(b)!=listener)return 0;
  return service;
 }
+
+/* Exact MU1005 startBtStack virtual entry, actual started store, and
+ * both original stop paths. Both call OSAPI stop BEFORE clearing the
+ * service flag: a live flag alone cannot exclude concurrent shutdown. */
+int mu_bt_sdk_lifecycle_sites(int(*r)(void*,uint32_t,void*,size_t),void*c){
+ static const uint32_t a[][2]={
+  {0x2be500u,0x11e9b0u},{0x11e9b0u,0xe92d4ff0u},
+  {0x11eab0u,0xeb0571b6u},{0x11ec94u,0xe3a03001u},
+  {0x11ec98u,0xe5c531b0u},{0x125908u,0xe92d4070u},
+  {0x125968u,0xeb055604u},{0x125970u,0xe5c531b0u},
+  {0x11de34u,0xeb0574d1u},{0x11de54u,0xe5c831b0u}
+ };
+ uint8_t b[4];if(!r)return 0;
+ for(size_t i=0;i<sizeof a/sizeof a[0];++i)
+  if(r(c,a[i][0],b,4)!=1||le(b)!=a[i][1])return 0;
+ return 1;
+}

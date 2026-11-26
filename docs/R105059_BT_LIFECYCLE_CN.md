@@ -1,0 +1,2 @@
+# R105.059 原厂启动和停止路径（NO INSTALL）
+从用户原厂 btstack（SHA256 51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566）重新确认：0x2be500 vtable slot0 指向 0x11e9b0；原厂字符串 startBtStack；0x11ec98 写入 this+0x1b0=1。独立 stop 函数 0x125908 在 0x125968 先调用 0x27b180 后于 0x125970 清标志；另一路 0x11de34 同样先调用 OSAPI stop，0x11de54 才清标志。故不能把 started flag 当作排除并发 shutdown 的 lease。原厂 stop 有直接调用点 0x119b0c，启动为虚函数间接调用，尚未确认上层实际调用者。新增生命周期指令锚点检查；复用已有 queue producer 和 owner dispatch，在既有 lease 下检查同一活动服务和 OSAPI identity，不匹配停止投递，不自动复用旧对象。保留全部原厂配对和 MFi 检查。尚缺生产启动调用者、同步停止屏障及真实 OEM attach，禁止安装。
