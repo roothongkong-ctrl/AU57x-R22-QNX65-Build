@@ -2,6 +2,11 @@
  * Host-only ABI-shaped fake CFL library: checks adapter behavior,
  * not OEM ABI, runtime or authorization. */
 #include "inner_airplay.h"
+#include "inner_session.h"
+#include <sys/socket.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
 #include <assert.h>
 #include <dlfcn.h>
 #include <stdio.h>
@@ -77,6 +82,40 @@ static int relay_owner(void *p,uint64_t e){(void)p;return owner_live&&e==7;}
 static int write_cinemo(void *p,const unsigned char *b,size_t n){
  (void)p;assert(n==6&&!memcmp(b,marker,n));return (int)n;
 }
+static MuInnerSession joined;
+static int peer_ok=1;
+static int peer_proof(void *ctx,int fd,uint64_t e){return ctx==&joined&&fd>=0&&e==7&&peer_ok;}
+static void joined_test(const MuInnerAirplayProof *proof){
+ int f[2];assert(socketpair(AF_UNIX,SOCK_STREAM,0,f)==0);
+ for(int i=0;i<2;i++)assert(fcntl(f[i],F_SETFL,O_NONBLOCK)==0);
+ owner_live=1;fail_send=0;used=0;sends=0;
+ peer_ok=0;
+ assert(mu_inner_session_start(&joined,handle,&session,7,proof,f[0],&joined,peer_proof)==-1);
+ assert(fcntl(f[0],F_GETFD)>=0&&!joined.active&&!joined.airplay.bound);
+ peer_ok=1;
+ assert(mu_inner_session_start(&joined,handle,&session,7,proof,f[0],&joined,peer_proof)==1);
+ assert(write(f[1],marker,2)==2);
+ assert(mu_inner_session_tick(&joined,7)==1&&sends==0);
+ assert(write(f[1],marker+2,4)==4);
+ assert(mu_inner_session_tick(&joined,7)==1&&sends==0);
+ assert(mu_inner_session_tick(&joined,7)==1&&sends==1);
+ assert(mu_inner_session_control(&joined,6,&session,last->field[0],last->field[1])==-1&&joined.active);
+ assert(mu_inner_session_control(&joined,7,&session,last->field[0],last->field[1])==1);
+ assert(mu_inner_session_control(&joined,7,&session,last->field[0],last->field[1])==0);
+ assert(mu_inner_session_tick(&joined,7)==1);
+ unsigned char out[8];assert(read(f[1],out,sizeof out)==6&&!memcmp(out,marker,6));
+ owner_live=0;
+ assert(mu_inner_session_tick(&joined,7)==-1&&!joined.active&&!joined.airplay.bound);
+ assert(fcntl(f[0],F_GETFD)==-1&&errno==EBADF);
+ close(f[1]);mu_inner_session_stop(&joined);
+ owner_live=1;used=0;
+ assert(socketpair(AF_UNIX,SOCK_STREAM,0,f)==0);
+ for(int i=0;i<2;i++)assert(fcntl(f[i],F_SETFL,O_NONBLOCK)==0);
+ assert(mu_inner_session_start(&joined,handle,&session,7,proof,f[0],&joined,peer_proof)==1);
+ close(f[1]);assert(mu_inner_session_tick(&joined,7)==-1&&!joined.active);
+ assert(fcntl(f[0],F_GETFD)==-1&&errno==EBADF);
+ puts("MU1005_INNER_COMPOSED_SOCKET_AIRPLAY_PASS_HOST_FAKE_NO_OEM");
+}
 int main(void){
  handle=dlopen(NULL,RTLD_NOW);assert(handle);
  MuInnerAirplay a={0};MuInnerAirplayProof proof={0,library,owner};
@@ -124,5 +163,6 @@ int main(void){
  assert(mu_inner_pump(&relay,7)==-1&&!relay.active&&sends==2);
  owner_live=0;assert(mu_inner_ap_send(&a,marker,6)==-1&&sends==2);
  mu_inner_ap_unbind(&a);assert(!a.bound);
+ joined_test(&proof);
  dlclose(handle);puts("MU1005_INNER_AIRPLAY_ENVELOPE_HOST_PASS_NO_OEM");return 0;
 }
