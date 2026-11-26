@@ -106,7 +106,11 @@ int cp_wcp_bt_tick(struct cp_wcp_autoconnect *s,uint32_t gen,uint64_t now){
   if(s->attempts>=CP_WCP_MAX_ATTEMPTS){
    s->state=CP_WCP_BLOCKED;return CP_WCP_DENIED;
   }
-  if(!deadline(now,CP_WCP_RETRY_MS,&s->deadline_ms))return CP_WCP_CLOCK;
+  if(!deadline(now,CP_WCP_RETRY_MS,&s->deadline_ms)){
+   /* Native cancel has completed. Never leave OPENING with requested=0:
+    * the next dispatch must not cancel the same operation again. */
+   s->state=CP_WCP_BLOCKED;return CP_WCP_CLOCK;
+  }
   s->state=CP_WCP_BACKOFF;return CP_WCP_WAIT;
  }
  if(s->state!=CP_WCP_DELAY&&s->state!=CP_WCP_BACKOFF)return CP_WCP_INVALID;

@@ -7,12 +7,14 @@
  * Caller must independently verify the actual session, loaded library,
  * mm-ipod peer, and decoded dispatch with a response-status contract.
  * Zero initialize before first use. Successful start transfers fd ownership;
- * failure leaves it with caller. Library remains mapped through stop. */
+ * failure leaves it with caller. Library remains mapped through stop.
+ * Keep this object across reconnects; each successful epoch must increase. */
 typedef struct {
  MuInnerAirplay airplay;
  MuInnerSocket socket;
  void *ctx;
  int (*peer)(void *,int,uint64_t);
+ uint64_t last_epoch;
  int active;
 } MuInnerSession;
 int mu_inner_session_start(MuInnerSession *,void *,void *,uint64_t,

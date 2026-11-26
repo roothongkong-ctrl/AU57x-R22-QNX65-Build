@@ -23,6 +23,7 @@ static Obj pool[32],session={.type=SESSION};
 static unsigned used;
 static void *handle;
 static int owner_live=1, sends, fail_send;
+static uint64_t owner_epoch=7;
 static Obj *last;
 static MuInner relay;
 static unsigned char marker[]={255,85,2,0,238,16};
@@ -77,14 +78,14 @@ int AirPlayReceiverSessionSendCommand(void *s,const void *d,void(*done)(void),vo
  last=o;sends++;return fail_send?-1:0;
 }
 static int library(void *p,void *h){(void)p;return h==handle;}
-static int owner(void *p,void *s,uint64_t e){(void)p;return owner_live&&s==&session&&e==7;}
+static int owner(void *p,void *s,uint64_t e){(void)p;return owner_live&&s==&session&&e==owner_epoch;}
 static int relay_owner(void *p,uint64_t e){(void)p;return owner_live&&e==7;}
 static int write_cinemo(void *p,const unsigned char *b,size_t n){
  (void)p;assert(n==6&&!memcmp(b,marker,n));return (int)n;
 }
 static MuInnerSession joined;
 static int peer_ok=1;
-static int peer_proof(void *ctx,int fd,uint64_t e){return ctx==&joined&&fd>=0&&e==7&&peer_ok;}
+static int peer_proof(void *ctx,int fd,uint64_t e){return ctx==&joined&&fd>=0&&e==owner_epoch&&peer_ok;}
 static void joined_test(const MuInnerAirplayProof *proof){
  int f[2];assert(socketpair(AF_UNIX,SOCK_STREAM,0,f)==0);
  for(int i=0;i<2;i++)assert(fcntl(f[i],F_SETFL,O_NONBLOCK)==0);
@@ -111,8 +112,12 @@ static void joined_test(const MuInnerAirplayProof *proof){
  owner_live=1;used=0;
  assert(socketpair(AF_UNIX,SOCK_STREAM,0,f)==0);
  for(int i=0;i<2;i++)assert(fcntl(f[i],F_SETFL,O_NONBLOCK)==0);
- assert(mu_inner_session_start(&joined,handle,&session,7,proof,f[0],&joined,peer_proof)==1);
- close(f[1]);assert(mu_inner_session_tick(&joined,7)==-1&&!joined.active);
+ assert(mu_inner_session_start(&joined,handle,&session,7,proof,f[0],&joined,peer_proof)==-1);
+ assert(fcntl(f[0],F_GETFD)>=0);
+ owner_epoch=8;
+ assert(mu_inner_session_start(&joined,handle,&session,8,proof,f[0],&joined,peer_proof)==1);
+ assert(mu_inner_session_tick(&joined,7)==-1&&joined.active);
+ close(f[1]);assert(mu_inner_session_tick(&joined,8)==-1&&!joined.active);
  assert(fcntl(f[0],F_GETFD)==-1&&errno==EBADF);
  puts("MU1005_INNER_COMPOSED_SOCKET_AIRPLAY_PASS_HOST_FAKE_NO_OEM");
 }

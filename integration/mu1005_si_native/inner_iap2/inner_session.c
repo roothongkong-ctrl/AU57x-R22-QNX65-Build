@@ -22,13 +22,13 @@ void mu_inner_session_stop(MuInnerSession *s){
 }
 int mu_inner_session_start(MuInnerSession *s,void *h,void *session,uint64_t e,
  const MuInnerAirplayProof *proof,int fd,void *ctx,int (*peer)(void *,int,uint64_t)){
- if(!s||s->active||s->airplay.bound||s->socket.verified||!peer||fd<0)return -1;
+ if(!s||s->active||s->airplay.bound||s->socket.verified||!peer||fd<0||!e||e<=s->last_epoch)return -1;
  if(mu_inner_ap_bind(&s->airplay,h,session,e,proof)!=1)return -1;
  s->ctx=ctx;s->peer=peer;
  if(mu_inner_socket_adopt(&s->socket,fd,e,s,peer_live,send_event)!=1){
   mu_inner_session_stop(s);return -1;
  }
- s->active=1;return 1;
+ s->last_epoch=e;s->active=1;return 1;
 }
 int mu_inner_session_tick(MuInnerSession *s,uint64_t e){
  if(!s||!s->active||e!=s->airplay.epoch)return -1;

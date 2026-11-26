@@ -93,6 +93,12 @@ int main(void){
  setup(&s,&f);f.paired=0;
  assert(cp_wcp_bt_acl_up(&s,7,0)==CP_WCP_DENIED);
  assert(f.opens==0);
+ setup(&s,&f);
+ assert(cp_wcp_bt_acl_up(&s,7,0)==CP_WCP_OK);
+ assert(cp_wcp_bt_tick(&s,7,4000)==CP_WCP_WAIT&&s.requested);
+ assert(cp_wcp_bt_tick(&s,7,UINT64_MAX)==CP_WCP_CLOCK);
+ assert(s.state==CP_WCP_BLOCKED&&!s.requested&&f.cancels==1);
+ assert(cp_wcp_bt_tick(&s,7,UINT64_MAX)==CP_WCP_DENIED&&f.cancels==1);
  printf("R87 WCP car-initiated original iAP2 state machine: PASS\n");
  return 0;
 }
