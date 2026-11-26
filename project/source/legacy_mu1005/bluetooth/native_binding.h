@@ -8,6 +8,9 @@ typedef struct {
  int (*owner_ready)(void *); /* real thread, lifecycle, lock context, verified image */
  int (*transport_ready)(void *); /* authenticated local endpoint ready */
  int (*read_live)(void *,uint32_t,void *,size_t); /* checked executable/object/peer reads, scoped to verified lifetime */
+ /* Optional independent original service authorization provider.
+  * NULL selects native RfSecCallback success provenance, with same
+  * association and existing original bond checks. Not a pairing bypass. */
  int (*paired_authorized)(void *,uint32_t,const uint8_t[6]);
  /* Optional explicit initial RX credits 1..7, not SCN. NULL selects the
   * pinned MU1005 stock four-credit first-connect parameter in R98. */

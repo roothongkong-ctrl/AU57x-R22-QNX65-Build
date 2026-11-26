@@ -10,7 +10,7 @@
  * callback serialization before attaching. No production default owner. */
 #include "native_binding_words.h"
 #include <pthread.h>
-typedef struct { Mu38PeerOps peer; MuBtOwner owner; InboundR5 bridge; MuBtThreadIdentity thread; int attempted; } Resident;
+typedef struct { Mu38PeerOps peer; MuBtOwner owner; InboundR5 bridge; MuBtThreadIdentity thread; int attempted; unsigned native_event_code,native_security_scope; int native_security_accepted; } Resident;
 static Resident res;
 static uint32_t current_tid(void){return (uint32_t)(uintptr_t)pthread_self();}
 static int sdk_started(const MuBtOwner *o){return mu_bt_sdk_started(o->services_address,o->read_live,o->opaque);}
@@ -30,8 +30,17 @@ static int auth(void*p,uint32_t a,const uint8_t mac[6]){
  Resident*r=p;
  /* Original persistent pairing record is additional evidence only.
   * Retain external current association/service authorization and owner. */
- return cert(r)&&mu38_stock_bond_present(mac,r->owner.read_live,r->owner.opaque)&&
-  r->owner.paired_authorized(r->owner.opaque,a,mac)==1&&cert(r);
+ if(!cert(r)||!mu38_stock_bond_present(mac,r->owner.read_live,r->owner.opaque))return 0;
+ if(r->owner.paired_authorized)
+  return r->owner.paired_authorized(r->owner.opaque,a,mac)==1&&cert(r);
+ /* No external assertion is needed when the genuine original security
+  * success callback itself is the witness. On event 2 retain only the
+  * accepted event-1 association and original bond; require the actual
+  * successful OEM event 2, not just an old bond record. */
+ if(!r->native_security_scope)return 0;
+ if(r->native_event_code==1)return cert(r);
+ return r->native_event_code==2&&r->native_security_accepted&&
+  r->bridge.service.pending&&r->bridge.native_association==a&&cert(r);
 }
 /* MU1005 arg3 is initial RX credit budget; allocated SCN is *slot. */
 static int register_verified(void *channel,uint8_t *slot,uint16_t ignored){
@@ -44,9 +53,38 @@ static int register_verified(void *channel,uint8_t *slot,uint16_t ignored){
  return ((int (*)(void*,uint8_t*,uint16_t))(uintptr_t)0x277a18u)
      (channel,slot,r->owner.rf_arg3_snapshot);
 }
-static void callback(void *ch,const void *event){
- if(cert(&res)&&res.bridge.initialized&&ch==&res.bridge.service.rf)
-  (void)mu38_dispatch(&res.bridge,&res.peer,ch,event);
+/* The stock callback dispatcher uses AAPCS and a fixed 48-byte frame.
+ * Preserve the stock LR and capture its saved caller LR BEFORE a C
+ * prologue. No patch of original security code or fabricated event.
+ * Only read the stack slot from the exact known dispatcher return PC. */
+static void mu_bt_native_callback_dispatch(void *ch,const void *event,uint32_t lr,uint32_t caller)
+ __attribute__((used,noinline));
+static void mu_bt_native_callback_dispatch(void *ch,const void *event,uint32_t lr,uint32_t caller){
+ if(!cert(&res)||!res.bridge.initialized||ch!=&res.bridge.service.rf||!event)return;
+ const uint8_t *e=event;
+ unsigned old_code=res.native_event_code,old_scope=res.native_security_scope;
+ int was_pending=res.bridge.service.pending;
+ res.native_event_code=e[0];res.native_security_scope=0;
+ if(!res.owner.paired_authorized&&e[2]==0&&e[3]==0){
+  if(e[0]==1)
+   res.native_security_scope=mu38_stock_rf_security_request(addr(ch),lr,caller,
+      res.owner.read_live,res.owner.opaque)==1;
+  else if(e[0]==2&&lr==0x203d54u&&res.native_security_accepted&&was_pending)
+   res.native_security_scope=1;
+ }
+ int rc=mu38_dispatch(&res.bridge,&res.peer,ch,event);
+ if(e[0]==1&&!was_pending)res.native_security_accepted=rc==1&&res.native_security_scope;
+ if(e[0]==2||e[0]==4)res.native_security_accepted=0;
+ res.native_event_code=old_code;res.native_security_scope=old_scope;
+}
+__attribute__((naked,noinline)) static void callback(void *ch __attribute__((unused)),const void *event __attribute__((unused))){
+ __asm__ volatile(
+  "mov r2, lr\n"
+  "mov r3, #0\n"
+  "ldr r12, =0x203d54\n"
+  "cmp lr, r12\n"
+  "ldreq r3, [sp, #44]\n"
+  "b mu_bt_native_callback_dispatch\n");
 }
 /* Require native executable words at all vendor call entry points, in
  * addition to the caller's full mapped-image verification. This is not a
@@ -78,7 +116,7 @@ int mu_bt_native_refresh_eir(void){
 }
 #define RFN(type,a) ((type)(uintptr_t)(a))
 int mu_bt_native_attach(const MuBtOwner *o,int fd){
- if(!o||!o->owner_ready||!o->transport_ready||!o->read_live||!o->paired_authorized||
+ if(!o||!o->owner_ready||!o->transport_ready||!o->read_live||
     o->rf_arg3_snapshot_valid!=1u||o->rf_arg3_snapshot<1u||o->rf_arg3_snapshot>7u||
     res.attempted||fd<0||o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
  MuBtThreadIdentity identity;

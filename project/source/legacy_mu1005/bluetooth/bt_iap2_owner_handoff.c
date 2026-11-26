@@ -92,7 +92,7 @@ int au98_publish(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*owner,unsigned 
     !h->original_image_verified||!h->on_original_iap2_owner||
     !h->original_iap2_service_verified||!h->attach||!h->tick||!h->withdraw||
     !owner->owner_ready||!owner->transport_ready||!owner->read_live||
-    !owner->paired_authorized)return -1;
+    !owner->read_live)return -1;
 #if !defined(AU57X_R98_HOST_TEST) || AU57X_R98_HOST_TEST!=1
  if(port!=57342u)return -1;
 #endif
@@ -155,7 +155,7 @@ int au98_adopt(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*o,
     !h->original_image_verified||!h->on_original_iap2_owner||
     !h->original_iap2_service_verified||!h->attach||!h->tick||!h->withdraw||
     !o->owner_ready||!o->transport_ready||!o->read_live||
-    !o->paired_authorized||!verified)return -1;
+    !verified)return -1;
 #if !defined(AU57X_R98_HOST_TEST) || AU57X_R98_HOST_TEST!=1
  if(port!=57342u)return -1;
 #endif

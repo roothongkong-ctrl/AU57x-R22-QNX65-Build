@@ -99,3 +99,25 @@ int mu38_stock_bond_present(const uint8_t mac[6],int (*r)(void*,uint32_t,void*,s
  return bond_scan(mac,r,ctx,a,&na)&&bond_scan(mac,r,ctx,b,&nb)&&
   na==nb&&!memcmp(a,b,na*8u);
 }
+
+/* Verified on pinned original MU1005: RfSecCallback event 50 with an
+ * incoming request -> channel state 3 -> dispatch event 1, status 0.
+ * The original dispatcher saves its caller LR at entry SP-4; after
+ * push 20 / sub 28, the saved LR is at callback-entry SP+44.
+ * The alternate path at 0x20d528 is deliberately NOT admitted here. */
+int mu38_stock_rf_security_request(uint32_t ch,uint32_t lr,uint32_t caller,
+ int (*r)(void*,uint32_t,void*,size_t),void *ctx){
+ static const uint32_t anchor[][2]={
+  {0x20e3f8u,0xe3530032u},{0x20e3fcu,0x0a000030u},
+  {0x20e4c4u,0xe3a01000u},{0x20e4d0u,0xe5c5305cu},
+  {0x20e4d4u,0xe3a02001u},{0x20e4dcu,0xebffd5fau},
+  {0x203cccu,0xe92d40f0u},{0x203cdcu,0xe24dd01cu},
+  {0x203d40u,0xe5953008u},{0x203d50u,0xe12fff33u}
+ };
+ uint8_t b[4],state;
+ if(!r||!ch||(ch&3u)||ch>UINT32_MAX-0x5cu||
+    lr!=0x203d54u||caller!=0x20e4e0u)return 0;
+ for(size_t i=0;i<sizeof anchor/sizeof anchor[0];i++)
+  if(r(ctx,anchor[i][0],b,4)!=1||le32(b)!=anchor[i][1])return 0;
+ return r(ctx,ch+0x5cu,&state,1)==1&&state==3u;
+}

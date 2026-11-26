@@ -32,4 +32,11 @@ int mu38_registry_association(uint32_t channel,uint32_t association,
  * service authorization, or MFi. No link key bytes are read. */
 int mu38_stock_bond_present(const uint8_t mac[6],
  int (*read_live)(void *,uint32_t,void *,size_t),void *);
+/* Native incoming security completion provenance. Only the exact
+ * original RfSecCallback success branch may authorize an incoming request.
+ * The two return PCs are captured at the ARM callback entry, before any C
+ * prologue. Caller must already hold the certified native owner context.
+ * No new security decision, link key or MFi credential is manufactured. */
+int mu38_stock_rf_security_request(uint32_t channel,uint32_t dispatch_lr,uint32_t security_lr,
+ int (*read_live)(void*,uint32_t,void*,size_t),void*);
 #endif

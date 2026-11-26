@@ -87,7 +87,31 @@ static void bond_test(void){
  f.deny=1;assert(!mu38_stock_bond_present(mac,bond_read,&f));
  puts("PASS original BR/EDR bond metadata presence (fixture, no key read or current authentication claim)");
 }
+typedef struct {unsigned bad;uint8_t state;} SecFixture;
+static int sec_read(void *p,uint32_t a,void *out,size_t n){
+ SecFixture*f=p;
+ static const uint32_t va[]={0x20e3f8,0x20e3fc,0x20e4c4,0x20e4d0,0x20e4d4,0x20e4dc,0x203ccc,0x203cdc,0x203d40,0x203d50};
+ static const uint32_t w[]={0xe3530032,0x0a000030,0xe3a01000,0xe5c5305c,0xe3a02001,0xebffd5fa,0xe92d40f0,0xe24dd01c,0xe5953008,0xe12fff33};
+ if(a==0x70005c&&n==1){*(uint8_t*)out=f->state;return 1;}
+ if(n!=4)return 0;
+ for(unsigned i=0;i<10;i++)if(a==va[i]){
+  uint32_t v=w[i]^(f->bad==i+1);
+  for(unsigned j=0;j<4;j++)((uint8_t*)out)[j]=(uint8_t)(v>>(8*j));
+  return 1;
+ }
+ return 0;
+}
+static void security_test(void){
+ SecFixture f={0,3};
+ assert(mu38_stock_rf_security_request(0x700000,0x203d54,0x20e4e0,sec_read,&f));
+ assert(!mu38_stock_rf_security_request(0x700000,0x203d54,0x20d528,sec_read,&f));
+ assert(!mu38_stock_rf_security_request(0x700000,0x203d98,0x20e4e0,sec_read,&f));
+ for(unsigned i=1;i<=10;i++){f.bad=i;assert(!mu38_stock_rf_security_request(0x700000,0x203d54,0x20e4e0,sec_read,&f));}
+ f.bad=0;f.state=7;assert(!mu38_stock_rf_security_request(0x700000,0x203d54,0x20e4e0,sec_read,&f));
+ puts("PASS original RfSecCallback success provenance (fixture code words; no original security bypass)");
+}
 int main(int argc,char **argv){
+ security_test();
  registry_test();bond_test();
  trace_mode=argc==3&&!strcmp(argv[1],"native-trace");
  int server=socket(AF_INET,SOCK_STREAM,0),fd=socket(AF_INET,SOCK_STREAM,0);assert(server>=0&&fd>=0);int reuse=1;assert(!setsockopt(server,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof reuse));struct sockaddr_in a={0};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);a.sin_port=htons(57342);assert(!bind(server,(struct sockaddr*)&a,sizeof a)&&!listen(server,1));assert(!connect(fd,(struct sockaddr*)&a,sizeof a));int remote=accept(server,NULL,NULL);assert(remote>=0);
