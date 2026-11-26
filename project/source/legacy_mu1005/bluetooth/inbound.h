@@ -5,6 +5,9 @@
  * contain 32-bit addresses; host tests use explicit token mappings. */
 #include <stdint.h>
 #include <stddef.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 enum { RF_SIZE=176, PACKET_SIZE=100, SDP_SIZE=36, MAX_DATA=5035, MU_RFCOMM_SCN_MIN=1, MU_RFCOMM_SCN_MAX=30 };
 typedef struct { uint32_t words[RF_SIZE/4]; } RfObject;
 typedef struct { uint32_t words[PACKET_SIZE/4]; } RfPacket;
@@ -43,6 +46,10 @@ enum { IN_EMPTY,IN_PREPARED,IN_REGISTERED,IN_PUBLISHED,IN_LINK,IN_DIRTY,IN_WITHD
 enum { IN_RF=1, IN_IAP_SDP=2, IN_CP_SDP=4 };
 /* Zero-initialize stable instance ONCE; cannot move until OEM reclamation. */
 int inbound_prepare(Inbound*,const InboundOps*,uint32_t callback_address);
+/* Explicit guarded boundary between native RF registration and SDP publish. */
+int inbound_register_rf(Inbound*); /* legacy donor zero-argument route */
+int inbound_register_rf_original(Inbound*,uint8_t attested_arg3); /* verified OEM route */
+int inbound_publish_sdp(Inbound*);
 int inbound_publish(Inbound*);
 /* Owner-supervised only: barrier must cover callback exclusion, native idle,
  * no outstanding packets and service membership; no memory reclamation. */
@@ -50,4 +57,7 @@ int inbound_withdraw(Inbound*,int (*barrier)(void*,const Inbound*),void*);
 int inbound_event(Inbound*,void* channel,unsigned code,unsigned status,
                   const uint8_t* payload,unsigned length,uint32_t packet_address);
 int inbound_send(Inbound*,const uint8_t*,unsigned);
+#ifdef __cplusplus
+}
+#endif
 #endif
