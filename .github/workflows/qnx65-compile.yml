@@ -123,6 +123,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
+      - name: Checkout AU57x R103 bridge source and pinned vendor tree
+        uses: actions/checkout@v4
+        with:
+          repository: roothongkong-ctrl/AU57x-R22-QNX65-Build
+          ref: mu1005-r103-qnx-iap2-link-20261126
+          path: au57x
       - name: Checkout pinned upstream wireless CarPlay source
         uses: actions/checkout@v4
         with:
@@ -144,7 +150,7 @@ jobs:
           docker run --rm --platform=linux/amd64 \
             -v "$GITHUB_WORKSPACE":/src -w /src \
             qnx65-armv7-toolchain:8.5-rust \
-            cargo test --offline --manifest-path /src/integration/r103_iap2_bridge/Cargo.toml
+            cargo test --offline --manifest-path /src/au57x/integration/r103_iap2_bridge/Cargo.toml
 
       - name: Cross-build AU57x R103 iAP2 bridge for QNX 6.5 ARMv7
         run: |
@@ -157,7 +163,7 @@ jobs:
       - name: Verify AU57x R103 QNX ARMv7 ELF
         run: |
           set -euo pipefail
-          BIN="target/armv7-unknown-nto-qnx650/release/au57x-r103-qnx-smoke"
+          BIN="au57x/integration/r103_iap2_bridge/target/armv7-unknown-nto-qnx650/release/au57x-r103-qnx-smoke"
           test -s "$BIN"
           file "$BIN" | tee qnx-r103-elf.txt
           file "$BIN" | grep -q "ELF 32-bit.*ARM"
@@ -226,7 +232,7 @@ jobs:
         with:
           name: R103-QNX-Rust-Bridge-and-Daemon-REVIEW-ONLY
           path: |
-            target/armv7-unknown-nto-qnx650/release/au57x-r103-qnx-smoke
+            au57x/integration/r103_iap2_bridge/target/armv7-unknown-nto-qnx650/release/au57x-r103-qnx-smoke
             qnx-r103-elf.txt
             qnx-r103-qemu.log
             qnx-r103-build-info.txt
