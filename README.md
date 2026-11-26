@@ -60,3 +60,8 @@ The current route separates (1) mm-ipod physical Transport plugins, (2) internal
 ### R105.009–R105.010 — owner nonblocking fix and classic MHI2 donor comparison
 
 R105.009 makes the legacy native bind entry fail-closed so the BlueSDK/iAP2 owner callback cannot accidentally perform a blocking TCP connect; only a worker-prepared nonblocking/CLOEXEC fd may be adopted on the proven owner thread. R105.010 compares classic MHI2 MU1440, MHI2Q MU1316 and MH2p donors. It elevates the stock Type-3 transport path for investigation before duplicating the iAP2 link layer; R103 remains the fallback. No donor binary is transplanted and no vehicle install is authorized. [R105.009](integration/mu1005_si_native/R105_009_OWNER_NONBLOCKING_BOUNDARY_CN.md) · [R105.010](integration/mu1005_si_native/R105_010_CLASSIC_MHI2_DONOR_COMPARISON_CN.md).
+
+
+### 22-step execution — Step 01 ABI map
+
+Step 01 has mapped the MU1005 mm-ipod outer Transport loader and the seven OEM USB donor callback slots (ABI v2 / 0x200), reusing the prior 22/22 OEM static audit. A new host C layout gate verifies the documented ARM32 48-byte callback prefix and 36-byte module object; callback prototypes, loader lifecycle and runtime selected plugin remain explicitly unresolved. [R105.011 Step 01 report](integration/mu1005_si_native/R105_011_STEP01_MM_IPOD_PLUGIN_ABI_CN.md). No install.
