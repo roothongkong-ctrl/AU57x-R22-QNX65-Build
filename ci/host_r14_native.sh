@@ -22,3 +22,14 @@ gcc -std=c99 -O1 -g -Wall -Wextra -Werror -D_DEFAULT_SOURCE -DINITIAL_RX=4 -fsan
 # Native incoming/open identity continuity, even when MAC and authorization match.
 "$OUT/r45_test_native_event" association-switch | tee "$OUT/r45_association_switch.log"
 "$OUT/r45_test_native_event" revoked-peer | tee "$OUT/r45_revoked_peer.log"
+
+# R105.057: one owner lifecycle, real worker and real bidirectional stream.
+gcc -std=c99 -O1 -g -Wall -Wextra -Werror -D_DEFAULT_SOURCE -pthread \
+  -fsanitize=address,undefined -fno-omit-frame-pointer -no-pie -I"$SRC" \
+  "$ROOT/tests/r105057_joint_bt.c" \
+  "$SRC/inbound.c" "$SRC/inbound_r5.c" "$SRC/native_event.c" \
+  "$SRC/mu1005_rf_ingress.c" "$SRC/mu1005_ipc_stream.c" "$SRC/mu1005_socket_pump.c" \
+  "$SRC/bt_socket_worker.c" "$SRC/bt_iap2_owner_handoff.c" "$SRC/rf_arg_experiment.c" \
+  "$SRC/bt_notify_bridge.c" "$SRC/bt_queue_pulse.c" -o "$OUT/r105057_joint_bt"
+timeout 30 "$OUT/r105057_joint_bt" | tee "$OUT/r105057_joint_bt.log"
+grep -F R105057_JOINT_OWNER_RFCOMM_TWO_SESSIONS_PASS_FIXTURE_ONLY_NO_INSTALL "$OUT/r105057_joint_bt.log"
