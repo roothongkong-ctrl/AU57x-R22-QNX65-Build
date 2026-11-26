@@ -1,0 +1,6 @@
+# R105.039 — DIO 原厂 iAP2 client 启动 job 与 event 超时（NO INSTALL）
+原厂 dio_manager SHA256 e40b5bf9df3f96221ac01bc0484e06493e6c58e60cca32d2547939ff1d56f63c，与既有基线一致。llvm-objdump 对临时分析副本修正一个超出 section 数量的 dynsym section index，不修改原厂文件。此前 R105.017 已分析 libiap2client 的 IPC，本次追踪 DIO 上层调用，不重复该 IPC 分析。
+- .rel.plt 0x1a70e0 对应 iap2_connect PLT 0x1127f0；唯一直接 BL 在 0x17a094。函数入口 0x17a054，r0 为连接对象，r1 为路径。0x17a084 检查对象+0 的已有 handle 必须为空，路径不得 NULL。0x17a090 将路径传给原厂 iap2_connect，r1 此时为此前已检查为 0 的 handle；0x17a09c 保存返回 handle 到对象+0。成功返回 1，失败返回 0。PIC 日志字符串 0x1a06a8 为 CIpodAP2Service 连接驱动路径，0x1a0544 为 connect。
+- 0x17a55c 是 onJob_connect 路径，0x17a614 唯一直接调用 0x17a054：r0 从 service+8 取连接对象，r1 来自上游字符串对象的内联或堆存储。0x17a5b4 写入 service+0x20 的 id，0x17a62c–0x17a634 成功后更新 service+0x10 状态为 1；0x17a640/0x17a754 根据标志进入额外 EXLAP 流程。literal 0x17a888 -> 0x1a0758 的日志明确为 CIpodAP2Service id、driver path 和 EXLAP；0x17a88c -> 0x1a054c 为 onJob_connect。
+- 0x17a554 是调整 this -4 的 thunk，再进入 0x17a55c；在分析副本 data.rel.ro 中发现两个原始地址引用。下一步追踪 job 发起方与 service 实例，优先复用原厂 job，而非直接调用低层 iap2_connect 绕过原厂状态管理。未证明 job 可在无线模式安全调用，也未绑定真实服务实例。
+- R105.038 新增 fixture 完成后 owner_epoch=9；修复后续独立 adapter fixture 绑定 epoch 10，避免误用旧 epoch。新增 monotonic tick 的暂定 5 秒 event completion 超时，停止会话但保留独立 mailbox，迟到回调 drain 前不得重用。当前需由真实 owner 驱动 tick_at；不宣称 HTTP completion=手机 ACK。

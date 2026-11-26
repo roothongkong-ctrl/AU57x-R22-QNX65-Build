@@ -153,13 +153,14 @@ static void joined_test(const MuInnerAirplayProof *proof){
  for(int i=0;i<2;i++)assert(fcntl(f[i],F_SETFL,O_NONBLOCK)==0);
  assert(mu_inner_session_start(&joined,handle,&session,9,proof,f[0],&joined,peer_proof)==1);
  assert(mu_inner_session_track_events(&joined,&flight)==1);
- assert(write(f[1],marker,6)==6&&mu_inner_session_tick(&joined,9)==1);
- assert(mu_inner_session_tick(&joined,9)==1&&pending_done&&sends==1);
- assert(write(f[1],marker,6)==6&&mu_inner_session_tick(&joined,9)==1);
- assert(mu_inner_session_tick(&joined,9)==1&&sends==1);
+ assert(write(f[1],marker,6)==6&&mu_inner_session_tick_at(&joined,9,100)==1);
+ assert(mu_inner_session_tick_at(&joined,9,101)==1&&pending_done&&sends==1);
+ assert(write(f[1],marker,6)==6&&mu_inner_session_tick_at(&joined,9,102)==1);
+ assert(mu_inner_session_tick_at(&joined,9,103)==1&&sends==1);
  deliver_completion(0,NULL);
- assert(mu_inner_session_tick(&joined,9)==1&&sends==2&&pending_done);
- mu_inner_session_stop(&joined);
+ assert(mu_inner_session_tick_at(&joined,9,104)==1&&sends==2&&pending_done);
+ assert(mu_inner_session_tick_at(&joined,9,5103)==1);
+ assert(mu_inner_session_tick_at(&joined,9,5104)==-1&&!joined.active);
  assert(mu_inner_event_reclaim(&flight,0)==-1);
  deliver_completion(-1,NULL); /* late callback must not touch closed session */
  assert(mu_inner_event_reclaim(&flight,1)==1);
@@ -217,8 +218,8 @@ int main(void){
  /* Original send returns queue admission, not completion. The completion
   * context belongs to the caller and must outlive unbind. */
  MuInnerAirplay tracked={0};int cookie=42;
- owner_live=1;used=0;fail_send=0;
- assert(mu_inner_ap_bind(&tracked,handle,&session,8,&proof)==1);
+ owner_live=1;owner_epoch=10;used=0;fail_send=0;
+ assert(mu_inner_ap_bind(&tracked,handle,&session,10,&proof)==1);
  completion_expected=&cookie;
  assert(mu_inner_ap_send_with_completion(&tracked,marker,6,NULL,&cookie)==-1);
  assert(mu_inner_ap_send_with_completion(&tracked,marker,6,completion,&cookie)==1);

@@ -36,7 +36,7 @@ static int send_event(void *ctx,const unsigned char *p,size_t n){
 int mu_inner_session_track_events(MuInnerSession *s,MuInnerEventFlight *f){
  if(!s||!s->active||s->flight||!f||flight_state(f)!=FL_IDLE||
     s->socket.relay.tx_len||s->socket.relay.rx_len)return -1;
- s->flight=f;return 1;
+ s->flight=f;s->event_timer=0;return 1;
 }
 int mu_inner_event_reclaim(MuInnerEventFlight *f,int drained){
  if(!f||drained!=1||flight_state(f)!=FL_RETIRED)return -1;
@@ -45,6 +45,7 @@ int mu_inner_event_reclaim(MuInnerEventFlight *f,int drained){
 void mu_inner_session_stop(MuInnerSession *s){
  if(!s)return;
  if(s->flight){(void)__sync_lock_test_and_set(&s->flight->state,FL_RETIRED);s->flight=NULL;}
+ s->event_timer=0;
  mu_inner_socket_close(&s->socket);
  mu_inner_ap_unbind(&s->airplay);
  s->active=0;s->ctx=NULL;s->peer=NULL;
@@ -63,7 +64,7 @@ int mu_inner_session_tick(MuInnerSession *s,uint64_t e){
  if(!s||!s->active||e!=s->airplay.epoch)return -1;
  if(s->flight&&flight_state(s->flight)==FL_DONE){
   if(s->flight->status!=0){mu_inner_session_stop(s);return -1;}
-  (void)__sync_lock_test_and_set(&s->flight->state,FL_IDLE);
+  (void)__sync_lock_test_and_set(&s->flight->state,FL_IDLE);s->event_timer=0;
  }
  if(!ap_live(s,e)||mu_inner_socket_tick(&s->socket,e)!=1){
   mu_inner_session_stop(s);return -1;
@@ -112,6 +113,20 @@ int mu_inner_session_dispatch_command(MuInnerSession *s,uint64_t e,MuInnerStockC
  return stock(session,flags,command,qualifier,params,response);
 }
 
+int mu_inner_session_tick_at(MuInnerSession *s,uint64_t e,uint64_t now){
+ if(!s||!s->active||e!=s->airplay.epoch)return -1;
+ if(s->flight&&flight_state(s->flight)==FL_PENDING){
+  if(!s->event_timer){s->event_started_ms=now;s->event_timer=1;}
+  if(now<s->event_started_ms||now-s->event_started_ms>=5000u){
+   mu_inner_session_stop(s);return -1;
+  }
+ }
+ int r=mu_inner_session_tick(s,e);
+ if(r==1&&s->flight&&!s->event_timer&&flight_state(s->flight)==FL_PENDING){
+  s->event_started_ms=now;s->event_timer=1;
+ }
+ return r;
+}
 /* R105.035 / R105.037: actual original return VA 0x2cadc.
  * Other stock call at 0x2ccc4 returns 0x2ccc8 and is never intercepted. */
 int mu_inner_session_dispatch_at(MuInnerSession *s,uint64_t e,MuInnerStockControl stock,

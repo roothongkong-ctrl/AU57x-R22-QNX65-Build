@@ -21,6 +21,8 @@ typedef struct {
  int (*peer)(void *,int,uint64_t);
  uint64_t last_epoch;
  MuInnerEventFlight *flight;
+ uint64_t event_started_ms;
+ int event_timer;
  int active;
 } MuInnerSession;
 int mu_inner_session_start(MuInnerSession *,void *,void *,uint64_t,
@@ -48,6 +50,9 @@ int mu_inner_session_dispatch_command(MuInnerSession *,uint64_t,MuInnerStockCont
  * only after independently confirmed old callback drain. */
 int mu_inner_session_track_events(MuInnerSession *,MuInnerEventFlight *);
 int mu_inner_event_reclaim(MuInnerEventFlight *,int original_drain_confirmed);
+/* Monotonic owner tick for tracked sender. A provisional 5s completion
+ * timeout retires the session; it does NOT cancel the original request. */
+int mu_inner_session_tick_at(MuInnerSession *,uint64_t,uint64_t);
 /* Only the exact ARM BL return address of the original HTTP command
  * handler may intercept; all other calls use the original target.
  * The load bias must come from an independently verified mapped image. */
