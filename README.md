@@ -50,3 +50,8 @@ Clarifies the separate mm-ipod physical plugin and ipod-drvr-iap2 internal compo
 ## R105.003 — factory iAP2 route review
 
 Re-prioritizes the native MU1005 iAP2 path around the actual config consumer, `iap2_init` component factory/identifier map, and BlueSDK data producer. R88 host server-first adapter is retained; R100 runtime gates remain blocking; R99 staging is not an activation proof. See [docs/R105_003_FACTORY_IAP2_ROUTE_REVIEW_CN.md](docs/R105_003_FACTORY_IAP2_ROUTE_REVIEW_CN.md). NO_INSTALL.
+
+
+## R105.004 — passive OEM iAP2/BT probe
+
+Adds a one-shot read-only QNX inventory extending R93: process maps, loaded iAP2 driver, actual connectivity/bluetooth/iap2 config paths, and private SD-side config copies. No firmware/config mutation or service restart. See [docs/R105_004_READONLY_PROBE_CN.md](docs/R105_004_READONLY_PROBE_CN.md). Not executed on vehicle; NO_INSTALL.
