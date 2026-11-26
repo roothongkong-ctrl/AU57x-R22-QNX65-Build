@@ -9,7 +9,7 @@ INC="-Isrc/bluetooth -Iproject/source/legacy_mu1005/bluetooth -Ix3/src"
 CFLAGS="-std=c11 -O2 -Wall -Wextra -Werror -fPIC -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp $INC"
 SRC=(
   src/bluetooth/native_binding.c
-  src/bluetooth/bt_route_gate.c
+  project/source/legacy_mu1005/bluetooth/bt_route_gate.c
   x3/src/mu1005_owner_gate.c
   project/source/legacy_mu1005/bluetooth/native_event.c
   project/source/legacy_mu1005/bluetooth/inbound_r5.c
