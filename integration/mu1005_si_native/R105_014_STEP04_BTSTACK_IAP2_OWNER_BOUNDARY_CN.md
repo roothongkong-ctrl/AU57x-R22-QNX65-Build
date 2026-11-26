@@ -80,3 +80,14 @@ R101 的 HFP=7 / SIM=4 只说明不同服务使用不同注册参数；第三参
 - R45/R98 production owner binding：NOT_PROVEN
 - QNX runtime / iPhone MFi / vehicle：NOT_TESTED
 - installable / safe_to_flash：false
+
+## GitHub 自动门禁实测（2026-11-26）
+
+R105 host-only workflow run `45764929332` 已完成 SUCCESS。第 04 步新增的 5 项审计门禁全部 PASS：
+- 三份原厂 ELF 指纹固定；
+- Bluetooth app 的 iAP 标记与 DSI 服务类被正确归类为控制面；
+- btstack 的 SDP/RFCOMM job 与 tracing 被正确归类为通用协议设施；
+- ASI iAP proxy 未被误称为 RFCOMM 原始字节传输；
+- 所有未证明的 iAP2 owner / SCN / callback / installable 状态继续 fail-closed。
+
+本次 CI 是对静态审计记录的主机检查，不执行原厂 QNX ELF，不证明真实 owner 已绑定。
