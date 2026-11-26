@@ -24,11 +24,25 @@ static int yes_profile(void*p,uint8_t *v){
  Fixture*f=p;if(!f->profile)return 0;
  *v=(uint8_t)(f->profile==2?0:f->profile==3?31:5);return 1;
 }
-static int dummy_read(void*p,uint32_t a,void*b,size_t n){(void)p;(void)a;(void)b;(void)n;return 1;}
+static int dummy_read(void*p,uint32_t a,void*b,size_t n){
+ Fixture*f=p;uint32_t word=0;
+ if(n!=4)return 0;
+ switch(a){
+ case 0x24dca8u:word=0xe3a02004u;break;
+ case 0x24dcacu:word=0xeb00a759u;break;
+ case 0x277a18u:word=0xe92d4070u;break;
+ case 0x277a6cu:word=0xe5c4608bu;break;
+ case 0x277a74u:word=0xe1c468b6u;break;
+ default:return 0;
+ }
+ if(f->profile==4&&a==0x24dca8u)word=0;
+ for(unsigned i=0;i<4;i++)((uint8_t*)b)[i]=(uint8_t)(word>>(8*i));
+ return 1;
+}
 static int dummy_auth(void*p,uint32_t a,const uint8_t b[6]){(void)p;(void)a;(void)b;return 1;}
 static int fake_attach(void*p,const MuBtOwner*owner,int fd){Fixture*f=p;struct sockaddr_in sa;socklen_t n=sizeof sa;
  assert(owner->opaque==p);
- assert(owner->rf_arg3_snapshot_valid==1u && owner->rf_arg3_snapshot==5u);
+ assert(owner->rf_arg3_snapshot_valid==1u && owner->rf_arg3_snapshot==(owner->iap2_profile_proven?5u:4u));
  assert(getpeername(fd,(struct sockaddr*)&sa,&n)==0);
  assert(sa.sin_addr.s_addr==htonl(INADDR_LOOPBACK));assert(fcntl(fd,F_GETFD)&FD_CLOEXEC);
  f->got_fd=fd;f->calls++;return f->attach;
@@ -73,7 +87,14 @@ static void adopt_cases(void){
  v.deny_at=0;v.calls=0;
  assert(au98_adopt(&h,&k,&o,fd,port==65535?port-1:port+1,witness,&v)==-1&&!v.calls);
  f.thread=0;assert(au98_adopt(&h,&k,&o,fd,port,witness,&v)==-1&&!f.calls);f.thread=1;
+ /* Reuse the actual MU1005 credit setting without a separate iAP2
+  * profile callback; the fixture reproduces only the stock words. */
+ o.iap2_profile_proven=NULL;f.profile=4;
+ assert(au98_adopt(&h,&k,&o,fd,port,witness,&v)==-1&&!f.calls);
+ f.profile=1;
  assert(au98_adopt(&h,&k,&o,fd,port,witness,&v)==0&&h.fd==fd&&f.calls==1);
+ assert(h.native_owner.rf_arg3_snapshot==4u);
+ puts("PASS pinned MU1005 stock initial four-credit trial selection");
  assert(au98_withdraw(&h,barrier,&ok)==0&&h.fd==-1);close(peer);close(l);
  puts("PASS prepared daemon fd adoption: no blocking connect and exact attestation");
 }

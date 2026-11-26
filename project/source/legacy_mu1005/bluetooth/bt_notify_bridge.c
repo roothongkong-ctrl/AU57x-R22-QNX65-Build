@@ -75,7 +75,7 @@ static int bind_common(const MuBtNotifyBinding*b,int queue_only){
  !b->policy.safe_dispatch||!b->policy.wired_idle||!b->policy.withdraw_barrier||!b->policy.reclaimed||
  !b->proof.original_image_verified||!b->proof.on_original_iap2_owner||!b->proof.original_iap2_service_verified||
  !b->owner.owner_ready||!b->owner.read_live||!b->owner.transport_ready||!b->owner.paired_authorized||
- !b->owner.iap2_profile_proven||!b->daemon_verified||
+ !b->daemon_verified||
  au100_route_select(b->proof.route_evidence)!=AU100_GRAFT_RFCOMM_ROUTE||!safe(b)||
  !mu_bt_sdk_started(b->owner.services_address,b->owner.read_live,b->owner.opaque)||
  !mu_bt_comm_words_match(b->owner.comm_load_bias,b->owner.read_live,b->owner.opaque)||

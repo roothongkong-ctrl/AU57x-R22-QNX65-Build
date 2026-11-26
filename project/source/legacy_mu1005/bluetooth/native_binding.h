@@ -9,7 +9,8 @@ typedef struct {
  int (*transport_ready)(void *); /* authenticated local endpoint ready */
  int (*read_live)(void *,uint32_t,void *,size_t); /* checked executable/object/peer reads, scoped to verified lifetime */
  int (*paired_authorized)(void *,uint32_t,const uint8_t[6]);
- /* Historical callback name retained; attest initial RX credits 1..7, not SCN. */
+ /* Optional explicit initial RX credits 1..7, not SCN. NULL selects the
+  * pinned MU1005 stock four-credit first-connect parameter in R98. */
  int (*iap2_profile_proven)(void *,uint8_t *profile);
  /* R101: freeze the externally attested arg3 once per original owner
   * generation, before opening TCP or calling any native RF/SDP function.

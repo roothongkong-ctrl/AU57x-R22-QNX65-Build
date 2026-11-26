@@ -23,6 +23,30 @@ static int oem_ok(const Au98Handoff *s){
         h->original_iap2_service_verified(h->opaque)==1 &&
         s->native_owner.owner_ready(s->native_owner.opaque)==1;
 }
+/* For the pinned MU1005 SDK, the native 0x24dcac caller uses four
+ * initial RX credits (MOV r2,#4 at 0x24dca8). The registration function
+ * stores the third argument as its initial credit budget. Use that
+ * known SDK parameter for the first-connect trial, not the donor's zero.
+ * It is a valid stock parameter, not proof that iAP2 is already working.
+ * A supplied profile provider remains authoritative, including denial. */
+static int first_connect_arg(const MuBtOwner *o,uint8_t *arg){
+ static const struct {uint32_t va,word;} sites[]={
+  {0x24dca8u,0xe3a02004u},{0x24dcacu,0xeb00a759u},
+  {0x277a18u,0xe92d4070u},{0x277a6cu,0xe5c4608bu},
+  {0x277a74u,0xe1c468b6u}
+ };
+ if(o->iap2_profile_proven)
+  return mu_rf_arg_choose(o->iap2_profile_proven,o->opaque,arg);
+ for(size_t i=0;i<sizeof sites/sizeof sites[0];i++){
+  uint8_t bytes[4]={0};
+  if(o->read_live(o->opaque,sites[i].va,bytes,sizeof bytes)!=1||
+     ((uint32_t)bytes[0]|((uint32_t)bytes[1]<<8)|
+      ((uint32_t)bytes[2]<<16)|((uint32_t)bytes[3]<<24))!=sites[i].word)
+   return MU_RF_ARG_DENY;
+ }
+ *arg=4;
+ return MU_RF_ARG_VERIFIED;
+}
 static int connected(unsigned port){
  struct sockaddr_in peer,actual;
  socklen_t len;
@@ -68,7 +92,7 @@ int au98_publish(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*owner,unsigned 
     !h->original_image_verified||!h->on_original_iap2_owner||
     !h->original_iap2_service_verified||!h->attach||!h->tick||!h->withdraw||
     !owner->owner_ready||!owner->transport_ready||!owner->read_live||
-    !owner->paired_authorized||!owner->iap2_profile_proven)return -1;
+    !owner->paired_authorized)return -1;
 #if !defined(AU57X_R98_HOST_TEST) || AU57X_R98_HOST_TEST!=1
  if(port!=57342u)return -1;
 #endif
@@ -77,7 +101,7 @@ int au98_publish(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*owner,unsigned 
     h->original_iap2_service_verified(h->opaque)!=1||
     owner->owner_ready(owner->opaque)!=1||
     owner->transport_ready(owner->opaque)!=1||
-    mu_rf_arg_choose(owner->iap2_profile_proven,owner->opaque,&candidate_scn)!=MU_RF_ARG_VERIFIED)return -1;
+    first_connect_arg(owner,&candidate_scn)!=MU_RF_ARG_VERIFIED)return -1;
  fd=connected(port);if(fd<0)return -1;
  /* connect can block for up to one second. Recheck every owner claim
   * immediately before first native attach, not just before opening TCP.
@@ -131,14 +155,14 @@ int au98_adopt(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*o,
     !h->original_image_verified||!h->on_original_iap2_owner||
     !h->original_iap2_service_verified||!h->attach||!h->tick||!h->withdraw||
     !o->owner_ready||!o->transport_ready||!o->read_live||
-    !o->paired_authorized||!o->iap2_profile_proven||!verified)return -1;
+    !o->paired_authorized||!verified)return -1;
 #if !defined(AU57X_R98_HOST_TEST) || AU57X_R98_HOST_TEST!=1
  if(port!=57342u)return -1;
 #endif
  if(h->on_original_iap2_owner(h->opaque)!=1||h->original_image_verified(h->opaque)!=1||
     h->original_iap2_service_verified(h->opaque)!=1||o->owner_ready(o->opaque)!=1||
     o->transport_ready(o->opaque)!=1||!socket_ready(fd,port)||verified(ctx,fd)!=1||
-    mu_rf_arg_choose(o->iap2_profile_proven,o->opaque,&arg)!=MU_RF_ARG_VERIFIED)return -1;
+    first_connect_arg(o,&arg)!=MU_RF_ARG_VERIFIED)return -1;
  if(!socket_ready(fd,port)||verified(ctx,fd)!=1||h->on_original_iap2_owner(h->opaque)!=1||
     h->original_image_verified(h->opaque)!=1||h->original_iap2_service_verified(h->opaque)!=1||
     o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
