@@ -88,3 +88,10 @@ Luka 的 MHI2Q MU1316 公开实车笔记记录其无线电扫描只有 2.4 GHz�
 **新的优先方向是：先查本车原厂 Type-3/driver 是否已经提供可接入的 iAP2 传输层，避免重复实现 stock 已经拥有的 iAP2/MFi 功能；R103 保留为备用协议路线。**
 
 installable=false / safe_to_flash=false / vehicle_verified=false / mfi_apple_verified=false。
+
+
+## 精确车型公开资料检索补充
+
+对 `MHI2_CN_AU57x_K1006_2`、`MU1005`、`MHI2_CN_AU57x` 与 iAP2/RFCOMM 的精确 GitHub 关键词检索，没有找到可证明本车 MU1005 已有完整原生无线 CarPlay 实现的公开项目。检索到的同车型公开配置主要涉及有线 CarPlay 的仪表地图/双屏适配，不能作为无线链路证据。因此本报告将 MU1440/MH2p/MHI2Q 资料严格列为架构 donor，不把它们的地址、ELF、配置、profile 或设备路径直接套用到本车。
+
+这进一步支持“先审本车 Type-3/原厂 transport ABI，再决定是否自建 LinkEngine”的顺序。
