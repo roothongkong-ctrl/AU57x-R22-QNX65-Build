@@ -6,7 +6,7 @@ LABELS=("DRIVER_NOW","USB_NOW","DRIVER_LAZY")
 DETAIL=re.compile(r"^PRIVATE_LINKER_DETAIL (DRIVER_NOW|USB_NOW|DRIVER_LAZY) (.*)$")
 RESULT=re.compile(r"^IAP2_LOADER_(DRIVER_NOW|USB_NOW|DRIVER_LAZY)_(OK|BLOCKED)$")
 LIB=re.compile(r"(?<![A-Za-z0-9_.+-])(?:lib[A-Za-z0-9_+-]{1,80}\.so(?:\.[0-9]{1,8}){0,4})(?![A-Za-z0-9_.+-])")
-SYM=re.compile(r"(?:unresolved symbol|undefined symbol|symbol not found)\s*[:=]?\s*['\"]?([A-Za-z_][A-Za-z0-9_]{0,200})",re.I)
+SYM=re.compile(r"(?:unresolved symbol|undefined symbol|symbol not found)\b\s*[:=]?\s*['\"]?([A-Za-z_][A-Za-z0-9_]{0,200})",re.I)
 def classify(lines):
     out={k:{"result":"not_observed","classes":[],"libraries":[],"symbols":[]} for k in LABELS}
     for line in lines:
@@ -38,6 +38,8 @@ def selftest():
         "PRIVATE_LINKER_DETAIL UNKNOWN secret /path",
         "unlabelled private raw text"])
     assert x["DRIVER_NOW"]["symbols"]==["example_init"]
+    assert classify(["PRIVATE_LINKER_DETAIL DRIVER_NOW Unresolved symbols"])["DRIVER_NOW"]["symbols"]==[]
+    assert classify(["PRIVATE_LINKER_DETAIL DRIVER_NOW Unresolved symbols"])["DRIVER_NOW"]["classes"]==["symbol_resolution"]
     assert x["USB_NOW"]["result"]=="ok"
     assert x["DRIVER_LAZY"]["libraries"]==["libexample.so.1"]
     assert "secret" not in json.dumps(x)

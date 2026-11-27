@@ -1,4 +1,4 @@
-name: R105.134 original iAP2 linker cause isolation (NO INSTALL)
+name: R105.136 iAP2 host symbol provider and loader evidence (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -89,6 +89,8 @@ jobs:
           fi
           qemu-system-arm --version | tee qnx-runtime-evidence/qemu-version.log
           sha256sum toolchain/tests/qemu/{startup-virt,libstartup.a,devc-serdebug,u-boot.bin} toolchain/tests/qemu-run.sh | tee qnx-runtime-evidence/boot-inputs.sha256
+      - name: Check exact symbol provider candidates before QNX build
+        run: python3 lab/mu1005_original_ipod/symbol_providers.py "$RUNNER_TEMP/oem-launch-private" toolchain qnx-runtime-evidence/ipod-symbol-providers.json
       - uses: actions/cache/restore@v4
         id: gnu-cache
         with:
@@ -115,7 +117,7 @@ jobs:
           QEMU_KEEP_LOG="$RUNNER_TEMP/ipod-serial.log" QEMU_TIMEOUT=120 QEMU_RUN_SECS=75 sh toolchain/tests/qemu-run.sh "$PWD/qnx-runtime-evidence/mu1005-ipod-witness" 8.5 > "$RUNNER_TEMP/ipod-runtime.log" 2>&1 || rc=$?
           python3 lab/mu1005_original_ipod/classify_linker.py qnx-runtime-evidence/ipod-linker.json "$RUNNER_TEMP/ipod-runtime.log"
           echo "WRAPPER_EXIT=$rc" > qnx-runtime-evidence/ipod-result.txt
-          grep -E '^IAP2_' "$RUNNER_TEMP/ipod-runtime.log" | tee -a qnx-runtime-evidence/ipod-result.txt
+          tr -d '\r' < "$RUNNER_TEMP/ipod-runtime.log" | grep -E '^IAP2_' | tee -a qnx-runtime-evidence/ipod-result.txt
           grep -F IAP2_ORIGINAL_BYTES_OK qnx-runtime-evidence/ipod-result.txt
           grep -E '^IAP2_LOADER_DRIVER_NOW_(OK|BLOCKED)$' qnx-runtime-evidence/ipod-result.txt
           grep -E '^IAP2_LOADER_USB_NOW_(OK|BLOCKED)$' qnx-runtime-evidence/ipod-result.txt
@@ -124,9 +126,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r105134-ipod-linker-evidence-NO-INSTALL
+          name: r105136-ipod-symbol-evidence-NO-INSTALL
           path: |
             qnx-runtime-evidence/staged.json
             qnx-runtime-evidence/ipod-result.txt
             qnx-runtime-evidence/ipod-linker.json
+            qnx-runtime-evidence/ipod-symbol-providers.json
           retention-days: 30
