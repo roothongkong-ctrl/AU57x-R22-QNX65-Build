@@ -70,6 +70,9 @@ struct cp_cloud_pipeline {
  int remote_start_confirmed,remote_snapshot_fresh;
  /* Historical bootstrap evidence, never a substitute for live inner MFi. */
  int remote_bootstrap_committed;
+ /* Historical only: never grants media or live session authority. */
+ int first_authenticated_session_seen;
+ uint64_t first_authenticated_session_ms;
  int remote_media,remote_inner;
  unsigned remote_channels;
  uint64_t remote_sample_ms;
@@ -127,6 +130,11 @@ int cp_cloud_remote_live_at(const struct cp_cloud_pipeline *,uint64_t now_ms);
  * Still requires the actual same-session OEM video and inner MFi witnesses.
  * Not an assertion of LCD output or full CarPlay feature completion. */
 int cp_cloud_remote_video_at(const struct cp_cloud_pipeline *,uint64_t now_ms);
+/* Separate first authenticated session from first video. Current observation
+ * requires fresh op11 and independent original-owner proof; history survives
+ * disconnect until cp_cloud_init. Neither is a media grant. */
+int cp_cloud_remote_session_at(const struct cp_cloud_pipeline *,uint64_t now_ms);
+int cp_cloud_first_session_seen(const struct cp_cloud_pipeline *);
 /* Normal idle STOP only; preserves R79 streaming BUSY semantics and waits
  * for DIO's actual original restore ACK. For wired takeover, the owner first
  * calls cp_cloud_wired_preempt(), then repeatedly calls drive_remote_dio()

@@ -639,6 +639,16 @@ static int remote_steady_proof(struct cp_cloud_pipeline *p){
 /* First-video observation, not full media or an assertion that pixels
  * appeared on the physical LCD. Keep the existing op11 media=7 contract
  * until the original meanings of 0/4/5 are known. */
+int cp_cloud_first_session_seen(const struct cp_cloud_pipeline *p){
+ return p&&p->first_authenticated_session_seen==1;
+}
+int cp_cloud_remote_session_at(const struct cp_cloud_pipeline *s,uint64_t now){
+ struct cp_cloud_pipeline *p=(struct cp_cloud_pipeline *)s;
+ return p&&!p->stopped&&p->remote_phase==2&&p->remote_snapshot_fresh&&
+    p->remote_bootstrap_committed&&
+    (p->handoff.phase==CP_HO_INNER_IAP_AUTH||p->handoff.phase==CP_HO_MEDIA_ACTIVE)&&
+    now>=p->remote_sample_ms&&now-p->remote_sample_ms<=500&&remote_inner_proof(p);
+}
 int cp_cloud_remote_video_at(const struct cp_cloud_pipeline *s,uint64_t now){
  struct cp_cloud_pipeline *p=(struct cp_cloud_pipeline *)s;
  if(!p||p->remote_phase!=2||!p->remote_snapshot_fresh||
@@ -753,6 +763,10 @@ int cp_cloud_drive_remote_dio(struct cp_cloud_pipeline *p,uint64_t now){
   * Only an explicit native BT close event retires the physical link. */
  if(p->handoff.phase==CP_HO_INNER_IAP_AUTH||p->handoff.phase==CP_HO_MEDIA_ACTIVE)
   p->remote_bootstrap_committed=1;
+ if(!p->first_authenticated_session_seen&&cp_cloud_remote_session_at(p,now)){
+  p->first_authenticated_session_ms=now;
+  p->first_authenticated_session_seen=1;
+ }
  if(!remote_steady_proof(p))return CP_CLOUD_RETRY;
  if(p->handoff.phase==CP_HO_INNER_IAP_AUTH&&
     cp_ho_signal(&p->handoff,p->epoch,CP_HO_EV_MEDIA_CONFIRMED,1)!=CP_HO_OK)
