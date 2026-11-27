@@ -165,3 +165,6 @@ R105.165 run46013467170 4/4及回归46013466993 4/4成功；原始日志 parser-
 
 ## 24. R105.167 第8项对象上游与真实解析库ABI
 R105.166 run46014286871：donor job140557318887、config-contract job140557318270、reader-object job140557319018成功。donor仅证明原方案有connectivity.json事务与btstack wrapper，不证明MU1005运行；原始配置对比只改exec，原厂parser未执行。原始指令parser-b 0x11799c r1=sl、0x1179a0 r2=sp+0x110、0x1179a4 r3=0、0x1179a8 r0=fp，sl来自UnicodeString utf8返回对象分支；0x117954 r1=[sp+0xe0]。Provider入口0x128058，构造0x1280f0 r1=sb来自[r8+8]、r2=r8来自[sl+8]，初始r8=r1、sl=r2。新专项追踪0x128058直接调用者、sp+dc/e0写入及原厂libutil.so真实定义的构造/析构/parseFileToArray ABI。只保留静态证据，不猜对象尺寸或执行未知ABI，不重复R105.165/166。现有native-preflight job140557318911仍运行，已进入缓存后的QEMU环境步骤；新增2路专项加4路自动回归及现有1路，预算7。第8项未完成，下一项未开始。若无上游关联，停止同类扫描，采用原厂只读运行证据。NO INSTALL。
+
+## 25. R105.168 第8项原厂库预检路径修复
+R105.166 native-preflight job140557318911实际失败：SDK_CONFIRMED_PIC_LINK_OK，BT_PINNED_SDK_RUNTIME_STAGED，REAL_LOGGING_PROVIDER_STAGED均成功；ARM链接器cannot open output file /home/runner/work/.../qnx-runtime-evidence/reader/step8-parser: No such file or directory。宿主绝对路径错误传入容器，实际映射/src。只改编译输出为/src/qnx-runtime-evidence/reader/step8-parser，宿主检查产物非空，保留原QNX预检，不改变原厂文件/ABI，不重复其他三路。R105.167 run46014738003两路成功，producer实际发现Provider入口直接调用者0x122e88、0x123548；UnicodeString栈槽只得到读取，未找到写入；native-abi输出libraries=[]，尚未找到带非零大小的定义函数，不能说解析库ABI确认。该项仍未完成。新增1专项+4自动回归，require-cache=true，无完整编译器重建；不启动第9项。NO INSTALL。

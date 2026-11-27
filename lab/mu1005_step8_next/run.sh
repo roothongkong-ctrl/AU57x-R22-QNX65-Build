@@ -49,7 +49,9 @@ mkdir -p "$out"
 cp "$p/staged.json" "$p/sdk.json" "$out/"
 python3 lab/mu1005_slogf_trial/stage_provider.py "$RUNNER_TEMP/combined" "$private" sdk "$out/provider.json" "$ROOT/qnx-runtime-evidence/liblab-slogf.so"
 test -s "$private/libutil.so"
-docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src "$sdk_image" "$gcc" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 lab/mu1005_step8_next/parser_probe.c -lc -o "$out/step8-parser"
+docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src "$sdk_image" "$gcc" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 lab/mu1005_step8_next/parser_probe.c -lc -o /src/qnx-runtime-evidence/reader/step8-parser
+ test -s "$out/step8-parser"
+ echo R105168_CONTAINER_OUTPUT_PATH_OK
 runner="$ROOT/toolchain/tests/qemu-step8.sh"
 cp toolchain/tests/qemu-run.sh "$runner"
 python3 lab/mu1005_oem_launch/prepare_ifs.py "$runner" "$private" baseline
