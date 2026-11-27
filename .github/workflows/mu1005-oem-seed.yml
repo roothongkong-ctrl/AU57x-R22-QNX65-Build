@@ -2,7 +2,7 @@ name: MU1005 OEM seed verification (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [oem_inputs/mu1005/**, .github/workflows/mu1005-oem-seed.yml]
+    paths: [oem_inputs/mu1005/**, .github/workflows/mu1005-oem-seed.yml, tools/mu1005_oem_trace_anchors.py]
   workflow_dispatch:
 permissions:
   contents: read
@@ -18,3 +18,8 @@ jobs:
             exit 0
           fi
           python3 oem_inputs/mu1005/verify_seed.py "${RUNNER_TEMP}/mu1005-oem"
+      - name: Verify original uploaded ELF trace and lifecycle anchors
+        run: |
+          set -euo pipefail
+          test -f "${RUNNER_TEMP}/mu1005-oem/oem/eso/bin/apps/btstack"
+          python3 tools/mu1005_oem_trace_anchors.py "${RUNNER_TEMP}/mu1005-oem/oem/eso/bin/apps/btstack"

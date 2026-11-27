@@ -9,8 +9,13 @@ with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     page = browser.new_page(accept_downloads=True)
     page.goto(PAGE, wait_until="domcontentloaded", timeout=60000)
-    label = page.get_by_text(NAME, exact=True).first
-    label.wait_for(timeout=30000)
+    label = page.get_by_text(NAME, exact=False).first
+    try:
+        label.wait_for(timeout=30000)
+    except Exception:
+        print("MIRROR_PAGE_TITLE", page.title(), "STATUS", flush=True)
+        print("MIRROR_FILENAME_PRESENT", NAME in page.locator("body").inner_text()[:200000], flush=True)
+        raise
     # Select only the nearest card containing this exact filename and a single Download control.
     card = label
     control = None
