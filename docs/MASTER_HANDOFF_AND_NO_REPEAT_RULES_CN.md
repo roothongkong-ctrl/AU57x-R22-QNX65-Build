@@ -14,7 +14,7 @@
 
 ## 2. 当前状态和下一任务（R105.156 → 后续）
 
-**下一任务：先核实 R105.156 的 reader-targets / boot-path 两路实际结果，再决定后续修改。** 当前连接器只返回 PR 触发的 commit runs，未找到此次 push workflow；不能认定运行完成或失败。可在 [Actions 工作流](../.github/workflows/r105156-config-reader.yml) 对应的 Actions 页面查询；若权限允许，按真实 run ID 检查 jobs、必要日志和 artifact。不重复触发已成功任务。
+**下一任务 R105.157：停止重复配置 reader 静态扫描，将 R105.155 只读实车探测列为待办，优先推进真实 RFCOMM/iAP2 原厂接入证据。** 已通过 GitHub repository Actions runs GET 查到 R105.156 run 45998478475，两个 job 均 SUCCESS；原始日志分别明确打印 R105156_EVIDENCE_ONLY_NOT_CONSUMER_VERIFIED。reader-targets 解码两个 callee 但没有证明配置 consumer；boot-path 扫描201个文本文件，找到启动脚本路径候选，未证明实车挂载或生效。保留首连配置第03步90%，不重跑此测试。
 
 - R105.156：[报告](R105156_CONFIG_READER_CN.md)。Bluetooth enableIap 已知调用链继续追踪 0x15619c → 0x21d814 / 0x21cc68，另核对 stage2 启动路径，避免再次全量 marker/ABI/NAS 扫描。
 - 若两路提供新 reader/路径证据，记录实际结果及仍缺的运行时生效证明；若无新证据，停止同类反复扫描，将只读配置路径、真实 reader、生效和受控回滚验证合并为一次实车探测待办，转向 RFCOMM/iAP2 真实接入、原厂 MFi、AP owner、AirPlay 首连。不允许以静态候选代替运行证据。
@@ -31,9 +31,11 @@
 | R105.153 | 4/4 新增及 12/12 回归通过（仓库报告）；热点控制权仍需 OEM provider | [153](R105153_AP_OWNER_CN.md) |
 | R105.154 | R105.156 报告记录 31/31 原厂直接依赖在 fork 子进程 dlopen NOW 成功；旧 R105.151 31 次 SPAWN_FAIL 不算成功；不是 OEM 服务正常运行 | [154](R105154_CI_EVIDENCE_CN.md) / [156](R105156_CONFIG_READER_CN.md) |
 | R105.155 | 已直接查询 GitHub：host-fixture 和 qnx-read-only-probe 两项成功；报告记载 probe exit0，artifact 15196840612；未在实车运行 | [报告](R105155_CONFIG_PATH_CN.md) / [run 45995760126](https://github.com/roothongkong-ctrl/AU57x-R22-QNX65-Build/actions/runs/45995760126) |
-| R105.156 | 本轮确认源码已提交，push run 最终结果未核实 | [报告](R105156_CONFIG_READER_CN.md) / [commit](https://github.com/roothongkong-ctrl/AU57x-R22-QNX65-Build/commit/88b0ceace9e8da91b03f33188eb61f9271a2cc95) |
+| R105.156 | 实际 run 45998478475 两路 SUCCESS，job 140503777308 / 140503777888，artifact 15196748262 / 15197356418；静态候选证据，非真实 reader 生效 | [报告](R105156_CONFIG_READER_CN.md) / [commit](https://github.com/roothongkong-ctrl/AU57x-R22-QNX65-Build/commit/88b0ceace9e8da91b03f33188eb61f9271a2cc95) |
 
 R106 实车已有：原厂进程、2.4GHz AP association、有线 CarPlay 视频音频等证据；没有真实无线 CarPlay、真实无线 MFi、真实 5GHz 的成功证据。
+
+最新通用 SI/CPRX workflow run 46001009254 SUCCESS（文档 HEAD 6c912abd）；两次纯文档提交仍触发该 workflow，后续应核对触发过滤器，不能说已避免无关 CI。
 
 ## 4. 固定22步主表及历史资料
 
