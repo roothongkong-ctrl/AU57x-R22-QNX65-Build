@@ -1,0 +1,41 @@
+name: 'R12 synchronized original 70pct card over clean 111 map - SOURCE ONLY'
+on:
+  push:
+    branches: [experiment/cluster-card-r12-synced-original-card]
+    paths:
+      - 'experiments/cluster-compact-card/r12/**'
+      - '.github/workflows/cluster-card-r12-sync-join.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sync-and-compose:
+    name: ${{ matrix.variant }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        variant: [gcc-debug, gcc-release, gcc-sanitize, gcc-ubsan, clang-release, clang-sanitize]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile R12 real dual frame joiner and run session tests
+        shell: bash
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          set -euo pipefail
+          CXX=g++ FLAGS="-std=c++11 -pthread -O0 -g -Wall -Wextra -Werror -pedantic"
+          case "$VARIANT" in
+            gcc-debug) ;;
+            gcc-release) FLAGS="-std=c++11 -pthread -O2 -g -Wall -Wextra -Werror -pedantic";;
+            gcc-sanitize) FLAGS="$FLAGS -fsanitize=address,undefined -fno-omit-frame-pointer";;
+            gcc-ubsan) FLAGS="$FLAGS -fsanitize=undefined -fno-omit-frame-pointer";;
+            clang-release) CXX=clang++;FLAGS="-std=c++11 -pthread -O2 -g -Wall -Wextra -Werror -pedantic";;
+            clang-sanitize) CXX=clang++;FLAGS="$FLAGS -fsanitize=address,undefined -fno-omit-frame-pointer";;
+            *)exit 2;;
+          esac
+          "$CXX" $FLAGS experiments/cluster-compact-card/r12/test_joiner.cpp -o /tmp/r12-test
+          /tmp/r12-test
+          echo "PASS $VARIANT, SOURCE-ONLY, NO iPhone/GaoDe type112 evidence"
