@@ -32,3 +32,58 @@ jobs:
             nasmusic-ci/TestResults/*.json
             nasmusic-ci/TestResults/*.xcresult
           retention-days: 1
+
+  device-build:
+    if: github.event_name == 'pull_request' && github.head_ref == 'nasmusic-ios-ci-v092'
+    runs-on: macos-15
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: nasmusic-ci
+    steps:
+      - uses: actions/checkout@v4
+      - run: command -v xcodegen >/dev/null || brew install xcodegen
+      - name: Compile iPhone device target without signing
+        run: |
+          set -o pipefail
+          mkdir -p TestResults
+          xcodegen generate
+          xcodebuild -project NASMusic.xcodeproj -scheme NASMusic -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath TestResults/DeviceBuild CODE_SIGNING_ALLOWED=NO build 2>&1 | tee TestResults/device-build.log
+          test -d TestResults/DeviceBuild/Build/Products/Release-iphoneos/NASMusic.app
+          mkdir -p TestResults/Payload
+          cp -R TestResults/DeviceBuild/Build/Products/Release-iphoneos/NASMusic.app TestResults/Payload/
+          cd TestResults
+          zip -qry NASMusic-CI-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nasmusic-device-unsigned-test-only
+          path: |
+            nasmusic-ci/TestResults/device-build.log
+            nasmusic-ci/TestResults/NASMusic-CI-unsigned.ipa
+          retention-days: 1
+  source-audit:
+    if: github.event_name == 'pull_request' && github.head_ref == 'nasmusic-ios-ci-v092'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: nasmusic-ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify sanitized inputs and JS syntax
+        run: |
+          node --check Integration/native-music.js
+          python3 -m py_compile Scripts/select_simulator.py
+          bash -n Scripts/xcode_test.sh
+          python3 - <<'PY'
+          import pathlib
+          base = pathlib.Path('.')
+          code = (base/'Sources/NativeQueue.swift').read_text()
+          assert 'https://example.invalid:1232' in code
+          assert 'UIBackgroundModes: [audio]' in (base/'project.yml').read_text()
+          for f in base.rglob('*'):
+              if f.is_file():
+                  assert not any(x in f.name.lower() for x in ('.p12', '.mobileprovision', '.spk'))
+          print('PASS: sanitized host, background audio configuration, no signing files or NAS package')
+          PY
