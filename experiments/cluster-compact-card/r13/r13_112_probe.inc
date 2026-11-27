@@ -98,9 +98,16 @@ static void *r13_card_worker(void *arg)
     int listener=(int)(intptr_t)arg;
     int fd;
     unsigned configs=0,frames=0,decrypted=0,rejects=0;
-    uint64_t bytes=0;
+    uint64_t bytes=0,probe_stream=0;
+    struct alt111_video parsed112;
+    alt111_video_init(&parsed112);
+    probe_stream=alt111_video_begin(&parsed112,r13_session_connection);
     fd=accept(listener,NULL,NULL);
-    if(fd<0){logf_u2("R13 type112 accept unavailable errno=%d",errno);return NULL;}
+    if(fd<0){
+        logf_u2("R13 type112 accept unavailable errno=%d",errno);
+        alt111_video_destroy(&parsed112);
+        return NULL;
+    }
     pthread_mutex_lock(&r13_lock);
     r13_client_fd=fd;
     pthread_mutex_unlock(&r13_lock);
@@ -120,10 +127,13 @@ static void *r13_card_worker(void *arg)
             if(rr<=0){free(body);break;}
         }
         if(h.opcode==K_SCREEN_VIDEO_CONFIG){
-            if(body&&h.bodySize>=7 && body[0]==1){
-                ++configs; /* AVCDecoderConfigurationRecord header. */
-                logf_u2("R13 type112 valid-looking avcC header received length=%u",h.bodySize);
-            }else ++rejects;
+            if(body && h.bodySize){
+                int crc=alt111_video_config(&parsed112,probe_stream,body,h.bodySize);
+                if(crc==ALT111_OK||crc==ALT111_RESTART_CONSUMER){
+                    ++configs;
+                    logf_u2("R13 type112 validated avcC config length=%u",h.bodySize);
+                }else ++rejects;
+            } else ++rejects;
         }else if(h.opcode==K_SCREEN_VIDEO_FRAME){
             if(!configs){++rejects;}
             else if(body&&h.bodySize){
@@ -132,10 +142,18 @@ static void *r13_card_worker(void *arg)
                 e=r13_aes_valid?g_aes_ctr_update(&r13_aes,body,h.bodySize,body):-1;
                 pthread_mutex_unlock(&r13_lock);
                 if(e==K_NO_ERR){
-                    ++decrypted; ++frames; bytes+=h.bodySize;
-                    if(frames<=3 || (frames%30)==0)
-                        logf_u2("R13 type112 decrypted encrypted frame count=%u bytes_total=%llu source=unverified",
-                                frames,(unsigned long long)bytes);
+                    uint64_t before=parsed112.source_aus;
+                    int parsed=alt111_video_submit(&parsed112,probe_stream,body,h.bodySize,1);
+                    ++decrypted; /* CTR call success alone proves NO plaintext integrity. */
+                    if(parsed==ALT111_WAIT && parsed112.source_aus>before){
+                        ++frames;bytes+=h.bodySize;
+                        if(frames<=3 || (frames%30)==0)
+                            logf_u2("R13 type112 validated H264 AU count=%u bytes_total=%llu (content still unverified)",
+                                    frames,(unsigned long long)bytes);
+                    }else{
+                        ++rejects;
+                        logf_u2("R13 type112 invalid H264 AU rc=%d; AES plaintext NOT confirmed",parsed);
+                    }
                 } else {++rejects;free(body);break;}
             }
         }else if(h.opcode!=K_SCREEN_KEEPALIVE&&
@@ -148,9 +166,10 @@ static void *r13_card_worker(void *arg)
         /* Bounded observational run: don't keep private stream alive indefinitely. */
         if(frames>=120u || rejects>=10u)break;
     }
-    logf_u2("R13 type112 SUMMARY connection=%llu configs=%u decrypted=%u frames=%u bytes=%llu rejects=%u (content NOT verified)",
+    logf_u2("R13 type112 SUMMARY connection=%llu avcC=%u ctrCalls=%u validatedH264=%u bytes=%llu rejects=%u (GaoDe content NOT verified)",
             (unsigned long long)r13_session_connection,configs,decrypted,frames,
             (unsigned long long)bytes,rejects);
+    alt111_video_destroy(&parsed112);
     pthread_mutex_lock(&r13_lock);
     if(r13_client_fd==fd)r13_client_fd=-1;
     pthread_mutex_unlock(&r13_lock);
