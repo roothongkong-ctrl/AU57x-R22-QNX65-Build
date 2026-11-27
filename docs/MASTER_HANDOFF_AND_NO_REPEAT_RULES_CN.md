@@ -216,3 +216,6 @@ R105.177 run46024744384/job140593107045 SUCCESS，artifact15211206944（11126字
 
 ## 41. R105.179 新3反汇编窗口修复
 R105.178 run46025185470/job140594643481 FAILURE；原厂app70提取及driver SHA检查通过，分析脚本 ValueError: raw branch not decoded，旧线性Capstone反汇编未到已知0x10680目标（具体阻断字节尚未保留，不能认定原厂逻辑错误）。本轮按4字节独立解码已限定ARM范围，保留无法解码间隙、ELF $a/$d/$t映射，不将已标记数据/Thumb当ARM；单独从已知0x10680分支目标及transport_recv_pkt入口取窗口，先写JSON再做入口验收，失败保留证据。无重复已过descriptor或功能测试，无QEMU，1路专项。第3项仍部分；不进入第4项，NO INSTALL。
+
+## 42. R105.179 实际验收及 R105.180 新3接口契约攻关
+R105.179 run46025407820/job140595421320 SUCCESS，artifact15210309557（3473字节，未过期）。原始日志0x10680 mov r0,r5；0x10684 add r1,r6,#0x14；0x10688 ldr r2,[r6,#0xc]；0x1068c实际调用link_send_raw_message 0x113a8，检查返回并在成功路径0x106ac MsgReply。接收入口transport_recv_pkt实际调用link_get_transport_data 0x12208、packet_parse_hdr及0x21468 link_handle_iap2pkt 0x12e00。至此原厂resmgr消息发送及内部接收静态链闭合，不等于无线producer。复核R105.011/012、R98/R99/R103、cp_step2_transport.h：现有RFCOMM桥非原厂插件ABI；优先保留原厂iAP2，已有桥可复用，但不能猜原厂函数参数。R105.180仅检查尚未闭合的真实参数与返回值：已知driver send/receive调用点及USB donor对应函数入口、已发现raw send和get transport data函数体，复用原始SHA固定的app70；不再测试旧消息回调或重跑整套回归。仅1路专项，提交前活动任务0；不会把USB donor当无线插件，真实owner/接线未验证，仍新3，未启动新4，NO INSTALL。

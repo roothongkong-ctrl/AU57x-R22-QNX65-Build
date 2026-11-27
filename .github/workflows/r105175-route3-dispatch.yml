@@ -1,4 +1,4 @@
-name: R105.179 route 3 independent ARM branch windows (NO INSTALL)
+name: R105.180 route 3 transport argument contract (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -66,12 +66,12 @@ jobs:
           mkdir -p "${RUNNER_TEMP}/combined"
           python3 tools/mu1005_extract_app70.py "$archive" "${RUNNER_TEMP}/app70/app.img"
           /tmp/mu1005-extract-venv/bin/python extractor/tools/extract_firmware.py --source "${RUNNER_TEMP}/app70/app.img" --output "${RUNNER_TEMP}/combined/app70" --variant 70 --qnxmount-root "$PWD/qnxmount" > evidence/app-summary.json
-      - name: Inspect only previously uncovered raw-message tail and receive entry
+      - name: Inspect new physical transport argument and return contract
         run: |
           /tmp/mu1005-extract-venv/bin/pip install capstone==5.0.3 pyelftools==0.31
-          /tmp/mu1005-extract-venv/bin/python lab/mu1005_route3_dispatch/route3_tail.py "$RUNNER_TEMP/combined" evidence/route3-tail.json
+          /tmp/mu1005-extract-venv/bin/python lab/mu1005_route3_dispatch/transport_contract.py "$RUNNER_TEMP/combined" evidence/route3-contract.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r105179-route3-tail-NO-INSTALL
-          path: evidence/route3-tail.json
+          name: r105180-route3-contract-NO-INSTALL
+          path: evidence/route3-contract.json
