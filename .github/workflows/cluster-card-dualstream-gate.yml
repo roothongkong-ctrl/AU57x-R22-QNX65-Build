@@ -30,5 +30,5 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/MacsInSpace/mib-cluster-map/v1.2.14/thirdparty/mhi2_altscreen_carplay/libaltscreen111_gen2.c -o /tmp/upstream111.c
           grep -q '#define K_STREAM_ALT 111' /tmp/upstream111.c
           grep -q 'static struct alt111_video g2_video;' /tmp/upstream111.c
-          grep -q 'static const char *nav_surface_url' /tmp/upstream111.c
+          grep -Fq 'static const char *nav_surface_url' /tmp/upstream111.c
           echo 'PASS upstream single-111 baseline; no 112 receiver or live card feed is proven'
