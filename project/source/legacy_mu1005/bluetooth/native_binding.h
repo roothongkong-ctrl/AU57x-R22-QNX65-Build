@@ -34,6 +34,8 @@ int mu_bt_native_attach(const MuBtOwner *,int fd);
  * daemon (type4 parser, one outstanding TX). Does not replace native owner,
  * peer authorization, or MFi proof. No actual startup caller yet. */
 int mu_bt_native_attach_ack(const MuBtOwner *,int fd,int (*ack_peer_ready)(void*,int));
+/* Context is borrowed only during the synchronous attach; never retained. */
+int mu_bt_native_attach_ack_context(const MuBtOwner *,int,int(*)(void*,int),void*);
 int mu_bt_native_tick(void);
 int mu_bt_native_discovery_ready(void);
 int mu_bt_native_eir_buffer_matches(const uint8_t*);

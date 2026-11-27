@@ -121,7 +121,7 @@ int mu_bt_native_refresh_eir(void){
  return 0;
 }
 #define RFN(type,a) ((type)(uintptr_t)(a))
-static int native_attach(const MuBtOwner *o,int fd,int (*ack_peer_ready)(void*,int)){
+static int native_attach(const MuBtOwner *o,int fd,int (*ack_peer_ready)(void*,int),void *ack_context){
  if(!o||!o->owner_ready||!o->transport_ready||!o->read_live||
     o->rf_arg3_snapshot_valid!=1u||o->rf_arg3_snapshot<1u||o->rf_arg3_snapshot>7u||
     res.attempted||fd<0||o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
@@ -129,7 +129,7 @@ static int native_attach(const MuBtOwner *o,int fd,int (*ack_peer_ready)(void*,i
  if(!words_ok(o)||!eir_request_words(o)||!sdk_started(o)||!mu_bt_comm_words_match(o->comm_load_bias,o->read_live,o->opaque)||
     !mu_bt_osapi_identity(o->comm_load_bias,current_tid(),o->read_live,o->opaque,&identity)||
     o->owner_ready(o->opaque)!=1)return -1;
- if(ack_peer_ready&&ack_peer_ready(o->opaque,fd)!=1)return -1;
+ if(ack_peer_ready&&ack_peer_ready(ack_context,fd)!=1)return -1;
  res.attempted=1;res.owner=*o;res.thread=identity;res.peer=(Mu38PeerOps){&res,assoc,rd,auth};
  InboundOps n={0};n.reg=register_verified;n.unreg=RFN(int (*)(void*,uint8_t*),0x2779b4u);
  n.add=RFN(int (*)(void*),0x207244u);n.remove=RFN(int (*)(void*),0x2071c4u);
@@ -138,15 +138,18 @@ static int native_attach(const MuBtOwner *o,int fd,int (*ack_peer_ready)(void*,i
  n.certify=cert;n.ready=ready;n.addr=addr;n.opaque=&res;
  n.initial_rx_credits=res.owner.rf_arg3_snapshot;
  if(ir5_init(&res.bridge,&n,mu38_resolve_peer,fd,(uint32_t)(uintptr_t)callback))return -1;
- if(ack_peer_ready&&(ack_peer_ready(o->opaque,fd)!=1||
+ if(ack_peer_ready&&(ack_peer_ready(ack_context,fd)!=1||
      ir5_enable_completion_ack(&res.bridge)))return -1;
  int rc=ir5_publish(&res.bridge);
  if(rc==0)(void)mu_bt_native_refresh_eir();
  return rc;
 }
-int mu_bt_native_attach(const MuBtOwner *o,int fd){return native_attach(o,fd,NULL);}
+int mu_bt_native_attach(const MuBtOwner *o,int fd){return native_attach(o,fd,NULL,NULL);}
 int mu_bt_native_attach_ack(const MuBtOwner *o,int fd,int (*ready)(void*,int)){
- return ready?native_attach(o,fd,ready):-1;
+ return ready&&o?native_attach(o,fd,ready,o->opaque):-1;
+}
+int mu_bt_native_attach_ack_context(const MuBtOwner *o,int fd,int (*ready)(void*,int),void *ctx){
+ return ready?native_attach(o,fd,ready,ctx):-1;
 }
 int mu_bt_native_discovery_ready(void){return ir5_discovery_ready(&res.bridge);}
 int mu_bt_native_eir_buffer_matches(const uint8_t*b){
@@ -177,6 +180,7 @@ int mu_bt_native_reclaim(int (*reclaimed)(void*,const Inbound*),void*p){
 #else
 int mu_bt_native_attach(const MuBtOwner *o,int fd){(void)o;(void)fd;return -1;}
 int mu_bt_native_attach_ack(const MuBtOwner *o,int fd,int (*ready)(void*,int)){(void)o;(void)fd;(void)ready;return -1;}
+int mu_bt_native_attach_ack_context(const MuBtOwner *o,int fd,int (*ready)(void*,int),void *ctx){(void)o;(void)fd;(void)ready;(void)ctx;return -1;}
 int mu_bt_native_discovery_ready(void){return 0;}
 int mu_bt_native_eir_buffer_matches(const uint8_t*b){(void)b;return 0;}
 int mu_bt_native_refresh_eir(void){return -1;}

@@ -148,8 +148,8 @@ static int socket_ready(int fd,unsigned port){
  }
  return 1;
 }
-int au98_adopt(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*o,
-               int fd,unsigned port,int(*verified)(void*,int),void*ctx){
+static int adopt_common(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*o,
+               int fd,unsigned port,int(*verified)(void*,int),void*ctx,Au98AckAttach ack){
  uint8_t arg=0;
  if(!s||!h||!o||s->state!=AU98_EMPTY||s->generations==UINT32_MAX||
     !h->original_image_verified||!h->on_original_iap2_owner||
@@ -168,8 +168,14 @@ int au98_adopt(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*o,
     o->owner_ready(o->opaque)!=1||o->transport_ready(o->opaque)!=1)return -1;
  s->state=AU98_POISONED;s->fd=fd;s->hooks=*h;s->native_owner=*o;
  s->native_owner.rf_arg3_snapshot=arg;s->native_owner.rf_arg3_snapshot_valid=1u;
- if(h->attach(h->opaque,&s->native_owner,fd)!=0)return -2;
+ if((ack?ack(&s->native_owner,fd,verified,ctx):h->attach(h->opaque,&s->native_owner,fd))!=0)return -2;
  ++s->generations;s->state=AU98_PUBLISHED;return 0;
+}
+int au98_adopt(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*o,int fd,unsigned port,int(*verified)(void*,int),void*ctx){
+ return adopt_common(s,h,o,fd,port,verified,ctx,NULL);
+}
+int au98_adopt_with_ack(Au98Handoff*s,const Au98Hooks*h,const MuBtOwner*o,int fd,unsigned port,int(*verified)(void*,int),void*ctx,Au98AckAttach ack){
+ return ack?adopt_common(s,h,o,fd,port,verified,ctx,ack):-1;
 }
 int au98_tick(Au98Handoff*s){
  if(!s||s->state!=AU98_PUBLISHED)return -1;
@@ -250,7 +256,7 @@ int au98_bind_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*
  (void)s;(void)p;(void)o;
  return -1;
 }
-int au98_adopt_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*o,int fd,int(*verified)(void*,int),void*ctx){
+static int adopt_stock_common(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*o,int fd,int(*verified)(void*,int),void*ctx,int ack){
  Au98Hooks h;
  if(!p||au100_route_select(p->route_evidence)!=AU100_GRAFT_RFCOMM_ROUTE)return -1;
  memset(&h,0,sizeof h);
@@ -258,7 +264,11 @@ int au98_adopt_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner
  h.on_original_iap2_owner=p->on_original_iap2_owner;
  h.original_iap2_service_verified=p->original_iap2_service_verified;
  h.attach=native_attach_adapter;h.tick=native_tick_adapter;h.withdraw=native_withdraw_adapter;
- return au98_adopt(s,&h,o,fd,57342,verified,ctx);
+ return ack?au98_adopt_with_ack(s,&h,o,fd,57342,verified,ctx,mu_bt_native_attach_ack_context):
+            au98_adopt(s,&h,o,fd,57342,verified,ctx);
+}
+int au98_adopt_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*o,int fd,int(*verified)(void*,int),void*ctx){
+ return adopt_stock_common(s,p,o,fd,verified,ctx,0);
 }
 int au98_rearm_stock_native(Au98Handoff*s,int(*reclaimed)(void*,const Inbound*),void*ctx){
  if(!s||s->state!=AU98_RETIRED||s->fd!=-1||s->generations==UINT32_MAX||
@@ -270,14 +280,19 @@ int au98_rearm_stock_native(Au98Handoff*s,int(*reclaimed)(void*,const Inbound*),
 }
 typedef struct {
  const Au98OwnerProof *proof;const MuBtOwner *owner;
- int (*verified)(void*,int);void *opaque;
+ int (*verified)(void*,int);void *opaque;int ack;
 } NativeDispatch;
 static int adopt_dispatch(void*ctx,Au98Handoff*s,int fd){
  NativeDispatch*d=ctx;
- return au98_adopt_stock_native(s,d->proof,d->owner,fd,d->verified,d->opaque);
+ return adopt_stock_common(s,d->proof,d->owner,fd,d->verified,d->opaque,d->ack);
 }
 int au98_drive_stock_native(Au98Handoff*s,int*fd,const Au98DispatchPolicy*p,const Au98OwnerProof*proof,const MuBtOwner*o,int(*verified)(void*,int),void*ctx){
- NativeDispatch d={proof,o,verified,ctx};
+ NativeDispatch d={proof,o,verified,ctx,0};
+ if(!proof||!o||!verified)return -1;
+ return au98_drive(s,fd,p,adopt_dispatch,&d,au98_rearm_stock_native);
+}
+int au98_drive_stock_native_ack(Au98Handoff*s,int*fd,const Au98DispatchPolicy*p,const Au98OwnerProof*proof,const MuBtOwner*o,int(*verified)(void*,int),void*ctx){
+ NativeDispatch d={proof,o,verified,ctx,1};
  if(!proof||!o||!verified)return -1;
  return au98_drive(s,fd,p,adopt_dispatch,&d,au98_rearm_stock_native);
 }
@@ -290,6 +305,9 @@ int au98_rearm_stock_native(Au98Handoff*s,int(*reclaimed)(void*,const Inbound*),
 #endif
 
 #if !defined(__QNXNTO__) || !defined(__arm__) || UINTPTR_MAX != UINT32_MAX
+int au98_drive_stock_native_ack(Au98Handoff*s,int*fd,const Au98DispatchPolicy*p,const Au98OwnerProof*proof,const MuBtOwner*o,int(*v)(void*,int),void*ctx){
+ (void)s;(void)fd;(void)p;(void)proof;(void)o;(void)v;(void)ctx;return -1;
+}
 int au98_drive_stock_native(Au98Handoff*s,int*fd,const Au98DispatchPolicy*p,const Au98OwnerProof*proof,const MuBtOwner*o,int(*v)(void*,int),void*ctx){
  (void)s;(void)fd;(void)p;(void)proof;(void)o;(void)v;(void)ctx;return -1;
 }

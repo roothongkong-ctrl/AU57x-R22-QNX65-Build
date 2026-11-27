@@ -25,6 +25,9 @@ typedef struct {
  MuBtOwner owner;
  int (*daemon_verified)(void*,int);
  void *daemon_context;
+ /* Optional exact-FD ACK protocol capability, same caller-owned context.
+  * NULL retains legacy protocol. Must not be inferred from port or PID. */
+ int (*ack_daemon_verified)(void*,int);
 } MuBtNotifyBinding;
 int mu_bt_notify_bind(const MuBtNotifyBinding*);
 /* Queue-only mode leaves original notification slot unchanged. */

@@ -38,13 +38,20 @@ static int safe(const MuBtNotifyBinding*b){
  b->proof.on_original_iap2_owner(b->proof.opaque)==1&&
  b->owner.owner_ready(b->owner.opaque)==1;
 }
+static int combined_ack_witness(void*p,int fd){
+ const MuBtNotifyBinding*b=p;
+ return b->daemon_verified(b->daemon_context,fd)==1&&
+        b->ack_daemon_verified(b->daemon_context,fd)==1;
+}
 static void after(void*p){
  (void)p;
  if(!safe(&n.b)||!mu_bt_osapi_identity_matches(&n.thread,tid(),n.b.owner.read_live,n.b.owner.opaque))return;
  if(n.b.worker&&n.b.handoff->state==AU98_EMPTY&&*n.b.prepared_fd<0&&
     n.b.policy.wired_idle(n.b.policy.opaque)==1)
   (void)mu_bt_worker_poll(n.b.worker,n.b.prepared_fd);
- int rc=au98_drive_stock_native(n.b.handoff,n.b.prepared_fd,&n.b.policy,&n.b.proof,&n.b.owner,n.b.daemon_verified,n.b.daemon_context);
+ int rc=n.b.ack_daemon_verified?
+  au98_drive_stock_native_ack(n.b.handoff,n.b.prepared_fd,&n.b.policy,&n.b.proof,&n.b.owner,combined_ack_witness,&n.b):
+  au98_drive_stock_native(n.b.handoff,n.b.prepared_fd,&n.b.policy,&n.b.proof,&n.b.owner,n.b.daemon_verified,n.b.daemon_context);
  /* Failed preflight never transfers ownership. Worker sockets have
   * default non-lingering close; do not keep retrying a stale descriptor.
   * An ambiguous native attach already transferred ownership, never close. */

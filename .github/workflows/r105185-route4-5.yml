@@ -1,4 +1,4 @@
-name: R105.190 reuse stock launcher in independent review directory (NO INSTALL)
+name: R105.191 existing owner dispatch selects ACK only on explicit daemon support (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -8,91 +8,32 @@ permissions:
   contents: read
   actions: read
 jobs:
-  route6-independent-layout:
+  owner-ack-context:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      GH_TOKEN: ${{ github.token }}
-      SOURCE_RUN: "45923122041"
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Obtain retained archive from existing NAS task (no second NAS request)
-        run: |
-          set -euo pipefail
-          mkdir -p firmware evidence
-          # A push that updates both workflows uses its own acquisition run.
-          # Never consume the known failed 20-minute run or duplicate a NAS request.
-          if [ -z "$SOURCE_RUN" ]; then
-            for i in $(seq 1 40); do
-              SOURCE_RUN=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow mu1005-oem-nas.yml --branch mu1005-si-cprx-real-review --commit "$GITHUB_SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
-              if [ -n "$SOURCE_RUN" ]; then break; fi
-              sleep 15
-            done
-          fi
-          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
-          echo "NAS_SOURCE_RUN:$SOURCE_RUN"
-          for i in $(seq 1 380); do
-            result=$(gh run view "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --json status,conclusion --jq '.status + ":" + .conclusion')
-            if [ "$result" = "completed:success" ]; then break; fi
-            if [[ "$result" == completed:* ]]; then echo "NAS_SOURCE_NOT_SUCCESS:$result"; exit 2; fi
-            sleep 15
-          done
-          test "$result" = "completed:success"
-          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
-          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z" | sha256sum -c -
-      - name: Fetch exact upstream MHI2 extractor and QNX6 reader
+      - name: Test new ACK witness and owner context via existing real TCP handoff
         run: |
           set -euxo pipefail
-          git init extractor
-          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
-          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
-          git -C extractor checkout --detach FETCH_HEAD
-          test "$(git -C extractor rev-parse HEAD)" = 64a44fe23dbaa08771440d69642d2874d7028295
-          git init qnxmount
-          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
-          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
-          git -C qnxmount checkout --detach FETCH_HEAD
-          test "$(git -C qnxmount rev-parse HEAD)" = 0379c064975d5bbe3595ac7e3d149ea789406794
-          python3 -m venv /tmp/mu1005-extract-venv
-          /tmp/mu1005-extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
-          command -v 7z || { sudo apt-get update -qq && sudo apt-get install -y p7zip-full; }
-      - name: Extract only exact original EFS needed for new launcher layout
-        run: |
-          set -euo pipefail
-          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
-          mkdir -p "${RUNNER_TEMP}/combined"
-          /tmp/mu1005-extract-venv/bin/python tools/mu1005_extract_stage2.py "$archive" "${RUNNER_TEMP}/combined/stage2" --toolkit extractor --qnxmount qnxmount --report evidence/stage2-summary.json
-      - name: Adapt existing exact original configuration stage to independent directory
-        run: |
-          set -euo pipefail
-          cfg="$RUNNER_TEMP/combined/stage2/filesystems/MMX2/efs-sys/70/default/efs-system.img/etc/eso/production/connectivity.json"
-          python3 lab/mu1005_route4_5/independent_layout.py "$cfg" evidence/layout
-          cat evidence/layout/STATUS.json
-      - uses: actions/upload-artifact@v4
+          s=project/source/legacy_mu1005/bluetooth
+          cc -std=gnu99 -D_DEFAULT_SOURCE -DAU57X_R98_HOST_TEST=1 -Wall -Wextra -Werror -fsanitize=undefined -I"$s" "$s"/{bt_iap2_owner_handoff,rf_arg_experiment,bt_route_gate}.c lab/mu1005_route4_5/test_ack_handoff.c -o "$RUNNER_TEMP/ack-handoff"
+          timeout 15 "$RUNNER_TEMP/ack-handoff"
+      - uses: ./.github/actions/mu1005-qnx-image
         with:
-          name: R105190-INDEPENDENT-LAYOUT-NO-INSTALL
-          path: evidence/layout/
-  route6-existing-native-libraries:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 8
-    env:
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Reuse last successful native ARM artifact without rebuilding
+          require-cache: 'true'
+      - name: Compile only changed QNX native glue
         run: |
-          set -euo pipefail
-          mkdir -p input package
-          gh run download 46028843161 --repo "$GITHUB_REPOSITORY" --name mu1005-si-cprx-arm-NO-INSTALL --dir input
-          (cd input && sha256sum -c SHA256SUMS)
-          for f in libmu1005_bt_preload_review.so libmu1005_bt_native_review.so; do
-            readelf -h "input/payload/$f" | grep -E 'Machine:.*ARM'
-            cp "input/payload/$f" package/
+          set -euxo pipefail
+          mkdir -p evidence
+          s=project/source/legacy_mu1005/bluetooth
+          for n in native_binding bt_iap2_owner_handoff bt_notify_bridge; do
+            docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -I"$s" -c "$s/$n.c" -o "/src/evidence/$n.o"
+            readelf -h "evidence/$n.o" | grep -E 'Machine:.*ARM'
           done
-          readelf -Ws package/libmu1005_bt_native_review.so | grep -w mu_bt_native_attach_ack
-          (cd package && sha256sum *.so > SHA256SUMS)
-          echo ROUTE6_REUSE_NATIVE_PROBE_AND_BINDING_SEPARATE_NOT_ACTIVATED
+          readelf -Ws evidence/bt_notify_bridge.o | grep -w au98_drive_stock_native_ack
+          echo ROUTE6_8_9_ACK_DISPATCH_ARM_COMPILE_ONLY
       - uses: actions/upload-artifact@v4
         with:
-          name: R105190-EXISTING-NATIVE-LIBRARIES-NO-INSTALL
-          path: package/
+          name: R105191-OWNER-ACK-CONTEXT-NO-INSTALL
+          path: evidence/

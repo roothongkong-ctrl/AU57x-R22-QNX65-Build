@@ -40,6 +40,10 @@ int au98_publish(Au98Handoff*,const Au98Hooks*,const MuBtOwner*,unsigned port);
 /* Worker transfers exclusive prepared nonblocking fd; -1 caller owns,
  * 0/-2 handoff owns. Exact daemon attestation must be nonblocking. */
 int au98_adopt(Au98Handoff*,const Au98Hooks*,const MuBtOwner*,int,unsigned,int(*)(void*,int),void*);
+/* Separate explicit ACK adoption; callback context used synchronously only.
+ * verified must attest exact daemon FD AND type4 support/one pending TX. */
+typedef int (*Au98AckAttach)(const MuBtOwner*,int,int(*)(void*,int),void*);
+int au98_adopt_with_ack(Au98Handoff*,const Au98Hooks*,const MuBtOwner*,int,unsigned,int(*)(void*,int),void*,Au98AckAttach);
 /* Serialized original owner only. Any lost owner/transport proof on that
  * thread enters DRAINING; recovering proof permits withdrawal, not tick.
  * Wrong-thread calls are rejected without mutating the owner state. */
@@ -77,4 +81,5 @@ typedef int (*Au98AdoptStep)(void*,Au98Handoff*,int);
 typedef int (*Au98ReclaimStep)(Au98Handoff*,int(*)(void*,const Inbound*),void*);
 int au98_drive(Au98Handoff*,int*,const Au98DispatchPolicy*,Au98AdoptStep,void*,Au98ReclaimStep);
 int au98_drive_stock_native(Au98Handoff*,int*,const Au98DispatchPolicy*,const Au98OwnerProof*,const MuBtOwner*,int(*)(void*,int),void*);
+int au98_drive_stock_native_ack(Au98Handoff*,int*,const Au98DispatchPolicy*,const Au98OwnerProof*,const MuBtOwner*,int(*)(void*,int),void*);
 #endif
