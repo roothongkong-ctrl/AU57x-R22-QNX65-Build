@@ -1,0 +1,2 @@
+# R105.133 SI 环境修复与真实 linker 分类
+R105.130 run45973803993 公共编译预检 140420429888 成功，12 路已分发；SI layout 140424850274 失败为 packages.microsoft.com HTTP403（apt exit100），非原厂程序失败。仅重试该 lane，使用 Ubuntu 官方已配置 ubuntu.sources，跳过无关第三方源、保留签名验证，重试3次；不改现有 11 路。新增严格 allowlist 的 linker failure 分类，从 runner 私有 stdout/serial 仅输出库 basename、符号名、错误类别，不发布原始日志。R105.131 run45974489232 实际原厂 iAP2 driver 原始依赖名称 missing0/ambiguous0，但 dlopen BLOCKED、mm-ipod exit0、未发现 /dev/ipod0。R105.132 双插件对照仍在跑，不重复启动。无原厂服务成功、无无线认证、NO INSTALL。
