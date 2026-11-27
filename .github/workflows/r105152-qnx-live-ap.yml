@@ -1,0 +1,82 @@
+name: R105.152 QNX ARM live AP dual-band fallback runtime (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105152-qnx-live-ap.yml, tests/test_cloud_pipeline.c, lab/mu1005_qnx_live_ap/**]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  qnx-live-ap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir -p qnx-runtime-evidence
+      - name: Fetch locked public QNX boot environment and QEMU
+        run: |
+          set -euxo pipefail
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          for f in startup-virt libstartup.a devc-serdebug u-boot.bin; do test -s "toolchain/tests/qemu/$f"; done
+          if ! command -v qemu-system-arm >/dev/null; then
+            aptopts=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+            sudo apt-get "${aptopts[@]}" update -qq
+            sudo apt-get "${aptopts[@]}" install -y -qq qemu-system-arm
+          fi
+          qemu-system-arm --version | tee qnx-runtime-evidence/qemu-version.log
+          sha256sum toolchain/tests/qemu/{startup-virt,libstartup.a,devc-serdebug,u-boot.bin} toolchain/tests/qemu-run.sh | tee qnx-runtime-evidence/boot-inputs.sha256
+      - uses: actions/cache/restore@v4
+        id: gnu-cache
+        with:
+          path: ~/.cache/au57x-gnu
+          key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
+      - name: Configure reusable compiler build cache
+        uses: docker/setup-buildx-action@v3
+      - name: Build verified toolchain
+        run: |
+          set -euxo pipefail
+          bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee qnx-runtime-evidence/gnu.log
+          docker buildx build --load --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 --cache-from type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1 --cache-to type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1,mode=min,ignore-error=true -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee qnx-runtime-evidence/compiler.log
+          docker run --rm --platform linux/amd64 qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc --version | tee qnx-runtime-evidence/compiler-version.log
+      - name: Build and execute live AP fallback under actual QNX ARM
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            set -eux
+            c=project/source/src
+            a=project/source/legacy_mu1005/airplay
+            b=project/source/legacy_mu1005/bluetooth
+            p=integration/mu1005_si_native/ap_live
+            arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -Wno-unused-function -O2 -DMU1005_QNX_FIRST_LINK_FIXTURE -DMU_QNX_LIVE_AP_FALLBACK -DMU_AP_REFRESH_TEST -Wl,-E -I"$c" -I"$a" -I"$b" tests/test_cloud_pipeline.c "$p"/{ap_live,ap_refresh}.c "$c"/{cp_cloud_pipeline,cp_wcp_autoconnect,cp_wcp_handoff,cp_radio_policy,cp_session_handoff,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_oem_boundary,cp_wireless,cp_event,cp_csm}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" -lsocket -lc -o qnx-runtime-evidence/mu1005-live-ap
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW qnx-runtime-evidence/mu1005-live-ap
+          ' 2>&1 | tee qnx-runtime-evidence/build.log
+          QEMU_KEEP_LOG="$PWD/qnx-runtime-evidence/serial.log" QEMU_TIMEOUT=90 QEMU_RUN_SECS=45 sh toolchain/tests/qemu-run.sh "$PWD/qnx-runtime-evidence/mu1005-live-ap" 8.5 | tee qnx-runtime-evidence/runtime.log
+          grep -Fx 'PASS 5_TO_24_REFRESH_BEFORE_ASSOCIATION_NO_OEM' qnx-runtime-evidence/runtime.log
+          grep -Fx 'PASS 24_TO_5_REFRESH_BEFORE_ASSOCIATION_NO_OEM' qnx-runtime-evidence/runtime.log
+          grep -Fx R105152_QNX_LIVE_AP_BOTH_DIRECTIONS_FIXTURE_PASS qnx-runtime-evidence/runtime.log
+          grep -E 'Process [0-9]+ \(mu1005-live-ap\) exited status=0' qnx-runtime-evidence/serial.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r105152-qnx-live-ap-NO-INSTALL
+          path: qnx-runtime-evidence/*.log
+  host-live-ap:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run identical fixture with host sanitizers
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          bash lab/mu1005_qnx_live_ap/host.sh | tee evidence/host.log
+          grep -Fx R105152_QNX_LIVE_AP_BOTH_DIRECTIONS_FIXTURE_PASS evidence/host.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r105152-host-live-ap-NO-INSTALL
+          path: evidence/host.log

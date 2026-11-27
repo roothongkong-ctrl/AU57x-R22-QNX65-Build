@@ -295,6 +295,9 @@ static void radio_to_airplay_direction(enum cp_radio_band first){
  };
  config.wifi.channel=first==CP_RADIO_5?36:6;
  reset_fixture();mocked_oem(&b,&stock,1);cp_cloud_init(&p);
+#ifdef MU_QNX_LIVE_AP_FALLBACK
+ assert(cp_cloud_require_live_ap_refresh(&p)==CP_CLOUD_OK);
+#endif
  b.link.phase=CP_LK_IDLE;
  assert(cp_cloud_bind_bootstrap(&p,&b,&config,&identity)==CP_CLOUD_OK);
  assert(cp_cloud_bind_bootstrap(&p,&b,&config,&identity)==CP_CLOUD_BAD);
@@ -305,6 +308,14 @@ static void radio_to_airplay_direction(enum cp_radio_band first){
  assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
  assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK&&p.band==first);
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
+#ifdef MU_QNX_LIVE_AP_FALLBACK
+ assert(proof.verified_mfi&&!proof.live_hotspot&&!proof.network_airplay_ready);
+ assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_PROOF);
+ int first_verify=1;
+ assert(cp_cloud_refresh_ap_config(&p,&config,ap_config_fixture,&first_verify)==CP_CLOUD_OK);
+ assert(p.live_ap_config==&config);
+ assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
+#endif
  assert(proof.verified_mfi&&proof.live_hotspot&&!proof.network_airplay_ready);
  /* First attempt failed; verify actual disconnect before switching bands. */
  assert(cp_cloud_radio_report_failure(&p,9,4,first)==CP_CLOUD_STALE);
@@ -312,6 +323,9 @@ static void radio_to_airplay_direction(enum cp_radio_band first){
  assert(cp_cloud_radio_report_failure(&p,8,4,next)==CP_CLOUD_STALE);
  assert(cp_cloud_radio_report_failure(&p,8,4,first)==CP_CLOUD_OK);
  assert(p.radio_failure_pending);
+#ifdef MU_QNX_LIVE_AP_FALLBACK
+ assert(!p.live_ap_config);
+#endif
  int old_verify=1;
  assert(cp_cloud_refresh_ap_config(&p,&config,ap_config_fixture,&old_verify)==CP_CLOUD_PROOF);
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1&&!proof.live_hotspot);
@@ -331,6 +345,9 @@ static void radio_to_airplay_direction(enum cp_radio_band first){
  b.wireless_pending=0;
  assert(cp_cloud_refresh_ap_config(&p,&updated,ap_config_fixture,&verify)==CP_CLOUD_OK);
  assert(b.wireless.session==&updated);
+#ifdef MU_QNX_LIVE_AP_FALLBACK
+ assert(p.live_ap_config==&updated);
+#endif
 #ifdef MU_AP_REFRESH_TEST
  struct mu_ap_refresh_slot slot={0};
  struct ap_refresh_fixture f={0,first==CP_RADIO_5?36:6,0,0};
@@ -348,6 +365,9 @@ static void radio_to_airplay_direction(enum cp_radio_band first){
  b.wireless_pending=0;
  assert(mu_ap_refresh_commit(&slot,&p,refresh_verify,&f)==CP_CLOUD_OK);
  assert(b.wireless.session==&slot.session&&slot.session.wifi.channel==updated.wifi.channel);
+#ifdef MU_QNX_LIVE_AP_FALLBACK
+ assert(p.live_ap_config==&slot.session);
+#endif
  assert(slot.session.public_key==updated.public_key&&slot.session.ip_addresses==updated.ip_addresses);
  assert(mu_ap_refresh_clear(&slot,&p)==CP_CLOUD_BAD);
  assert(mu_ap_refresh_prepare(&slot,&p,refresh_query,&f)==CP_CLOUD_BAD);
@@ -1675,7 +1695,10 @@ static void r87_cloud_bootstrap(void){
 /* Same first-video state machine and AF_UNIX transaction as the host test.
  * Radio, original MFi and native DIO callbacks remain explicit fixtures. */
 int main(void){
-#if defined(MU1005_QNX_SEPARATE_OWNER_FIXTURE)
+#if defined(MU_QNX_LIVE_AP_FALLBACK)
+ radio_to_airplay_proof();
+ puts("R105152_QNX_LIVE_AP_BOTH_DIRECTIONS_FIXTURE_PASS");
+#elif defined(MU1005_QNX_SEPARATE_OWNER_FIXTURE)
  native_remote_process_boundary();
  puts("MU1005_QNX_SEPARATE_OWNER_PASS_FIXTURE_ONLY");
 #elif defined(MU1005_QNX_WIRED_RESTORE_FIXTURE)
