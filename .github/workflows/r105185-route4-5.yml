@@ -1,4 +1,4 @@
-name: R105.192 reuse stock trace and queue bootstrap (NO INSTALL)
+name: R105.193 four-route fallback transaction lab (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -6,33 +6,22 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-  actions: read
 jobs:
-  route6-source-to-bootstrap:
+  fallback-sequence:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Validate revised nonblocking call chain and new trace source handoff
+      - name: Reuse existing transaction supervisor for new four-route sequence
         run: |
           set -euxo pipefail
-          python3 tests/test_r105_owner_nonblocking_gate.py
-          s=project/source/legacy_mu1005/bluetooth
-          cc -std=gnu99 -D_DEFAULT_SOURCE -Wall -Wextra -Werror -fsanitize=undefined -I"$s" "$s"/{bt_startup_watch,bt_startup_snapshot,bt_trace_latch}.c lab/mu1005_route4_5/test_startup_source.c -o "$RUNNER_TEMP/startup"
-          "$RUNNER_TEMP/startup"
-      - uses: ./.github/actions/mu1005-qnx-image
-        with:
-          require-cache: 'true'
-      - name: Compile changed original startup bridge and check real queue dependency
-        run: |
-          set -euxo pipefail
+          s=tools/review_txn
+          cc -std=c99 -Wall -Wextra -Werror -pedantic "$s"/{txn,sha256,fixture_cli,supervisor_fixture}.c -o "$RUNNER_TEMP/txn"
           mkdir -p evidence
-          s=project/source/legacy_mu1005/bluetooth
-          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -I"$s" -c "$s/bt_startup_watch.c" -o /src/evidence/bt_startup_watch.o
-          readelf -h evidence/bt_startup_watch.o | grep -E 'Machine:.*ARM'
-          readelf -Ws evidence/bt_startup_watch.o | grep -w mu_bt_queue_bootstrap
-          echo ROUTE6_STARTUP_SOURCE_TO_QUEUE_ARM_COMPILE_ONLY
+          TXN_TEST_BIN="$RUNNER_TEMP/txn" python3 -B lab/mu1005_route4_5/test_fallback_lab.py 2>&1 | tee evidence/fallback-tests.txt
+          cp lab/mu1005_route4_5/FOUR_ROUTE_PLAN_CN.md evidence/
+          echo ROUTE_FOUR_SEQUENCE_HOST_FIXTURE_ONLY_NO_INSTALL
       - uses: actions/upload-artifact@v4
         with:
-          name: R105192-STARTUP-BRIDGE-NO-INSTALL
+          name: R105193-FOUR-ROUTE-LAB-NO-INSTALL
           path: evidence/
