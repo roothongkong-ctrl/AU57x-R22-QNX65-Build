@@ -34,7 +34,7 @@ on:
 permissions:
   contents: read
 jobs:
-  r103-host-only:
+  upstream-link:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -49,6 +49,11 @@ jobs:
         run: |
           set -euxo pipefail
           bash ci/host_r103_c_wire.sh
+  oem-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
       - name: Enforce nonblocking OEM owner activation boundary
         run: |
           set -euxo pipefail
@@ -77,6 +82,11 @@ jobs:
         run: |
           set -euxo pipefail
           python3 tests/test_r105_step06_resmgr_mount_audit.py
+  airplay-envelope:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
       - name: Exercise AirPlay iAP2 envelope adapter (host fake only)
         run: |
           set -euxo pipefail
@@ -89,6 +99,13 @@ jobs:
             integration/mu1005_si_native/inner_iap2/test_airplay.c \
             -ldl -o /tmp/r105-airplay-envelope-host
           /tmp/r105-airplay-envelope-host
+  scope:
+    needs: [upstream-link, oem-contracts, airplay-envelope]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
       - name: Record scope boundary
         run: |
           printf '%s\n' 'HOST_ONLY=1' 'QNX_TARGET_RUNTIME=NOT_TESTED' 'OEM_RFCOMM_OWNER=NOT_PROVEN' 'MFI=NOT_TESTED' 'VEHICLE_VERIFIED=0' 'INSTALLABLE=0' | tee r105-host-scope.txt

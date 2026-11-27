@@ -2,7 +2,7 @@ name: MU1005 OEM firmware acquisition (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/mu1005-oem-acquire.yml, oem_inputs/mu1005/inspect_firmware.py]
+    paths: [.github/workflows/mu1005-oem-acquire.yml, oem_inputs/mu1005/inspect_firmware.py, oem_inputs/mu1005/download_mirror.py]
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,15 +20,20 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .oem-cache/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z
-          key: mu1005-oem-exact-filerun-archive-v1
-      - name: Fetch public shared firmware
+          key: mu1005-oem-archive-v2
+      - name: Install browser for the public mirror download
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          python3 -m venv /tmp/mu1005-download-venv
+          /tmp/mu1005-download-venv/bin/pip install playwright==1.51.0
+          /tmp/mu1005-download-venv/bin/python -m playwright install chromium
+      - name: Fetch exact named file using MIB Vault public download
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           mkdir -p .oem-cache oem-acquisition-evidence
-          url='https://mibsolution.one/wl/?id=AYWdpd5fxpX7kISuerx3xnIWgZeGBjbg&mode=list&path=CN%2FMHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z&fmode=download'
           archive=.oem-cache/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z
-          curl --fail --show-error --silent --location --max-redirs 5 --proto '=https' --proto-redir '=https' --connect-timeout 25 --max-time 900 --max-filesize 1200000000 --output "$archive.part" --write-out 'HTTP %{http_code}; bytes %{size_download}\n' "$url" | tee oem-acquisition-evidence/download.log
+          timeout 1200 /tmp/mu1005-download-venv/bin/python oem_inputs/mu1005/download_mirror.py "$archive.part" | tee oem-acquisition-evidence/download.log
           python3 -c 'import sys; f=open(sys.argv[1],"rb"); assert f.read(6)==bytes.fromhex("377abcaf271c"), "OEM_DOWNLOAD_NOT_7Z"' "$archive.part"
           mv "$archive.part" "$archive"
       - name: Verify archive and extract image candidates
@@ -43,7 +48,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .oem-cache/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z
-          key: mu1005-oem-exact-filerun-archive-v1
+          key: mu1005-oem-archive-v2
       - uses: actions/upload-artifact@v4
         if: always()
         with:
