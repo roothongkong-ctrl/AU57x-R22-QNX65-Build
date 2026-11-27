@@ -2,7 +2,7 @@ name: R105.058 Bluetooth joint QNX ARM runtime (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/r105058-bt-joint-qnx.yml, tests/r14_test_native_event.c, tests/r105057_joint_bt.c]
+    paths: [.github/workflows/r105058-bt-joint-qnx.yml, tests/r14_test_native_event.c, tests/r105057_joint_bt.c, tests/test_bt_trace_tail_arm.c, project/source/legacy_mu1005/bluetooth/bt_trace_tail_arm.S]
   workflow_dispatch:
 permissions:
   contents: read
@@ -71,12 +71,13 @@ jobs:
           docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
             set -eux
             b=project/source/legacy_mu1005/bluetooth
-            arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -ffunction-sections -fdata-sections -Wl,--gc-sections -I"$b" tests/r105057_joint_bt.c "$b"/{bt_socket_worker,bt_iap2_owner_handoff,rf_arg_experiment,bt_notify_bridge,bt_queue_pulse,native_binding,native_event,inbound,inbound_r5,mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump,bt_route_gate,bt_startup_snapshot,bt_owner_identity}.c -lsocket -lc -o qnx-runtime-evidence/mu1005-bt-joint
+            arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -ffunction-sections -fdata-sections -Wl,--gc-sections -DMU_BT_TRACE_TAIL_TEST -I"$b" tests/r105057_joint_bt.c tests/test_bt_trace_tail_arm.c "$b/bt_trace_tail_arm.S" "$b"/{bt_socket_worker,bt_iap2_owner_handoff,rf_arg_experiment,bt_notify_bridge,bt_queue_pulse,native_binding,native_event,inbound,inbound_r5,mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump,bt_route_gate,bt_startup_snapshot,bt_owner_identity}.c -lsocket -lc -o qnx-runtime-evidence/mu1005-bt-joint
             arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW qnx-runtime-evidence/mu1005-bt-joint
           ' 2>&1 | tee qnx-runtime-evidence/bt-joint-build.log
           python3 lab/mu1005_qnx_runtime/prepare_inner_ifs.py toolchain/tests/qemu-run.sh
           export QNX_TEST_INNER_LIB="$PWD/previous-native/payload/libmu1005_inner_iap2_review.so"
           QEMU_KEEP_LOG="$PWD/qnx-runtime-evidence/bt-joint-serial.log" QEMU_TIMEOUT=95 QEMU_RUN_SECS=50 sh toolchain/tests/qemu-run.sh "$PWD/qnx-runtime-evidence/mu1005-bt-joint" 8.5 2>&1 | tee qnx-runtime-evidence/bt-joint-runtime.log
+          grep -F 'MU1005_TRACE_TAIL_ARM_VARIADIC_FORWARD_PASS_FIXTURE_ONLY' qnx-runtime-evidence/bt-joint-runtime.log
           grep -F 'R105057_JOINT_OWNER_RFCOMM_TWO_SESSIONS_PASS_FIXTURE_ONLY_NO_INSTALL' qnx-runtime-evidence/bt-joint-runtime.log
           grep -E 'Process [0-9]+ \(mu1005-bt-joint\) exited status=0' qnx-runtime-evidence/bt-joint-serial.log
           printf '%s\n' "revision=$GITHUB_SHA" 'QNX ARM real TCP and pthread, RFCOMM fixture events, no OEM attachment, no radio, no installation' > qnx-runtime-evidence/result.txt

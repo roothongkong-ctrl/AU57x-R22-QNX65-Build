@@ -92,7 +92,13 @@ static void j_session(Joint*j,int l,unsigned round){
  j->released=1;j_pulse(j);assert(j->h.state==AU98_EMPTY);
  j->wired=1;
 }
+#ifdef MU_BT_TRACE_TAIL_TEST
+extern void mu_bt_trace_tail_test(void);
+#endif
 int main(void){
+#ifdef MU_BT_TRACE_TAIL_TEST
+ mu_bt_trace_tail_test();
+#endif
  Joint j={0};j.owner_tid=pthread_self();j.fd=j.h.fd=-1;j.wired=1;j.pulse.active=1;
  j.hooks=(Au98Hooks){&j,j_owner,j_owner,j_owner,j_attach,j_tick,j_withdraw};
  j.owner.opaque=&j;j.owner.owner_ready=j_owner;j.owner.transport_ready=j_owner;

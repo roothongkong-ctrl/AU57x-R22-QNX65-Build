@@ -1,0 +1,2 @@
+# R105.071 — congobg 启动日志路径的 ARM ABI 实测准备
+原厂 btstack SHA 51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566，本轮再次实际反汇编确认 0x11ed10 BL 0x116e44, LR 0x11ed14, R_ARM_JUMP_SLOT 0x2c12c8 对应 _ZN7tracing7Channel5logCVEsPKcz。congobg 采用 Device-ID 日志，但没有公开完整 libbthook C 源；本轮按其思路编写 ARM AAPCS 尾转发器（不是直接复制 donor 二进制）。原始参数寄存器、栈参数、LR 完整转发；在独立 QNX fixture 验证普通字、64bit、double、栈参数。加入已经成功执行的 R105.058 QNX workflow，必须同时满足新 marker 和原 RFCOMM 双会话 marker、进程 exit0。尚未导出原厂 logCV 符号、未接真实 trace resolver、未注册真实服务，不能称为第一步完成。NO INSTALL。
