@@ -1,4 +1,4 @@
-name: R105.185 parallel route4 and route5 (NO INSTALL)
+name: R105.186 parallel routes 4 5 6 (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -8,7 +8,34 @@ permissions:
   contents: read
   actions: read
 jobs:
-  route4-stock-inventory:
+  route4-readonly-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble only new read-only stock path observation package
+        run: |
+          set -euo pipefail
+          mkdir -p input package
+          gh run download 46027509995 --repo "$GITHUB_REPOSITORY" --name R105185-ROUTE4-INVENTORY-NO-INSTALL --dir input
+          python3 lab/mu1005_route4_5/prepare_reference.py input/route4.json package
+          cp lab/mu1005_route4_5/observe_files.sh package/
+          sh -n package/observe_files.sh
+          (cd package && sha256sum reference_manifest.json candidate_paths.tsv observe_files.sh > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105186-ROUTE4-READONLY-NO-INSTALL
+          path: package/
+  route5-reference-manifest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify new manifest coverage and unsafe input rejection
+        run: python3 lab/mu1005_route4_5/test_reference.py -v
+  route6-stock-boot:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -64,31 +91,10 @@ jobs:
           python3 tools/mu1005_extract_app70.py "$archive" "${RUNNER_TEMP}/app70/app.img"
           /tmp/mu1005-extract-venv/bin/python extractor/tools/extract_firmware.py --source "${RUNNER_TEMP}/app70/app.img" --output "${RUNNER_TEMP}/combined/app70" --variant 70 --qnxmount-root "$PWD/qnxmount" > evidence/app-summary.json
           /tmp/mu1005-extract-venv/bin/python tools/mu1005_extract_stage2.py "$archive" "${RUNNER_TEMP}/combined/stage2" --toolkit extractor --qnxmount qnxmount --report evidence/stage2-summary.json
-      - name: Inventory original files without assuming vehicle paths
-        run: python3 lab/mu1005_route4_5/inventory.py "$RUNNER_TEMP/combined" evidence/route4.json
+      - name: Inspect new original boot and recovery entry anchors
+        run: python3 lab/mu1005_route4_5/startup_edges.py "$RUNNER_TEMP/combined" evidence/route6.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105185-ROUTE4-INVENTORY-NO-INSTALL
-          path: evidence/route4.json
-  route4-reuse-probe:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 8
-    env:
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Reuse accepted read-only ARM path helper
-        run: |
-          set -euo pipefail
-          mkdir -p package
-          gh run download 46020545537 --repo "$GITHUB_REPOSITORY" --name R105173-ROUTE1-READ-ONLY-PROBE --dir package
-          (cd package && sha256sum -c SHA256SUMS)
-          echo ROUTE4_EXISTING_PROBE_AVAILABLE_NOT_VEHICLE
-  route5-backup-verification:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@v4
-      - name: Test new offline backup integrity verifier
-        run: python3 lab/mu1005_route4_5/test_backup.py -v
+          name: R105186-ROUTE6-BOOT-NO-INSTALL
+          path: evidence/route6.json
