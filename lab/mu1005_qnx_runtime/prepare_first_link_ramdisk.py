@@ -1,18 +1,21 @@
 """Provision a writable /tmp in disposable QNX first-link QEMU only."""
 from pathlib import Path
-import sys
+import sys, os
+profile=os.environ.get('QNX_RAMDISK_PROFILE','sysram-demand')
+profiles={'sysram-demand':'demand','sysram-cache':'cache'}
+if profile not in profiles: raise SystemExit('unknown RAM disk profile')
 p=Path(sys.argv[1]);s=p.read_text()
 def replace(a,b):
     global s
     if s.count(a)!=1:raise SystemExit("unexpected launcher anchor: "+a)
     s=s.replace(a,b)
-replace('    display_msg "@@QNXRUN-START@@"','''    display_msg "R105095 RAMDISK START: internal io-blk, no redundant cache or dummy format"
-    /proc/boot/devb-ram cam quiet disk name=labdummy ram capacity=28,nodinit blk cache=0,ramdisk=10m,vnode=256 &
+replace('    display_msg "@@QNXRUN-START@@"','''    display_msg "R105096 RAMDISK START: memory=sysram PROFILE_ALLOC"
+    /proc/boot/devb-ram disk name=labdummy ram capacity=28,nodinit blk memory=sysram,alloc=PROFILE_ALLOC,cache=512k,ramdisk=10m,vnode=256,verbose=cf &
     waitfor /dev/ram0 15
     /proc/boot/dinit /dev/ram0
     /proc/boot/mount -tqnx4 /dev/ram0 /tmp
     /proc/boot/mount
-    display_msg "@@QNXRUN-START@@"''')
+    display_msg "@@QNXRUN-START@@"'''.replace("PROFILE_ALLOC",profiles[profile]))
 replace('[type=dir] /tmp','''[+raw +page_align perms=0555] devb-ram
 [+raw +page_align perms=0555] dinit
 [+raw +page_align perms=0555] mount

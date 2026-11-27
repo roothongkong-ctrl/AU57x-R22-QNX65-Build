@@ -1,4 +1,4 @@
-name: R105.088 first-link QNX ARM targeted retry (NO INSTALL)
+name: R105.096 parallel first-link QNX ARM RAM disk profiles (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -11,6 +11,13 @@ jobs:
   first-link-qnx:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        ramdisk: [sysram-demand, sysram-cache]
+    env:
+      QNX_RAMDISK_PROFILE: ${{ matrix.ramdisk }}
     steps:
       - uses: actions/checkout@v4
       - name: Download previously verified exact ARM payload
@@ -87,6 +94,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r105088-first-link-qnx-evidence-NO-INSTALL
+          name: r105096-first-link-${{ matrix.ramdisk }}-NO-INSTALL
           path: qnx-runtime-evidence/
           retention-days: 30
