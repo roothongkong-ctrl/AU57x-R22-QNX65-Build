@@ -1,4 +1,4 @@
-name: R105.132 original iAP2 driver and USB transport baseline (NO INSTALL)
+name: R105.134 original iAP2 linker cause isolation (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -16,6 +16,8 @@ jobs:
       SOURCE_RUN: "45923122041"
     steps:
       - uses: actions/checkout@v4
+      - name: Test private linker classifier
+        run: python3 lab/mu1005_original_ipod/classify_linker.py --selftest
       - name: Obtain retained archive from existing NAS task (no second NAS request)
         run: |
           set -euo pipefail
@@ -79,8 +81,12 @@ jobs:
           git -C toolchain checkout --detach FETCH_HEAD
           test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
           for f in startup-virt libstartup.a devc-serdebug u-boot.bin; do test -s "toolchain/tests/qemu/$f"; done
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq qemu-system-arm
+          if ! command -v qemu-system-arm >/dev/null; then
+            test -f /etc/apt/sources.list.d/ubuntu.sources
+            aptopts=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+            sudo apt-get "${aptopts[@]}" update -qq
+            sudo apt-get "${aptopts[@]}" install -y -qq qemu-system-arm
+          fi
           qemu-system-arm --version | tee qnx-runtime-evidence/qemu-version.log
           sha256sum toolchain/tests/qemu/{startup-virt,libstartup.a,devc-serdebug,u-boot.bin} toolchain/tests/qemu-run.sh | tee qnx-runtime-evidence/boot-inputs.sha256
       - uses: actions/cache/restore@v4
@@ -107,16 +113,20 @@ jobs:
           python3 lab/mu1005_original_ipod/prepare_ifs.py toolchain/tests/qemu-run.sh "$QNX_OEM_PRIVATE"
           rc=0
           QEMU_KEEP_LOG="$RUNNER_TEMP/ipod-serial.log" QEMU_TIMEOUT=120 QEMU_RUN_SECS=75 sh toolchain/tests/qemu-run.sh "$PWD/qnx-runtime-evidence/mu1005-ipod-witness" 8.5 > "$RUNNER_TEMP/ipod-runtime.log" 2>&1 || rc=$?
+          python3 lab/mu1005_original_ipod/classify_linker.py qnx-runtime-evidence/ipod-linker.json "$RUNNER_TEMP/ipod-runtime.log"
           echo "WRAPPER_EXIT=$rc" > qnx-runtime-evidence/ipod-result.txt
           grep -E '^IAP2_' "$RUNNER_TEMP/ipod-runtime.log" | tee -a qnx-runtime-evidence/ipod-result.txt
           grep -F IAP2_ORIGINAL_BYTES_OK qnx-runtime-evidence/ipod-result.txt
+          grep -E '^IAP2_LOADER_DRIVER_NOW_(OK|BLOCKED)$' qnx-runtime-evidence/ipod-result.txt
+          grep -E '^IAP2_LOADER_USB_NOW_(OK|BLOCKED)$' qnx-runtime-evidence/ipod-result.txt
           grep -F IAP2_DIAGNOSTIC_COMPLETE_NO_PHONE qnx-runtime-evidence/ipod-result.txt
           grep -E 'Process [0-9]+ \(mu1005-ipod-witness\) exited status=0' "$RUNNER_TEMP/ipod-serial.log" >/dev/null
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r105132-original-ipod-transport-evidence-NO-INSTALL
+          name: r105134-ipod-linker-evidence-NO-INSTALL
           path: |
             qnx-runtime-evidence/staged.json
             qnx-runtime-evidence/ipod-result.txt
+            qnx-runtime-evidence/ipod-linker.json
           retention-days: 30

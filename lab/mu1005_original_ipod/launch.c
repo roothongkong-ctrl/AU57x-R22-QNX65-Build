@@ -18,17 +18,27 @@ static int exact(const char *path){
  while((n=read(fd,b,sizeof b))>0){size+=(unsigned long)n;for(ssize_t i=0;i<n;i++)h=(h^b[i])*16777619u;}
  close(fd);return n==0&&size==PROGRAM_SIZE&&h==PROGRAM_FNV;
 }
+/* Private guest diagnostics; publish only classified tokens on the host. */
+static int probe(const char *path,const char *label,int flags){
+ (void)dlerror();
+ void *h=dlopen(path,flags|RTLD_LOCAL);
+ if(h){printf("IAP2_LOADER_%s_OK\n",label);dlclose(h);return 1;}
+ const char *e=dlerror();
+ printf("IAP2_LOADER_%s_BLOCKED\n",label);
+ printf("PRIVATE_LINKER_DETAIL %s %s\n",label,e?e:"(no dlerror)");
+ return 0;
+}
 int main(void){
  setvbuf(stdout,NULL,_IONBF,0);alarm(35);
  if(!exact("/proc/boot/mm-ipod")){puts("IAP2_ORIGINAL_BYTES_MISMATCH");return 2;}
  if(access("/dev/ipod0",F_OK)==0){puts("IAP2_BASELINE_NODE_ALREADY_PRESENT");return 3;}
  puts("IAP2_ORIGINAL_BYTES_OK");
- void *h=dlopen("/proc/boot/ipod-drvr-iap2.so",RTLD_NOW|RTLD_LOCAL);
- if(h){puts("IAP2_ORIGINAL_PLUGIN_DLOPEN_OK");dlclose(h);}
- else puts("IAP2_ORIGINAL_PLUGIN_DLOPEN_BLOCKED");
- h=dlopen("/proc/boot/ipod-transport-usbdevice.so",RTLD_NOW|RTLD_LOCAL);
- if(h){puts("IAP2_ORIGINAL_USB_TRANSPORT_DLOPEN_OK");dlclose(h);}
- else puts("IAP2_ORIGINAL_USB_TRANSPORT_DLOPEN_BLOCKED");
+ int driver=probe("/proc/boot/ipod-drvr-iap2.so","DRIVER_NOW",RTLD_NOW);
+ puts(driver?"IAP2_ORIGINAL_PLUGIN_DLOPEN_OK":"IAP2_ORIGINAL_PLUGIN_DLOPEN_BLOCKED");
+ int usb=probe("/proc/boot/ipod-transport-usbdevice.so","USB_NOW",RTLD_NOW);
+ puts(usb?"IAP2_ORIGINAL_USB_TRANSPORT_DLOPEN_OK":"IAP2_ORIGINAL_USB_TRANSPORT_DLOPEN_BLOCKED");
+ /* Lazy success is not service readiness; never call module symbols. */
+ if(!driver)(void)probe("/proc/boot/ipod-drvr-iap2.so","DRIVER_LAZY",RTLD_LAZY);
  char *args[]={"mm-ipod","-d","iap2,config=/etc/mm/iap2.cfg,probe,ppsdir=/ramdisk/pps/iap2","-a","i2c,addr=0x11,path=/dev/i2c8,speed=50000","-t","usbdevice,path=/dev/io-usb/otg_dev","-l","/dev/shmem/iap2.log","-vvvvvv",NULL};
  int pid=spawnv(P_NOWAIT,"/proc/boot/mm-ipod",args);
  if(pid<0){printf("IAP2_SPAWN_BLOCKED errno=%d\n",errno);puts("IAP2_DIAGNOSTIC_COMPLETE_NO_PHONE");return 0;}
