@@ -1,0 +1,2 @@
+# R105.097 固件获取完成、跨镜像并行定位
+NAS 45923122041 success，原始 958324352 bytes SHA256 6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94。app70 4/4 pinned，原始 btstack、SI、DIO、libairplay 均精确匹配；libicuuc.so.58 已找到，app70 单独依赖尚有17个 unresolved。组合报告确认 bluetooth 与 ipod-drvr-iap2.so SHA 匹配，iap2.cfg 位于 EFS system etc/mm，缺少已知 schema 的 bluetooth.json。新增独立 config/dependencies 两条 runner，使用同一已校验 GitHub archive（不再次访问 NAS），配置仅输出候选路径、哈希和布尔状态，依赖合并 app70/stage2/EFS，不猜运行时优先级，不安装。R105.096 两条 QNX profile 尚运行。未增加正式功能验收。

@@ -1,0 +1,103 @@
+name: R105.097 original configuration and dependency parallel discovery (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105097-original-discovery.yml, tools/mu1005_config_discovery.py]
+  workflow_dispatch:
+    inputs:
+      nas_run_id:
+        description: "Successful NAS acquisition run id"
+        default: "45923122041"
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  discover:
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        lane: [config, dependencies]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: ${{ inputs.nas_run_id || '45923122041' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify dependency metadata resolution without host symlinks
+        run: python3 tools/test_mu1005_metadata_aliases.py
+      - name: Obtain retained archive from existing NAS task (no second NAS request)
+        run: |
+          set -euo pipefail
+          mkdir -p firmware evidence
+          # A push that updates both workflows uses its own acquisition run.
+          # Never consume the known failed 20-minute run or duplicate a NAS request.
+          if [ -z "$SOURCE_RUN" ]; then
+            for i in $(seq 1 40); do
+              SOURCE_RUN=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow mu1005-oem-nas.yml --branch mu1005-si-cprx-real-review --commit "$GITHUB_SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+              if [ -n "$SOURCE_RUN" ]; then break; fi
+              sleep 15
+            done
+          fi
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
+          echo "NAS_SOURCE_RUN:$SOURCE_RUN"
+          for i in $(seq 1 380); do
+            result=$(gh run view "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --json status,conclusion --jq '.status + ":" + .conclusion')
+            if [ "$result" = "completed:success" ]; then break; fi
+            if [[ "$result" == completed:* ]]; then echo "NAS_SOURCE_NOT_SUCCESS:$result"; exit 2; fi
+            sleep 15
+          done
+          test "$result" = "completed:success"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z" | sha256sum -c -
+      - name: Fetch exact upstream MHI2 extractor and QNX6 reader
+        run: |
+          set -euxo pipefail
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          test "$(git -C extractor rev-parse HEAD)" = 64a44fe23dbaa08771440d69642d2874d7028295
+          git init qnxmount
+          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
+          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
+          git -C qnxmount checkout --detach FETCH_HEAD
+          test "$(git -C qnxmount rev-parse HEAD)" = 0379c064975d5bbe3595ac7e3d149ea789406794
+          python3 -m venv /tmp/mu1005-extract-venv
+          /tmp/mu1005-extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          command -v 7z || { sudo apt-get update -qq && sudo apt-get install -y p7zip-full; }
+      - name: Extract exact app70 and stage2/EFS into a common original-only tree
+        run: |
+          set -euo pipefail
+          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
+          mkdir -p "${RUNNER_TEMP}/combined"
+          python3 tools/mu1005_extract_app70.py "$archive" "${RUNNER_TEMP}/app70/app.img"
+          /tmp/mu1005-extract-venv/bin/python extractor/tools/extract_firmware.py --source "${RUNNER_TEMP}/app70/app.img" --output "${RUNNER_TEMP}/combined/app70" --variant 70 --qnxmount-root "$PWD/qnxmount" > evidence/app-summary.json
+          /tmp/mu1005-extract-venv/bin/python tools/mu1005_extract_stage2.py "$archive" "${RUNNER_TEMP}/combined/stage2" --toolkit extractor --qnxmount qnxmount --report evidence/stage2-summary.json
+      - name: Find actual OEM configuration by content and report schema without staging
+        if: matrix.lane == 'config'
+        run: |
+          set -euo pipefail
+          python3 tools/mu1005_config_discovery.py "${RUNNER_TEMP}/combined" evidence/config-discovery.json
+      - name: Resolve app70 plus stage2 and EFS dependency closure across real origins
+        if: matrix.lane == 'dependencies'
+        run: |
+          set -euo pipefail
+          root="${RUNNER_TEMP}/combined"
+          python3 tools/mu1005_oem_inventory.py "$root" --link-map "$root/app70/filesystems/MMX2/app/70/default/app.img" "$root/app70/metadata/mmx2-app-70.json" --link-map "$root/stage2/filesystems/stage2" "$root/stage2/metadata/stage2.json" --out evidence/combined-inventory.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open("evidence/combined-inventory.json"))
+          for n in ("libcomm.so","libosal.so","libutil.so","libiplcommon.so","libicuuc.so.58"):
+              print("OEM_DEPENDENCY",n,len(r["dependency_candidates"].get(n,[])))
+          print("REMAINING",r["unresolved_dependencies"])
+          assert r["pinned_set_found"]
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r105097-${{ matrix.lane }}-evidence-NO-INSTALL
+          path: evidence/
+          retention-days: 30
