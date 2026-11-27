@@ -1,4 +1,5 @@
 #include "ap_refresh.h"
+#include <string.h>
 static int referenced(const struct mu_ap_refresh_slot *s,const struct cp_cloud_pipeline *p){
  return p&&p->bootstrap&&p->bootstrap->wireless.session==&s->session;
 }
@@ -42,18 +43,54 @@ int mu_ap_refresh_commit(struct mu_ap_refresh_slot*s,struct cp_cloud_pipeline*p,
  return cp_cloud_refresh_ap_config(p,&s->session,verify,&v);
 }
 
-/* Worker-only: use the existing stock AP snapshot and Device IE adapter
- * before publishing a live configuration to the authenticated bootstrap.
- * The caller owns the serialized OEM radio lease. A failed/uncertain write
- * retains lease state for explicit recovery; never clear foreign slots. */
+/* Revalidate session and original radio ownership before each driver write.
+ * All calls are serialized by the original owner; no concurrent worker access. */
+static int first_link_live(const struct cp_cloud_pipeline*p){
+ return current(p)&&p->owner.wired_idle&&p->owner.bt_alive&&
+  p->owner.wired_idle(p->owner.ctx)==1&&
+  p->owner.bt_alive(p->owner.ctx,p->epoch,p->bt_generation)==1&&
+  cp_s4_authenticated(p->bootstrap);
+}
+struct first_link_guard{
+ const struct cp_cloud_pipeline*p;
+ const struct mu_ap_refresh_slot*s;
+ const struct mu_ap_ie_ops*ops;
+};
+static int guard_live(struct first_link_guard*g){
+ return first_link_live(g->p)&&g->p->epoch==g->s->epoch&&
+  g->p->bt_generation==g->s->generation&&g->p->band==g->s->band;
+}
+static int guard_query(void*v,unsigned n,char*out,size_t cap){
+ struct first_link_guard*g=v;
+ if(!guard_live(g))return -1;
+ return g->ops->query(g->ops->ctx,n,out,cap);
+}
+static int guard_exclusive(void*v,const uint8_t b[6],unsigned slot){
+ struct first_link_guard*g=v;
+ return guard_live(g)&&g->ops->exclusive(g->ops->ctx,b,slot)==1;
+}
+static int guard_write(void*v,unsigned slot,const uint8_t bt[6],const uint8_t id[6],int en){
+ struct first_link_guard*g=v;
+ if(!guard_exclusive(v,g->s->ap.bssid,slot)||!en)return -1;
+ return g->ops->write(g->ops->ctx,slot,bt,id,en);
+}
+/* Do not mutate a foreign SSID or advertise a different Bluetooth identity.
+ * Retain any uncertain lease for explicit recovery by the original AP owner. */
 int mu_ap_refresh_prepare_first_link(struct mu_ap_refresh_slot*s,
  const struct cp_cloud_pipeline*p,struct mu_ap_ie_lease*lease,
  const struct mu_ap_ie_ops*ops,const uint8_t bt[6],const uint8_t id[6]){
  int r;
- if(!s||!p||!lease||lease->state||!ops||!ops->query||!ops->exclusive)return CP_CLOUD_BAD;
+ if(!s||!p||!lease||lease->state||!ops||!ops->query||!ops->exclusive||!ops->write||!bt||!id)return CP_CLOUD_BAD;
+ if(!first_link_live(p))return CP_CLOUD_PROOF;
  r=mu_ap_refresh_prepare(s,p,ops->query,ops->ctx);
  if(r!=CP_CLOUD_OK)return r;
- if(s->band!=CP_RADIO_24||mu_ap_ie_install_first_free(lease,ops,&s->ap,bt,id)<0){
+ const struct cp_identification*i=p->bootstrap->identity;
+ struct first_link_guard g={p,s,ops};
+ const struct mu_ap_ie_ops guarded={&g,guard_query,guard_write,guard_exclusive};
+ if(!guard_live(&g)||!i||!i->wireless_ssid||!i->bluetooth_mac6||
+    strcmp(i->wireless_ssid,s->ap.ssid)||memcmp(i->bluetooth_mac6,bt,6)||
+    s->band!=CP_RADIO_24||mu_ap_ie_install_first_free(lease,&guarded,&s->ap,bt,id)<0||
+    !guard_live(&g)){
   mu_ap_live_clear(s,sizeof *s);return CP_CLOUD_PROOF;
  }
  return CP_CLOUD_OK;
