@@ -5,6 +5,8 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 static uint8_t key=0x5a;
 static int xor_crypto(void *ctx,uint8_t *p,size_t n){
  size_t i;uint8_t k=*(uint8_t*)ctx;
@@ -25,7 +27,51 @@ static void sendpkt(int fd,unsigned op,const uint8_t *data,size_t n,int encrypt)
  for(i=0;i<n;i++)body[i]=(uint8_t)(data[i]^(encrypt?key:0));
  if(n)sendall(fd,body,n);
 }
+static void tcp_loopback_test(void){
+ const uint8_t cfg[]={1,0x64,0,0x1e,0xff,0xe1,0,4,0x67,0x64,0,0x1e,1,0,2,0x68,0xee};
+ const uint8_t idr[]={0,0,0,3,0x65,0x88,0x84};
+ int listen_fd=socket(AF_INET,SOCK_STREAM,0),client,server;
+ struct sockaddr_in a; socklen_t alen=sizeof(a);
+ struct c112_receiver rcv;
+ uint8_t bad[128]={0};
+ assert(listen_fd>=0);
+ memset(&a,0,sizeof(a));a.sin_family=AF_INET;
+ a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);a.sin_port=0;
+ assert(bind(listen_fd,(struct sockaddr*)&a,sizeof(a))==0);
+ assert(listen(listen_fd,1)==0);
+ assert(getsockname(listen_fd,(struct sockaddr*)&a,&alen)==0);
+ client=socket(AF_INET,SOCK_STREAM,0);assert(client>=0);
+ assert(connect(client,(struct sockaddr*)&a,sizeof(a))==0);
+ server=accept(listen_fd,NULL,NULL);assert(server>=0);
+ c112_init(&rcv);
+ assert(c112_begin(&rcv,99,199,xor_crypto,&key)==0);
+ assert(alt111_video_attach(&rcv.video)==ALT111_OK);
+ sendpkt(client,1,cfg,sizeof(cfg),0);
+ sendpkt(client,0,idr,sizeof(idr),1);
+ assert(c112_receive_one(&rcv,server)==C112_CONFIG);
+ assert(c112_receive_one(&rcv,server)==C112_FRAME);
+ assert(rcv.video.count>0);
+ c112_end(&rcv);
+ /* Fuzz input framing: size=UINT32_MAX is rejected before allocation. */
+ assert(c112_begin(&rcv,100,200,xor_crypto,&key)==0);
+ bad[0]=bad[1]=bad[2]=bad[3]=255;bad[4]=0;
+ sendall(client,bad,128);
+ assert(c112_receive_one(&rcv,server)==C112_INVALID);
+ assert(!rcv.active&&rcv.video.count==0);
+ /* Truncation across network must invalidate private stream state. */
+ assert(c112_begin(&rcv,101,201,xor_crypto,&key)==0);
+ memset(bad,0,sizeof(bad));bad[0]=10;bad[4]=0;
+ sendall(client,bad,128);sendall(client,idr,3);
+ assert(shutdown(client,SHUT_WR)==0);
+ assert(c112_receive_one(&rcv,server)==C112_CLOSED);
+ assert(!rcv.active&&rcv.video.count==0);
+ c112_end(&rcv);
+ close(server);close(client);close(listen_fd);
+ puts("PASS AF_INET TCP loopback with encrypted H264 frame, oversized packet rejection and truncation teardown");
+}
+
 int main(void){
+ tcp_loopback_test();
  const uint8_t avcc[]={1,0x64,0,0x1e,0xff,0xe1,0,4,0x67,0x64,0,0x1e,1,0,2,0x68,0xee};
  const uint8_t idr[]={0,0,0,3,0x65,0x88,0x84};
  struct c112_receiver card;
