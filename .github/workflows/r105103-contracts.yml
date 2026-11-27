@@ -1,0 +1,64 @@
+name: R105.103 SDK closure and native interface contracts (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105103-contracts.yml, tools/mu1005_contract_closure.py]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  sdk-closure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: r105098-original-symbols-evidence-NO-INSTALL
+          run-id: 45926462532
+          github-token: ${{ github.token }}
+          path: prior
+      - name: Fetch exact public SDK candidate files without building compiler
+        run: |
+          set -euxo pipefail
+          mkdir sdk evidence
+          for n in libc.so.3 libecpp-ne.so.4 libm.so.2 libsocket.so.3; do
+            curl -fLsS --retry 2 --max-time 60 "https://raw.githubusercontent.com/luka-dev/qnx65-armv7-toolchain/baa45224f18ae6b13c2e9c77c6663bb8181eb6a1/sdp/target/qnx6/armle-v7/lib/$n" -o "sdk/$n"
+          done
+          python3 tools/mu1005_contract_closure.py sdk prior/original-symbols.json sdk evidence/sdk.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r105103-sdk-closure-NO-INSTALL
+          path: evidence/
+  native-contract:
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [dio-server, video, mfi]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: r105100-libairplay.so-evidence-NO-INSTALL
+          run-id: 45926698977
+          github-token: ${{ github.token }}
+          path: prior/airplay
+      - uses: actions/download-artifact@v4
+        with:
+          name: r105100-dio_manager-evidence-NO-INSTALL
+          run-id: 45926698977
+          github-token: ${{ github.token }}
+          path: prior/dio
+      - name: Check pinned original exported interface contracts
+        run: |
+          mkdir evidence
+          python3 tools/mu1005_contract_closure.py "${{ matrix.lane }}" prior/airplay/interface.json prior/dio/interface.json evidence/contract.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r105103-${{ matrix.lane }}-NO-INSTALL
+          path: evidence/
