@@ -3,7 +3,13 @@
 # Adapted from MacsInSpace/mib-cluster-map v1.2.10 swdl/update_run.sh.
 # Review-only dispatcher. No OEM paths, mount operations or executable update metadata.
 set -eu
-[ "$#" = 1 ] || exit 2
+[ "$#" = 1 ] || [ "$#" = 3 ] || exit 2
+BACKEND=${2:-}
+TXROOT=${3:-}
+if [ "$#" = 3 ]; then
+    case "$TXROOT" in /tmp/mu1005-c-txn-*) ;; *) exit 2;; esac
+    [ -f "$TXROOT/LAB_ONLY" ] && [ ! -L "$TXROOT/LAB_ONLY" ] && [ -x "$BACKEND" ] || exit 2
+fi
 CARD=$(cd "$1" && pwd -P) || exit 2
 case "$CARD" in /tmp/au57x-swdl-lab-*) ;; *) exit 2;; esac
 [ -f "$CARD/LAB_ONLY" ] && [ ! -L "$CARD/LAB_ONLY" ] || exit 2
@@ -42,10 +48,24 @@ fi
 {
     echo "NO INSTALL / LAB ONLY"
     echo "Mode: $MODE"
+    if [ "$MODE" = collect ]; then
+        echo "LAB COLLECT OK: no vehicle access"
+        exit 0
+    fi
+    if [ -z "$BACKEND" ]; then
+        echo "BLOCKED: OEM install/restore backend unavailable"
+        exit 3
+    fi
     case "$MODE" in
-        install) echo "BLOCKED: OEM install backend unavailable" ;;
-        uninstall) echo "BLOCKED: OEM restore backend unavailable" ;;
-        collect) echo "LAB COLLECT OK: no vehicle access" ;;
+        install) ACTION=supervised-trial ;;
+        uninstall) ACTION=supervised-restore ;;
+    esac
+    rc=0
+    "$BACKEND" "$TXROOT" "$ACTION" || rc=$?
+    case "$MODE:$rc" in
+        install:0) echo "LAB_INSTALL_COMMITTED"; exit 0 ;;
+        install:3) echo "LAB_INSTALL_ROLLED_BACK"; exit 4 ;;
+        uninstall:3) echo "LAB_RESTORE_COMPLETE"; exit 0 ;;
+        *) echo "LAB_TRANSACTION_BLOCKED rc=$rc"; exit 5 ;;
     esac
 } > "$RESULT"
-[ "$MODE" = collect ] || exit 3
