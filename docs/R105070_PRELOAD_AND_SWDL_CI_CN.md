@@ -1,0 +1,2 @@
+# R105.070 — 并行构建补齐
+R105.069 只改 integration/mu1005_swdl_review/，原 unified workflow push 路径遗漏该目录，所以只有 SI host workflow 触发。增加 SD 入口和 recovery 核心路径；本次 workflow 变更会触发全量测试。与此同时把现有 R92/R97 预加载观察器（原始 SHA 校验、pthread 原样转发、显式可选 HFP 观察）编入 ARM DSO，检查导出符号，transport lane 自动测试 host preload。该库还不是生产 libbthook：未接 Device-ID trace 的 ABI 转发、未取得启动/停止生命周期租约、不自动注册 iAP2、不安装。保留 congobg 的预加载架构与已通过的 QNX 通信模块。此次构建尚待 CI 验证。
