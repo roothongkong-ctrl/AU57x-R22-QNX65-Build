@@ -1,0 +1,50 @@
+name: R11 multi-thread stress: card-only map pixel invariance (SOURCE ONLY)
+on:
+  workflow_dispatch:
+  push:
+    branches: [experiment/cluster-card-r11-parallel-verification]
+    paths:
+      - '.github/workflows/cluster-card-r11-parallel.yml'
+      - 'experiments/cluster-compact-card/r11/**'
+permissions:
+  contents: read
+jobs:
+  parallel:
+    name: ${{ matrix.case }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        case: [core-4, core-8, core-16, reads-4, reads-8, reads-16, fallback-4, fallback-8, fallback-16, asan-8, ubsan-8, source-audit]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run concurrent independent-source stress
+        shell: bash
+        env:
+          CASE: ${{ matrix.case }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          if [ "$CASE" = source-audit ];then
+            git clone -q --depth 1 --branch v1.2.14 https://github.com/MacsInSpace/mib-cluster-map.git /tmp/r11-upstream
+            python3 experiments/cluster-compact-card/r10/check_upstream_card_controls.py /tmp/r11-upstream --json
+            echo "PASS: source API unchanged; still no direct card size"
+            exit 0
+          fi
+          CXX=g++
+          CXXFLAGS="-std=c++11 -O2 -g -pthread -Wall -Wextra -Werror -pedantic"
+          MODE="cores"
+          WORKERS=8
+          case "$CASE" in
+            core-*) MODE="cores";WORKERS="${CASE#core-}";;
+            reads-*) MODE="reads";WORKERS="${CASE#reads-}";;
+            fallback-*) MODE="fallback";WORKERS="${CASE#fallback-}";;
+            asan-8) MODE="cores";WORKERS=8;CXXFLAGS="$CXXFLAGS -fsanitize=address,undefined -fno-omit-frame-pointer";;
+            ubsan-8) MODE="reads";WORKERS=8;CXXFLAGS="$CXXFLAGS -fsanitize=undefined -fno-omit-frame-pointer";;
+            *) exit 2;;
+          esac
+          $CXX $CXXFLAGS experiments/cluster-compact-card/r11/test_parallel.cpp -o /tmp/r11-parallel
+          /tmp/r11-parallel "$MODE" "$WORKERS"
+          echo "PASS: concurrent $CASE; source-only; no real iPhone/map-only source"
