@@ -1,0 +1,2 @@
+# R105.068 SD 入口复用（NO INSTALL）
+上游 MacsInSpace/mib-cluster-map v1.2.10 / 2d0df628ce19ee46051b69203f34a4f9a0731556，GPL-3.0。保留原始两个 SWDL 脚本和许可证作为参考文本（不执行）。实际改编入口 update_run_lab.sh 复用了 SD 结果轮转、UNINSTALL/COLLECT 模式优先级、一次性 autorun 标记。独立 WirelessCarPlay/ 命名空间，不修改 ClusterMap/。当前只支持临时目录实验，安装和恢复明确返回阻塞；没有发布 metainfo2.txt、真实 autorun、原厂脚本执行或车辆文件写入。后续以现有 txn_supervised_trial/restore 为后台，原厂生命周期和备份文件清单仍须接入。禁止把参考脚本复制到车机 SD 卡运行。

@@ -278,7 +278,10 @@ jobs:
                 cc -std=c99 -Wall -Wextra -Werror -O2 -DMU_MM_NOTIFY_HOST_TEST -rdynamic "$inner/mm_notify.c" "$inner/test_mm_notify.c" -ldl -o "$RUNNER_TEMP/inner-mm-notify"
                 "$RUNNER_TEMP/inner-mm-notify"
                 ;;
-              recovery) bash ci/host_sd_txn.sh ;;
+              recovery)
+                bash ci/host_sd_txn.sh
+                python3 integration/mu1005_swdl_review/test_dispatch.py
+                ;;
               *) exit 2 ;;
             esac
             echo "HOST_LANE_PASS:$lane:NO_INSTALL"
