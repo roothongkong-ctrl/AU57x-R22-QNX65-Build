@@ -141,3 +141,6 @@ R105.157 run 46004940954 / job 140525636386 SUCCESS。实际日志确认原厂 c
 
 ## 16. R105.160 第7项并行收口
 R105.159 run 46007850122：12/12主机参数转发及精确原厂配置job 140535457592均通过；通用回归46007850078 4/4通过，总17/18。QNX job 140535457283仍在Build verified toolchain，不重复启动相同编译。原始配置日志确认btstack节点只有customer、exec、maxUnhealthyReports、onFailure、preCondition，无显式参数字段；副本仅改exec，原始SHA 56c14940...，新SHA 2cf6a5339deeafa1f0636475f23eb0ace83c891f0b41e2e5b127939d876bcc82。不能据此断言原厂实际参数来源。新增R105.160两路独立定向原厂参数生产/消费检查：launcher的非setExecutable ProcessTNG参数及启动API；原厂btstack入口/参数解析导入。复用精确app70，不重新编译QNX，不重跑先前扫描，不进入第8项。提交前原QNX一路运行，另MIB审计3个job已完成；新增2路+4路自动集成=最多7路计划。第7项保持部分完成，仍待真实QNX测试及参数来源证据，NO INSTALL。
+
+## 17. R105.161 第7项针对失败修复
+R105.159 QNX job140535457283最终FAILURE，原始日志实际 STEP7_TARGET factory pid=4 argc=2、exit0、STEP7_QNX_ARGV_PASS factory pid=4，证明确实在QNX guest内完成第一例数字参数转发且同PID；第二例spawnv shell ENOENT，supervisor exit1，不能认定其余4例通过。artifact15201469833。其余R105.159/160累计23/24 jobs成功（其中4路重复自动回归，并非新功能）。R105.160 run46008695322原始日志：ProcessTNG::start 4个调用点0x10ffe0/0x11ca28/0x11cb20/0x11f470；btstack main 0x118868、strtol 0x118a40，argc/argv来源仍为候选，不是实际参数生产证明。R105.161新QNX专用workflow只运行剩余4例，fork/execve替换实验supervisor spawnv，逐例独立结果、stat/errno诊断，既有wrapper/目标不改，保留原成功证据。不假定已找到ENOENT根因。另一路使用原固件直接依赖唯一OSAL provider的ProcessTNG::start符号追踪实际spawn入口，禁止重复旧全量扫描。当前计划2路专项+4路自动回归（提交前无活动run），第7项仍部分完成，NO INSTALL；仅验证实际结果，后续8未启动。
