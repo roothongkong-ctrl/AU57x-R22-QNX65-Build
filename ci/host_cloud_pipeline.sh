@@ -2,10 +2,13 @@
 set -Eeuo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$ROOT/cloud12_result"
-gcc -std=c99 -O1 -g -Wall -Wextra -Werror -D_DEFAULT_SOURCE -rdynamic \
+gcc -std=c99 -O1 -g -Wall -Wextra -Werror -D_DEFAULT_SOURCE -DMU_AP_REFRESH_TEST -rdynamic \
  -fsanitize=address,undefined -fno-omit-frame-pointer \
  -I"$ROOT/project/source/src" -I"$ROOT/project/source/legacy_mu1005/bluetooth" \
  -I"$ROOT/project/source/legacy_mu1005/airplay" \
+ -I"$ROOT/integration/mu1005_si_native/ap_live" \
+ "$ROOT/integration/mu1005_si_native/ap_live/ap_live.c" \
+ "$ROOT/integration/mu1005_si_native/ap_live/ap_refresh.c" \
  "$ROOT/tests/test_cloud_pipeline.c" \
  "$ROOT/project/source/src/cp_cloud_pipeline.c" \
  "$ROOT/project/source/src/cp_wcp_autoconnect.c" \

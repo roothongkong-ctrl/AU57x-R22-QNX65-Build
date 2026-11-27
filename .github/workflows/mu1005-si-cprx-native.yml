@@ -29,6 +29,7 @@ jobs:
           (cd review/source/airplay && sha256sum *.c *.h) > review/evidence/receiver-source.sha256
           cp -R integration/mu1005_si_native review/source/si
           cp -R project/source/legacy_mu1005/bluetooth review/source/bluetooth
+          cp -R tools/review_txn review/source/recovery
           mkdir -p review/source/connection
           cp project/source/src/cp_*.{c,h} review/source/connection/
           cp third_party/luka-dev/mib2q-carplay-rgi/wireless/graft/eir.c review/source/bluetooth/upstream_eir.c
@@ -133,6 +134,10 @@ jobs:
             core=review/source/connection
             "$C" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -shared -Wl,--no-undefined -I"$core" -I"$a" -I"$b" -I"$ap" "$core"/{cp_cloud_pipeline,cp_wcp_autoconnect,cp_wcp_handoff,cp_wcp_r45_remote,cp_step04_socket_io,cp_step04_tcp_bridge,cp_radio_policy,cp_session_handoff,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_oem_boundary,cp_wireless,cp_event,cp_csm}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" "$ap"/{ap_live,ap_refresh,qnx_process}.c -lsocket -lc -o review/payload/libmu1005_connection_review.so
             "$R" -h -dW -sW review/payload/libmu1005_connection_review.so > review/evidence/connection-elf.log
+            # Disposable recovery executable, never run against an OEM path.
+            tx=review/source/recovery
+            "$C" -std=c99 -D_DEFAULT_SOURCE -D_QNX_SOURCE -Wall -Wextra -Werror "$tx"/{txn,sha256,supervisor_fixture,txn_recovery_lab}.c -o review/payload/txn_recovery_lab_NO_INSTALL
+            "$R" -h -l -dW review/payload/txn_recovery_lab_NO_INSTALL > review/evidence/recovery-elf.log
             sh review/source/r29-full/build_qnx_review.sh
             cp review/source/r29-full/review-output/ipod-transport-R29-NO-INSTALL.so review/payload/
             cp review/source/r29-full/review-output/elf.log review/evidence/r29-full-elf.log
@@ -176,6 +181,8 @@ jobs:
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/connection-elf.log
           done
           echo CONNECTION_COORDINATOR_ARM_LINK_ONLY_NO_OEM_NO_INSTALL | tee review/evidence/connection-result.txt
+          grep -Eq 'Machine:.*ARM' review/evidence/recovery-elf.log
+          echo RECOVERY_LAB_ARM_COMPILED_NOT_EXECUTED_NO_INSTALL | tee review/evidence/recovery-result.txt
           grep -Eq 'Machine:.*ARM' review/evidence/r29-full-elf.log
           grep -Eq 'Type:.*DYN' review/evidence/r29-full-elf.log
           for sym in ipod_module wcp_lab_supply_fd wcp_oem_graft_pump wcp_graft_feed; do

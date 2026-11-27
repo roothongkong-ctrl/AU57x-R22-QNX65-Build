@@ -226,6 +226,12 @@ static void no_cert_no_radio(void){
 }
 #ifdef MU_AP_REFRESH_TEST
 #include "../integration/mu1005_si_native/ap_live/ap_refresh.h"
+/* This host fixture supplies only refresh_query; never execute a stock command. */
+int mhi2q_qnx_capture(const char *path,char *const argv[],char *out,unsigned cap,int *incomplete){
+ (void)path;(void)argv;(void)out;(void)cap;
+ if(incomplete)*incomplete=1;
+ return -1;
+}
 struct ap_refresh_fixture {unsigned calls;int channel,verified,unstable;};
 static int refresh_query(void*v,unsigned id,char*out,size_t cap){
  struct ap_refresh_fixture*f=v;unsigned n=f->calls++;

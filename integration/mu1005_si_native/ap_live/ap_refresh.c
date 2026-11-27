@@ -7,7 +7,7 @@ int mu_ap_refresh_clear(struct mu_ap_refresh_slot*s,const struct cp_cloud_pipeli
  mu_ap_live_clear(s,sizeof *s);return CP_CLOUD_OK;
 }
 static int current(const struct cp_cloud_pipeline*p){
- return p&&p->started&&!p->stopped&&p->bootstrap&&
+ return p&&p->started&&!p->stopped&&!p->radio_failure_pending&&p->bootstrap&&
   p->bootstrap->wireless_bound&&p->bootstrap->wireless.session&&
   p->epoch&&p->bt_generation&&p->radio.phase==CP_RADIO_CONNECTING&&
   p->radio.epoch==p->epoch&&p->band!=CP_RADIO_NONE&&p->radio.selected==p->band;
