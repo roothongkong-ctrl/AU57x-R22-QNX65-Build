@@ -27,7 +27,7 @@ static char *mu_fixture_mkdtemp(char *path){
   uint32_t value=((uint32_t)getpid()*UINT32_C(2654435761))+(++counter);
   for(unsigned i=0;i<6;i++){path[len-1-i]=digits[value%36u];value/=36u;}
   if(mkdir(path,0700)==0)return path;
-  if(errno!=EEXIST)break;
+  if(errno!=EEXIST){int err=errno;fprintf(stderr,"QNX_FIRST_LINK_MKDIR_ERROR path=%s errno=%d %s\n",path,err,strerror(err));errno=err;break;}
  }
  memcpy(path+len-6,"XXXXXX",6);
  return NULL;

@@ -2,7 +2,7 @@ name: R105.088 first-link QNX ARM targeted retry (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/r105088-first-link-qnx.yml, tests/test_cloud_pipeline.c]
+    paths: [.github/workflows/r105088-first-link-qnx.yml, tests/test_cloud_pipeline.c, lab/mu1005_qnx_runtime/prepare_first_link_ramdisk.py]
   workflow_dispatch:
 permissions:
   contents: read
@@ -76,6 +76,8 @@ jobs:
             arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -Wno-unused-function -O2 -DMU1005_QNX_FIRST_LINK_FIXTURE -Wl,-E -I"$c" -I"$a" -I"$b" tests/test_cloud_pipeline.c "$c"/{cp_cloud_pipeline,cp_wcp_autoconnect,cp_wcp_handoff,cp_radio_policy,cp_session_handoff,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_oem_boundary,cp_wireless,cp_event,cp_csm}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" -lsocket -lc -o qnx-runtime-evidence/mu1005-first-link
             arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW qnx-runtime-evidence/mu1005-first-link
           ' 2>&1 | tee qnx-runtime-evidence/first-link-build.log
+          python3 lab/mu1005_qnx_runtime/prepare_inner_ifs.py toolchain/tests/qemu-run.sh
+          python3 lab/mu1005_qnx_runtime/prepare_first_link_ramdisk.py toolchain/tests/qemu-run.sh
           export QNX_TEST_INNER_LIB="$PWD/previous-native/payload/libmu1005_inner_iap2_review.so"
           QEMU_KEEP_LOG="$PWD/qnx-runtime-evidence/first-link-serial.log" QEMU_TIMEOUT=120 QEMU_RUN_SECS=75 sh toolchain/tests/qemu-run.sh "$PWD/qnx-runtime-evidence/mu1005-first-link" 8.5 2>&1 | tee qnx-runtime-evidence/first-link-runtime.log
           grep -F 'PASS first-connect remote AirPlay: inner auth, BT release, video before optional channels' qnx-runtime-evidence/first-link-runtime.log
