@@ -138,3 +138,6 @@ R105.157 run 46004940954 / job 140525636386 SUCCESS。实际日志确认原厂 c
 
 ## 15. R105.159 只攻关第7项
 用户明确先完成第7项再讨论第8项。复用现有原厂参数转发wrapper，不重复静态扫描，新增12项独立host实际exec、1项原厂精确配置参数保留、1项QNX shell+ARM目标实际执行测试；另预留4路自动集成回归，总预算18。报告见 [R105159_STEP7_ARGV_CN.md](R105159_STEP7_ARGV_CN.md)。目前未取得CI结果，第7项仍部分完成，第01主项60%不变。真实原厂supervisor与配置reader不以夹具替代，NO INSTALL。下一轮只核实第7项的实际结果和修复失败，不提前进入第8项。
+
+## 16. R105.160 第7项并行收口
+R105.159 run 46007850122：12/12主机参数转发及精确原厂配置job 140535457592均通过；通用回归46007850078 4/4通过，总17/18。QNX job 140535457283仍在Build verified toolchain，不重复启动相同编译。原始配置日志确认btstack节点只有customer、exec、maxUnhealthyReports、onFailure、preCondition，无显式参数字段；副本仅改exec，原始SHA 56c14940...，新SHA 2cf6a5339deeafa1f0636475f23eb0ace83c891f0b41e2e5b127939d876bcc82。不能据此断言原厂实际参数来源。新增R105.160两路独立定向原厂参数生产/消费检查：launcher的非setExecutable ProcessTNG参数及启动API；原厂btstack入口/参数解析导入。复用精确app70，不重新编译QNX，不重跑先前扫描，不进入第8项。提交前原QNX一路运行，另MIB审计3个job已完成；新增2路+4路自动集成=最多7路计划。第7项保持部分完成，仍待真实QNX测试及参数来源证据，NO INSTALL。
