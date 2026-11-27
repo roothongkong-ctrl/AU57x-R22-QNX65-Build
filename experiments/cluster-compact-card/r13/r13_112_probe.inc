@@ -14,6 +14,7 @@
 #define R13_STREAM_CARD 112
 #define R13_CARD_UUID "b7e6c5a0-2222-4000-8000-000000000003"
 #define R13_CARD_URL ALT_URL_INSTRUCTIONCARD
+#include "r15_wire.h"
 
 static pthread_mutex_t r13_lock=PTHREAD_MUTEX_INITIALIZER;
 static pthread_t r13_thread;
@@ -93,10 +94,38 @@ static void r13_stop_receiver(void)
     pthread_mutex_unlock(&r13_lock);
     if(fd>=0)close(fd);
 }
+/* Only the 112 worker owns this local fd and parser. No global 111 state. */
+static void r15_reset_local(struct alt111_video *v,int *local)
+{
+    if(*local>=0){close(*local);*local=-1;}
+    alt111_video_detach(v);
+    if(v->active && v->config_valid && !v->config_blocked)
+        (void)alt111_video_attach(v);
+}
+static void r15_forward_au(struct alt111_video *v,int *local,uint64_t cid)
+{
+    const uint8_t *p=NULL;
+    size_t n=0;
+    struct alt111_output_ticket t;
+    while(alt111_video_peek(v,&p,&n,&t)==ALT111_OK){
+        if(*local<0){
+            if(!t.idr || t.offset!=0){r15_reset_local(v,local);return;}
+            *local=r15_connect_local(R15_PORT);
+        }
+        if(*local<0 || r15_send_record(*local,cid,t.sequence,r15_clock(),t.idr,p,n)){
+            r15_reset_local(v,local);
+            return; /* wait for next independent IDR */
+        }
+        if(alt111_video_advance(v,&t,n)!=ALT111_OK){
+            r15_reset_local(v,local);
+            return;
+        }
+    }
+}
 static void *r13_card_worker(void *arg)
 {
     int listener=(int)(intptr_t)arg;
-    int fd;
+    int fd,local=-1;
     unsigned configs=0,frames=0,decrypted=0,rejects=0;
     uint64_t bytes=0,probe_stream=0;
     struct alt111_video parsed112;
@@ -109,6 +138,7 @@ static void *r13_card_worker(void *arg)
         return NULL;
     }
     pthread_mutex_lock(&r13_lock);
+    if(r13_stop_flag){pthread_mutex_unlock(&r13_lock);close(fd);alt111_video_destroy(&parsed112);return NULL;}
     r13_client_fd=fd;
     pthread_mutex_unlock(&r13_lock);
     logf_u2("R13 type112 iPhone socket connected, validating encrypted packet flow");
@@ -116,7 +146,10 @@ static void *r13_card_worker(void *arg)
         AirPlayScreenHeaderCompat h;
         uint8_t *body=NULL;
         int rr;
-        if(r13_stop_flag)break;
+        pthread_mutex_lock(&r13_lock);
+        rr=r13_stop_flag;
+        pthread_mutex_unlock(&r13_lock);
+        if(rr)break;
         rr=read_exact(fd,&h,sizeof(h));
         if(rr<=0)break;
         if(h.bodySize>MAX_SCREEN_BODY){++rejects;break;}
@@ -128,11 +161,14 @@ static void *r13_card_worker(void *arg)
         }
         if(h.opcode==K_SCREEN_VIDEO_CONFIG){
             if(body && h.bodySize){
+                uint64_t old_codec=parsed112.codec;
                 int crc=alt111_video_config(&parsed112,probe_stream,body,h.bodySize);
                 if(crc==ALT111_OK||crc==ALT111_RESTART_CONSUMER){
+                    if(old_codec!=parsed112.codec||!parsed112.attached)
+                        r15_reset_local(&parsed112,&local);
                     ++configs;
                     logf_u2("R13 type112 validated avcC config length=%u",h.bodySize);
-                }else ++rejects;
+                }else {++rejects;r15_reset_local(&parsed112,&local);}
             } else ++rejects;
         }else if(h.opcode==K_SCREEN_VIDEO_FRAME){
             if(!configs){++rejects;}
@@ -145,13 +181,15 @@ static void *r13_card_worker(void *arg)
                     uint64_t before=parsed112.source_aus;
                     int parsed=alt111_video_submit(&parsed112,probe_stream,body,h.bodySize,1);
                     ++decrypted; /* CTR call success alone proves NO plaintext integrity. */
-                    if(parsed==ALT111_WAIT && parsed112.source_aus>before){
+                    if((parsed==ALT111_OK||parsed==ALT111_WAIT) && parsed112.source_aus>before){
+                        if(parsed==ALT111_OK)r15_forward_au(&parsed112,&local,r13_session_connection);
                         ++frames;bytes+=h.bodySize;
                         if(frames<=3 || (frames%30)==0)
                             logf_u2("R13 type112 validated H264 AU count=%u bytes_total=%llu (content still unverified)",
                                     frames,(unsigned long long)bytes);
                     }else{
                         ++rejects;
+                        r15_reset_local(&parsed112,&local);
                         logf_u2("R13 type112 invalid H264 AU rc=%d; AES plaintext NOT confirmed",parsed);
                     }
                 } else {++rejects;free(body);break;}
@@ -164,11 +202,12 @@ static void *r13_card_worker(void *arg)
         }
         free(body);
         /* Bounded observational run: don't keep private stream alive indefinitely. */
-        if(frames>=120u || rejects>=10u)break;
+        if(rejects>=10u)break; /* experimental streaming, not limited to 120 frames */
     }
     logf_u2("R13 type112 SUMMARY connection=%llu avcC=%u ctrCalls=%u validatedH264=%u bytes=%llu rejects=%u (GaoDe content NOT verified)",
             (unsigned long long)r13_session_connection,configs,decrypted,frames,
             (unsigned long long)bytes,rejects);
+    if(local>=0)close(local);
     alt111_video_destroy(&parsed112);
     pthread_mutex_lock(&r13_lock);
     if(r13_client_fd==fd)r13_client_fd=-1;
