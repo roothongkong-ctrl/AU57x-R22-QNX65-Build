@@ -30,6 +30,10 @@ typedef struct {
  * On other hosts returns -1 without reading/calling any native address.
  * fd is already connected to 127.0.0.1:57342; caller owns fd afterwards. */
 int mu_bt_native_attach(const MuBtOwner *,int fd);
+/* Separate review-only entry; caller must attest the exact FD's compatible
+ * daemon (type4 parser, one outstanding TX). Does not replace native owner,
+ * peer authorization, or MFi proof. No actual startup caller yet. */
+int mu_bt_native_attach_ack(const MuBtOwner *,int fd,int (*ack_peer_ready)(void*,int));
 int mu_bt_native_tick(void);
 int mu_bt_native_discovery_ready(void);
 int mu_bt_native_eir_buffer_matches(const uint8_t*);

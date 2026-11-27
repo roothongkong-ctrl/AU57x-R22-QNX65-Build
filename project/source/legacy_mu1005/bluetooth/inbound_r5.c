@@ -51,6 +51,12 @@ int ir5_discovery_ready(const InboundR5*b){
     !b->vendor.certify||!b->vendor.ready)return 0;
  return b->vendor.certify(b->vendor.opaque)==1&&b->vendor.ready(b->vendor.opaque)==1;
 }
+/* This is a pre-publication protocol choice, not radio authorization. */
+int ir5_enable_completion_ack(InboundR5*b){
+ if(!b||!b->initialized||b->dead||b->had_link||b->service.state!=IN_PREPARED||
+    !b->vendor.certify||!cert(b))return -1;
+ return au_rf_enable_completion_ack(&b->rf);
+}
 int ir5_publish(InboundR5*b){if(!b||!b->initialized||b->dead)return -1;return inbound_publish(&b->service);}
 int ir5_event(InboundR5*b,void*ch,const void*raw,unsigned code,unsigned status,const uint8_t*data,unsigned len,uint32_t packet){
  if(!b||!b->initialized||!cert(b)||ch!=&b->service.rf)return -1;

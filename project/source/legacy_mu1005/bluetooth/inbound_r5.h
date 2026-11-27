@@ -21,6 +21,10 @@ typedef struct {
  uint8_t native_rx[MAX_DATA]; unsigned native_rx_busy;
 } InboundR5;
 int ir5_init(InboundR5 *,const InboundOps *,ResolvePeer,int,uint32_t);
+/* Explicit opt-in on certified owner BEFORE publishing. Caller separately
+ * proves that exact connected daemon understands type4 and has one TX
+ * outstanding. Legacy callers remain unchanged. */
+int ir5_enable_completion_ack(InboundR5 *);
 int ir5_publish(InboundR5 *);
 int ir5_discovery_ready(const InboundR5 *);
 /* event is normalized by the separately verified native callback binder.
