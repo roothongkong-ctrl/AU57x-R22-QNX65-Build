@@ -1,4 +1,4 @@
-name: R105.178 route 3 raw message tail and receive entry (NO INSTALL)
+name: R105.179 route 3 independent ARM branch windows (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -73,5 +73,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r105178-route3-tail-NO-INSTALL
+          name: r105179-route3-tail-NO-INSTALL
           path: evidence/route3-tail.json

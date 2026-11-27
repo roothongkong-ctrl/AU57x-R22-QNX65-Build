@@ -24,14 +24,29 @@ def symbol_size(addr,name):
         raise ValueError("unresolved symbol size: "+name)
     return sizes.pop()
 def decode(start,end):
-    if not (b.va<=start<end<=b.va+len(b.code)) or end-start>8192:
-        raise ValueError("invalid bounded code range")
+    if not (b.va<=start<end<=b.va+len(b.code)) or end-start>8192 or start%4 or end%4:
+        raise ValueError("invalid bounded ARM code range")
+    # A literal pool or invalid word must never prevent decoding a known later
+    # direct branch target. Preserve gaps and ELF ARM mapping markers.
+    marks=sorted((addr,name.split(".")[0]) for addr,names in b.names.items()
+                 for name in names if name.split(".")[0] in ("$a","$d","$t")
+                 and b.va<=addr<b.va+len(b.code))
     rows=[]
-    for i in md.disasm(b.code[start-b.va:end-b.va],start):
-        row={"va":hex(i.address),"insn":i.mnemonic+" "+i.op_str}
-        if i.mnemonic.startswith("b") and i.operands and i.operands[0].type==ARM_OP_IMM:
-            target=i.operands[0].imm
-            row.update(target=hex(target),labels=b.labels(target))
+    for addr in range(start,end,4):
+        mode=next((mode for va,mode in reversed(marks) if va<=addr),None)
+        row={"va":hex(addr),"mapping":mode}
+        if mode in ("$d","$t"):
+            row["gap"]="mapped data or Thumb, not decoded as ARM"
+        else:
+            word=b.code[addr-b.va:addr-b.va+4]
+            i=next(md.disasm(word,addr,count=1),None)
+            if i is None or i.size!=4:
+                row["gap"]="undecodable ARM word"
+            else:
+                row["insn"]=i.mnemonic+" "+i.op_str
+                if i.mnemonic in ("b","bl","blx","beq","bne","bhs","blo","bmi","bpl","bvs","bvc","bhi","bls","bge","blt","bgt","ble","bcs","bcc") and i.operands and i.operands[0].type==ARM_OP_IMM:
+                    target=i.operands[0].imm
+                    row.update(target=hex(target),labels=b.labels(target))
         rows.append(row)
     return rows
 msg=0xf4c8
@@ -41,14 +56,11 @@ tail=0x104ac
 if not tail<=0x10680<end:
     raise ValueError("raw branch outside original function symbol")
 rows=decode(tail,end)
-raw=[r for r in rows if 0x10680<=int(r["va"],16)<min(end,0x106b4)]
-if not raw or raw[0]["va"]!="0x10680":
-    raise ValueError("raw branch not decoded")
+raw=decode(0x10680,min(end,0x106b4))
 recv=0x2121c
 recv_end=recv+symbol_size(recv,"transport_recv_pkt")
 receive=decode(recv,recv_end)
-if not receive or receive[0]["va"]!=hex(recv):
-    raise ValueError("receive entry not decoded")
+
 res={"scope":"NEW_STATIC_TAIL_AND_RECEIVE_ENTRY_ONLY","driver_sha256":digest,
      "prior_artifact":15211206944,"iap2_msg_end":hex(end),"new_tail":rows,
      "raw_branch_3000":raw,"transport_recv_pkt":receive,"runtime_verified":False,
@@ -56,4 +68,8 @@ res={"scope":"NEW_STATIC_TAIL_AND_RECEIVE_ENTRY_ONLY","driver_sha256":digest,
 out.write_text(json.dumps(res,indent=2)+"\n")
 print("ROUTE3_RAW_BRANCH_3000",json.dumps(raw))
 print("ROUTE3_RECV_ENTRY_CALLS",json.dumps([r for r in receive if r.get("labels")]))
+if not raw or raw[0]["va"]!="0x10680" or "insn" not in raw[0]:
+    raise ValueError("raw branch target not ARM code; mapping evidence retained")
+if not receive or receive[0]["va"]!=hex(recv) or "insn" not in receive[0]:
+    raise ValueError("receive entry not ARM code; mapping evidence retained")
 print("ROUTE3_NEW_TAIL_AND_RECV_STATIC_ONLY_NOT_WIRELESS")
