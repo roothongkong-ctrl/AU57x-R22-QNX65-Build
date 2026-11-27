@@ -1,0 +1,68 @@
+name: 'R13 real MIB v1.2.14 AirPlay 112 experiment - source only'
+on:
+  push:
+    branches: [experiment/cluster-card-r13-real-112-protocol]
+    paths:
+      - 'experiments/cluster-compact-card/r13/**'
+      - '.github/workflows/cluster-card-r13-real-hook.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration:
+    name: ${{ matrix.compiler }} / ${{ matrix.mode }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        compiler: [gcc, clang]
+        mode: [default-off, opt-in-build, strict-source-diff]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout original official v1.2.14 source
+        run: git clone -q --depth 1 --branch v1.2.14 https://github.com/MacsInSpace/mib-cluster-map.git /tmp/r13-upstream
+      - name: Patch true original AirPlay protocol hook
+        run: |
+          cp experiments/cluster-compact-card/r13/r13_112_probe.inc /tmp/r13-upstream/thirdparty/mhi2_altscreen_carplay/
+          python3 experiments/cluster-compact-card/r13/patch_real_v1214.py /tmp/r13-upstream/thirdparty/mhi2_altscreen_carplay/libaltscreen111_gen2.c
+          git -C /tmp/r13-upstream diff --check
+          test "$(git -C /tmp/r13-upstream diff --name-only)" = "thirdparty/mhi2_altscreen_carplay/libaltscreen111_gen2.c"
+      - name: Compile and inspect actual built C code (no QNX cross-compiler)
+        shell: bash
+        env:
+          COMPILER: ${{ matrix.compiler }}
+          MODE: ${{ matrix.mode }}
+        run: |
+          set -euo pipefail
+          CC="$COMPILER"
+          INC=/tmp/r13-upstream/thirdparty/mhi2_altscreen_carplay
+          SRC=$INC/libaltscreen111_gen2.c
+          FLAGS="-std=gnu99 -O1 -g -Wall -Wextra -Wno-unused-function -Werror=implicit-function-declaration -I$INC/include"
+          case "$MODE" in
+            default-off)
+              "$CC" $FLAGS -c "$SRC" -o /tmp/r13-hook-stock.o
+              if nm /tmp/r13-hook-stock.o | grep -Fq 'r13_start_receiver'; then
+                echo 'ERROR: R13 code entered default OFF build'
+                exit 1
+              fi
+              echo 'PASS: real hook compiles and experimental code absent by default'
+              ;;
+            opt-in-build)
+              "$CC" $FLAGS -DCLUSTERMAP_R13_112_LAB -c "$SRC" -o /tmp/r13-hook-lab.o
+              strings /tmp/r13-hook-lab.o | grep -Fq 'R13 type112 SUMMARY'
+              strings /tmp/r13-hook-lab.o | grep -Fq 'CLUSTERMAP_R13_112_PROBE'
+              echo 'PASS: real hook compiled with isolated 112 packet+AES experiment'
+              ;;
+            strict-source-diff)
+              grep -Fq 'r13_strip112(request)' "$SRC"
+              grep -Fq 'r13_advertise(displays,alt)' "$SRC"
+              grep -Fq 'r13_setup(s,request,(CFMutableDictionaryRef)stockResp)' "$SRC"
+              grep -Fq 'r13_stop_receiver()' "$SRC"
+              grep -Fq '#ifdef CLUSTERMAP_R13_112_LAB' "$SRC"
+              ! grep -Fq 'CLUSTERMAP_CARPLAY_SCALE=140' /tmp/r13-upstream/config/gal_dualscreen.conf
+              echo 'PASS: strict one-original-file integration, guarded; no SCALE and no stock install edits'
+              ;;
+            *)exit 2;;
+          esac
