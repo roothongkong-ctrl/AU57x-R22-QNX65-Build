@@ -177,3 +177,6 @@ R105.166 native-preflight job140557318911实际失败：SDK_CONFIRMED_PIC_LINK_O
 
 ## 28. R105.170 QNX旧SDK字符串兼容修复
 R105.169 run46016668674/job140565432928最终失败，实际缓存命中、原厂launcher及依赖准备已过，编译错误strnlen implicit declaration，-Werror导致未进入guest。仅替换为最多512字节的有界长度循环，不改变读取观察、尾转发、原厂逻辑或验收条件；新增1专项+4自动回归，提交前无活动任务。用户要求对话只汇报通俗结果，完整日志、源码与进度保存在GitHub。未完成8，不进入9，NO INSTALL。
+
+## 29. R105.171 原厂启动参数修复、停止无关回归
+R105.170 run46017228755/job140567350546实际编译成功、原厂launcher字节校验成功、pid4启动，随后CoreApiLocator.cxx:13 no AgentStarter instance、Servmngt.cxx:40 the bundle loader commandline is invalid，libcomm ProxyTracked空指针SIGSEGV。之前仅传argv[0]不够；具体参数与服务是否齐全未证，不归咎原厂解析器。新专项先从已提取原厂启动文本找明确完整-sm-name/id/time/restart实参，并记录真实libservmngt命令行标记；仅唯一明确原厂命令才生成argv并复用原只读观察，不能猜参数或伪造服务。若无明确命令，保留诊断并停止无效重启。用户要求只测试受影响内容，自动集成workflow对独立step8实验、两交接文档及该workflow自身变更跳过，其他变更仍原样触发，可手动运行。此次只计划1路专项，不重复4路无关回归。第8项仍部分完成，第9项未开始。NO INSTALL。

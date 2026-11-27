@@ -2,6 +2,12 @@ name: MU1005 SI real CPRX source integration (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
+    paths-ignore:
+      - 'lab/mu1005_step8_*/**'
+      - '.github/workflows/r*-step8-*.yml'
+      - '.github/workflows/mu1005-si-cprx-real-review.yml'
+      - 'docs/MASTER_HANDOFF_AND_NO_REPEAT_RULES_CN.md'
+      - 'docs/WIRELESS_FIRST_LINK_TASK_REGISTER_CN.md'
   workflow_dispatch:
 permissions:
   contents: read
