@@ -43,6 +43,11 @@ jobs:
       - name: Install FFmpeg OpenGLES headers (original player only)
         if: matrix.target == 'minimal-v1214-patch'
         run: |
+          # GitHub's preinstalled Microsoft apt source intermittently returns 403.
+          # It is not needed for public Ubuntu FFmpeg/GLES dependencies.
+          for f in /etc/apt/sources.list.d/*; do
+            if [ -f "$f" ] && grep -q 'packages.microsoft.com' "$f"; then sudo rm -f "$f"; fi
+          done
           sudo apt-get -qq update
           sudo apt-get -qq -y install libgles2-mesa-dev libglfw3-dev libavcodec-dev libavformat-dev libavutil-dev
       - name: Run independent source-only test
