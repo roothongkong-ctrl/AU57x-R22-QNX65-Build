@@ -74,6 +74,14 @@ __attribute__((constructor)) static void au57x_probe_ctor(void){
  /* Only an exact stock executable is admitted; no mutation or vendor calls. */
  probe_enabled=1;
  log_one("stock-image-pinned",0,0,1);
+#if defined(__QNXNTO__) && defined(__arm__) && UINTPTR_MAX == UINT32_MAX
+ /* Optional first-link start witness; no OEM SDK registration in constructor. */
+ if(getenv("AU57X_MU1005_TRACE_ATTACH") &&
+    strcmp(getenv("AU57X_MU1005_TRACE_ATTACH"),"1")==0){
+  extern int mu_bt_trace_attach(void);
+  log_one(mu_bt_trace_attach()?"startup-trace-attached":"startup-trace-unavailable",0,0,0);
+ }
+#endif
  /* Experimental original-HFP observer only; separate opt-in, never iAP2. */
  if(getenv("AU57X_R97_GOT_PROBE") &&
     strcmp(getenv("AU57X_R97_GOT_PROBE"),"1")==0){

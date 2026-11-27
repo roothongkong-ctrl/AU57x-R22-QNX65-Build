@@ -152,7 +152,7 @@ jobs:
             # Compile from checkout to retain the relative SHA256 header.
             # Review-only observer: never automatically register RFCOMM.
             orig=project/source/legacy_mu1005/bluetooth
-            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined "$orig"/{bt_preload_probe,bt_thread_owner,bt_got_observer}.c tools/review_txn/sha256.c -lc -o review/payload/libmu1005_bt_preload_review.so
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined "$orig"/{bt_preload_probe,bt_thread_owner,bt_got_observer,bt_trace_attach,bt_trace_latch,bt_startup_snapshot,bt_self_reader}.c "$orig/bt_trace_tail_arm.S" tools/review_txn/sha256.c -lc -o review/payload/libmu1005_bt_preload_review.so
             "$R" -h -dW -sW review/payload/libmu1005_bt_preload_review.so > review/evidence/preload-elf.log
             ap=review/source/ap-live
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined "$ap"/{ap_live,qnx_process,cp_csm}.c -lc -o review/payload/libmu1005_ap_live_review.so
@@ -184,7 +184,7 @@ jobs:
           done
           grep -Eq 'Machine:.*ARM' review/evidence/preload-elf.log
           grep -Eq 'Type:.*DYN' review/evidence/preload-elf.log
-          for sym in au57x_r92_stock_image_verified au57x_r92_threads_seen pthread_create; do
+          for sym in au57x_r92_stock_image_verified au57x_r92_threads_seen pthread_create mu_bt_trace_attach mu_bt_trace_attached_take mu_bt_trace_tail; do
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/preload-elf.log
           done
           echo BT_PRELOAD_OBSERVER_ARM_LINK_ONLY_NO_OEM_ATTACH | tee review/evidence/preload-result.txt
