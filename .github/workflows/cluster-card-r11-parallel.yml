@@ -1,4 +1,4 @@
-name: R11 multi-thread stress: card-only map pixel invariance (SOURCE ONLY)
+name: 'R11 multithread stress - card only; map invariant (SOURCE ONLY)'
 on:
   workflow_dispatch:
   push:
