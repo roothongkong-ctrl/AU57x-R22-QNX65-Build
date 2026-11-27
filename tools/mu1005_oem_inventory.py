@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Private offline MU1005 OEM input locator and ELF symbol inventory. No installation."""
-import argparse, hashlib, json, os, re, struct
+import argparse, hashlib, json, os, re, struct, subprocess
 from pathlib import Path
 
 PIN = {
@@ -19,13 +19,42 @@ def sha(path):
             h.update(block)
         return h.hexdigest()
 
+def dynamic_inventory(path,elf_type):
+    """GNU readelf -D reads PT_DYNAMIC even when IFS stripped section headers."""
+    def run(*flags):
+        try:
+            return subprocess.check_output(["readelf",*flags,str(path)],text=True,
+                                            stderr=subprocess.STDOUT,timeout=30)
+        except (subprocess.SubprocessError,OSError) as e:
+            raise ValueError("dynamic ELF inspection failed") from e
+    dyn=run("-dW")
+    if "Dynamic section at offset" not in dyn:
+        raise ValueError("no readable PT_DYNAMIC")
+    needed=sorted(set(re.findall(r"\(NEEDED\).*?\[([^\]]+)\]",dyn)))
+    table=run("-D","-sW")
+    symbols=[]
+    for line in table.splitlines():
+        a=line.split()
+        if len(a)<8 or not re.fullmatch(r"\d+:",a[0]):continue
+        if not PAT.search(a[7]):continue
+        try:
+            value=int(a[1],16);size=int(a[2],0) if a[2].startswith("0x") else int(a[2])
+        except ValueError:continue
+        symbols.append({"name":a[7],"va":hex(value),"size":size,"imported":a[6]=="UND"})
+    if not re.search(r"(?m)^\s*\d+:\s+[0-9a-fA-F]+\s+",table):
+        raise ValueError("PT_DYNAMIC symbol table unavailable")
+    return {"elf_type":elf_type,"machine":"ARM","needed":needed,
+            "symbol_tables":["dynamic_program_header"],"candidate_symbols":symbols,
+            "candidate_only":True}
+
 def inventory(path):
     d = path.read_bytes()
     if len(d)<52 or d[:6] != b"\x7fELF\x01\x01":
         raise ValueError("not ELF32 little-endian")
     h=struct.unpack_from("<16sHHIIIIIHHHHHH",d)
-    if h[2]!=40 or h[11]!=40 or not h[12]:
-        raise ValueError("not ARM ELF32 with section table")
+    if h[2]!=40:raise ValueError("not ARM ELF32")
+    if not h[6] or not h[12]:return dynamic_inventory(path,h[1])
+    if h[11]!=40:raise ValueError("invalid ARM section header size")
     def block(off,n):
         if off<0 or n<0 or off+n>len(d): raise ValueError("truncated ELF")
         return d[off:off+n]

@@ -7,7 +7,7 @@ on:
     inputs:
       nas_run_id:
         description: "Successful NAS acquisition run id"
-        default: ""
+        default: "45923122041"
         type: string
 permissions:
   contents: read
@@ -18,11 +18,15 @@ jobs:
     timeout-minutes: 120
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE_RUN: ${{ inputs.nas_run_id }}
+      SOURCE_RUN: ${{ inputs.nas_run_id || '45923122041' }}
     steps:
       - uses: actions/checkout@v4
       - name: Verify dependency metadata resolution without host symlinks
         run: python3 tools/test_mu1005_metadata_aliases.py
+      - name: Verify real pinned OEM ELF with section-header-free test copy
+        run: |
+          python3 oem_inputs/mu1005/verify_seed.py "$RUNNER_TEMP/oem-seed"
+          python3 tools/test_mu1005_sectionless.py "$RUNNER_TEMP/oem-seed/oem/eso/bin/apps/btstack"
       - name: Obtain retained archive from existing NAS task (no second NAS request)
         run: |
           set -euo pipefail
