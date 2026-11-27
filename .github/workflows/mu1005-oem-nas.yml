@@ -21,13 +21,17 @@ jobs:
         with:
           path: .oem-cache/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z
           key: mu1005-oem-archive-v2
-      - name: Download via owner-provided HTTPS secret
+      - name: Download via owner-authorized temporary public share
         if: steps.cache.outputs.cache-hit != 'true'
         env:
           NAS_URL: ${{ secrets.MU1005_NAS_URL }}
+          TEMP_PUBLIC_URL: 'https://ccnnai.duckdns.org:1232/share-download/CwX8lbAYPG1bkaJI_UySpVAvEtZBhbPC9ZHDZHzFEk8'
         run: |
           set -euo pipefail
           mkdir -p .oem-cache nas-evidence
+          NAS_URL="${NAS_URL:-$TEMP_PUBLIC_URL}"
+          export NAS_URL
+          echo "::add-mask::$NAS_URL"
           if [ -z "$NAS_URL" ]; then
             echo "NAS_URL_SECRET_MISSING"
             exit 2
@@ -56,6 +60,14 @@ jobs:
         with:
           path: .oem-cache/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z
           key: mu1005-oem-archive-v2
+      - name: Retain full integrity-checked archive for later independent retrieval
+        uses: actions/upload-artifact@v4
+        with:
+          name: mu1005-nas-firmware-archive
+          path: .oem-cache/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z
+          compression-level: 0
+          retention-days: 30
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
