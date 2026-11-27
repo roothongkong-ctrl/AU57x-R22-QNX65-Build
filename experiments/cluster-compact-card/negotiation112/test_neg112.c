@@ -9,7 +9,8 @@
 static uint8_t key=0x4e;
 static int crypt(void *ctx,uint8_t *p,size_t n){
  size_t j;uint8_t k=*(uint8_t*)ctx;
- for(j=0;j<n;++j)p[j]^=k;return 0;
+ for(j=0;j<n;++j){ p[j]^=k; }
+ return 0;
 }
 static void sent(int fd,const uint8_t *p,size_t n){
  while(n){ssize_t x=send(fd,p,n,0);assert(x>0);p+=(size_t)x;n-=(size_t)x;}
