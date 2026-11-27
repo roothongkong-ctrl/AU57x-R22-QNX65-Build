@@ -39,10 +39,10 @@ int main(void){
  assert(gate_view(&g,1030000)==V_DUAL); /* map is 30ms older, still synchronized */
  assert(gate_frame(&g,112,7,1123,1210000,1210010)==G_OK);
  assert(gate_view(&g,1210010)==V_MAP); /* 210ms mismatch: never overlay stale map/card */
- assert(gate_frame(&g,111,7,1111,1030100,1030110)==G_OK);
- assert(gate_view(&g,1030200)==V_DUAL);
+ assert(gate_frame(&g,111,7,1111,1210100,1210110)==G_OK);
+ assert(gate_view(&g,1210200)==V_DUAL);
  assert(gate_end(&g,111,7,1111)==G_OK);
- assert(gate_view(&g,1030200)==V_BLANK);
+ assert(gate_view(&g,1210200)==V_BLANK);
  assert(gate_invariant(&g));
  assert(gate_full_end(&g,7)==G_OK);
  assert(gate_setup(&g,112,7,1122)==G_STALE);
