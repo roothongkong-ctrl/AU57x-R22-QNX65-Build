@@ -1,4 +1,4 @@
-name: R105.189 reuse accepted probes and MIB workflow (NO INSTALL)
+name: R105.190 reuse stock launcher in independent review directory (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -8,33 +8,91 @@ permissions:
   contents: read
   actions: read
 jobs:
-  assemble-existing-readonly:
+  route6-independent-layout:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: "45923122041"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Obtain retained archive from existing NAS task (no second NAS request)
+        run: |
+          set -euo pipefail
+          mkdir -p firmware evidence
+          # A push that updates both workflows uses its own acquisition run.
+          # Never consume the known failed 20-minute run or duplicate a NAS request.
+          if [ -z "$SOURCE_RUN" ]; then
+            for i in $(seq 1 40); do
+              SOURCE_RUN=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow mu1005-oem-nas.yml --branch mu1005-si-cprx-real-review --commit "$GITHUB_SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+              if [ -n "$SOURCE_RUN" ]; then break; fi
+              sleep 15
+            done
+          fi
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
+          echo "NAS_SOURCE_RUN:$SOURCE_RUN"
+          for i in $(seq 1 380); do
+            result=$(gh run view "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --json status,conclusion --jq '.status + ":" + .conclusion')
+            if [ "$result" = "completed:success" ]; then break; fi
+            if [[ "$result" == completed:* ]]; then echo "NAS_SOURCE_NOT_SUCCESS:$result"; exit 2; fi
+            sleep 15
+          done
+          test "$result" = "completed:success"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z" | sha256sum -c -
+      - name: Fetch exact upstream MHI2 extractor and QNX6 reader
+        run: |
+          set -euxo pipefail
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          test "$(git -C extractor rev-parse HEAD)" = 64a44fe23dbaa08771440d69642d2874d7028295
+          git init qnxmount
+          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
+          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
+          git -C qnxmount checkout --detach FETCH_HEAD
+          test "$(git -C qnxmount rev-parse HEAD)" = 0379c064975d5bbe3595ac7e3d149ea789406794
+          python3 -m venv /tmp/mu1005-extract-venv
+          /tmp/mu1005-extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          command -v 7z || { sudo apt-get update -qq && sudo apt-get install -y p7zip-full; }
+      - name: Extract only exact original EFS needed for new launcher layout
+        run: |
+          set -euo pipefail
+          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
+          mkdir -p "${RUNNER_TEMP}/combined"
+          /tmp/mu1005-extract-venv/bin/python tools/mu1005_extract_stage2.py "$archive" "${RUNNER_TEMP}/combined/stage2" --toolkit extractor --qnxmount qnxmount --report evidence/stage2-summary.json
+      - name: Adapt existing exact original configuration stage to independent directory
+        run: |
+          set -euo pipefail
+          cfg="$RUNNER_TEMP/combined/stage2/filesystems/MMX2/efs-sys/70/default/efs-system.img/etc/eso/production/connectivity.json"
+          python3 lab/mu1005_route4_5/independent_layout.py "$cfg" evidence/layout
+          cat evidence/layout/STATUS.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105190-INDEPENDENT-LAYOUT-NO-INSTALL
+          path: evidence/layout/
+  route6-existing-native-libraries:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - name: Reuse existing accepted ARM binaries, not recompile
+      - name: Reuse last successful native ARM artifact without rebuilding
         run: |
-          set -euxo pipefail
-          mkdir -p input/identity input/config package/mod/au57x-readonly
-          gh run download 46028235774 --repo "$GITHUB_REPOSITORY" --name R105187-ROUTE4-IDENTITY-READONLY --dir input/identity
-          gh run download 46020545537 --repo "$GITHUB_REPOSITORY" --name R105173-ROUTE1-READ-ONLY-PROBE --dir input/config
-          (cd input/identity && sha256sum -c SHA256SUMS)
-          (cd input/config && sha256sum -c SHA256SUMS)
-          p=package/mod/au57x-readonly
-          cp input/identity/observe-identity input/config/config-path-probe "$p/"
-          cp input/identity/reference_manifest.json "$p/"
-          cp lab/mu1005_stock_reuse/observe.sh "$p/observe_stock.sh"
-          cp lab/mu1005_route4_5/custom_readonly.sh "$p/"
-          cp lab/mu1005_route4_5/SIMPLE_REUSE_CN.md package/README_CN.md
-          chmod +x "$p/observe-identity" "$p/config-path-probe"
-          sh -n "$p/custom_readonly.sh"
-          sh -n "$p/observe_stock.sh"
-          (cd "$p" && sha256sum observe-identity config-path-probe reference_manifest.json observe_stock.sh custom_readonly.sh > SHA256SUMS && sha256sum -c SHA256SUMS)
-          echo ROUTE4_5_6_EXISTING_READONLY_PACKAGE_NOT_RUNTIME
+          set -euo pipefail
+          mkdir -p input package
+          gh run download 46028843161 --repo "$GITHUB_REPOSITORY" --name mu1005-si-cprx-arm-NO-INSTALL --dir input
+          (cd input && sha256sum -c SHA256SUMS)
+          for f in libmu1005_bt_preload_review.so libmu1005_bt_native_review.so; do
+            readelf -h "input/payload/$f" | grep -E 'Machine:.*ARM'
+            cp "input/payload/$f" package/
+          done
+          readelf -Ws package/libmu1005_bt_native_review.so | grep -w mu_bt_native_attach_ack
+          (cd package && sha256sum *.so > SHA256SUMS)
+          echo ROUTE6_REUSE_NATIVE_PROBE_AND_BINDING_SEPARATE_NOT_ACTIVATED
       - uses: actions/upload-artifact@v4
         with:
-          name: R105189-MU1005-READONLY-NO-INSTALL
+          name: R105190-EXISTING-NATIVE-LIBRARIES-NO-INSTALL
           path: package/
