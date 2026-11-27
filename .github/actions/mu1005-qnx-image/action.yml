@@ -1,0 +1,98 @@
+name: Locked QNX 6.5 prebuilt compiler cache
+description: Restore complete verified Docker image or build once on miss
+inputs:
+  require-cache:
+    description: Fail rather than rebuild if completed image is not available
+    default: 'false'
+    required: false
+outputs:
+  cache-hit:
+    description: Complete compiler image restored and checked
+    value: ${{ steps.load.outputs.hit }}
+runs:
+  using: composite
+  steps:
+    - name: Restore full compiler image
+      id: cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ~/.cache/au57x-qnx-image
+        key: mu1005-qnx65-image-linux-amd64-baa45224f18ae6b13c2e9c77c6663bb8181eb6a1-gcc850-v1-${{ hashFiles('tools/ci/mu1005_gnu_mirrors.sh', '.github/actions/mu1005-qnx-image/action.yml') }}
+    - name: Load and verify complete image
+      id: load
+      shell: bash
+      env:
+        RESTORED: ${{ steps.cache.outputs.cache-hit }}
+        REQUIRE: ${{ inputs.require-cache }}
+      run: |
+        set -euo pipefail
+        d="$HOME/.cache/au57x-qnx-image"
+        if [[ "$RESTORED" == true ]]; then
+          (cd "$d" && sha256sum -c image.sha256)
+          docker load -i "$d/image.tar.gz"
+          test "$(docker image inspect --format '{{.Id}}' qnx65-armv7-toolchain:8.5)" = "$(cat "$d/image.id")"
+          test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' qnx65-armv7-toolchain:8.5)" = linux/amd64
+          echo "hit=true" >> "$GITHUB_OUTPUT"
+          echo QNX_COMPLETE_IMAGE_CACHE_HIT
+        else
+          test "$REQUIRE" != true || { echo QNX_COMPLETE_IMAGE_CACHE_MISSING; exit 1; }
+          echo "hit=false" >> "$GITHUB_OUTPUT"
+          echo QNX_COMPLETE_IMAGE_CACHE_MISS
+        fi
+    - name: Fetch locked upstream only on miss
+      if: steps.load.outputs.hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [[ ! -d toolchain/.git ]]; then
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+        fi
+        test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+        git -C toolchain diff --exit-code
+    - uses: actions/cache/restore@v4
+      if: steps.load.outputs.hit != 'true'
+      with:
+        path: ~/.cache/au57x-gnu
+        key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
+    - uses: docker/setup-buildx-action@v3
+      if: steps.load.outputs.hit != 'true'
+    - name: Build once on miss
+      if: steps.load.outputs.hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain
+        docker buildx build --load --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain
+    - name: Validate compiler and generated ARM ELF
+      shell: bash
+      run: |
+        set -euo pipefail
+        img=qnx65-armv7-toolchain:8.5
+        d=$(mktemp -d)
+        trap 'rm -rf "$d"' EXIT
+        chmod 755 "$d"
+        printf 'int main(void){return 0;}\n' > "$d/smoke.c"
+        docker run --rm --platform linux/amd64 -v "$d:/w" -w /w "$img" sh -ec 'arm-unknown-nto-qnx6.5.0eabi-gcc --version; test "$(arm-unknown-nto-qnx6.5.0eabi-gcc -dumpfullversion)" = 8.5.0; arm-unknown-nto-qnx6.5.0eabi-gcc smoke.c -o smoke; command -v mkifs'
+        readelf -h "$d/smoke" | tee "$d/elf.txt"
+        grep -E 'Machine:.*ARM' "$d/elf.txt"
+        echo QNX_COMPILER_SMOKE_PASS
+    - name: Save full image and integrity manifest
+      if: steps.load.outputs.hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        d="$HOME/.cache/au57x-qnx-image"
+        mkdir -p "$d"
+        docker save qnx65-armv7-toolchain:8.5 | gzip -1 > "$d/image.tar.gz"
+        docker image inspect --format '{{.Id}}' qnx65-armv7-toolchain:8.5 > "$d/image.id"
+        (cd "$d" && sha256sum image.tar.gz image.id > image.sha256)
+        du -h "$d/image.tar.gz"
+    - name: Store verified image before downstream tests
+      if: steps.load.outputs.hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ~/.cache/au57x-qnx-image
+        key: ${{ steps.cache.outputs.cache-primary-key }}

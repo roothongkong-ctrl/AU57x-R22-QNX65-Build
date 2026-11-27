@@ -1,0 +1,34 @@
+name: R105.163 reusable QNX compiler image (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105163-qnx-image.yml, .github/actions/mu1005-qnx-image/**, tools/ci/mu1005_gnu_mirrors.sh]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mu1005-qnx-image-warm-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  prepare-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+  verify-fresh-runner:
+    needs: prepare-image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - id: compiler
+        uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Require actual cache hit
+        env:
+          HIT: ${{ steps.compiler.outputs.cache-hit }}
+        run: |
+          test "$HIT" = true
+          echo R105163_FRESH_RUNNER_REUSE_PASS
