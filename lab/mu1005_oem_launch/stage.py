@@ -74,8 +74,12 @@ if hashlib.sha256(candidate).hexdigest()!="75671e53af6dddcba7df62f26e4e1e6ec62e1
 (out/"connectivity.json").write_bytes(original)
 (out/"candidate.config").write_bytes(candidate)
 # Prefer actual EFS config path, never alter iAP2 config.
-icfg=checked(efs/"etc/mm/iap2.cfg")
-if sha(icfg)!="85039d16132d827ddcb53be82c84a2d6ec6f02be6ef33258fa33e181e443715b":raise ValueError("iap2 config pin")
+icfg_hits=[]
+for f in root.rglob("iap2.cfg"):
+    if f.is_file() and not f.is_symlink() and f.stat().st_size<=1024*1024 and sha(checked(f))=="85039d16132d827ddcb53be82c84a2d6ec6f02be6ef33258fa33e181e443715b":
+        icfg_hits.append(checked(f))
+if not icfg_hits:raise ValueError("iap2 config pin missing")
+icfg=sorted(set(icfg_hits))[0]
 shutil.copyfile(icfg,out/"iap2.cfg")
 (out/"profile.h").write_text('#define PROGRAM "'+kind+'"\n#define PROGRAM_SIZE '+str(selected[kind]["size"])+'u\n#define PROGRAM_FNV '+str(selected[kind]["fnv32"])+'u\n')
 evidence.write_text(json.dumps({"program":kind,"archive_pinned":True,"selected":selected,"missing":sorted(missing),"ambiguous":ambiguous,"sdk_baseline":sorted(base),"runtime_ready":False},indent=2)+"\n")

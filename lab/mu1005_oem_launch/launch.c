@@ -7,6 +7,7 @@
 #include <sys/neutrino.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <process.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <errno.h>
@@ -69,9 +70,9 @@ int main(int argc,char **argv){
  char *ipod[]={PROGRAM,"-d","iap2,config=/etc/mm/iap2.cfg,probe,ppsdir=/ramdisk/pps/iap2","-a","i2c,addr=0x11,path=/dev/i2c8,speed=50000","-t","usbdevice,path=/dev/io-usb/otg_dev","-l","/dev/shmem/iap2.log","-vvvvvv",NULL};
  char *dio[]={PROGRAM,NULL};
  char **args=!strcmp(PROGRAM,"btstack")?bt:!strcmp(PROGRAM,"bluetooth")?blue:!strcmp(PROGRAM,"smartphone_integrator")?si:!strcmp(PROGRAM,"mm-ipod")?ipod:dio;
- pid_t pid=fork();
- if(pid<0){printf("ORIGINAL_FORK_FAIL errno=%d\n",errno);return 3;}
- if(pid==0){execv(path,args);printf("ORIGINAL_EXEC_FAIL errno=%d\n",errno);_exit(126);}
+ /* spawnv avoids fork in a multithreaded QNX resource-manager process. */
+ pid_t pid=spawnv(P_NOWAIT,path,(const char *const*)args);
+ if(pid<0){printf("ORIGINAL_SPAWN_FAIL errno=%d\n",errno);puts("ORIGINAL_LAUNCH_DIAGNOSTIC_COMPLETE_NOT_CONNECTION");alarm(0);return 0;}
  printf("ORIGINAL_EXEC_ATTEMPT %s\n",PROGRAM);
  int status=0;
  for(unsigned i=0;i<8;i++){

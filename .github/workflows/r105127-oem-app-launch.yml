@@ -111,7 +111,8 @@ jobs:
           cp toolchain/tests/qemu-run.sh toolchain/tests/qemu-run-original.sh
           export QNX_OEM_PRIVATE="$RUNNER_TEMP/oem-launch-private"
           modes=baseline
-          if [ "${{ matrix.program }}" = btstack ] || [ "${{ matrix.program }}" = bluetooth ]; then modes="baseline model"; fi
+          if [ "${{ matrix.program }}" = bluetooth ]; then modes="baseline enable"; fi
+          if [ "${{ matrix.program }}" = btstack ]; then modes="baseline enable model"; fi
           for mode in $modes; do
             cp toolchain/tests/qemu-run-original.sh toolchain/tests/qemu-run-launch.sh
             python3 lab/mu1005_oem_launch/prepare_ifs.py toolchain/tests/qemu-run-launch.sh "$QNX_OEM_PRIVATE" "$mode"

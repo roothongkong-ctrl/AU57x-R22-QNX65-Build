@@ -1,2 +1,3 @@
 # R105.127 原厂程序实跑，不再以自研 fixture 代替 OEM
 R106 001 实车包重新读取：QNX6.5/T30，btstack btstack 1、bluetooth bluetooth 4、SI sm 参数、mm-ipod 原厂启动参数、SDIO0、i2c8、USB OTG、uap0/mlan0/carplay0、原厂 AirPlay wired session started/teardown。未上传原始日志及网络标识。复用已通过的固定 QNX ARM boot 和真实 app70+stage2/EFS，5 路独立执行原厂 btstack/bluetooth/SI/mm-ipod/DIO ELF，以原始启动参数尝试 exec；蓝牙两路基线与配置单字段变更实验，btstack 另加 /dev/sdio0 QNX resmgr 打开/拒绝控制观测（仅拒绝，非真实硬件模型）。每路记录缺失/冲突依赖、原厂字节一致性、进程退出/存活，不把存活当服务就绪；不伪造 MFi、HCI、AP 或 AirPlay。原厂字节及配置仅 runner 临时使用。缺失 libecpp-ne/NVIDIA 等可能仍阻塞，真实执行结果待 CI；实际原厂硬件模型及 API 接入未完成。NO INSTALL。
+补充：配置对照与硬件边界分离：bluetooth baseline/enable 两路，btstack baseline/enable/model 三路。model 仅在 enable 基础上增加拒绝式 SDIO，不能与真实硬件等同。iap2.cfg 按已核验 SHA 在完整固件提取树查找，不猜所在分区。使用 QNX spawnv 避免多线程资源管理器内 fork；spawn 失败保留真实 errno，不视为原厂进程运行成功。
