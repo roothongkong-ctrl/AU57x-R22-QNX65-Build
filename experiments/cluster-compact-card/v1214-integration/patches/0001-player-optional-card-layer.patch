@@ -1,0 +1,24 @@
+diff --git a/player/opengl_gpu.cc b/player/opengl_gpu.cc
+--- a/player/opengl_gpu.cc
++++ b/player/opengl_gpu.cc
+@@ -1426,6 +1426,7 @@
+ }
+ 
+ #include "splash.h"
++#include "compact_card_layer.h"
+ 
+ void InitGL() {
+@@ -2852,6 +2853,7 @@
+ 
+     InitGL();
+     splash_init();
++    compact_card_layer::init();
+     ack_connect();
+ 
+@@ -3013,6 +3015,7 @@
+                     LOGE("render: SHADER PATH FAILED -- GPU YUV requires shaders! (Screen is blank)");
+             }
+             splash_draw(windowWidth, windowHeight, now_us());
++            compact_card_layer::draw(windowWidth, windowHeight, now_us());
+ 
+ #ifdef __QNX__

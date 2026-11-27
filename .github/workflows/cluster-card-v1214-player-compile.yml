@@ -1,0 +1,43 @@
+name: MIB v1.2.14 minimal player source integration NO INSTALL
+on:
+  push:
+    branches: [experiment/cluster-compact-card-r1]
+    paths:
+      - 'experiments/cluster-compact-card/v1214-integration/**'
+      - '.github/workflows/cluster-card-v1214-player-compile.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile-v1214:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply exact three-line source change to upstream v1.2.14
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone -q --branch v1.2.14 --depth 1 https://github.com/MacsInSpace/mib-cluster-map.git /tmp/mib-v1214
+          cp experiments/cluster-compact-card/v1214-integration/player/compact_card_layer.h /tmp/mib-v1214/player/
+          git -C /tmp/mib-v1214 apply --check "$GITHUB_WORKSPACE/experiments/cluster-compact-card/v1214-integration/patches/0001-player-optional-card-layer.patch"
+          git -C /tmp/mib-v1214 apply "$GITHUB_WORKSPACE/experiments/cluster-compact-card/v1214-integration/patches/0001-player-optional-card-layer.patch"
+          git -C /tmp/mib-v1214 diff --check
+          git -C /tmp/mib-v1214 diff --numstat -- player/opengl_gpu.cc
+          test "$(git -C /tmp/mib-v1214 diff --numstat -- player/opengl_gpu.cc | awk '{print $1 " " $2}')" = '3 0'
+      - name: Install Linux FFmpeg and GLES build headers (host, not QNX)
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq -y install g++ libgles2-mesa-dev libglfw3-dev libavcodec-dev libavformat-dev libavutil-dev
+      - name: Compile actual modified upstream player source
+        run: |
+          set -euo pipefail
+          cd /tmp/mib-v1214
+          g++ -std=gnu++11 -O2 -Wall -Wextra -Wno-unused-function -Wno-deprecated-declarations -Iplayer -c player/opengl_gpu.cc -o /tmp/compact-player.o
+          test -s /tmp/compact-player.o
+      - name: Run 3x 450 randomized safety regressions
+        run: |
+          set -euo pipefail
+          cd experiments/cluster-compact-card
+          g++ -std=c++11 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer test_stress.cpp -o /tmp/card-stress
+          for n in 1 2 3; do ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 /tmp/card-stress; done
