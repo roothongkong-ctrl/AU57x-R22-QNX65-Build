@@ -1,0 +1,2 @@
+# R105.128 R106 实车挂载驱动的原厂依赖恢复
+重新读取用户 001(5).zip 原始 mounts.txt / btstack_memory_map.txt / oem_paths.txt：`/mnt/app/eso/lib/icu.iso` 挂载至 `/mnt/app/eso/lib/icudt58l`，btstack 实际映射 libicudata.so.58，历史静态报告缺 icudt58_dat。新增定向嵌套 ISO 读取；只接受 ARM ELF、SONAME libicudata.so.58、动态导出 icudt58_dat、唯一 SHA。没有符合则明确报告缺失或冲突，不合成库。另核验原厂 w8787_wlan_SDIO_bt_SDIO.bin、sd8787_uapsta.bin、uaputl，以及真实 SI/DIO 配置路径；保留 SHA、大小及存在性，配置和 OEM 库只在私有 runner 暂存，不发布。独立 workflow 复用已保留原厂固件 45923122041，不重新请求 NAS、不启动额外 QEMU、不改正在运行的 R105.127 五路任务。实际结果待 CI，ICU 恢复不代表蓝牙启动。原厂 libecpp-ne.so.4 和硬件/owner 仍可能阻塞。NO INSTALL。
