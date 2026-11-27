@@ -50,7 +50,7 @@ def main():
             info=decompress_container(dest,decoded,decompress=decompress)
             digest=hashlib.sha256(decoded.read_bytes()).hexdigest()
             tree=a.root/"filesystems"/"stage2"
-            materialize_imagefs(decoded,tree,a.root/"metadata"/"stage2.json",display_root=a.root)
+            materialize_imagefs(decoded,tree,a.root/"metadata"/"stage2.json")
             reports.append({"member":str(rel),"decoded_sha256":digest,"decode":info})
         else:
             reports.append({"member":str(rel),"efs":extract_rcc_efs(dest,a.root)})

@@ -61,10 +61,65 @@ def inventory(path):
             "candidate_symbols":[{"name":n,"va":hex(v),"size":s,"imported":u} for n,v,s,u in sorted(symbols)],
             "candidate_only":True}
 
+def metadata_aliases(tree, metadata):
+    """Resolve only relative in-image links; never create host symlinks.
+    Absolute QNX targets can cross mount points, so leave them unresolved.
+    Preserve distinct actual library candidates and their source paths.
+    """
+    tree=tree.resolve(strict=True)
+    entries=json.loads(metadata.read_text(encoding="utf-8"))["entries"]
+    links={}
+    duplicates=set()
+    def normalize(parts):
+        clean=[]
+        for part in parts:
+            if part in ("","."):continue
+            if part=="..":
+                if not clean:return None
+                clean.pop()
+            else:clean.append(part)
+        return tuple(clean)
+    for row in entries:
+        if row.get("type")!="symlink":continue
+        path=row.get("path");target=row.get("target")
+        if not isinstance(path,str) or not isinstance(target,str) or not path or not target:continue
+        if path.startswith("/") or target.startswith("/") or "\\x00" in path or "\\x00" in target:continue
+        a=normalize(path.split("/"))
+        if not a or ".." in path.split("/"):continue
+        b=normalize([*a[:-1],*target.split("/")])
+        if not b:continue
+        if a in links:duplicates.add(a)
+        links[a]=b
+    def resolve(a):
+        seen=set()
+        for _ in range(40):
+            if a in seen:return None
+            seen.add(a)
+            for i in range(1,len(a)+1):
+                prefix=a[:i]
+                if prefix in duplicates:return None
+                if prefix in links:
+                    a=links[prefix]+a[i:]
+                    break
+            else:
+                f=tree.joinpath(*a)
+                try:
+                    actual=f.resolve(strict=True)
+                    if actual.is_relative_to(tree) and actual.is_file() and actual==f:return actual
+                except (OSError,RuntimeError):pass
+                return None
+        return None
+    result={}
+    for a in links:
+        f=resolve(a)
+        if f is not None:result[tree.joinpath(*a)]=f
+    return result
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("root",type=Path,help="already extracted app.img/firmware directory; no raw image parsing")
     p.add_argument("--out",type=Path,required=True)
+    p.add_argument("--link-map",nargs=2,action="append",default=[],metavar=("TREE","METADATA"),help="same-image extracted tree and link metadata")
     a=p.parse_args()
     if not a.root.is_dir() or a.out.exists():p.error("root must be directory; output must not exist")
     root=a.root.resolve(); found={k:[] for k in sorted(set(PIN)|AUX)}
@@ -84,6 +139,14 @@ def main():
                     except (ValueError,struct.error) as e:entry["elf_error"]=str(e)
                 found[n].append(entry)
             except OSError as e:errors.append({"relative_path":str(f.relative_to(root)),"error":str(e)})
+    aliases={}
+    for tree,meta in a.link_map:
+        tree=Path(tree).resolve(strict=True)
+        if not tree.is_relative_to(root):raise ValueError("metadata tree outside inventory root")
+        for link,target in metadata_aliases(tree,Path(meta)).items():
+            if link not in aliases and not link.exists():
+                aliases[link]=target
+                paths.setdefault(link.name,[]).append(link)
     missing=[n for n in PIN if not any(x.get("matches_pinned") for x in found[n])]
     # Resolve the full DT_NEEDED closure without running an OEM executable.
     # Preserve candidates rather than guessing QNX LD_LIBRARY_PATH precedence.
@@ -97,7 +160,7 @@ def main():
         choices=[]
         for p in paths.get(n,[]):
             try:
-                target=p.resolve(strict=True)
+                target=aliases[p] if p in aliases else p.resolve(strict=True)
                 if not target.is_relative_to(root) or not target.is_file():continue
                 if target not in cache:
                     cache[target]={"sha256":sha(target),"elf":inventory(target)}
@@ -112,7 +175,7 @@ def main():
     missing_deps=sorted(n for n,v in deps.items() if not v)
     ambiguous_deps=sorted(n for n,v in deps.items() if len({x["sha256"] for x in v})>1)
     result={"scope":"PRIVATE_OFFLINE_EVIDENCE_ONLY",
-            "dependency_candidates":deps,"unresolved_dependencies":missing_deps,
+            "dependency_candidates":deps,"resolved_metadata_aliases":len(aliases),"unresolved_dependencies":missing_deps,
             "ambiguous_dependencies":ambiguous_deps,"pinned_set_found":not missing,
             "missing_or_mismatched":missing,"files":found,"errors":errors,
             "runtime_verified":False,"mfi_verified":False,"installable":False}

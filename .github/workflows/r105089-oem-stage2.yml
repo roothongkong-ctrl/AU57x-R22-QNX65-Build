@@ -2,7 +2,7 @@ name: R105.089 OEM stage2 and EFS extraction (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/r105089-oem-stage2.yml, tools/mu1005_extract_stage2.py]
+    paths: [.github/workflows/r105089-oem-stage2.yml, tools/mu1005_extract_stage2.py, tools/mu1005_oem_inventory.py, tools/test_mu1005_metadata_aliases.py]
   workflow_dispatch:
     inputs:
       nas_run_id:
@@ -21,6 +21,8 @@ jobs:
       SOURCE_RUN: ${{ inputs.nas_run_id || '45921008217' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Verify dependency metadata resolution without host symlinks
+        run: python3 tools/test_mu1005_metadata_aliases.py
       - name: Obtain retained archive from existing NAS task (no second NAS request)
         run: |
           set -euo pipefail
@@ -71,7 +73,7 @@ jobs:
           # Stage2 does not contain all four app70 pins. Preserve report even
           # when unrelated app70 files are absent; do not fake a complete set.
           rc=0
-          python3 tools/mu1005_oem_inventory.py "${RUNNER_TEMP}/stage2-tree/filesystems" --out evidence/stage2-inventory.json || rc=$?
+          python3 tools/mu1005_oem_inventory.py "${RUNNER_TEMP}/stage2-tree/filesystems" --link-map "${RUNNER_TEMP}/stage2-tree/filesystems/stage2" "${RUNNER_TEMP}/stage2-tree/metadata/stage2.json" --out evidence/stage2-inventory.json || rc=$?
           test "$rc" -eq 0 || test "$rc" -eq 2
           python3 - <<'PY'
           import json
