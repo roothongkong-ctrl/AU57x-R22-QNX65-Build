@@ -1,0 +1,25 @@
+name: R105.123 STEP 4 integrated AirPlay session (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105123-step4.yml, tests/test_step4_integrated.c, ci/host_step4_integrated.sh]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  step4:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run integrated WiFi to CPRX receiver and CarPlay start
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          bash ci/host_step4_integrated.sh | tee evidence/step4.log
+          grep -F STEP4_REAL_CPRX_AND_4301_ACK_SESSION_FIXTURE_PASS_NO_OEM evidence/step4.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: step4-integrated-evidence-NO-INSTALL
+          path: evidence/
