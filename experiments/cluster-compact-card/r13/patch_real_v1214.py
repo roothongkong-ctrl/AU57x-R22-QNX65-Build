@@ -50,7 +50,7 @@ change(
 
 change(
     """    e=call_stock_setup(s,request,&stockResp);
-    logf_u2("SETUP stock result=%d response=%s", """,
+""",
     """#ifdef CLUSTERMAP_R13_112_LAB
     /* Stock does not own the optional type112; hide it from stock SETUP.
      * Do not alter the ordinary type110+111 request otherwise. */
@@ -66,7 +66,7 @@ change(
 #else
     e=call_stock_setup(s,request,&stockResp);
 #endif
-    logf_u2("SETUP stock result=%d response=%s", """,
+""",
     "stock SETUP 112 isolation")
 
 change(
