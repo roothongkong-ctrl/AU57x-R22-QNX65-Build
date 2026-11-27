@@ -1,8 +1,8 @@
-name: R105.176 route 3 Python import collision fix (NO INSTALL)
+name: R105.177 route 3 original archive identity repair (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/r105175-route3-dispatch.yml]
+    paths: [.github/workflows/r105175-route3-dispatch.yml, lab/mu1005_route3_dispatch/**]
   workflow_dispatch:
 permissions:
   contents: read
@@ -75,4 +75,6 @@ jobs:
         if: always()
         with:
           name: r105175-route3-dispatch-NO-INSTALL
-          path: evidence/route3-dispatch.json
+          path: |
+            evidence/route3-dispatch.json
+            evidence/route3-identity.json

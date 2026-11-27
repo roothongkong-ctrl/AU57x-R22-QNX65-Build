@@ -207,3 +207,6 @@ run46021591240/job140582324465 SUCCESS，实际日志 ROUTE2_NEW_CALLBACK_SNAPSH
 
 ## 38. R105.176 新3专项工具导入冲突修复
 R105.175 run46023609556/job140589224873实际失败：本地inspect.py遮蔽Python标准库inspect，pyelftools经pprint/dataclasses循环导入probe，未执行原厂descriptor分析。将工具改名driver_dispatch.py并删除原inspect.py，更新同一专项workflow调用，在提取前增加标准库inspect.signature检查，原分析逻辑不变。只触发同一专项1路，不重复其他测试。新3仍部分，未开始新4，NO INSTALL。
+
+## 39. R105.177 新3原厂文件身份修复
+R105.176 run46023875819/job140590138224实际失败，标准库导入检查与固件提取成功；分析脚本 ValueError: missing exact mm-ipod。历史交接/静态审计的 mm-ipod SHA 字符串为65位，永远不能匹配SHA256；不猜删哪一位。复用已验收R105.127原厂路径 app70/filesystems/MMX2/app/70/default/app.img/armle/usr/sbin/mm-ipod 和已校验整包SHA 6946216d...；记录实际文件SHA、尺寸、ARM ELF及历史函数锚点，尺寸40297及至少两个已知符号锚点匹配后才继续旧descriptor专项。driver仍使用原64位SHA固定值；失败亦上传脱敏身份JSON。保留历史错误原文以便追溯，不能把候选哈希当历史精确身份；不修改原厂文件，不重复已过功能测试，新增同一专项1路。新3未完成，未启动新4，NO INSTALL。
