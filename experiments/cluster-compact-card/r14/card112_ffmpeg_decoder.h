@@ -29,11 +29,12 @@ class Card112Decoder {
     uint64_t completed_;
     uint64_t rejected_;
     bool active_;
-    bool decode_packet(const uint8_t *bytes,int len,uint64_t now) {
-        if(len<=0||!bytes||len>2*1024*1024){++rejected_;return false;}
+    bool decode_packet(const uint8_t *bytes,int len,uint64_t now,bool complete=false) {
+        if(len<=0||!bytes||len>2*1024*1024+4096){++rejected_;return false;}
         av_packet_unref(pkt_);
         if(av_new_packet(pkt_,len)<0){++rejected_;return false;}
         memcpy(pkt_->data,bytes,(size_t)len);
+        if(complete){pkt_->pts=(int64_t)now;pkt_->dts=(int64_t)now;}
         int rc=avcodec_send_packet(codec_,pkt_);
         av_packet_unref(pkt_);
         if(rc<0){++rejected_;return false;}
@@ -57,7 +58,8 @@ class Card112Decoder {
                                frame_->data[plane]+(size_t)y*frame_->linesize[plane],w);
                     off+=(size_t)w*h;
                 }
-                if(good && out_.submit(r12::ORIGINAL_CARD_112,session_,now,
+                const uint64_t stamp=frame_->pts>0?(uint64_t)frame_->pts:now;
+                if(good && out_.submit(r12::ORIGINAL_CARD_112,session_,stamp,
                                      packed.data(),800,298))++completed_;
                 else {good=false;++rejected_;}
             }else ++rejected_;
@@ -104,6 +106,15 @@ public:
     void drop(){
         if(active_)out_.drop(r12::ORIGINAL_CARD_112,session_);
         active_=false;session_=0;
+    }
+    /* R15 uses complete AU boundaries from the original MIB parser; no
+     * second byte-stream parser or future timestamp is required. */
+    bool feed_complete_au(const uint8_t* data,size_t len,uint64_t ts){
+        if(!active_||!data||!len||len>2u*1024u*1024u+4096u||!ts||ts>INT64_MAX){
+            ++rejected_;return false;
+        }
+        if(!decode_packet(data,(int)len,ts,true)){drop();return false;}
+        return true;
     }
     bool feed_annexb(const uint8_t* data,size_t len,uint64_t now){
         if(!active_||!parser_||!codec_||!data||!len||!now||len>2*1024*1024){
