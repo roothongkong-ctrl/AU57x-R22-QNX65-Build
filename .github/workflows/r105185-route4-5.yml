@@ -1,4 +1,4 @@
-name: R105.194 adapt actual donor daemon RF completion (NO INSTALL)
+name: R105.195 combined MU1005 donor adapters and ACK (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -6,31 +6,118 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  DONOR: 20c94f51c0f0ae88b154c12e4f604643ba23022c
+  TOOLCHAIN: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
 jobs:
-  donor-ack-real-socket:
+  combined-real-c-rust:
     runs-on: ubuntu-24.04
-    timeout-minutes: 18
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch pinned existing GPL daemon and add explicit ACK mode
+      - name: Combine existing AP receiver MFi and ACK source adaptations
         run: |
           set -euxo pipefail
           git init donor
           git -C donor remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
-          git -C donor fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C donor fetch --depth 1 origin "$DONOR"
           git -C donor checkout --detach FETCH_HEAD
+          for n in adapt_live_ap adapt_receiver_unix adapt_mfi_sequence; do
+            python3 "integration/mu1005_donor_daemon/$n.py" donor
+          done
           python3 lab/mu1005_route4_5/adapt_donor_ack.py donor
           rustup toolchain install nightly-2026-07-21 --profile minimal
           mkdir -p evidence fixture
           cp donor/wireless/daemon/probes/dio_manager.fixture.json fixture/dio_manager.json
           cargo +nightly-2026-07-21 build --offline --locked --bin mhi2q-wireless-daemon --manifest-path donor/wireless/daemon/Cargo.toml 2>&1 | tee evidence/build.txt
-          git -C donor diff -- wireless/daemon > evidence/donor-ack.diff
-      - name: Exercise actual daemon with new type4 and unchanged legacy mode
+          git -C donor diff -- wireless/daemon > evidence/combined.diff
+      - name: Connect actual existing C RF ingress to combined Rust daemon
         run: |
           set -euxo pipefail
-          timeout 25 python3 lab/mu1005_route4_5/test_donor_ack_socket.py donor/wireless/daemon/target/debug/mhi2q-wireless-daemon fixture 2>&1 | tee evidence/socket.txt
+          b=project/source/legacy_mu1005/bluetooth
+          cc -std=c99 -O2 -Wall -Wextra -Werror -I"$b" lab/mu1005_route4_5/bridge_ack_peer.c "$b"/{mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump}.c -o "$RUNNER_TEMP/bridge-peer"
+          env -i PATH="$PATH" IPL_CONFIG_DIR_DIO_MANAGER="$PWD/fixture" MHI2Q_CP_MODEL=LAB-ONLY MHI2Q_CP_SERIAL=LAB-ONLY MHI2Q_CP_HARDWARE=LAB-ONLY MHI2Q_CP_BT_MAC=02:00:00:00:00:01 MHI2Q_CP_DEVICE_ID=02:00:00:00:00:02 MHI2Q_CP_SSID=LAB-ONLY MHI2Q_CP_PASSPHRASE=labfixturepassword MHI2Q_CP_CHANNEL=11 MHI2Q_CP_IP_ADDRESS=127.0.0.1 MHI2Q_CP_AIRPLAY_PORT=5000 MHI2Q_CP_RECEIVER=stock210 donor/wireless/daemon/target/debug/mhi2q-wireless-daemon --mu1005-ack > evidence/daemon.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 100); do
+            kill -0 "$pid"
+            if grep -Fq MU1005_RF_ACK_MODE_ENABLED evidence/daemon.log; then break; fi
+            sleep .05
+          done
+          grep -F MU1005_RF_ACK_MODE_ENABLED evidence/daemon.log
+          timeout 40 "$RUNNER_TEMP/bridge-peer" | tee evidence/bridge.log
+          grep -F MU1005_DONOR_ADAPTED_ACK_C_RUST_FOUR_GENERATIONS_PASS_NO_OEM evidence/bridge.log
+          kill -0 "$pid"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105194-DONOR-ACK-NO-INSTALL
+          name: R105195-C-RUST-COMBINED-NO-INSTALL
           path: evidence/
+  qnx-arm-daemon:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch locked daemon and Rust-capable QNX compiler
+        run: |
+          set -euxo pipefail
+          mkdir -p donor-arm-evidence
+          git init donor
+          git -C donor remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C donor fetch --depth 1 origin "$DONOR"
+          git -C donor checkout --detach FETCH_HEAD
+          test "$(git -C donor rev-parse HEAD)" = "$DONOR"
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin "$TOOLCHAIN"
+          git -C toolchain checkout --detach FETCH_HEAD
+          test "$(git -C toolchain rev-parse HEAD)" = "$TOOLCHAIN"
+      - uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/au57x-gnu
+          key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
+      - name: Verify GNU sources
+        run: bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: toolchain
+          platforms: linux/amd64
+          target: with-rust
+          build-args: BASE=base-8.5
+          tags: mu1005-qnx65-rust:review
+          load: true
+          push: false
+          cache-from: |
+            type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1
+            type=gha,scope=mu1005-qnx65-baa45224-rust-v1
+          cache-to: type=gha,scope=mu1005-qnx65-baa45224-rust-v1,mode=min,ignore-error=true
+      - name: Adapt original MU1005 live AP source
+        run: |
+          set -euxo pipefail
+          python3 integration/mu1005_donor_daemon/adapt_live_ap.py donor | tee donor-arm-evidence/ap-port.log
+          python3 integration/mu1005_donor_daemon/adapt_receiver_unix.py donor | tee donor-arm-evidence/unix-port.log
+          python3 integration/mu1005_donor_daemon/adapt_mfi_sequence.py donor | tee donor-arm-evidence/mfi-port.log
+          python3 lab/mu1005_route4_5/adapt_donor_ack.py donor | tee donor-arm-evidence/ack-port.log
+          git -C donor diff -- wireless/daemon > donor-arm-evidence/ap-port.diff
+      - name: Build adapted full QNX daemon (default feature set)
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src/donor mu1005-qnx65-rust:review \
+            /opt/rust/qnx-cargo build --locked --manifest-path /src/donor/wireless/daemon/Cargo.toml --bin mhi2q-wireless-daemon 2>&1 | tee donor-arm-evidence/build.log
+          bin=donor/wireless/daemon/target/armv7-unknown-nto-qnx650/release/mhi2q-wireless-daemon
+          test -s "$bin"
+          readelf -h -dW -AW "$bin" | tee donor-arm-evidence/elf.log
+          grep -Eq 'Machine:.*ARM' donor-arm-evidence/elf.log
+          grep -Eq 'Class:.*ELF32' donor-arm-evidence/elf.log
+          sha256sum "$bin" | tee donor-arm-evidence/daemon.sha256
+          # Explicitly non-installable research payload, not named like stock binary.
+          cp "$bin" donor-arm-evidence/donor-daemon-MU1005-ACK-REVIEW-ONLY.bin
+          for f in LICENSE LICENSE.md COPYING; do if test -f "donor/$f"; then cp "donor/$f" donor-arm-evidence/; fi; done
+          printf '%s\n' 'NO INSTALL: live AP and explicit ACK adapted; actual band selection, MU1005 runtime ABI, MFi owner, receiver and hardware not accepted' "donor=$DONOR" "toolchain=$TOOLCHAIN" "source=$GITHUB_SHA" > donor-arm-evidence/STATUS.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R105195-COMBINED-DONOR-ARM-NO-INSTALL
+          path: donor-arm-evidence/
+          retention-days: 30

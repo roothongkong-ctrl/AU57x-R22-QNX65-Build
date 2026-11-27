@@ -268,3 +268,6 @@ R105.192四个workflow共18路全SUCCESS，旧规则修复通过。用户确认�
 
 ## 58. R105.193验收及R105.194上游真实daemon协议差异
 R105.193 run46032818633 job140620634723 SUCCESS，6/6组合测试，artifact15215186473；不重复恢复流程测试。新6/8/9仍未100%。复核LuKa GPL固定20c94f51c0f0ae88b154c12e4f604643ba23022c wireless/daemon/src/lib.rs:28-29, FrameDecoder及serve_stream_with_receiver，实际成熟Rust daemon仅支持1/2/3，R105.188/191本工程type4若直接发送会导致上游断开。R105.194新增精确上游源码适配，仅显式--mu1005-ack模式允许同代单个待确认TX，错误/重复/超时停止，默认旧协议不启用；不改MFi、接收器及AP。实际编译上游Rust并通过真实TCP与合成无线端测试ACK/不匹配/缺失/legacy，不重做整个QNX环境。实际daemon FD能力提供者、原厂SDK lifecycle和真实无线仍缺，ARM构建和原厂接入未证。1路专项，35限定完成。NO INSTALL。
+
+## 59. R105.194验收及R105.195真实C/Rust联合移植
+R105.194 run46033208663/job140621972391 SUCCESS，artifact15214369795，实际Rust daemon在真实TCP上正确接收ACK、拒绝错代及旧模式ACK、超时退出，日志MU1005_DONOR_ACK_REAL_TCP_OPT_IN_AND_LEGACY_PASS_NO_OEM。R105.195复用同一LuKa GPL固定20c94f51c0f0ae88b154c12e4f604643ba23022c，合并既有adapt_live_ap、adapt_receiver_unix、adapt_mfi_sequence及已过ACK适配。复用原bridge_peer C代码只增显式ACK/receipt核验，实际C ingress/IPC/socket pump连接合并后的Rust daemon，两TCP四代marker/SYN及分段SDK完成夹具，不重复单项测试。另用已有Rust QNX工具链构建完整合并ARM程序，只编译新组合，不重跑历史PHDR或QNX启动夹具。QNX编译不等于真实运行，保持默认真实硬件认证、不启动车机。新6实际启动/生命周期及daemon FD身份provider未完成；新8/9真实注册/无线传输未完成，35/66限定完成。2路专项，NO INSTALL。
