@@ -8,6 +8,8 @@ on:
       - 'lab/mu1005_route1_path/**'
       - 'lab/mu1005_route2_callback/**'
       - 'lab/mu1005_route3_dispatch/**'
+      - 'lab/mu1005_route4_5/**'
+      - '.github/workflows/r105185-route4-5.yml'
       - '.github/workflows/r105175-route3-dispatch.yml'
       - '.github/workflows/r105174-route2-callback.yml'
       - 'project/source/legacy_mu1005/bluetooth/native_binding.c'
