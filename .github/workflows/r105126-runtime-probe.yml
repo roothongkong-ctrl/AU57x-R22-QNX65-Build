@@ -1,0 +1,25 @@
+name: R105.126 original runtime read-only probe (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105126-runtime-probe.yml, lab/mu1005_runtime_probe/**, docs/R105126_RUNTIME_PROBE_CN.md]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify syntax and allowlisted report
+        run: sh lab/mu1005_runtime_probe/test_probe.sh
+      - name: Prepare read-only package
+        run: |
+          mkdir -p package
+          cp lab/mu1005_runtime_probe/runtime_probe.sh package/
+          cp docs/R105126_RUNTIME_PROBE_CN.md package/README_CN.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MU1005-R105126-READ-ONLY-PROBE-NO-INSTALL
+          path: package/
