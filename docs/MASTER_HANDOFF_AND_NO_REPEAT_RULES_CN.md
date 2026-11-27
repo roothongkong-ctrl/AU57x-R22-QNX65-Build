@@ -2,7 +2,7 @@
 
 更新：2026-11-27（本轮文档交接）
 研发分支：`mu1005-si-cprx-real-review`
-最近核实的功能研发基线：**R105.156 / 88b0ceace9e8da91b03f33188eb61f9271a2cc95**
+最近已验收的功能研发基线：**R105.156 / 88b0ceace9e8da91b03f33188eb61f9271a2cc95**；R105.157 已提交定向源码和CI，待验收 e493fada6b6110fc51c6ca266b6a12397ba19bf1
 状态：**SOURCE REVIEW ONLY / NO INSTALL / NOT VEHICLE VERIFIED**
 
 ## 1. 新会话先读这里（不依赖旧聊天）
@@ -14,7 +14,7 @@
 
 ## 2. 当前状态和下一任务（R105.156 → 后续）
 
-**下一任务 R105.157：停止重复配置 reader 静态扫描，将 R105.155 只读实车探测列为待办，优先推进真实 RFCOMM/iAP2 原厂接入证据。** 已通过 GitHub repository Actions runs GET 查到 R105.156 run 45998478475，两个 job 均 SUCCESS；原始日志分别明确打印 R105156_EVIDENCE_ONLY_NOT_CONSUMER_VERIFIED。reader-targets 解码两个 callee 但没有证明配置 consumer；boot-path 扫描201个文本文件，找到启动脚本路径候选，未证明实车挂载或生效。保留首连配置第03步90%，不重跑此测试。
+**当前 R105.157：按第11节核实同平台成功方案，追踪MU1005原厂connectivity_launcher启动路线；先检查新CI实际结果。** 已通过 GitHub repository Actions runs GET 查到 R105.156 run 45998478475，两个 job 均 SUCCESS；原始日志分别明确打印 R105156_EVIDENCE_ONLY_NOT_CONSUMER_VERIFIED。reader-targets 解码两个 callee 但没有证明配置 consumer；boot-path 扫描201个文本文件，找到启动脚本路径候选，未证明实车挂载或生效。保留首连配置第03步90%，不重跑此测试。
 
 - R105.156：[报告](R105156_CONFIG_READER_CN.md)。Bluetooth enableIap 已知调用链继续追踪 0x15619c → 0x21d814 / 0x21cc68，另核对 stage2 启动路径，避免再次全量 marker/ABI/NAS 扫描。
 - 若两路提供新 reader/路径证据，记录实际结果及仍缺的运行时生效证明；若无新证据，停止同类反复扫描，将只读配置路径、真实 reader、生效和受控回滚验证合并为一次实车探测待办，转向 RFCOMM/iAP2 真实接入、原厂 MFi、AP owner、AirPlay 首连。不允许以静态候选代替运行证据。
@@ -115,3 +115,12 @@ R106 实车已有：原厂进程、2.4GHz AP association、有线 CarPlay 视频
 本轮重新审查 R105.155 probe.c/probe.sh、R105.156 reader.py 及实际 artifact 列表。无需重编或重复静态扫描。现成可用只读探测包：[R105155-MU1005-READ-ONLY-PROBE](https://github.com/roothongkong-ctrl/AU57x-R22-QNX65-Build/actions/runs/45995760126/artifacts/15196840612)（本轮核实未过期，5826 bytes）。包含 QNX ARM helper、probe.sh、README_CN.md、SHA256SUMS；只读检测，不是安装器。用户可将解压后的文件一起放在车机可读目录，在车辆停稳、原厂有线会话结束时，经已开启 SSH 进入该目录运行 `sh ./probe.sh`，完整返回输出（不包含配置原文）。不执行写入、重启或remount；若 helper 不可执行/路径不可读则停止，不能猜设备路径。实际使用前核对包内 SHA256SUMS。没有实车 SSH 权限的云端不能代替这次采集。
 
 验收：SAME_FILE/CONFIG_HASH/MOUNT_READONLY 只证明身份/候选及挂载信息；CONFIG_FD 可提供进程打开该文件的证据，不等于读取或应用 enableIap；未看到 FD 也不证明未读取。须结合真实原厂reader/服务状态才能记第四点，真实配置生效才记第五点。若需受控配置实验，先检查可恢复性、原厂流程及安全门禁，不能强行改只读 EFS。当前无真实实车结果，60%不变。本轮只整理并验证已有可用探测产物，不宣称新增功能。第01项若实车暂不可测，可按此前规则并行推进第02项，避免停在无新输入的云端任务。
+
+## 11. R105.157 同平台成功方案的原厂启动路线（2026-11-27）
+
+已直接核实 [MU1367 v1.6.1](https://github.com/tomasz-twardzicki/MHI2-Carplay-Maps/blob/fda1104067d1ed653a194c50c222ba3fecde375f/MU1367/wireless-native/README.md) 与其[原厂验证报告](https://github.com/tomasz-twardzicki/MHI2-Carplay-Maps/blob/fda1104067d1ed653a194c50c222ba3fecde375f/MU1367/wireless-native/FIRMWARE-VERIFICATION.json)：维护者报告11月19日test2实车成功。其来源为 omonob 方案；[启动包装脚本](https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps/blob/aec37f5b1c87a0d961d16fe4328ac3638d0a833e/standalone/SD_ROOT/carplay/payload/wireless/common/ota/btstack_wrap.sh) 保留原厂btstack执行，按开关加载专用接入层，接收器启动环境独立。不是单纯enableIap开关。该方案部分接收器涉及应用许可变更，不纳入本工程；保留原厂MFi及应用授权。不直接移植二进制或外部固件地址。
+- 原厂btstack SHA：MU1005 51ecbd44...，MU1367 dd80ce8f...、MU1102 896c9d58...、MU1440 d2b55046...，均不一致；MU1367的13个指令签名仅证明其自己的profile。connectivity.json同为8699字节但哈希不同，不是同一配置。
+- 用户上传001(6).zip本轮实际检查CRC，20份snapshot，实车pidin中已有connectivity_launcher、原厂btstack及Bluetooth；/mnt/system为flash挂载。OEM复制0文件，不能把路径列表当文件内容，也不能证明reader或开关生效。不发布原始日志/个人标识。
+- 复用本仓库现有 tools/mu1005_efs_launcher_stage.py 的原厂 launcher.btstack.exec 单字段离线适配及 tools/r94_launcher_audit.py 的固定原厂launcher SHA。R105.157新增 lab/mu1005_donor_launcher/trace.py，针对不同的原厂程序 connectivity_launcher，定位 setExecutable/JSONReader 直接调用及配置路径引用，拒绝不匹配的ELF；不再重复Bluetooth enableIap静态扫描。代码提交 3fb80582，CI配置提交 e493fada6；工作流 .github/workflows/r105157-donor-launcher.yml 复用已校验NAS artifact，仅提取app70，不重编QNX，不安装或修改OEM。当前新CI最终结果未取得。
+- [joeyQuery MU0678 roadmap](https://github.com/joeyQuery/MHI2-wirelessCarPlay/blob/3db007ae20226adc3e1aab4ca85c6626c09178f8/docs/roadmap.md) 明确enableIap是Bluetooth topology/reconnect policy而非btstack启动/端点创建开关；仅作另一版本证据，不直接推定MU1005同义。
+- 本轮第01项保持3/5（60%），第一阶段可沿原厂launcher适配路线推进；下一任务检查R105.157真实CI结果，按实际调用证据决定能否复用既有启动适配，原厂接入/实车读取生效未闭环。任何静态候选/诊断通过均不计实车生效。NO INSTALL。
