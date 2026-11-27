@@ -1,0 +1,2 @@
+# R105.131 原厂 iAP2 插件与设备节点
+R105.127 run 45970891323：mm-ipod 原始 ELF 子进程 exit 0；Bluetooth/SI/DIO exit 1；btstack baseline exit 1、SDIO baseline errno2。exit0 不代表服务就绪。按 R106 实车参数执行 mm-ipod，增加精确原厂 ipod-drvr-iap2.so SHA256 42fd984ebbdccd11595bd45909683829565147c8cbc8a482618d6dd8e564d3bf，补齐唯一原厂依赖，尝试 dlopen 并在子进程退出后持续观察 /dev/ipod0 12 秒。PPS 目录仅占位，不伪造设备或 MFi。R105.127 改手动运行，R105.130 12 路仍独立执行。NO INSTALL，实际结果待验收。

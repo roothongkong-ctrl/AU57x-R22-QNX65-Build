@@ -1,8 +1,5 @@
 name: R105.127 actual OEM application launch and SDIO boundary (NO INSTALL)
 on:
-  push:
-    branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/r105127-oem-app-launch.yml, lab/mu1005_oem_launch/**]
   workflow_dispatch:
 permissions:
   contents: read
