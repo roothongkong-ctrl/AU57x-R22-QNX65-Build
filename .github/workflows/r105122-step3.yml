@@ -1,0 +1,25 @@
+name: R105.122 STEP 3 integrated WiFi handoff (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105122-step3.yml, tests/test_step3_integrated.c, ci/host_step3_integrated.sh]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  step3:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run integrated Bluetooth to WiFi credential handoff
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          bash ci/host_step3_integrated.sh | tee evidence/step3.log
+          grep -F STEP3_SAME_IAP2_SOCKET_5703_PEER_ACK_AND_24GHZ_ASSOCIATION_FIXTURE_PASS evidence/step3.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: step3-integrated-evidence-NO-INSTALL
+          path: evidence/
