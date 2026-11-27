@@ -1,8 +1,5 @@
 name: R105.096 parallel first-link QNX ARM RAM disk profiles (NO INSTALL)
 on:
-  push:
-    branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/r105088-first-link-qnx.yml, tests/test_cloud_pipeline.c, lab/mu1005_qnx_runtime/prepare_first_link_ramdisk.py]
   workflow_dispatch:
 permissions:
   contents: read

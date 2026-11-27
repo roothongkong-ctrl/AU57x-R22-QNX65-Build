@@ -1193,7 +1193,7 @@ static void native_remote_process_boundary(void){
   }
   int rc=mu_cprx_tick(&rx,100+i);
   assert(rc==0||rc==1);
-  server_end=rx.backend_released;
+  server_end=rx.backend_released&&rx.listener<0&&rx.client<0;
   if(!server_end)usleep(500);
  }
  assert(server_end&&b.starts==1&&b.stops==1);
@@ -1552,14 +1552,14 @@ static void native_r85_wired_remote_rollback(void){
   assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_OK);
   int sr=mu_cprx_tick(&rx,360+i);
   assert(sr==0||sr==1);
-  if(native_stop_calls&&rx.listener>=0){
+  if(native_stop_calls&&rx.listener>=0&&!rx.backend_released){
    pending=1;
    assert(!rx.backend_released&&lstat(path,&st)==0&&S_ISSOCK(st.st_mode));
    assert(p.remote_phase!=4);
   }
   r=cp_cloud_drive_remote_dio(&p,360+i);
   assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_OK);
-  restored=rx.backend_released;
+  restored=rx.backend_released&&p.remote_phase==4&&rx.listener<0;
   assert(!restored||r==CP_CLOUD_RETRY); /* no SI teardown proof yet */
  }
  assert(restored&&pending&&rx.backend_released);
@@ -1667,8 +1667,16 @@ static void r87_cloud_bootstrap(void){
 /* Same first-video state machine and AF_UNIX transaction as the host test.
  * Radio, original MFi and native DIO callbacks remain explicit fixtures. */
 int main(void){
+#if defined(MU1005_QNX_SEPARATE_OWNER_FIXTURE)
+ native_remote_process_boundary();
+ puts("MU1005_QNX_SEPARATE_OWNER_PASS_FIXTURE_ONLY");
+#elif defined(MU1005_QNX_WIRED_RESTORE_FIXTURE)
+ native_r85_wired_remote_rollback();
+ puts("MU1005_QNX_WIRED_RESTORE_PASS_FIXTURE_ONLY");
+#else
  native_remote_owner_cloud_pipeline();
  puts("MU1005_QNX_FIRST_LINK_PIPELINE_PASS_FIXTURE_ONLY");
+#endif
  return 0;
 }
 #else
