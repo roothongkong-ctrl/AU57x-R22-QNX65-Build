@@ -1,0 +1,2 @@
+# R105.089 stage2/EFS 原厂取件通道
+R105.088 13 项 host/native 通过，专项目标首次连接 QNX run 45921262454 正在构建，尚未验收；原 NAS run 45921008217 与 app70 run 45921008218 进行中。本次增加独立 stage2/EFS 取件任务，复用同一份已校验的 NAS artifact，不新增 NAS 请求。直接调用已锁定上游解析器及 liblzo2 的 lzo1z_decompress_safe，限定 70 版 MMX2 stage2/EFS 成员，逐项验证大小，保留来源及解压 SHA，验证原厂 btstack pin 后列出缺失的五个依赖候选。只输出证据，不改车机，不声称获取或运行成功。上游提取器依赖版本调整为其 requirements.txt 的 0.11。新脚本待实际原厂压缩包验证。曾提供的文件在当前 Library 按名搜索未返回结果，继续复用已有 NAS 云端任务。

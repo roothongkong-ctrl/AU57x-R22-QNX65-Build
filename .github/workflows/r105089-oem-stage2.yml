@@ -1,0 +1,88 @@
+name: R105.089 OEM stage2 and EFS extraction (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105089-oem-stage2.yml, tools/mu1005_extract_stage2.py]
+  workflow_dispatch:
+    inputs:
+      nas_run_id:
+        description: "Successful NAS acquisition run id"
+        default: "45921008217"
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  extract-stage2:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: ${{ inputs.nas_run_id || '45921008217' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Obtain retained archive from existing NAS task (no second NAS request)
+        run: |
+          set -euo pipefail
+          mkdir -p firmware evidence
+          # A push that updates both workflows uses its own acquisition run.
+          # Never consume the known failed 20-minute run or duplicate a NAS request.
+          if [ -z "$SOURCE_RUN" ]; then
+            for i in $(seq 1 40); do
+              SOURCE_RUN=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow mu1005-oem-nas.yml --branch mu1005-si-cprx-real-review --commit "$GITHUB_SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+              if [ -n "$SOURCE_RUN" ]; then break; fi
+              sleep 15
+            done
+          fi
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
+          echo "NAS_SOURCE_RUN:$SOURCE_RUN"
+          for i in $(seq 1 380); do
+            result=$(gh run view "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --json status,conclusion --jq '.status + ":" + .conclusion')
+            if [ "$result" = "completed:success" ]; then break; fi
+            if [[ "$result" == completed:* ]]; then echo "NAS_SOURCE_NOT_SUCCESS:$result"; exit 2; fi
+            sleep 15
+          done
+          test "$result" = "completed:success"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          test -s firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z
+      - name: Fetch exact upstream MHI2 extractor and QNX6 reader
+        run: |
+          set -euxo pipefail
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          test "$(git -C extractor rev-parse HEAD)" = 64a44fe23dbaa08771440d69642d2874d7028295
+          git init qnxmount
+          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
+          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
+          git -C qnxmount checkout --detach FETCH_HEAD
+          test "$(git -C qnxmount rev-parse HEAD)" = 0379c064975d5bbe3595ac7e3d149ea789406794
+          python3 -m venv /tmp/mu1005-extract-venv
+          /tmp/mu1005-extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          command -v 7z || { sudo apt-get update -qq && sudo apt-get install -y p7zip-full; }
+      - name: Extract original MMX stage2 and EFS with native LZO1Z
+        run: |
+          set -euo pipefail
+          /tmp/mu1005-extract-venv/bin/python tools/mu1005_extract_stage2.py firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z "${RUNNER_TEMP}/stage2-tree" --toolkit extractor --qnxmount qnxmount --report evidence/stage2-efs.json
+      - name: Locate exact original btstack and its missing dependencies
+        run: |
+          set -euo pipefail
+          # Stage2 does not contain all four app70 pins. Preserve report even
+          # when unrelated app70 files are absent; do not fake a complete set.
+          rc=0
+          python3 tools/mu1005_oem_inventory.py "${RUNNER_TEMP}/stage2-tree/filesystems" --out evidence/stage2-inventory.json || rc=$?
+          test "$rc" -eq 0 || test "$rc" -eq 2
+          python3 - <<'PY'
+          import json
+          r=json.load(open("evidence/stage2-inventory.json"))
+          assert any(x.get("matches_pinned") for x in r["files"]["btstack"]), "exact MU1005 btstack not found"
+          for n in ("libcomm.so","libosal.so","libutil.so","libiplcommon.so","libicuuc.so.58"):
+              print("OEM_DEPENDENCY",n,len(r["dependency_candidates"].get(n,[])))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mu1005-stage2-efs-extraction-evidence
+          path: evidence/
+          retention-days: 30
