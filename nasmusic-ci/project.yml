@@ -1,0 +1,49 @@
+name: NASMusic
+options:
+  deploymentTarget:
+    iOS: '16.0'
+targets:
+  NASMusic:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: Integration/native-music.js
+        buildPhase: resources
+    info:
+      path: Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UIBackgroundModes: [audio]
+        CFBundleDisplayName: 音乐
+        UILaunchScreen: {}
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.ccnn.nasmusic
+        SWIFT_VERSION: '5.0'
+        GENERATE_INFOPLIST_FILE: NO
+        MARKETING_VERSION: '0.9.2'
+        CURRENT_PROJECT_VERSION: '11'
+  NASMusicSimulatorTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: SimulatorTests
+      - path: Integration/native-music.js
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.ccnn.nasmusic.simulatortests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: '5.0'
+schemes:
+  NASMusic:
+    build:
+      targets:
+        NASMusic: all
+        NASMusicSimulatorTests: [test]
+    test:
+      config: Debug
+      targets:
+        - NASMusicSimulatorTests
