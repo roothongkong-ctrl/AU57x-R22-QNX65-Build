@@ -1,0 +1,116 @@
+name: R105.115 original iAP2 client IPC observation (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105115-iap2-ipc.yml, lab/mu1005_iap2_ipc/**]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-iap2-ipc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: "45923122041"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Obtain retained archive from existing NAS task (no second NAS request)
+        run: |
+          set -euo pipefail
+          mkdir -p firmware evidence
+          # A push that updates both workflows uses its own acquisition run.
+          # Never consume the known failed 20-minute run or duplicate a NAS request.
+          if [ -z "$SOURCE_RUN" ]; then
+            for i in $(seq 1 40); do
+              SOURCE_RUN=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow mu1005-oem-nas.yml --branch mu1005-si-cprx-real-review --commit "$GITHUB_SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+              if [ -n "$SOURCE_RUN" ]; then break; fi
+              sleep 15
+            done
+          fi
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
+          echo "NAS_SOURCE_RUN:$SOURCE_RUN"
+          for i in $(seq 1 380); do
+            result=$(gh run view "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --json status,conclusion --jq '.status + ":" + .conclusion')
+            if [ "$result" = "completed:success" ]; then break; fi
+            if [[ "$result" == completed:* ]]; then echo "NAS_SOURCE_NOT_SUCCESS:$result"; exit 2; fi
+            sleep 15
+          done
+          test "$result" = "completed:success"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z" | sha256sum -c -
+      - name: Fetch exact upstream MHI2 extractor and QNX6 reader
+        run: |
+          set -euxo pipefail
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          test "$(git -C extractor rev-parse HEAD)" = 64a44fe23dbaa08771440d69642d2874d7028295
+          git init qnxmount
+          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
+          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
+          git -C qnxmount checkout --detach FETCH_HEAD
+          test "$(git -C qnxmount rev-parse HEAD)" = 0379c064975d5bbe3595ac7e3d149ea789406794
+          python3 -m venv /tmp/mu1005-extract-venv
+          /tmp/mu1005-extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          command -v 7z || { sudo apt-get update -qq && sudo apt-get install -y p7zip-full; }
+      - name: Extract exact app70 into a private original-only tree
+        run: |
+          set -euo pipefail
+          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
+          mkdir -p "${RUNNER_TEMP}/combined"
+          python3 tools/mu1005_extract_app70.py "$archive" "${RUNNER_TEMP}/app70/app.img"
+          /tmp/mu1005-extract-venv/bin/python extractor/tools/extract_firmware.py --source "${RUNNER_TEMP}/app70/app.img" --output "${RUNNER_TEMP}/combined/app70" --variant 70 --qnxmount-root "$PWD/qnxmount" > evidence/app-summary.json
+      - name: Stage only three exact OEM libraries in private runner storage
+        run: |
+          mkdir -p qnx-runtime-evidence
+          python3 lab/mu1005_oem_runtime/stage.py "${RUNNER_TEMP}/combined" "$PWD/oem-runtime-private"
+      - name: Fetch locked public QNX boot environment and QEMU
+        run: |
+          set -euxo pipefail
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          for f in startup-virt libstartup.a devc-serdebug u-boot.bin; do test -s "toolchain/tests/qemu/$f"; done
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+          qemu-system-arm --version | tee qnx-runtime-evidence/qemu-version.log
+          sha256sum toolchain/tests/qemu/{startup-virt,libstartup.a,devc-serdebug,u-boot.bin} toolchain/tests/qemu-run.sh | tee qnx-runtime-evidence/boot-inputs.sha256
+      - uses: actions/cache/restore@v4
+        id: gnu-cache
+        with:
+          path: ~/.cache/au57x-gnu
+          key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
+      - name: Configure reusable compiler build cache
+        uses: docker/setup-buildx-action@v3
+      - name: Build verified toolchain
+        run: |
+          set -euxo pipefail
+          bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee qnx-runtime-evidence/gnu.log
+          docker buildx build --load --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 --cache-from type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1 --cache-to type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1,mode=min,ignore-error=true -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee qnx-runtime-evidence/compiler.log
+          docker run --rm --platform linux/amd64 qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc --version | tee qnx-runtime-evidence/compiler-version.log
+      - name: Build negative-only original iAP2 client IPC observer
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 lab/mu1005_iap2_ipc/probe.c -lc -o qnx-runtime-evidence/mu1005-iap2-ipc
+          python3 lab/mu1005_oem_runtime/prepare_ifs.py toolchain/tests/qemu-run.sh
+      - name: Observe actual OEM client request to a private rejecting QNX endpoint
+        run: |
+          set -euxo pipefail
+          export QNX_OEM_PRIVATE="$PWD/oem-runtime-private"
+          QEMU_KEEP_LOG="$PWD/qnx-runtime-evidence/iap2-ipc-serial.log" QEMU_TIMEOUT=120 QEMU_RUN_SECS=75 sh toolchain/tests/qemu-run.sh "$PWD/qnx-runtime-evidence/mu1005-iap2-ipc" 8.5 2>&1 | tee qnx-runtime-evidence/iap2-ipc-runtime.log
+          grep -F 'OEM_IAP2_REAL_CALL_NEGATIVE_IPC_PASS' qnx-runtime-evidence/iap2-ipc-runtime.log
+          grep -E 'Process [0-9]+ \(mu1005-iap2-ipc\) exited status=0' qnx-runtime-evidence/iap2-ipc-serial.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r105115-iap2-original-ipc-evidence-NO-INSTALL
+          path: |
+            qnx-runtime-evidence/*.log
+            qnx-runtime-evidence/*.sha256
+            evidence/app-summary.json
+          retention-days: 30
