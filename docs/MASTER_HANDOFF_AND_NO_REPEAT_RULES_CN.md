@@ -171,3 +171,6 @@ R105.166 native-preflight job140557318911实际失败：SDK_CONFIRMED_PIC_LINK_O
 
 ## 26. R105.168 两路原厂库预检成功与用户同意收口方案
 实际run46015546454/job140561611027及run46015546355/job140561611649均SUCCESS；原始日志两路均QNX_COMPLETE_IMAGE_CACHE_HIT、R105168_CONTAINER_OUTPUT_PATH_OK、STEP8_NATIVE_EXPORT_OK 0/1/2/3、STEP8_FIXTURE_READ size=8699 fnv=a82094ed、两个进程exit0、R105166_QNX_NATIVE_EXPORT_PREFLIGHT_PASS。故原厂libutil真实加载及4个导出接口、独立只读配置副本读取通过；未执行原厂parseFileToArray，未证明原厂解析器与connectivity.json实际调用关联。另重复触发旧workflow是共享脚本路径匹配所致，不再重复预检。用户同意保留原厂读取机制、复用成熟接入方案、验证配置兼容性，不重写解析器，不继续无休止静态逆向；第8项只需取得调用链有效证据，第9项验证实际路径、第11项实车生效。第8项仍部分完成；下一步以原厂读取的只读证据为主，不猜C++ ABI，不提前开始第9项。总表28完成4部分34待完成。NO INSTALL。
+
+## 27. R105.169 按用户同意的omonob模式验证原厂真实调用
+保留原厂配置读取逻辑与解析器，不重写、不复制donor授权修改；既有配置对比/原厂库预检不重跑。新建独立QNX guest，按原SHA选取connectivity_launcher，复用已验证编译环境及真实库依赖；只观察原厂parseFileToArray调用的文件名参数。ARM尾转发保留原始r0-r3、栈和返回契约，实际调用真实libutil，不猜C++对象布局；未找到真实函数则退出，绝不伪造解析成功。仅实验环境，不安装、不改原厂文件；真实目标文件名出现才认定调用关联观察到，仍不代表实车路径或配置生效。若原厂启动被服务/硬件依赖阻塞，记录实际阻塞，不重复逆向全固件。1专项+4自动回归，预算5，第8项未完成，第9项不启动。NO INSTALL。
