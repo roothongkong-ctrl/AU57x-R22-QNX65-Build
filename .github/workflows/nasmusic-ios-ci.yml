@@ -1,0 +1,32 @@
+name: NASMusic iOS isolated CI
+on:
+  push:
+    branches: [nasmusic-ios-ci-v092]
+    paths: ['nasmusic-ci/READY']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    if: github.ref == 'refs/heads/nasmusic-ios-ci-v092'
+    runs-on: macos-15
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: nasmusic-ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: command -v xcodegen >/dev/null || brew install xcodegen
+      - name: Build and test
+        run: bash Scripts/xcode_test.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nasmusic-ios-test-results
+          path: |
+            nasmusic-ci/TestResults/*.txt
+            nasmusic-ci/TestResults/*.log
+            nasmusic-ci/TestResults/*.json
+            nasmusic-ci/TestResults/*.xcresult
+          retention-days: 1
