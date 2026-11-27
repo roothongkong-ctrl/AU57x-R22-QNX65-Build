@@ -27,3 +27,15 @@ jobs:
           cd experiments/cluster-compact-card/receiver112
           gcc -std=c99 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I/tmp/mibcodec c112_ingest.c /tmp/mibcodec/alt111_video.c test_c112.c -o /tmp/receive112
           for n in 1 2 3; do ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 /tmp/receive112; done
+
+      - name: Upload R5 source review bundle (NOT A VEHICLE INSTALLER)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClusterCard-R5-Type112-SOCKET-SOURCE-NO-INSTALL
+          path: |
+            experiments/cluster-compact-card/receiver112/
+            experiments/cluster-compact-card/dualstream/
+            experiments/cluster-compact-card/v1214-integration/
+          retention-days: 14
+          if-no-files-found: error
