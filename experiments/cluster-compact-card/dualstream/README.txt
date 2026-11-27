@@ -1,0 +1,5 @@
+R4 dual Type111/112 protocol state mock, source-only. Based on exact upstream MIB Cluster Map v1.2.14 and uploaded ZIP SHA256 7450ac0761d97a8de05e74c961c9e44e619c279fb2faa5e7683098de115485a1.
+
+Existing upstream only owns one Type111 cluster stream. map/card/full are alternative initialURL choices, not simultaneous video. In this model Type110 always stays stock, Type111 remains the map and Type112 is rejected by default until seven proof gates establish that iPhone actually offers Type112, receiver and AES contexts are independent, distinct UUIDs exist, teardown is safe, and transparent-card pixels or mask exist. The proof flags are mock inputs; setting all true in a unit test is not actual compatibility evidence.
+
+Host C99 tests compile and execute 20000 deterministic operations per run with sanitizers. They cover stale/duplicate stream IDs, teardown and fallback to map. This DOES NOT implement Type112 AirPlay handshake/decoder or modify original MIB code. Do not install. Next: iOS CarPlay simulator display offer inspection + real transport implementation; then QNX build and install rollback.

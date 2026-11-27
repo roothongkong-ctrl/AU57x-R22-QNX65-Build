@@ -1,0 +1,34 @@
+name: ClusterCard v1.2.14 dual stream protocol R4 - NO INSTALL
+on:
+  push:
+    branches: [experiment/cluster-compact-card-r2-dualstream]
+    paths:
+      - 'experiments/cluster-compact-card/dualstream/**'
+      - '.github/workflows/cluster-card-dualstream-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  protocol-lifecycle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Repeated native C99 lifecycle tests with ASan and UBSan
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd experiments/cluster-compact-card/dualstream
+          gcc -std=c99 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer test_gate.c -o /tmp/cm-dual-gate
+          for n in 1 2 3; do
+            ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 /tmp/cm-dual-gate
+          done
+      - name: Validate exact upstream v1.2.14 single-stream limitation
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://raw.githubusercontent.com/MacsInSpace/mib-cluster-map/v1.2.14/thirdparty/mhi2_altscreen_carplay/libaltscreen111_gen2.c -o /tmp/upstream111.c
+          grep -q '#define K_STREAM_ALT 111' /tmp/upstream111.c
+          grep -q 'static struct alt111_video g2_video;' /tmp/upstream111.c
+          grep -q 'static const char *nav_surface_url' /tmp/upstream111.c
+          echo 'PASS upstream single-111 baseline; no 112 receiver or live card feed is proven'
