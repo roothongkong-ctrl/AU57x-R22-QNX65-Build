@@ -8,7 +8,9 @@ dest = Path(sys.argv[1])
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     page = browser.new_page(accept_downloads=True)
-    page.goto(PAGE, wait_until="domcontentloaded", timeout=60000)
+    response = page.goto(PAGE, wait_until="domcontentloaded", timeout=60000)
+    if (response and response.status in (401,403,429)) or "Security Checkpoint" in page.title():
+        sys.exit("MIRROR_ACCESS_RESTRICTED: stop automated retrieval; normal authorized download required")
     label = page.get_by_text(NAME, exact=False).first
     try:
         label.wait_for(timeout=30000)

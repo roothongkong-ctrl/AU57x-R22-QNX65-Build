@@ -4,6 +4,11 @@ on:
     branches: [mu1005-si-cprx-real-review]
     paths: [.github/workflows/mu1005-oem-acquire.yml, oem_inputs/mu1005/inspect_firmware.py, oem_inputs/mu1005/download_mirror.py]
   workflow_dispatch:
+    inputs:
+      direct_https_url:
+        description: "Optional verified public direct firmware URL (no credentials)"
+        type: string
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -22,18 +27,25 @@ jobs:
           path: .oem-cache/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z
           key: mu1005-oem-archive-v2
       - name: Install browser for the public mirror download
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.cache.outputs.cache-hit != 'true' && inputs.direct_https_url == ''
         run: |
           python3 -m venv /tmp/mu1005-download-venv
           /tmp/mu1005-download-venv/bin/pip install playwright==1.51.0
           /tmp/mu1005-download-venv/bin/python -m playwright install chromium
       - name: Fetch exact named file using MIB Vault public download
         if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          OEM_DIRECT_URL: ${{ inputs.direct_https_url }}
         run: |
           set -euo pipefail
           mkdir -p .oem-cache oem-acquisition-evidence
           archive=.oem-cache/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z
-          timeout 1200 /tmp/mu1005-download-venv/bin/python oem_inputs/mu1005/download_mirror.py "$archive.part" | tee oem-acquisition-evidence/download.log
+          if [ -n "$OEM_DIRECT_URL" ]; then
+            python3 -c 'import os,urllib.parse; u=urllib.parse.urlsplit(os.environ["OEM_DIRECT_URL"]); assert u.scheme=="https" and u.hostname and not u.username and not u.password'
+            curl --fail --silent --show-error --location --max-redirs 5 --proto '=https' --proto-redir '=https' --connect-timeout 30 --max-time 1200 --max-filesize 1200000000 --output "$archive.part" "$OEM_DIRECT_URL"
+          else
+            timeout 1200 /tmp/mu1005-download-venv/bin/python oem_inputs/mu1005/download_mirror.py "$archive.part" | tee oem-acquisition-evidence/download.log
+          fi
           python3 -c 'import sys; f=open(sys.argv[1],"rb"); assert f.read(6)==bytes.fromhex("377abcaf271c"), "OEM_DOWNLOAD_NOT_7Z"' "$archive.part"
           mv "$archive.part" "$archive"
       - name: Verify archive and extract image candidates
