@@ -7,6 +7,8 @@ on:
       - 'lab/mu1005_stock_reuse/**'
       - 'lab/mu1005_route1_path/**'
       - 'lab/mu1005_route2_callback/**'
+      - 'lab/mu1005_route3_dispatch/**'
+      - '.github/workflows/r105175-route3-dispatch.yml'
       - '.github/workflows/r105174-route2-callback.yml'
       - 'project/source/legacy_mu1005/bluetooth/native_binding.c'
       - 'project/source/legacy_mu1005/bluetooth/bt_callback_snapshot.h'

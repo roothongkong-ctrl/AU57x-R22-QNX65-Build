@@ -201,3 +201,6 @@ R105.172 run46019620969两路实际成功：job140575558757 NEW_COMBINED_OBSERVE
 
 ## 36. R105.174 新2专项结果与真实接入边界
 run46021591240/job140582324465 SUCCESS，实际日志 ROUTE2_NEW_CALLBACK_SNAPSHOT_TEST_PASS_FIXTURE_ONLY、QNX_COMPLETE_IMAGE_CACHE_HIT、ROUTE2_CHANGED_CALLBACK_ARM_COMPILE_PASS_NOT_LIVE_BINDING。源代码变更还触发统一开发workflow run46021591144，9路全SUCCESS（native-library、6类parallel-host、upstream-graft、collect-review）；这是已有通用CI自动触发，不误称只实际运行1路。已复核native_event/native_binding、R105.014原厂owner边界、BT_NOTIFY_BINDING、R92预加载：回调16字节布局及软件适配已有，真实原厂iAP2 owner、锁/生命周期及服务注册仍未取得，现有预加载探针只能证明进入进程及线程创建，不能代替owner。没有新车机数据；不重复已通过测试，不新增模拟owner。建议用户确认后将真实owner/回调接入联验并入新6/8/9；新2按软件范围收口，未获确认前仍部分，未开始新3。此次仅记录结果。NO INSTALL。
+
+## 37. R105.175 新2限定收口、新3专项
+用户在建议新2软件范围收口后回复1，按继续口令执行。新2限定完成，实际原厂owner、回调锁与生命周期接入证据保留在新6/8/9，不认为已连通。新3原23复用R105.011/013/018/019/020、R105.115/132等：已知mm-ipod mount/io_msg薄转发、device+0x38 context及+0x24回调槽、外层Transport +0x14/28/2c不同对象，不重跑USB加载、IPC拒绝、全固件扫描。新增1路只从已保留固件取精确mm-ipod和driver SHA，追原厂driver ipod_module+0x20 relocation及候选接口+0x24槽，结合mm-ipod driver_init/iface_find已有函数区间核实对象关系，记录候选函数及opcode立即数。不能把单一槽位或立即数认定为实际分派；不能把原厂USB transport当BT。未改原厂代码、无安装、不启动QEMU。待实际结果，新3未完成，不启动新4。32限定完成、5部分、29待；正式评分不变。NO INSTALL。
