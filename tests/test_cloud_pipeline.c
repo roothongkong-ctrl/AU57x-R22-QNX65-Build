@@ -14,6 +14,26 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
+/* QNX 6.5 lacks mkdtemp in its SDK headers. Fixture-only fallback:
+ * atomic mkdir, never reuse existing paths, preserve original 6-char suffix.
+ * No predictable temporary directory is accepted if already present. */
+#ifdef __QNXNTO__
+static char *mu_fixture_mkdtemp(char *path){
+ static unsigned counter;
+ static const char digits[]="0123456789abcdefghijklmnopqrstuvwxyz";
+ size_t len=strlen(path);
+ if(len<6||strcmp(path+len-6,"XXXXXX")){errno=EINVAL;return NULL;}
+ for(unsigned attempt=0;attempt<256;attempt++){
+  uint32_t value=((uint32_t)getpid()*UINT32_C(2654435761))+(++counter);
+  for(unsigned i=0;i<6;i++){path[len-1-i]=digits[value%36u];value/=36u;}
+  if(mkdir(path,0700)==0)return path;
+  if(errno!=EEXIST)break;
+ }
+ memcpy(path+len-6,"XXXXXX",6);
+ return NULL;
+}
+#define mkdtemp mu_fixture_mkdtemp
+#endif
 static int wired=1,bt=1,cap5=1,cap24=1,ap=1,associated=1;
 static int single=1,bonjour=1,listener=1,inner=1,request=1,phone_session=1;
 static int media[5]={0,1,1,1,1};
