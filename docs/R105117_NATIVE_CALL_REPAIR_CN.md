@@ -1,0 +1,2 @@
+# R105.117 真库调用修复（NO INSTALL）
+R105.116 45959105336 的 iAP2 未执行：旧 objdump 不支持 --disassemble=符号；改用已确认的 0x2cec–0x2e00 地址区间。Bonjour 真实运行报告 socket 未解析；显式链接 SDK libsocket 并执行 AF_UNIX socket 基线，保留真实错误，不替代网络管理器。iAP2 增加 open handler 计数，区分 OEM 参数检查、open、IPC 阶段，所有测试控制消息仍拒绝。复用现有固件归档，不重新采集。独立 CI 待验收，不宣称手机、MFi、AirPlay 成功。

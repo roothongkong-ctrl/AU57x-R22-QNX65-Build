@@ -1,4 +1,4 @@
-name: R105.116 independent original iAP2 and Bonjour calls (NO INSTALL)
+name: R105.117 native call repair and independent runtime (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -102,11 +102,11 @@ jobs:
           set -euo pipefail
           lane="${{ matrix.lane }}"
           if [ "$lane" = iap2 ]; then
-            docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-objdump -d --disassemble=iap2_connect oem-runtime-private/libiap2client.so.1 > "$RUNNER_TEMP/iap2-connect.private"
-            test -s "$RUNNER_TEMP/iap2-connect.private"
+            docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-objdump -d --start-address=0x2cec --stop-address=0x2e00 oem-runtime-private/libiap2client.so.1 > "$RUNNER_TEMP/iap2-connect.private"
+            grep -Eq '^[[:space:]]*2cec:' "$RUNNER_TEMP/iap2-connect.private"
             sha256sum "$RUNNER_TEMP/iap2-connect.private" | awk '{print $1}' > qnx-runtime-evidence/iap2-disassembly.sha256
           fi
-          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 "lab/mu1005_native_calls/$lane.c" -lc -o "qnx-runtime-evidence/mu1005-$lane-call"
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 "lab/mu1005_native_calls/$lane.c" -lsocket -lc -o "qnx-runtime-evidence/mu1005-$lane-call"
           python3 lab/mu1005_oem_runtime/prepare_ifs.py toolchain/tests/qemu-run.sh
       - name: Execute selected real original call
         run: |
@@ -124,7 +124,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r105116-${{ matrix.lane }}-evidence-NO-INSTALL
+          name: r105117-${{ matrix.lane }}-evidence-NO-INSTALL
           path: |
             qnx-runtime-evidence/*.log
             qnx-runtime-evidence/*.sha256

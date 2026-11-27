@@ -22,7 +22,13 @@ static resmgr_connect_funcs_t conn;
 static resmgr_io_funcs_t io;
 static iofunc_attr_t attr;
 static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
-static unsigned received, valid;
+static unsigned received, valid, opened;
+static int observe_open(resmgr_context_t *ctp,io_open_t *msg,RESMGR_HANDLE_T *handle,void *extra){
+    int rc=iofunc_open_default(ctp,msg,handle,extra);
+    pthread_mutex_lock(&lock);opened++;
+    printf("LAB_OPEN_DISPATCH result=%d\n",rc);
+    pthread_mutex_unlock(&lock);return rc;
+}
 static int reject_msg(resmgr_context_t *ctp,io_msg_t *msg,RESMGR_OCB_T *ocb) {
     struct _io_msg hdr;
     (void)msg;(void)ocb;
@@ -69,6 +75,7 @@ int main(void){
     dispatch_t *dpp=dispatch_create();
     if(!dpp){perror("dispatch_create");return 6;}
     iofunc_func_init(_RESMGR_CONNECT_NFUNCS,&conn,_RESMGR_IO_NFUNCS,&io);
+    conn.open=observe_open;
     io.msg=reject_msg;
     iofunc_attr_init(&attr,S_IFNAM|0600,NULL,NULL);
     resmgr_attr_t ra;
@@ -95,7 +102,7 @@ int main(void){
     close(fd);
     pthread_mutex_lock(&lock);
     unsigned baseline_count=received,baseline_headers=valid;
-    received=valid=0;
+    received=valid=opened=0;
     pthread_mutex_unlock(&lock);
     printf("LAB_BASELINE_MSG result=%d errno=%d messages=%u valid=%u\n",mr,me,baseline_count,baseline_headers);
     if(mr!=-1||me!=ENOSYS||!baseline_count||!baseline_headers)return 14;
@@ -105,9 +112,9 @@ int main(void){
     saved=errno;
     if(client){disconnect_oem(client);puts("OEM_IAP2_REJECT_UNEXPECTED_HANDLE");return 10;}
     pthread_mutex_lock(&lock);
-    unsigned count=received,headers=valid;
+    unsigned count=received,headers=valid,opens=opened;
     pthread_mutex_unlock(&lock);
-    printf("OEM_IAP2_REJECT_RESULT errno=%d messages=%u valid_headers=%u\n",saved,count,headers);
+    printf("OEM_IAP2_REJECT_RESULT errno=%d opens=%u messages=%u valid_headers=%u\n",saved,opens,count,headers);
     if(!count||!headers){puts("OEM_IAP2_IPC_NOT_OBSERVED");return 11;}
     if(dlclose(h)!=0)return 12;
     puts("OEM_IAP2_REAL_CALL_NEGATIVE_IPC_PASS");

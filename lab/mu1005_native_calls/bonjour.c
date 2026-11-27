@@ -4,12 +4,21 @@
 #include <string.h>
 #include <dlfcn.h>
 #include <unistd.h>
+#include <errno.h>
+#include <sys/socket.h>
 typedef void *dns_ref;
 typedef int32_t (*create_fn)(dns_ref *);
 typedef void (*free_fn)(dns_ref);
 typedef int (*fd_fn)(dns_ref);
 int main(void){
     alarm(25);setvbuf(stdout,NULL,_IONBF,0);
+    /* A real SDK socket reference ensures its provider is linked. The
+       absent network manager must remain a visible runtime limitation. */
+    errno=0;
+    int socket_fd=socket(AF_UNIX,SOCK_STREAM,0);
+    int socket_error=errno;
+    printf("BONJOUR_SDK_SOCKET_BASELINE fd=%d errno=%d\n",socket_fd,socket_error);
+    if(socket_fd>=0)close(socket_fd);
     void *h=dlopen("/proc/boot/libdns_sd.so.1",RTLD_NOW|RTLD_LOCAL);
     if(!h){const char *e=dlerror();printf("BONJOUR_LOAD_FAIL %s\n",e?e:"unknown");return 2;}
     void *a=dlsym(h,"DNSServiceCreateConnection"),*b=dlsym(h,"DNSServiceRefDeallocate"),*c=dlsym(h,"DNSServiceRefSockFD");
