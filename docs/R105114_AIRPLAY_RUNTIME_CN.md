@@ -1,0 +1,2 @@
+# R105.114 原厂 AirPlay 真库加载实验
+以 R105.112 18827eded 为父提交。三个 Actions 已成功；原厂 iAP2 和 Bonjour 仅 dlopen/dlsym，独立 owner 仅 fixture，不能宣称无线成功。沿用 45923122041 已校验固件与 R105.097 合并依赖证据，不重扫全树。针对 libairplay.so 递归复验原厂 SHA 和实际 DT_NEEDED，保留不同哈希的独立测试方案，QNX SDK 启动 libc/libm/socket 与 OEM 候选分开记录；不填充缺库。实际 QNX ARM RTLD_NOW 记录 NVIDIA 和 AirPlay 加载结果。诊断成功不等于库加载成功；不调用认证、视频硬件或真实手机。不上传原厂文件或可安装产物。待 CI 运行。
