@@ -1,0 +1,2 @@
+# R105.129 原车路径布局与 ICU 数据分离
+R105.128 45971547975 成功执行，六项原厂路径存在，ICU 没找到符合 ELF。R106 zip 实际 mount 记录 icu.iso -> icudt58l，btstack libicudata.so.58 映射 4096/4096，不能认定该 ISO 含 ELF。此次读取完整 ISO SLT 名称及资源数量，区分 ICU UDataHeader 与真正 ARM ELF，查找原始树的 ICU SONAME/导出，禁止伪造库。原厂 SI/DIO/connectivity/iap2 配置、两份 8787 固件和 uaputl 共七项按 R106 真实路径布局到临时目录，记录原字节 SHA。配置路径映射为下一版 guest 的输入，不修改正在执行的五路 workflow，也不声明已经注入 QNX。原厂蓝牙、AirPlay 启动及硬件模拟仍未证明。原厂数据不发布，仅报告。
