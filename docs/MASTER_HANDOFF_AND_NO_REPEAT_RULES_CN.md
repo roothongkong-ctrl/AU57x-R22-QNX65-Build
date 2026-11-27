@@ -189,3 +189,6 @@ R105.171 run46018322716/job140571111196失败：原始dsistartup.json SHA c0fe47
 
 ## 32. 剩余36项路线按用户要求重排
 已完成30项从日常清单移除，保留原固定66项作为历史和验收映射。新的工作顺序为1—36，详见固定总表末尾新路线。新1=原9；新2=原16，新3=原23；新4/5=原63/64，任何实车写入前必要恢复；其后按原厂加载、蓝牙、iAP2、MFi、AP、接收器/网络、Bonjour、同次真实首连、双频、正式SD交付依赖顺序执行。先完成当前项才开始下一项；若需真实硬件，明确阻塞，不伪造通过、不以新编号覆盖旧证据。既有R105.172专项保留，本次仅文档，不新启动测试。当前30限定完成、6部分、30待；尚未开始新1。
+
+## 33. R105.173 新第1项（原9）开始；旧专项收尾
+R105.172 run46019620969两路实际成功：job140575558757 NEW_COMBINED_OBSERVER_FILTER_TEST_PASS_NOT_OEM；job140575559252 STOCK_DAEMON_BINARY_LOCATED_NOT_STARTED，原厂app70 armle/usr/sbin/mdnsd SHA843581c874bf075854cb584e827117f609e8dc697ff22509d296444a413273f2，libdns_sd.so.1 SHA9636f6a0b650ce5ba0d0c1550e6f64e0d67dc172f03b98a48c2bd72b852bec35，双方均含/var/run/mdnsd，原厂dio_manager.json 22/25-28行及etc/scripts/mdnsd.sh 3行有关；仅定位，不宣称连接，非新第23项开发。新第1项原厂EFS配置SHA已知，真实车辆/mnt/system已挂载但无配置文件实体和实际reader证据，历史资料未找到进一步实车确认。复用R105.155 run45995760126已通过的ARM helper artifact15196840612（仍可用），只补connectivity_launcher FD查询及helper缺失直接停止，生成独立只读包，1路云端仅校验原产物/新脚本并打包，不重跑QEMU或旧回归。原始EFS候选/mnt/system/etc/eso/production/connectivity.json，/etc/eso/production/connectivity.json是否别名待实际同文件证明；禁止假定。新1仍部分，待实车输出或用户明确同意限定收口，未开始新2。统计30限定完成、7部分、29待；正式评分不变。NO INSTALL。

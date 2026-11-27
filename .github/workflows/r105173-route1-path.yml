@@ -1,0 +1,35 @@
+name: R105.173 route 1 existing read-only probe package (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105173-route1-path.yml, lab/mu1005_route1_path/**]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  path-check-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reuse previously validated QNX ARM helper without recompilation
+        run: |
+          set -euo pipefail
+          mkdir -p package
+          gh run download 45995760126 --repo "$GITHUB_REPOSITORY" --name R105155-MU1005-READ-ONLY-PROBE --dir package
+          (cd package && sha256sum -c SHA256SUMS)
+          readelf -h package/config-path-probe | grep -E 'Machine:.*ARM'
+          cp lab/mu1005_route1_path/probe.sh package/probe.sh
+          cp lab/mu1005_route1_path/README_CN.md package/README_CN.md
+          chmod +x package/config-path-probe
+          sh -n package/probe.sh
+          grep -F 'for name in connectivity_launcher bluetooth btstack smartphone_integrator;do' package/probe.sh
+          (cd package && sha256sum config-path-probe probe.sh README_CN.md > SHA256SUMS && sha256sum -c SHA256SUMS)
+          echo ROUTE1_REUSED_EXISTING_QNX_PROBE_READY_NOT_CAR_VALIDATION
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105173-ROUTE1-READ-ONLY-PROBE
+          path: package/

@@ -5,6 +5,8 @@ on:
     paths-ignore:
       - 'lab/mu1005_step8_*/**'
       - 'lab/mu1005_stock_reuse/**'
+      - 'lab/mu1005_route1_path/**'
+      - '.github/workflows/r105173-route1-path.yml'
       - '.github/workflows/r105172-stock-reuse.yml'
       - 'docs/R105172_STOCK_REUSE_CN.md'
       - '.github/workflows/r*-step8-*.yml'
