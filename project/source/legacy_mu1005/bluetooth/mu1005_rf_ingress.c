@@ -62,5 +62,22 @@ int au_rf_send_complete(AuRfIngress*s,int ok){
  }
  s->tx_offset+=s->tx_inflight;
  if(s->tx_offset<s->tx_len)return send_next(s);
+ /* Full normalized frame only: no receipt for partial/cancelled sends. */
+ if(s->tx_receipt.sequence==UINT64_MAX){
+  s->tx_busy=0;s->tx_len=s->tx_offset=s->tx_inflight=0;
+  au_rf_abort(s);return -1;
+ }
+ ++s->tx_receipt.sequence;
+ s->tx_receipt.generation=s->generation;
+ s->tx_receipt.bytes=s->tx_len;
  s->tx_busy=0;s->tx_len=s->tx_offset=s->tx_inflight=0;return 0;
+}
+int au_rf_tx_receipt(const AuRfIngress*s,uint32_t g,uint64_t after,AuRfTxReceipt*out){
+ if(!out)return 0;
+ memset(out,0,sizeof(*out));
+ if(!s||!g||s->failed||!s->connected||s->tx_cancelled||
+    s->generation!=g||s->tx_receipt.generation!=g||
+    after==UINT64_MAX||s->tx_receipt.sequence!=after+1u||
+    !s->tx_receipt.bytes)return 0;
+ *out=s->tx_receipt;return 1;
 }

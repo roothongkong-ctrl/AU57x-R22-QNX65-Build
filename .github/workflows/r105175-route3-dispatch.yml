@@ -1,4 +1,4 @@
-name: R105.181 route 3 byte-count completion adapter (NO INSTALL)
+name: R105.182 route 3 existing RF full-frame receipt (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -7,30 +7,30 @@ on:
 permissions:
   contents: read
 jobs:
-  byte-contract:
+  rf-receipt:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Test new byte-count completion adapter only
+      - name: Test new full-frame receipt on existing RF ingress
         run: |
           set -euxo pipefail
-          s=project/source/src
+          s=project/source/legacy_mu1005/bluetooth
           l=lab/mu1005_route3_dispatch
-          cc -std=c99 -Wall -Wextra -Werror -fsanitize=undefined -I"$s" -I"$l" "$s"/{cp_bt_bridge,cp_bt_stream,cp_step2_transport}.c "$l"/{byte_contract,test_byte_contract}.c -o "$RUNNER_TEMP/route3"
+          cc -std=c99 -Wall -Wextra -Werror -fsanitize=undefined -I"$s" -I"$l" "$s"/mu1005_rf_ingress.c "$l"/test_rf_receipt.c -o "$RUNNER_TEMP/route3"
           "$RUNNER_TEMP/route3"
       - uses: ./.github/actions/mu1005-qnx-image
         with:
           require-cache: 'true'
-      - name: Compile only new adapter for QNX ARM
+      - name: Compile updated existing RF ingress for QNX ARM
         run: |
           set -euxo pipefail
           mkdir -p evidence
-          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -Iproject/source/src -Ilab/mu1005_route3_dispatch -c lab/mu1005_route3_dispatch/byte_contract.c -o /src/evidence/byte_contract.o
-          readelf -h evidence/byte_contract.o | grep -E 'Machine:.*ARM'
-          echo ROUTE3_BYTE_CONTRACT_ARM_COMPILE_ONLY_NOT_LIVE
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -Iproject/source/legacy_mu1005/bluetooth -c project/source/legacy_mu1005/bluetooth/mu1005_rf_ingress.c -o /src/evidence/rf_receipt.o
+          readelf -h evidence/rf_receipt.o | grep -E 'Machine:.*ARM'
+          echo ROUTE3_RF_RECEIPT_ARM_COMPILE_ONLY_NOT_LIVE
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: R105181-ROUTE3-REVIEW-NO-INSTALL
-          path: evidence/byte_contract.o
+          name: R105182-ROUTE3-REVIEW-NO-INSTALL
+          path: evidence/rf_receipt.o
