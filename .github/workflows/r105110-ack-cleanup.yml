@@ -1,0 +1,28 @@
+name: R105.110 fast ACK cleanup regression (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105110-ack-cleanup.yml, lab/mu1005_qnx_runtime/host_ack_cleanup.py]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ack-cleanup:
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [hold, immediate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise candidate and control on Linux without rebuilding QNX SDK
+        run: |
+          python3 lab/mu1005_qnx_runtime/host_ack_cleanup.py "${{ matrix.mode }}"
+          bash ci/host_cloud_pipeline.sh
+          grep -F 'MU1005_QNX_FIRST_LINK_PIPELINE_PASS_FIXTURE_ONLY' cloud12_result/cloud_pipeline.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r105110-${{ matrix.mode }}-NO-INSTALL
+          path: cloud12_result/cloud_pipeline.log

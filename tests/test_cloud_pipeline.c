@@ -1450,6 +1450,11 @@ static void native_remote_owner_cloud_pipeline(void){
  assert(ended&&rx.backend_released&&p.remote_phase==4&&p.stopped);
  assert(native_stop_calls==1&&!native.initialized);
  assert(!strcmp(current_native_iface,"eth0"));
+ /* A STOP ACK proves restoration, not immediate socket destruction.
+  * The server may retain a completed reply until the authenticated client
+  * closes. Execute the final owner tick and verify real resource cleanup. */
+ if(rx.unix_path[0])assert(mu_cprx_tick(&rx,idle_when+50)==1);
+ assert(rx.listener<0&&rx.client<0&&!rx.unix_path[0]);
  assert(rmdir(dir)==0);dlclose(h);
 }
 /* R85: same OEM DIO singleton, but physically distinct SI vs DIO original
