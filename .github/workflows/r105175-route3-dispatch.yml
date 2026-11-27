@@ -1,4 +1,4 @@
-name: R105.177 route 3 original archive identity repair (NO INSTALL)
+name: R105.178 route 3 raw message tail and receive entry (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -59,22 +59,19 @@ jobs:
           python3 -m venv /tmp/mu1005-extract-venv
           /tmp/mu1005-extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
           command -v 7z || { sudo apt-get update -qq && sudo apt-get install -y p7zip-full; }
-      - name: Extract exact app70 and stage2/EFS into a common original-only tree
+      - name: Extract only exact app70 for driver continuation
         run: |
           set -euo pipefail
           archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
           mkdir -p "${RUNNER_TEMP}/combined"
           python3 tools/mu1005_extract_app70.py "$archive" "${RUNNER_TEMP}/app70/app.img"
           /tmp/mu1005-extract-venv/bin/python extractor/tools/extract_firmware.py --source "${RUNNER_TEMP}/app70/app.img" --output "${RUNNER_TEMP}/combined/app70" --variant 70 --qnxmount-root "$PWD/qnxmount" > evidence/app-summary.json
-          /tmp/mu1005-extract-venv/bin/python tools/mu1005_extract_stage2.py "$archive" "${RUNNER_TEMP}/combined/stage2" --toolkit extractor --qnxmount qnxmount --report evidence/stage2-summary.json
-      - name: Inspect only missing original driver descriptor and dispatch slot
+      - name: Inspect only previously uncovered raw-message tail and receive entry
         run: |
           /tmp/mu1005-extract-venv/bin/pip install capstone==5.0.3 pyelftools==0.31
-          /tmp/mu1005-extract-venv/bin/python lab/mu1005_route3_dispatch/driver_dispatch.py "$RUNNER_TEMP/combined" evidence/route3-dispatch.json
+          /tmp/mu1005-extract-venv/bin/python lab/mu1005_route3_dispatch/route3_tail.py "$RUNNER_TEMP/combined" evidence/route3-tail.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r105175-route3-dispatch-NO-INSTALL
-          path: |
-            evidence/route3-dispatch.json
-            evidence/route3-identity.json
+          name: r105178-route3-tail-NO-INSTALL
+          path: evidence/route3-tail.json
