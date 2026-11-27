@@ -31,4 +31,9 @@ struct mu_ap_ie_ops {
 int mu_ap_stock_ie_write(void*,unsigned,const uint8_t[6],const uint8_t[6],int);
 int mu_ap_ie_install(struct mu_ap_ie_lease*,const struct mu_ap_ie_ops*,const struct mu_ap_live*,unsigned,const uint8_t[6],const uint8_t[6]);
 int mu_ap_ie_restore(struct mu_ap_ie_lease*,const struct mu_ap_ie_ops*);
+/* Select first explicitly empty exclusively owned slot, or observe existing
+ * identical advertisement. 0 free candidate, 1 existing (not owned), -1 none.
+ * Slot selection is read-only; install rechecks original lease and bytes. */
+int mu_ap_ie_select(const struct mu_ap_live*,const struct mu_ap_ie_ops*,const uint8_t[6],const uint8_t[6],unsigned*);
+int mu_ap_ie_install_first_free(struct mu_ap_ie_lease*,const struct mu_ap_ie_ops*,const struct mu_ap_live*,const uint8_t[6],const uint8_t[6]);
 #endif

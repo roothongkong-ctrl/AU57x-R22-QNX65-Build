@@ -195,3 +195,33 @@ int mu_ap_ie_restore(struct mu_ap_ie_lease *s,const struct mu_ap_ie_ops *o){
     o->exclusive(o->ctx,s->bssid,s->slot)!=1)return -1;
  memset(s,0,sizeof *s);return 0;
 }
+
+/* First-link AP selection: reuse the upstream-format exact IE verification.
+ * Only an explicitly empty slot is a candidate; missing/foreign/malformed
+ * slots never become writable. No owner acquisition or radio start here. */
+int mu_ap_ie_select(const struct mu_ap_live *ap,const struct mu_ap_ie_ops *o,
+ const uint8_t bt[6],const uint8_t id[6],unsigned *slot){
+ char buf[4096]={0};unsigned free_slot=4,matching=4,count=0;int rc=-1;
+ if(!slot)return -1;
+ *slot=4;
+ if(!ap_valid(ap)||ap->channel>14||!o||!o->query||!o->exclusive||
+    !ie_identity(bt)||!ie_identity(id))return -1;
+ if(o->query(o->ctx,6,buf,sizeof buf)||!memchr(buf,0,sizeof buf))goto done;
+ for(unsigned i=0;i<4;i++){
+  int r=ie_verify(buf,i,bt,id,1);
+  if(r==1){matching=i;++count;}
+  else if(r==0&&free_slot==4&&o->exclusive(o->ctx,ap->bssid,i)==1)free_slot=i;
+ }
+ if(count==1){*slot=matching;rc=1;} /* Already advertised, not owned. */
+ else if(!count&&free_slot<4){*slot=free_slot;rc=0;}
+done:mu_ap_live_clear(buf,sizeof buf);return rc;
+}
+int mu_ap_ie_install_first_free(struct mu_ap_ie_lease*s,const struct mu_ap_ie_ops*o,
+ const struct mu_ap_live*ap,const uint8_t bt[6],const uint8_t id[6]){
+ unsigned slot=4;int r;
+ if(!s||s->state)return -1;
+ r=mu_ap_ie_select(ap,o,bt,id,&slot);
+ if(r==1)return 1; /* Caller may use existing advertisement, never remove it. */
+ if(r!=0)return -1;
+ return mu_ap_ie_install(s,o,ap,slot,bt,id);
+}
