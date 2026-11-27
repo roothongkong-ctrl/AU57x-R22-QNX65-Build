@@ -1,4 +1,4 @@
-name: R105.123 STEP 4 integrated AirPlay session (NO INSTALL)
+name: R105.124 STEP 4 integrated AirPlay session (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -16,8 +16,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence
-          bash ci/host_step4_integrated.sh | tee evidence/step4.log
-          grep -F STEP4_REAL_CPRX_AND_4301_ACK_SESSION_FIXTURE_PASS_NO_OEM evidence/step4.log
+          for trial in 1 2 3; do
+            bash ci/host_step4_integrated.sh 2>&1 | tee "evidence/step4-$trial.log"
+            grep -F STEP4_REAL_CPRX_AND_4301_ACK_SESSION_FIXTURE_PASS_NO_OEM "evidence/step4-$trial.log"
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:

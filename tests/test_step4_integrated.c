@@ -195,8 +195,13 @@ static int dio_media(void *p){return p?4:-1;}
 static int dio_inner(void *p,uint32_t g,uint64_t e,uint32_t s){return dio_tuple(p,g,e,s)?0:-1;}
 static int dio_channel(void *p,uint32_t g,uint64_t e,uint32_t s,unsigned ch){(void)p;(void)g;(void)e;(void)s;(void)ch;return -1;}
 static void drive_receiver(struct cp_cloud_pipeline *cloud,MuCprxService *rx,uint64_t now){
+ enum cp_ho_phase before=cloud->handoff.phase;
  int r=cp_cloud_drive_remote_dio(cloud,now);
  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
+ /* The first client tick can complete op11 and advance the milestone.
+  * Do not immediately start another op11: it clears the prior fresh
+  * snapshot (remote_inner becomes -1) before its next response. */
+ if(cloud->handoff.phase!=before)return;
  assert(mu_cprx_tick(rx,now)==0);
  r=cp_cloud_drive_remote_dio(cloud,now);
  assert(r==CP_CLOUD_RETRY||r==CP_CLOUD_PROOF);
@@ -452,7 +457,8 @@ int main(void){
  assert(cloud.handoff.phase==CP_HO_START_REQUESTED&&!cloud.remote_bootstrap_committed);
  o.session=1;
  for(unsigned i=0;i<100&&cloud.handoff.phase!=CP_HO_AIRPLAY_SESSION;i++)drive_receiver(&cloud,&rx,clock++);
- assert(cloud.handoff.phase==CP_HO_AIRPLAY_SESSION&&cloud.remote_inner==0);
+ fprintf(stderr,"STEP4_SESSION_OBSERVATION phase=%d inner=%d fresh=%d media=%d channels=%u\n",cloud.handoff.phase,cloud.remote_inner,cloud.remote_snapshot_fresh,cloud.remote_media,cloud.remote_channels);
+ assert(cloud.handoff.phase==CP_HO_AIRPLAY_SESSION&&cloud.remote_snapshot_fresh&&cloud.remote_inner==0&&cloud.remote_media==4&&!cloud.remote_channels);
  assert(!cloud.remote_bootstrap_committed&&!cp_cloud_remote_video_at(&cloud,clock));
  puts("STEP4_REAL_CPRX_AND_4301_ACK_SESSION_FIXTURE_PASS_NO_OEM");
  /* No active media: close test client and restore receiver fixture. */

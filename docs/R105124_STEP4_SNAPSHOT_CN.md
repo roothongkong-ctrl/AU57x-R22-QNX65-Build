@@ -1,0 +1,2 @@
+# R105.124 第四步验收修复
+R105.123 run 45968794434 编译通过，最终 AIRPLAY_SESSION && remote_inner==0 断言失败。代码审查确认测试 drive_receiver 连续两次 drive_remote_dio；第一次可完成 op11 并推进状态，第二次开启新 op11 调用 remote_revoke_snapshot，清除 inner=-1 与 fresh。修复 fixture 在阶段变化后立即返回，不更改原厂认证及生产状态机；日志明确记录 phase、inner、fresh、media、channels，要求同一真实 CPRX 响应的 fresh=1/inner=0/media=4/channels=0，不要求视频。此为源代码支持的故障假设，仍需 CI 确认。三次完整运行均通过才验收。NO INSTALL，真实 OEM 回调和手机未验证。
