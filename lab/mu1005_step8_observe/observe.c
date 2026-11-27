@@ -13,6 +13,6 @@ void *step8_observe(const char *name){
  if(!p){const char s[]="STEP8_OBSERVER_FORWARD_UNAVAILABLE\n";write(2,s,sizeof s-1);_exit(91);}
  const char prefix[]="STEP8_ORIGINAL_PARSE_ARGUMENT ";
  write(2,prefix,sizeof prefix-1);
- if(name){size_t n=strnlen(name,512);write(2,name,n);}else write(2,"(null)",6);
+ if(name){size_t n=0;while(n<512 && name[n]!='\0')++n;write(2,name,n);}else write(2,"(null)",6);
  write(2,"\n",1);errno=e;return p;
 }
