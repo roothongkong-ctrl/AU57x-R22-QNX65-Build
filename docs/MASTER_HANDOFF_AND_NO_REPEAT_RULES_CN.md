@@ -73,3 +73,31 @@ R106 实车已有：原厂进程、2.4GHz AP association、有线 CarPlay 视频
 ## 7. 用户确认的简洁会话模式（2026-11-27）
 
 日常研发以 GitHub 源码、Actions 和交接文档为工作中心；真实硬件/iPhone 验证仍须实车。每轮默认仅回复一张简洁进度表（研发版本、实际完成项、测试结果、阻塞、下一任务、同步状态），不重复解释背景、不贴完整日志。用户发 1/继续 即按当前任务执行；只有需要讨论实质技术方案或重大取舍时才用简短文字讨论，方案明确后执行。每轮更新主交接文件并核实写入；没有实际执行的事项不得写成已完成。
+
+## 8. 固定10项用户进度表：2026-11-27 证据复核版
+
+这是用户展示层，原22步技术编号及原首连专项编号保留。废止此前没有明确分母的10项成熟度百分比和63%综合估算。每项5个明确证据验收点，每通过一个计20%；这是等权检查点覆盖比例，不是剩余工期、功能完成率、实车成功率。以下为本轮基于现有证据制定的计分口径，不是历史既有标准。未核实的结果不计分。每轮仅凭新证据更新相应检查点，不凭提交数、CI绿色或主观判断加分。
+
+| 项 | 已有证据（计分） | 尚未验收（不计分） | 计分 |
+|---|---|---|---|
+| 01 原厂配置读取与生效 | 精确原厂单字段候选；副本 apply/restore；QNX只读检测工具运行 | 实车有效文件及reader；原厂实际生效 | 3/5 |
+| 02 蓝牙 RFCOMM | 原厂接口静态边界；软件桥接及owner lifecycle fixture | 原厂iAP2专属注册/owner/SCN；真实callback双向接入；iPhone实际RFCOMM | 2/5 |
+| 03 无线 iAP2 | 上游LinkEngine集成；同socket SYN/LSP/ACK fixture | 原厂driver/transport运行接线；真实无线字节双向交付；iPhone真实握手 | 2/5 |
+| 04 原厂 MFi | 认证状态机及拒绝路径实现；模拟认证联合测试 | 原厂认证provider绑定；真实iPhone认证交换；原厂认可认证成功 | 2/5 |
+| 05 Wi-Fi热点连接 | R106原厂2.4G关联证据；AP适配器与5703 fixture；QNX ARM AP对象构建 | 原厂AP owner实际绑定；真实iPhone无线引导后关联及IP可达 | 3/5 |
+| 06 双频切换 | 5G优先/2.4G回退策略；host双向回退；QNX guest fixture实际退出0且保留artifact复核 | 真实5G AP硬件能力；真实手机双频回退 | 3/5 |
+| 07 Bonjour | R106有线AirPlay服务发现；联合fixture发现流程 | 原厂DNS-SD daemon真实调用成功；真实无线接口注册；iPhone发现对应无线服务 | 2/5 |
+| 08 AirPlay | 原厂delegate静态分析；实际TCP/CPRX Unix socket联合fixture | OEM receiver真实接入；真实无线AirPlay session；真实内层iAP2/认证见证 | 2/5 |
+| 09 实车无线首连 | 无真实端到端无线验收 | 真实无线BT/iAP2；原厂MFi；无线Wi-Fi发现；无线AirPlay；同一真实认证CarPlay session（可立即断开） | 0/5 |
+| 10 SD安装恢复 | SHA/权限/安全清单；主机真实文件事务与恢复；确定性源码复核包 | 原厂QNX生产安装及健康/恢复入口；真实SD安装与开机恢复验收 | 3/5 |
+
+证据核对：
+- 最新功能基线仍 R105.156；审查时 HEAD b4dfaf47，最近40条Actions记录已检查。
+- R105.125 run 45990637047 job 140477269660 原始日志明确 STEP2/3/4/5 FIXTURE PASS NO OEM/NO REAL MFI OR RF。
+- R105.147 run 45993057497：8 host + QNX ARM build 全成功；不是原厂AP owner。
+- R105.146 run 45988423332：5/5原厂副本实验事务通过。
+- R105.154 run 45994101072：四项通过；job 140489030484 原始日志 R105154_RETAINED_QNX_DUAL_BAND_CONFIRMED_FIXTURE_ONLY，确认 R105.152 红色workflow中的有效QNX guest测试证据；另外三个job为实际库加载诊断，不能等同原厂进程运行。
+- R105.118 报告记录 R105.117 原厂Bonjour实际调用 socket errno247 / DNSServiceCreateConnection -65539，未连daemon；不可计真实Bonjour成功。
+- R96_INSTALL_LIMITS_CN.md / R96_STEPS_18_19_CN.md 明确仅主机事务及源码复核包。
+- 最新通用集成 run 46002056817 四个host jobs成功；没有新功能提交。当前第01项云端证据收集结束，剩余真实reader/生效归入后续受控实车检测；按第02项推进 R105.157，不重复静态扫描。保持NO INSTALL。
+
