@@ -27,7 +27,9 @@ trace_fn mu_bt_trace_target(void *p,uintptr_t lr,const char *format){
  assert(p==&object&&lr&&format==fmt);caller_lr=lr;seen++;
  return deny?NULL:original;
 }
+extern void mu_bt_trace_latch_test(void);
 void mu_bt_trace_tail_test(void){
+ mu_bt_trace_latch_test();
  for(int i=0;i<3;i++)mu_bt_trace_tail(&object,3,fmt,0x11223344u,0x55667788u,UINT64_C(0x0123456789abcdef),1.25,"stack tail");
  assert(seen==3&&forwarded==3);
  deny=1;mu_bt_trace_tail(&object,3,fmt,0x11223344u,0x55667788u,UINT64_C(0x0123456789abcdef),1.25,"stack tail");
