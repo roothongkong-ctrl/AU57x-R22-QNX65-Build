@@ -1,4 +1,4 @@
-name: R105.120 STEP 2 integrated Bluetooth iAP2 (NO INSTALL)
+name: R105.121 STEP 2 integrated Bluetooth iAP2 (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -18,8 +18,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence
-          bash ci/host_step2_integrated.sh | tee evidence/step2.log
-          grep -F 'STEP2_INTEGRATED_R98_R45_IAP2_FIXTURE_PASS_NO_REAL_MFI_OR_RF' evidence/step2.log
+          for trial in 1 2 3; do
+            bash ci/host_step2_integrated.sh | tee "evidence/step2-$trial.log"
+            grep -F STEP2_INTEGRATED_R98_R45_IAP2_FIXTURE_PASS_NO_REAL_MFI_OR_RF "evidence/step2-$trial.log"
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:

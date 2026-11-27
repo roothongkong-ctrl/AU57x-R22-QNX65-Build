@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 /* SPDX-License-Identifier: GPL-3.0-only
  * Host-only! Synthetic OEM MFi, never a real Apple or vendor authentication.
  * Exercise REAL TCP socket, R44 iAP2, synthetic AA00-AA05, and R87 gate.
@@ -17,6 +18,8 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
+#include <time.h>
 struct original {
  int fd;
  uint32_t epoch,gen;
@@ -90,6 +93,20 @@ static size_t r90_packet(uint8_t *out,uint8_t control,uint8_t psn,
  if(n){memcpy(out+9,payload,n);out[9+n]=r90_sum(payload,n);}
  return total;
 }
+/* The production pump is nonblocking and a successful send does not
+ * guarantee the complete fragment is readable yet. Wait in the test
+ * harness only, preserving the production owner tick and logical clock. */
+static void await_bytes(int fd,size_t expected){
+ struct timespec delay={0,1000000L};
+ for(unsigned attempt=0;attempt<1000;attempt++){
+  int count=0;
+  assert(ioctl(fd,FIONREAD,&count)==0);
+  if(count>=0&&(size_t)count>=expected)return;
+  nanosleep(&delay,NULL);
+ }
+ fprintf(stderr,"STEP2_TRANSPORT_TIMEOUT expected=%zu\n",expected);
+ abort();
+}
 static void r90_send_data(int fd,struct cp_s4_socket_io *w,
                           const uint8_t *p,size_t n,uint64_t now){
  uint8_t frame[8+256]={2,0,0,0,7,0,0,0};
@@ -99,8 +116,10 @@ static void r90_send_data(int fd,struct cp_s4_socket_io *w,
  /* Break header and payload at independent boundaries to exercise the
   * production stream parser over a real AF_INET TCP connection. */
  assert(send(fd,frame,3,0)==3);
+ await_bytes(w->fd,3);
  assert(cp_s4_socket_poll(w,now)==CP_LK_OK);
  assert(send(fd,frame+3,n+5,0)==(ssize_t)(n+5));
+ await_bytes(w->fd,n+5);
  assert(cp_s4_socket_poll(w,now+1)==CP_LK_OK);
 }
 static int connect_client(void){
@@ -144,6 +163,7 @@ static void reject_coalesced_unpaired(void){
  int fd=connect_client();
  assert(cp_s4_listener_accept(l,&w,&t,sock_auth,&o)==CP_LK_OK);close(l);
  assert(send(fd,bytes,sizeof bytes,0)==sizeof bytes);
+ await_bytes(w.fd,sizeof bytes);
  assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,1)==CP_WCP_DENIED);
  assert(!w.attached&&t.closed&&!t.generation&&!r.bound&&!s.auth_ready);
  close(fd);
@@ -186,6 +206,7 @@ int main(void){
  Au98Hooks hooks={.opaque=&o,.original_image_verified=p_alive,.on_original_iap2_owner=p_alive,.original_iap2_service_verified=p_service,.attach=p_attach,.tick=p_tick,.withdraw=p_withdraw};
  MuBtOwner native={.opaque=&o,.owner_ready=p_alive,.transport_ready=p_transport,.iap2_profile_proven=p_profile,.read_live=p_read};
  client=au98_prepare_daemon_socket(CP_S4_LOCAL_PORT);assert(client>=0);
+ {int one=1;assert(setsockopt(client,IPPROTO_TCP,TCP_NODELAY,&one,sizeof one)==0);}
  o.paired=0;
  assert(au98_adopt(&handoff,&hooks,&native,client,CP_S4_LOCAL_PORT,p_fd,&o)==-1);
  o.paired=1;
@@ -201,8 +222,10 @@ int main(void){
  assert(cp_wcp_r45_remote_bind(&r,&w,&t,&ops)==-1); /* no CONNECT */
  /* Fragmented real TCP stream; same R14 normalized framing as R45. */
  assert(send(client,connect_frame,3,0)==3);
+ await_bytes(w.fd,3);
  assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,100)==CP_WCP_WAIT&&!r.bound);
  assert(send(client,connect_frame+3,11,0)==11);
+ await_bytes(w.fd,11);
  assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,101)==CP_WCP_WAIT&&r.bound);
  assert(ac.generation==7&&ac.state==CP_WCP_DELAY);
  assert(cp_wcp_r45_remote_ops(&r,&out)==0);

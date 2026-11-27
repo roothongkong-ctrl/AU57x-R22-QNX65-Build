@@ -1,0 +1,2 @@
+# R105.121 第二步验收修复
+R105.120 run 45968058117 上游 EIR 和编译通过，首次 marker 后的 CP_LK_NEGOTIATE 断言失败。检查真实 R98 producer 创建的非阻塞 socket 与旧测试 connect_client 不同，未设置 TCP_NODELAY；生产接收函数每 tick 仅非阻塞 recv 一次。修复仅限 host fixture：显式 NODELAY，接收侧 FIONREAD 限时等待完整片段后再调用原生产 tick，保留原 logical clock、所有握手及认证断言。此为有证据的测试时序假设，需 CI 确认，不能宣布生产链路已修复。重复三次完整验收，任一失败即失败。未修改生产认证、owner 或 native RF 行为。真实手机/MFi/RF 仍未验证。
