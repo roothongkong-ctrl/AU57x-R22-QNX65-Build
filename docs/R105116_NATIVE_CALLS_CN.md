@@ -1,0 +1,2 @@
+# R105.116 两条独立原厂调用路线
+R105.114 45955501084 diagnostic 完成，两个 profile 均 AirPlay loaded=0，一个 libnvaudio 真库加载成功；缺候选 libecpp-ne.so.4、libnvavp.so、libnvcwm.so、libnvdc.so、libnvddk_2d_v2.so、libnvos.so、libnvrm.so、libnvrm_graphics.so、libnvwsi.so。R105.115 45956059471 编译成功，实际调用两次 EINVAL，私有 IPC 收到 0 消息。先验证私有 QNX open 和 MsgSend 基线，才归因 OEM；不改未知参数 ABI，不生成假成功。独立 Bonjour 真实 DNSServiceCreateConnection/RefSockFD/Deallocate 测试，仅记录 daemon 通道可达或阻塞，不注册服务。两条 CI lane 独立失败互不影响。固件仍用既有归档。NO INSTALL；无手机、MFi、RF 或画面验收。
