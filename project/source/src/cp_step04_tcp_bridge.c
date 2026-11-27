@@ -47,6 +47,11 @@ static int dispatch(struct cp_s4_tcp_bridge *t,const uint8_t *pkt,size_t len,
   if(!t->connected||gen!=t->generation||n)return CP_LK_STALE;
  } else return CP_LK_BAD;
  if(!authorized(t))return CP_LK_OWNER;
+ /* CONNECT and DATA may arrive together in one TCP read. Verify the
+  * claimed phone against the independent original owner BEFORE dispatch,
+  * including the first frame, not only after the whole read completes. */
+ if(t->rf_guard&&t->rf_guard(t->rf_guard_ctx,t->epoch,gen,
+     kind==1?pkt+8:t->session->link.peer_mac)!=1)return CP_LK_OWNER;
  memcpy(frame.bytes,pkt,len);frame.len=len;
  rc=cp_s4_accept_rf(t->session,&frame,now);
  if(rc==CP_LK_OK){

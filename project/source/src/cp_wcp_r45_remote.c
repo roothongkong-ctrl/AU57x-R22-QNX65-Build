@@ -7,6 +7,19 @@ static int valid_mac(const uint8_t p[6]){
  for(unsigned i=0;i<6;i++){any|=p[i];all&=p[i];}
  return any!=0 && all!=255;
 }
+static int frame_owner(void *ctx,uint32_t epoch,uint32_t gen,const uint8_t mac[6]){
+ struct cp_wcp_r45_remote *r=ctx;
+ if(!r||!r->worker||!r->bridge||!r->worker->attached||
+    r->worker->bridge!=r->bridge||r->bridge->epoch!=epoch||
+    !gen||!valid_mac(mac)||!r->o.owner_verified||!r->o.server_published||
+    !r->o.paired_acl_authorized||!r->o.wired_idle||!r->o.transport_verified)return 0;
+ if(r->bound&&(r->epoch!=epoch||r->generation!=gen||memcmp(r->peer,mac,6)))return 0;
+ return r->o.owner_verified(r->o.ctx,epoch,gen)==1&&
+        r->o.server_published(r->o.ctx,epoch,gen)==1&&
+        r->o.paired_acl_authorized(r->o.ctx,epoch,gen,mac)==1&&
+        r->o.wired_idle(r->o.ctx)==1&&
+        r->o.transport_verified(r->o.ctx,r->worker->fd,epoch,gen)==1;
+}
 /* Every use of a transport assertion rechecks the REAL socket ownership,
  * R44 parser generation, session epoch, SDP publication and USB priority.
  * The R14 wire MAC is a claimed value until an independent OEM paired-ACL
@@ -53,14 +66,17 @@ int cp_wcp_r45_remote_bind(struct cp_wcp_r45_remote *r,
  if(!s||s->epoch!=t->epoch||
     s->link.generation!=t->generation||s->link.epoch!=t->epoch||
     !valid_mac(s->link.peer_mac))return -1;
+ if(t->rf_guard&&(t->rf_guard!=frame_owner||t->rf_guard_ctx!=r))return -1;
+ struct cp_wcp_r45_remote_owner saved=*o;
  memset(r,0,sizeof *r);
- r->worker=w;r->bridge=t;r->o=*o;
+ r->worker=w;r->bridge=t;r->o=saved;
  r->epoch=t->epoch;r->generation=t->generation;
  memcpy(r->peer,s->link.peer_mac,6);
  r->bound=1;
  if(!live(r,r->generation)){
   memset(r,0,sizeof *r);return -1;
  }
+ t->rf_guard=frame_owner;t->rf_guard_ctx=r;
  return 0;
 }
 static int owner(void *p,uint32_t g){return live((struct cp_wcp_r45_remote*)p,g);}
@@ -118,11 +134,23 @@ int cp_wcp_r45_bootstrap_tick(struct cp_wcp_r45_remote *r,
   cp_s4_socket_abort(w);
   return CP_WCP_DENIED;
  }
+ if(!r->bound){
+  /* Install before reading any bytes, including a coalesced CONNECT+DATA.
+   * Never replace an existing bridge owner or retrofit a parsed CONNECT. */
+  if(t->rf_guard){
+   if(t->rf_guard!=frame_owner||t->rf_guard_ctx!=r||r->worker!=w||r->bridge!=t)
+    return CP_WCP_DENIED;
+  }else{
+   if(t->connected||t->generation||t->rx_used)return CP_WCP_DENIED;
+   r->worker=w;r->bridge=t;r->o=*o;
+   t->rf_guard=frame_owner;t->rf_guard_ctx=r;
+  }
+ }
  rc=cp_s4_socket_poll(w,now);
  if(rc!=CP_LK_OK)return CP_WCP_DENIED;
  if(!t->connected)return CP_WCP_WAIT;
  if(!r->bound){
-  if(cp_wcp_r45_remote_bind(r,w,t,o)!=0)return CP_WCP_DENIED;
+  if(cp_wcp_r45_remote_bind(r,w,t,&r->o)!=0)return CP_WCP_DENIED;
   if(cp_wcp_r45_remote_ops(r,&ops)!=0||
      cp_wcp_bt_init(ac,&ops)!=CP_WCP_OK||
      cp_wcp_bt_acl_up(ac,r->generation,now)!=CP_WCP_OK)

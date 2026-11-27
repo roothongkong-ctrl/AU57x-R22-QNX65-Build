@@ -111,7 +111,29 @@ static int connect_client(void){
  assert(setsockopt(fd,IPPROTO_TCP,TCP_NODELAY,&flag,sizeof flag)==0);
  return fd;
 }
+static void reject_coalesced_unpaired(void){
+ struct original o={0};struct cp_step04_session s={0};struct cp_stock_mfi stock={0};
+ struct cp_s4_tcp_bridge t;struct cp_s4_socket_io w={0};struct cp_wcp_r45_remote r={0};
+ struct cp_wcp_autoconnect ac={0};
+ const uint8_t bytes[]={1,0,6,0,7,0,0,0,2,4,6,8,10,12,
+                        2,0,6,0,7,0,0,0,0xff,0x55,2,0,0xee,0x10};
+ o.epoch=8;o.gen=7;o.alive=o.published=o.usb_idle=o.transport=1;o.fd=-1;
+ memcpy(o.mac,bytes+8,6);
+ const struct cp_s4_external ext={&o,o_owner,o_owner,o_wired,o_peer_auth,o_other};
+ const struct cp_wcp_r45_remote_owner ops={&o,o_owner,o_server,o_paired,o_wired,o_transport};
+ assert(cp_s4_init(&s,&stock,o.epoch,&ext)==CP_LK_OK);
+ assert(cp_s4_tcp_init(&t,&s,allow,&o)==CP_LK_OK);
+ int l=cp_s4_listener_open();assert(l>=0);
+ int fd=connect_client();
+ assert(cp_s4_listener_accept(l,&w,&t,sock_auth,&o)==CP_LK_OK);close(l);
+ assert(send(fd,bytes,sizeof bytes,0)==sizeof bytes);
+ assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,1)==CP_WCP_DENIED);
+ assert(!w.attached&&t.closed&&!t.generation&&!r.bound&&!s.auth_ready);
+ close(fd);
+ puts("PASS coalesced unpaired CONNECT+DATA rejected before iAP2 dispatch");
+}
 int main(void){
+ reject_coalesced_unpaired();
  struct original o={0};
  struct cp_step04_session s={0};
  struct cp_stock_mfi stock={0};

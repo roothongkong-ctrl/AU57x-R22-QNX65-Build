@@ -13,6 +13,10 @@ struct cp_s4_tcp_bridge {
  struct cp_step04_session *session;
  void *opaque;
  int (*peer_authorized)(void *,uint32_t epoch);
+ /* Optional normalized-frame gate, installed before the first CONNECT by
+  * the R45 owner. Context must outlive the attached bridge. */
+ void *rf_guard_ctx;
+ int (*rf_guard)(void *,uint32_t epoch,uint32_t generation,const uint8_t mac[6]);
  uint32_t epoch,generation;
  uint8_t rx[AU_RF_WIRE_MAX];
  size_t rx_used,rx_expected;
