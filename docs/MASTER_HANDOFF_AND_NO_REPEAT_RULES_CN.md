@@ -2,7 +2,7 @@
 
 更新：2026-11-27（本轮文档交接）
 研发分支：`mu1005-si-cprx-real-review`
-最近已验收的功能研发基线：**R105.156 / 88b0ceace9e8da91b03f33188eb61f9271a2cc95**；R105.157 静态测试通过（run 46004940954）；R105.158 下一调用链分析已提交，结果待核实
+最近已验收的功能研发基线：**R105.156 / 88b0ceace9e8da91b03f33188eb61f9271a2cc95**；R105.157 静态测试通过（run 46004940954）；R105.158 四路静态检查及四路集成回归已通过；实际配置读取未闭环
 状态：**SOURCE REVIEW ONLY / NO INSTALL / NOT VEHICLE VERIFIED**
 
 ## 1. 新会话先读这里（不依赖旧聊天）
@@ -14,7 +14,7 @@
 
 ## 2. 当前状态和下一任务（R105.156 → 后续）
 
-**当前 R105.158：R105.157 已确认原厂setExecutable调用点，按第12节4路独立追踪参数、候选函数边界、配置文件指针和真实导入。** 已通过 GitHub repository Actions runs GET 查到 R105.156 run 45998478475，两个 job 均 SUCCESS；原始日志分别明确打印 R105156_EVIDENCE_ONLY_NOT_CONSUMER_VERIFIED。reader-targets 解码两个 callee 但没有证明配置 consumer；boot-path 扫描201个文本文件，找到启动脚本路径候选，未证明实车挂载或生效。保留首连配置第03步90%，不重跑此测试。
+**当前 R105.158：按第13节固定攻关总表逐项推进；下一项1.7/1.8，追踪原厂解析器与Provider调用参数来源。** 已通过 GitHub repository Actions runs GET 查到 R105.156 run 45998478475，两个 job 均 SUCCESS；原始日志分别明确打印 R105156_EVIDENCE_ONLY_NOT_CONSUMER_VERIFIED。reader-targets 解码两个 callee 但没有证明配置 consumer；boot-path 扫描201个文本文件，找到启动脚本路径候选，未证明实车挂载或生效。保留首连配置第03步90%，不重跑此测试。
 
 - R105.156：[报告](R105156_CONFIG_READER_CN.md)。Bluetooth enableIap 已知调用链继续追踪 0x15619c → 0x21d814 / 0x21cc68，另核对 stage2 启动路径，避免再次全量 marker/ABI/NAS 扫描。
 - 若两路提供新 reader/路径证据，记录实际结果及仍缺的运行时生效证明；若无新证据，停止同类反复扫描，将只读配置路径、真实 reader、生效和受控回滚验证合并为一次实车探测待办，转向 RFCOMM/iAP2 真实接入、原厂 MFi、AP owner、AirPlay 首连。不允许以静态候选代替运行证据。
@@ -129,3 +129,6 @@ R106 实车已有：原厂进程、2.4GHz AP association、有线 CarPlay 视频
 
 ## 12. R105.158 原厂启动管理器下一调用链
 R105.157 run 46004940954 / job 140525636386 SUCCESS。实际日志确认原厂 connectivity_launcher 在 0x10e310 调用 OSAL ProcessTNG::setExecutable（PLT 0x108278）；JSONReader 无直接符号候选；connectivity.json 字符串 VA 0x136402，旧算法无直接引用；两个绝对路径字符串未找到。不是实际reader或配置生效。第01项仍3/5。R105.158 4路独立：setExecutable 参数寄存器窗口、EHABI候选函数与调用者、确切文件名指针及PC相对访问、实际文件/配置解析导入与调用点。复用已校验固件，无NAS二次请求，不重编QNX，不重跑R105.157，不执行原厂程序。四路静态观察结果及空结果均应如实记录，只有证据闭环才更新验收。提交时既有近期工作流已完成；预计新增4路专项，另通用SI/CPRX可能自动触发4路，计划共8路，不凑20。下一轮读取实际日志后只追有意义的新边；若无有效线索，将第01剩余两项待实车验收并转第02，NO INSTALL。
+
+## 13. 固定细化攻关总表
+用户要求将全部任务固定列出逐条解决。已建立 [WIRELESS_FIRST_LINK_TASK_REGISTER_CN.md](WIRELESS_FIRST_LINK_TASK_REGISTER_CN.md)，10大项、66细项，保留既有正式进度比例，不把任务数量当功能完成比例。R105.158专项46005454333及回归46005454267均4/4成功；解析器调用点0x11603c/0x1179ac，Provider构造0x1280f0，fopen64 0x110454，setExecutable参数r0=r4/r1=[sp+0x30]，实际文件关联未证明；无前置unwind入口和文件名绝对指针命中。第01项60%不变。下一任务1.7/1.8，定向解析器/Provider参数及配置文件关联，不重跑旧检查。每轮只更新总表中实际状态变化，完整历史见Git。此提交仅整理验收和计划，不是新增功能。
