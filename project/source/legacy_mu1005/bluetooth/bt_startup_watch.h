@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #ifndef MU1005_BT_STARTUP_WATCH_H
 #define MU1005_BT_STARTUP_WATCH_H
-#include "bt_trace_latch.h"
+#include <sys/types.h>
+#include <stdint.h>
 #include <stddef.h>
+#include "bt_trace_latch.h"
 typedef struct {unsigned remaining;} MuBtStartupWatch;
 /* Worker-only. Each tick consumes at most one observation under a caller-
  * provided existing lifetime lease. No pointer escapes the lease; ready()

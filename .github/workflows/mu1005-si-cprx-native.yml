@@ -123,6 +123,8 @@ jobs:
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -Ireview/source/bluetooth -c review/source/bluetooth/bt_iap2_owner_handoff.c -o review/payload/r98-owner-handoff-review.o
             "$R" -h -sW review/payload/r98-owner-handoff-review.o > review/evidence/r98-owner-elf.log
             b=review/source/bluetooth
+            # Isolate QNX public header ABI errors before the larger link.
+            printf "%s\n" "#include \"bt_startup_watch.h\"" | "$C" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -I"$b" -x c -fsyntax-only -
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$b" "$b"/{native_binding,native_event,inbound,inbound_r5,mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump,rf_arg_experiment,native_eir_bridge,au102_eir_advertisement,upstream_eir,bt_iap2_owner_handoff,bt_route_gate,bt_startup_snapshot,bt_owner_identity,bt_notify_bridge,bt_socket_worker,bt_queue_pulse,bt_self_reader,bt_trace_latch,bt_startup_watch}.c -lsocket -lc -o review/payload/libmu1005_bt_native_review.so
             "$R" -h -dW -sW review/payload/libmu1005_bt_native_review.so > review/evidence/native-bt-elf.log
             # Existing preload constructor and original pthread forwarding.
