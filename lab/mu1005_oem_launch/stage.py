@@ -7,7 +7,7 @@ out=Path(sys.argv[2]); kind=sys.argv[3]; evidence=Path(sys.argv[4])
 app=root/"app70/filesystems/MMX2/app/70/default/app.img"
 efs=root/"stage2/filesystems/MMX2/efs-sys/70/default/efs-system.img"
 roots={"btstack":"eso/bin/apps/btstack","bluetooth":"eso/bin/apps/bluetooth",
-       "smartphone_integrator":"eso/bin/apps/smartphone_integrator","mm-ipod":"armle/usr/sbin/mm-ipod","dio_manager":"eso/bin/apps/dio_manager"}
+       "smartphone_integrator":"eso/bin/apps/smartphone_integrator","mm-ipod":"armle/usr/sbin/mm-ipod","dio_manager":"eso/bin/apps/dio_manager","uaputl":"armle/sbin/uaputl"}
 pins={"bluetooth":"7d5ae31396f016f811e18a7255bf1311e0bfa471b2a3252a6f2eb4bd3ad04272",
       "dio_manager":"e40b5bf9df3f96221ac01bc0484e06493e6c58e60cca32d2547939ff1d56f63c"}
 base={"libc.so.3","libm.so.2","libsocket.so.3"}
@@ -49,6 +49,16 @@ while queue:
     done.add(n)
     if q is None:
         options=index.get(n,set())
+        if n=="libicudata.so.58" and not options:
+            for f in root.rglob("*"):
+                if not f.is_file() or "icu" not in f.name.lower() or ".so" not in f.name.lower():continue
+                q0=checked(f)
+                if not elf(q0):continue
+                dyn=subprocess.check_output(["readelf","-dW",str(q0)],text=True,timeout=30)
+                syms=subprocess.check_output(["readelf","-D","-sW",str(q0)],text=True,timeout=30)
+                if re.findall(r"\(SONAME\).*?\[([^\]]+)\]",dyn)==[n] and any(re.search(r"\bicudt58_dat(?:@|\s|$)",l) and re.search(r"\bGLOBAL\b",l) and not re.search(r"\bUND\b",l) for l in syms.splitlines()):
+                    options.add(q0)
+            if options:print("ICU_SONAME_CANDIDATES",len(options))
         # Exact app path matches real process map location class, not a guessed other firmware.
         priorities=[app/"eso/lib"/n,app/"armle/usr/lib"/n,app/"root/lib-target"/n,app/"armle/lib"/n]
         exact={checked(x) for x in priorities if x.is_file() and elf(checked(x))}
@@ -81,6 +91,10 @@ for f in root.rglob("iap2.cfg"):
 if not icfg_hits:raise ValueError("iap2 config pin missing")
 icfg=sorted(set(icfg_hits))[0]
 shutil.copyfile(icfg,out/"iap2.cfg")
+for name in ("smartphone_integrator.json","dio_manager.json"):
+    src=checked(efs/"etc/eso/production"/name)
+    shutil.copyfile(src,out/name)
+    print("R106_CONFIG_STAGED",name,sha(src))
 (out/"profile.h").write_text('#define PROGRAM "'+kind+'"\n#define PROGRAM_SIZE '+str(selected[kind]["size"])+'u\n#define PROGRAM_FNV '+str(selected[kind]["fnv32"])+'u\n')
 evidence.write_text(json.dumps({"program":kind,"archive_pinned":True,"selected":selected,"missing":sorted(missing),"ambiguous":ambiguous,"sdk_baseline":sorted(base),"runtime_ready":False},indent=2)+"\n")
 print("STAGED_ORIGINAL",kind,"missing",len(missing),"ambiguous",len(ambiguous))

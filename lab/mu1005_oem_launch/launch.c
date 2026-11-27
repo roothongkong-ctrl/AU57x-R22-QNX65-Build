@@ -69,9 +69,10 @@ int main(int argc,char **argv){
  char *si[]={PROGRAM,"-sm-name","smartphone_integrator","-sm-id","353","-sm-time","3051","-sm-restart","0",NULL};
  char *ipod[]={PROGRAM,"-d","iap2,config=/etc/mm/iap2.cfg,probe,ppsdir=/ramdisk/pps/iap2","-a","i2c,addr=0x11,path=/dev/i2c8,speed=50000","-t","usbdevice,path=/dev/io-usb/otg_dev","-l","/dev/shmem/iap2.log","-vvvvvv",NULL};
  char *dio[]={PROGRAM,NULL};
- char **args=!strcmp(PROGRAM,"btstack")?bt:!strcmp(PROGRAM,"bluetooth")?blue:!strcmp(PROGRAM,"smartphone_integrator")?si:!strcmp(PROGRAM,"mm-ipod")?ipod:dio;
+ char *uap[]={PROGRAM,"-i","uap0","sys_cfg_bss_status",NULL};
+ char **args=!strcmp(PROGRAM,"btstack")?bt:!strcmp(PROGRAM,"bluetooth")?blue:!strcmp(PROGRAM,"smartphone_integrator")?si:!strcmp(PROGRAM,"mm-ipod")?ipod:!strcmp(PROGRAM,"uaputl")?uap:dio;
  /* spawnv avoids fork in a multithreaded QNX resource-manager process. */
- pid_t pid=spawnv(P_NOWAIT,path,(const char *const*)args);
+ pid_t pid=spawnv(P_NOWAIT,path,args);
  if(pid<0){printf("ORIGINAL_SPAWN_FAIL errno=%d\n",errno);puts("ORIGINAL_LAUNCH_DIAGNOSTIC_COMPLETE_NOT_CONNECTION");alarm(0);return 0;}
  printf("ORIGINAL_EXEC_ATTEMPT %s\n",PROGRAM);
  int status=0;
