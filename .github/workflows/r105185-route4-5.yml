@@ -1,4 +1,4 @@
-name: R105.193 four-route fallback transaction lab (NO INSTALL)
+name: R105.194 adapt actual donor daemon RF completion (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -7,21 +7,30 @@ on:
 permissions:
   contents: read
 jobs:
-  fallback-sequence:
+  donor-ack-real-socket:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
-      - name: Reuse existing transaction supervisor for new four-route sequence
+      - name: Fetch pinned existing GPL daemon and add explicit ACK mode
         run: |
           set -euxo pipefail
-          s=tools/review_txn
-          cc -std=c99 -Wall -Wextra -Werror -pedantic "$s"/{txn,sha256,fixture_cli,supervisor_fixture}.c -o "$RUNNER_TEMP/txn"
-          mkdir -p evidence
-          TXN_TEST_BIN="$RUNNER_TEMP/txn" python3 -B lab/mu1005_route4_5/test_fallback_lab.py 2>&1 | tee evidence/fallback-tests.txt
-          cp lab/mu1005_route4_5/FOUR_ROUTE_PLAN_CN.md evidence/
-          echo ROUTE_FOUR_SEQUENCE_HOST_FIXTURE_ONLY_NO_INSTALL
+          git init donor
+          git -C donor remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C donor fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C donor checkout --detach FETCH_HEAD
+          python3 lab/mu1005_route4_5/adapt_donor_ack.py donor
+          rustup toolchain install nightly-2026-07-21 --profile minimal
+          mkdir -p evidence fixture
+          cp donor/wireless/daemon/probes/dio_manager.fixture.json fixture/dio_manager.json
+          cargo +nightly-2026-07-21 build --offline --locked --bin mhi2q-wireless-daemon --manifest-path donor/wireless/daemon/Cargo.toml 2>&1 | tee evidence/build.txt
+          git -C donor diff -- wireless/daemon > evidence/donor-ack.diff
+      - name: Exercise actual daemon with new type4 and unchanged legacy mode
+        run: |
+          set -euxo pipefail
+          timeout 25 python3 lab/mu1005_route4_5/test_donor_ack_socket.py donor/wireless/daemon/target/debug/mhi2q-wireless-daemon fixture 2>&1 | tee evidence/socket.txt
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: R105193-FOUR-ROUTE-LAB-NO-INSTALL
+          name: R105194-DONOR-ACK-NO-INSTALL
           path: evidence/
