@@ -323,6 +323,20 @@ int mu_cprx_tick(MuCprxService *s,uint64_t now){
    * Even a correctly formatted CPRX session token is not an OS peer proof. */
   if(!peer_verified(s,fd)||nonblock(fd)||safe_send(fd)){close(fd);return 0;}
   s->client=fd;s->deadline=now+6500;}
+#if defined(__QNXNTO__) && !defined(MU_CPRX_QNX_IMMEDIATE_CLOSE)
+ /* QNX may invalidate getpeername when the sender closes before the
+  * receiver reads its queued reply. Keep the authenticated stream open
+  * until the receiver closes, bounded by the existing transaction deadline.
+  * Never accept another request on this completed stream. */
+ if(s->version==3&&s->size&&s->sent==s->size){
+  unsigned char extra;
+  ssize_t n=recv(s->client,&extra,1,MSG_PEEK);
+  if(n<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR)&&
+     now<s->deadline&&peer_verified(s,s->client))return 0;
+  drop(s);
+  return s->terminal||s->cleaning?mu_cprx_shutdown(s):0;
+ }
+#endif
  if(!peer_verified(s,s->client)){
   /* The local SI process may have exited/relinquished this lease.
    * If it was in a native mutation, preserve rollback semantics. */
@@ -343,7 +357,11 @@ int mu_cprx_tick(MuCprxService *s,uint64_t now){
   unsigned char extra;ssize_t r=recv(s->client,&extra,1,MSG_PEEK);if(r>=0)return abandoned(s);
   if(errno!=EAGAIN&&errno!=EWOULDBLOCK&&errno!=EINTR)return abandoned(s);
   handle(s);if(!s->size)return 0;}
- ssize_t w=send(s->client,s->reply+s->sent,s->size-s->sent,MSG_NOSIGNAL);if(w>0){s->sent+=(unsigned)w;if(s->sent==s->size){if(op==1&&s->reply[5]==0&&s->started)s->start_confirmed=1;drop(s);if(s->terminal||s->cleaning)return mu_cprx_shutdown(s);}return 0;}
+ ssize_t w=send(s->client,s->reply+s->sent,s->size-s->sent,MSG_NOSIGNAL);if(w>0){s->sent+=(unsigned)w;if(s->sent==s->size){if(op==1&&s->reply[5]==0&&s->started)s->start_confirmed=1;
+#if defined(__QNXNTO__) && !defined(MU_CPRX_QNX_IMMEDIATE_CLOSE)
+  if(s->version==3&&!s->cleaning){s->mutating=0;return 0;}
+#endif
+  drop(s);if(s->terminal||s->cleaning)return mu_cprx_shutdown(s);}return 0;}
  if(w<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))return 0;
  return s->terminal?mu_cprx_shutdown(s):abandoned(s);
 }
