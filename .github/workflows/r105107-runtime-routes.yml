@@ -1,0 +1,120 @@
+name: R105.107 three independent QNX runtime routes and host regression (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105107-runtime-routes.yml, lab/mu1005_qnx_runtime/test_peer_probe.c, lab/mu1005_qnx_runtime/peer_trace.py]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  first-link-qnx:
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        route: [remote-trace, peer-probe, local-owner]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download previously verified exact ARM payload
+        uses: actions/download-artifact@v4
+        with:
+          name: mu1005-si-cprx-arm-NO-INSTALL
+          run-id: 45546789122
+          github-token: ${{ github.token }}
+          path: previous-native
+      - name: Verify locked artifact and fixture source
+        run: |
+          set -euxo pipefail
+          mkdir -p qnx-runtime-evidence
+          grep -Fx 'source=082340439793b5c4aaf4b90d20b48e9a4318535c' previous-native/evidence/revisions.txt
+          (cd previous-native && sha256sum -c SHA256SUMS) > qnx-runtime-evidence/checksums.log
+          sha256sum previous-native/payload/libmu1005_inner_iap2_review.so | tee qnx-runtime-evidence/library.sha256
+          for f in mm_peer.h inner_socket.h inner_iap2.h test_mm_peer.c; do
+            cmp "previous-native/source/si/inner_iap2/$f" "integration/mu1005_si_native/inner_iap2/$f"
+          done
+      - name: Fetch locked public QNX boot environment and QEMU
+        run: |
+          set -euxo pipefail
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          for f in startup-virt libstartup.a devc-serdebug u-boot.bin; do test -s "toolchain/tests/qemu/$f"; done
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+          qemu-system-arm --version | tee qnx-runtime-evidence/qemu-version.log
+          sha256sum toolchain/tests/qemu/{startup-virt,libstartup.a,devc-serdebug,u-boot.bin} toolchain/tests/qemu-run.sh | tee qnx-runtime-evidence/boot-inputs.sha256
+      - uses: actions/cache/restore@v4
+        id: gnu-cache
+        with:
+          path: ~/.cache/au57x-gnu
+          key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
+      - name: Configure reusable compiler build cache
+        uses: docker/setup-buildx-action@v3
+      - name: Build verified toolchain
+        run: |
+          set -euxo pipefail
+          bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee qnx-runtime-evidence/gnu.log
+          docker buildx build --load --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 --cache-from type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1 --cache-to type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1,mode=min,ignore-error=true -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee qnx-runtime-evidence/compiler.log
+          docker run --rm --platform linux/amd64 qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc --version | tee qnx-runtime-evidence/compiler-version.log
+      - name: Build isolated QNX test provider
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -fPIC -shared -Wl,--no-undefined -Wall -Wextra lab/mu1005_qnx_runtime/lab_fixture_provider.c -lc -o qnx-runtime-evidence/libmu_lab_fixture.so
+            arm-unknown-nto-qnx6.5.0eabi-readelf -sW qnx-runtime-evidence/libmu_lab_fixture.so
+          ' | tee qnx-runtime-evidence/fixture-exports.log
+          python3 lab/mu1005_qnx_runtime/prepare_fixture_ifs.py toolchain/tests/qemu-run.sh
+          echo "QNX_LAB_FIXTURE=$PWD/qnx-runtime-evidence/libmu_lab_fixture.so" >> "$GITHUB_ENV"
+      - name: Inject diagnostics into a disposable source copy only
+        run: python3 lab/mu1005_qnx_runtime/peer_trace.py project/source/legacy_mu1005/airplay/cprx_service.c tests/test_cloud_pipeline.c
+      - name: Execute selected QNX ARM route
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            set -eux
+            c=project/source/src
+            a=project/source/legacy_mu1005/airplay
+            b=project/source/legacy_mu1005/bluetooth
+            if [ "${{ matrix.route }}" = peer-probe ]; then
+              arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 lab/mu1005_qnx_runtime/test_peer_probe.c -lsocket -lc -o qnx-runtime-evidence/mu1005-first-link
+            else
+              extra=""
+              if [ "${{ matrix.route }}" = local-owner ]; then extra="-DMU1005_QNX_LOCAL_OWNER_FIXTURE"; fi
+              arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -Wno-unused-function -O2 -DMU1005_QNX_FIRST_LINK_FIXTURE $extra -Wl,-E -I"$c" -I"$a" -I"$b" tests/test_cloud_pipeline.c "$c"/{cp_cloud_pipeline,cp_wcp_autoconnect,cp_wcp_handoff,cp_radio_policy,cp_session_handoff,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_oem_boundary,cp_wireless,cp_event,cp_csm}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" -lsocket -lc -o qnx-runtime-evidence/mu1005-first-link
+            fi
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW qnx-runtime-evidence/mu1005-first-link
+          ' 2>&1 | tee qnx-runtime-evidence/first-link-build.log
+          python3 lab/mu1005_qnx_runtime/prepare_inner_ifs.py toolchain/tests/qemu-run.sh
+          python3 lab/mu1005_qnx_runtime/prepare_first_link_flash.py toolchain/tests/qemu-run.sh
+          export QNX_TEST_INNER_LIB="$PWD/previous-native/payload/libmu1005_inner_iap2_review.so"
+          QEMU_KEEP_LOG="$PWD/qnx-runtime-evidence/first-link-serial.log" QEMU_TIMEOUT=120 QEMU_RUN_SECS=75 sh toolchain/tests/qemu-run.sh "$PWD/qnx-runtime-evidence/mu1005-first-link" 8.5 2>&1 | tee qnx-runtime-evidence/first-link-runtime.log
+          case "${{ matrix.route }}" in
+            remote-trace)
+              grep -F 'PASS first-connect remote AirPlay: inner auth, BT release, video before optional channels' qnx-runtime-evidence/first-link-runtime.log
+              grep -F 'MU1005_QNX_FIRST_LINK_PIPELINE_PASS_FIXTURE_ONLY' qnx-runtime-evidence/first-link-runtime.log ;;
+            peer-probe) grep -F 'QNX_PEER_PROBE_PASS' qnx-runtime-evidence/first-link-runtime.log ;;
+            local-owner) grep -F 'QNX_LOCAL_OWNER_START_RESTORE_PASS_FIXTURE_ONLY' qnx-runtime-evidence/first-link-runtime.log ;;
+          esac
+          grep -E 'Process [0-9]+ \(mu1005-first-link\) exited status=0' qnx-runtime-evidence/first-link-serial.log
+          printf '%s\n' 'QNX_ROUTE=${{ matrix.route }}; OEM callbacks/radio/MFi/video are fixtures; no phone or display' > qnx-runtime-evidence/first-link-result.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r105107-${{ matrix.route }}-NO-INSTALL
+          path: qnx-runtime-evidence/
+          retention-days: 30
+  host-regression:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash ci/host_cloud_pipeline.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r105107-host-regression-NO-INSTALL
+          path: cloud12_result/cloud_pipeline.log
