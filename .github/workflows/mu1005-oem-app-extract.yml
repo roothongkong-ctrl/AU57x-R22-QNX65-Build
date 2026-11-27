@@ -7,7 +7,7 @@ on:
     inputs:
       nas_run_id:
         description: "Successful NAS acquisition run id"
-        default: "45918406584"
+        default: ""
         type: string
 permissions:
   contents: read
@@ -15,18 +15,28 @@ permissions:
 jobs:
   extract-app70:
     runs-on: ubuntu-24.04
-    timeout-minutes: 55
+    timeout-minutes: 120
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE_RUN: ${{ inputs.nas_run_id || '45918406584' }}
+      SOURCE_RUN: ${{ inputs.nas_run_id }}
     steps:
       - uses: actions/checkout@v4
       - name: Obtain retained archive from existing NAS task (no second NAS request)
         run: |
           set -euo pipefail
           mkdir -p firmware evidence
+          # A push that updates both workflows uses its own acquisition run.
+          # Never consume the known failed 20-minute run or duplicate a NAS request.
+          if [ -z "$SOURCE_RUN" ]; then
+            for i in $(seq 1 40); do
+              SOURCE_RUN=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow mu1005-oem-nas.yml --branch mu1005-si-cprx-real-review --commit "$GITHUB_SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+              if [ -n "$SOURCE_RUN" ]; then break; fi
+              sleep 15
+            done
+          fi
           [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
-          for i in $(seq 1 100); do
+          echo "NAS_SOURCE_RUN:$SOURCE_RUN"
+          for i in $(seq 1 380); do
             result=$(gh run view "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --json status,conclusion --jq '.status + ":" + .conclusion')
             if [ "$result" = "completed:success" ]; then break; fi
             if [[ "$result" == completed:* ]]; then echo "NAS_SOURCE_NOT_SUCCESS:$result"; exit 2; fi
