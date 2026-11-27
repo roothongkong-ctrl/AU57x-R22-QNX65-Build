@@ -28,6 +28,12 @@ static int init_mode(struct mu_si_cprx*b,const struct mu_owner_ops*o,const struc
 int mu_si_cprx_init(struct mu_si_cprx*b,const struct mu_owner_ops*o,const struct mu_owner_session*k,const MuCprxRemoteEndpoint*e){
  return init_mode(b,o,k,e,15u);
 }
+int mu_si_cprx_init_first_session(struct mu_si_cprx*b,const struct mu_owner_ops*o,const struct mu_owner_session*k,const MuCprxRemoteEndpoint*e){
+ return init_mode(b,o,k,e,0u);
+}
+int mu_si_cprx_first_session_seen(const struct mu_si_cprx*b){
+ return b&&b->initialized&&b->first_session_seen==1;
+}
 int mu_si_cprx_init_first_video(struct mu_si_cprx*b,const struct mu_owner_ops*o,const struct mu_owner_session*k,const MuCprxRemoteEndpoint*e){
  return init_mode(b,o,k,e,1u);
 }
@@ -55,10 +61,11 @@ int mu_si_cprx_tick(struct mu_si_cprx*b,uint64_t now,void*key,void*info,size_t s
  if(rc!=MU_CPRX_CLIENT_CONFIRMED||b->query.operation!=MU_CPRX_OP_SESSION_STATUS||!b->query.remote_mode||b->query.generation!=b->endpoint.generation||b->query.epoch!=b->key.epoch||b->query.session!=b->key.session)return fail(b);
  if(b->query.observed_media!=0&&b->query.observed_media!=4&&b->query.observed_media!=5&&b->query.observed_media!=7)return fail(b);
  if(b->query.observed_inner<0||b->query.observed_inner>1||b->query.observed_channels>15||((b->query.observed_media!=7||!b->query.observed_inner)&&b->query.observed_channels))return fail(b);
- if(b->required_channels!=1u&&b->required_channels!=15u)return fail(b);
+ if(b->required_channels!=0u&&b->required_channels!=1u&&b->required_channels!=15u)return fail(b);
  b->proof=b->query.observed_media==7&&b->query.observed_inner==1&&
     (b->query.observed_channels&b->required_channels)==b->required_channels;
  rc=mu_owner_tick(&b->owner,&o,&b->key,NULL,NULL,0);
+ if(rc==MU_OWNER_CONNECTED&&b->proof)b->first_session_seen=1;
  close_query(b);b->next_ms=now+QUERY_GAP_MS;
  if(rc==MU_OWNER_CONNECTED||rc==MU_OWNER_PENDING)return rc;
  return fail(b);

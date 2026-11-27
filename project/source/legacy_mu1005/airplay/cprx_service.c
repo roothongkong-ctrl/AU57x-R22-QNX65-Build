@@ -289,8 +289,9 @@ static int handle(MuCprxService *s){
     /* Optional media owners may not yet be implemented. Unknown audio,
      * MMI or steering is absence of evidence, never a ready bit. Keep
      * genuine video evidence independent for the first-connect client.
-     * A failed video witness or invalid result still requests retry. */
-    if(live==-1&&channel!=1)continue;
+     * Unknown video is also an unset bit, never a ready bit. Full/video
+     * clients still require the corresponding bits; session-only clients do not. */
+    if(live==-1)continue;
     if(live!=0&&live!=1){reply(s,1);return 0;}
     if(live==1)mask|=1u<<(channel-1);
    }
