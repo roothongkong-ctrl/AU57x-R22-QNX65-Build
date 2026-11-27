@@ -1,0 +1,40 @@
+name: R105.174 route 2 callback snapshot safety (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths:
+      - '.github/workflows/r105174-route2-callback.yml'
+      - 'lab/mu1005_route2_callback/**'
+      - 'project/source/legacy_mu1005/bluetooth/native_binding.c'
+      - 'project/source/legacy_mu1005/bluetooth/bt_callback_snapshot.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  changed-callback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test only new bounded event header snapshot
+        run: |
+          set -euxo pipefail
+          b=project/source/legacy_mu1005/bluetooth
+          cc -std=c99 -Wall -Wextra -Werror -fsanitize=undefined -I"$b" lab/mu1005_route2_callback/test.c -o "$RUNNER_TEMP/route2"
+          "$RUNNER_TEMP/route2"
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Compile changed original ARM callback binding
+        run: |
+          set -euxo pipefail
+          b=project/source/legacy_mu1005/bluetooth
+          mkdir -p evidence
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -I"$b" -c "$b/native_binding.c" -o /src/evidence/native_binding.o
+          readelf -h evidence/native_binding.o | grep -E 'Machine:.*ARM'
+          echo ROUTE2_CHANGED_CALLBACK_ARM_COMPILE_PASS_NOT_LIVE_BINDING
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: R105174-ROUTE2-REVIEW-NO-INSTALL
+          path: evidence/native_binding.o

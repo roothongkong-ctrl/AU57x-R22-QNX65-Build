@@ -2,6 +2,7 @@
 #include "rf_arg_experiment.h"
 #include "bt_startup_snapshot.h"
 #include "bt_owner_identity.h"
+#include "bt_callback_snapshot.h"
 #include <stdint.h>
 #include <string.h>
 #if defined(__QNXNTO__) && defined(__arm__) && UINTPTR_MAX == UINT32_MAX
@@ -61,7 +62,12 @@ static void mu_bt_native_callback_dispatch(void *ch,const void *event,uint32_t l
  __attribute__((used,noinline));
 static void mu_bt_native_callback_dispatch(void *ch,const void *event,uint32_t lr,uint32_t caller){
  if(!cert(&res)||!res.bridge.initialized||ch!=&res.bridge.service.rf||!event)return;
- const uint8_t *e=event;
+ uint8_t e[16];
+ if(!mu_bt_callback_snapshot(addr(event),rd,&res,e)){
+  if(cert(&res)&&res.bridge.service.state==IN_LINK){res.bridge.service.state=IN_DIRTY;res.bridge.dead=1;au_ipc_socket_lost(&res.bridge.ipc);}
+  return;
+ }
+ if(!cert(&res))return;
  unsigned old_code=res.native_event_code,old_scope=res.native_security_scope;
  int was_pending=res.bridge.service.pending;
  res.native_event_code=e[0];res.native_security_scope=0;
@@ -72,7 +78,7 @@ static void mu_bt_native_callback_dispatch(void *ch,const void *event,uint32_t l
   else if(e[0]==2&&lr==0x203d54u&&res.native_security_accepted&&was_pending)
    res.native_security_scope=1;
  }
- int rc=mu38_dispatch(&res.bridge,&res.peer,ch,event);
+ int rc=mu38_dispatch(&res.bridge,&res.peer,ch,e);
  if(e[0]==1&&!was_pending)res.native_security_accepted=rc==1&&res.native_security_scope;
  if(e[0]==2||e[0]==4)res.native_security_accepted=0;
  res.native_event_code=old_code;res.native_security_scope=old_scope;
