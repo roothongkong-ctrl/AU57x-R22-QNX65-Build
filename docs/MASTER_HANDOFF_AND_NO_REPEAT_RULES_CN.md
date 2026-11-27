@@ -280,3 +280,6 @@ run46033436233两路SUCCESS：job140622748616 artifact15215541990，实际合并
 
 ## 62. R105.197 用户批准15项集中决策，补齐队列dispatch生命周期边界
 用户回复1，15项推荐全部批准，详情docs/R105197_USER_DECISIONS_CN.md。今后已定方向无需重复问；共同核心问题仍要完成真实provider，不可用选择代替证据。R105.196两workflow SUCCESS。修复真实代码：原有producer持lease但AO dispatch未持有，现mu_bt_pulse_dispatch_leased非阻塞取得同一lease并覆盖owner/service验证及SDK dispatch；关闭中失效则跳过，start/retire owner检查在lease内。明确真实原厂stop/destruction provider尚未实现，非阻塞lease禁止假证据。1项新增专项加自动回归，35/66限定完成，新6/8/9未100%，NO INSTALL。
+
+## 63. R105.197验收与R105.198真实关闭边界定位
+R105.197三workflow 46035405883、46035405819、46035406005共14路SUCCESS，包括实际ARM dispatch lease编译；不再重复测试。新6/8/9的共同阻塞仍为实际原厂关闭与启动互斥提供者。R105.198只查真实原厂btstack的OSAPI stop/cleanup、BluetoothServices start/stop的直接调用、函数体内调用及可用导入重定位（ActiveObject stop/destructor、mutex/join），寻找可复用的统一入口；复用已有精确固件归档和harman-f 64a44fe23dbaa08771440d69642d2874d7028295 GPL3.0、qnxmount 0379c064975d5bbe3595ac7e3d149ea789406794及原有Binary解析，不重新扫描配置/线程等旧问题。不公开原厂二进制、不自动生成patch，不把直接调用候选当作所有间接调用覆盖证明。1路专项，35/66限定完成，新6/8/9未100%，NO INSTALL。
