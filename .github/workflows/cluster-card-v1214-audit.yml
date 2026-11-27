@@ -1,0 +1,41 @@
+name: ClusterCard v1.2.14 package and sanitizer audit - NO INSTALL
+on:
+  push:
+    branches: [experiment/cluster-compact-card-r1]
+    paths:
+      - 'experiments/cluster-compact-card/**'
+      - '.github/workflows/cluster-card-v1214-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  official-v1214-parity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact official public v1.2.14 asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/cluster-card-release v1214_audit
+          gh release download v1.2.14 -R MacsInSpace/mib-cluster-map -p 'mib-cluster-map_v1.2.14.zip' -D /tmp/cluster-card-release --clobber
+          python3 experiments/cluster-compact-card/audit_v1214.py /tmp/cluster-card-release/mib-cluster-map_v1.2.14.zip --json v1214_audit/exact_release.json
+      - name: Three ASan UBSan stress rounds plus baseline
+        run: |
+          set -euo pipefail
+          cd experiments/cluster-compact-card
+          g++ -std=c++11 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer -Wall -Wextra -Werror -pedantic test_stress.cpp -o /tmp/cluster-card-stress
+          for n in 1 2 3; do ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 /tmp/cluster-card-stress; done
+          g++ -std=c++11 -O2 -Wall -Wextra -Werror -pedantic test_compose.cpp -o /tmp/cluster-card-base
+          for n in 1 2 3; do /tmp/cluster-card-base; done
+      - name: Publish verification only, no QNX installation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClusterCard-v1214-RELEASE-AUDIT-NO-INSTALL
+          path: v1214_audit/
+          if-no-files-found: warn
+          retention-days: 14
