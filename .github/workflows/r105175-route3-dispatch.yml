@@ -1,4 +1,4 @@
-name: R105.175 route 3 original driver dispatch producer (NO INSTALL)
+name: R105.176 route 3 Python import collision fix (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -40,6 +40,9 @@ jobs:
           test "$result" = "completed:success"
           gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
           echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z" | sha256sum -c -
+      - name: Check renamed module does not shadow standard inspect
+        run: |
+          python3 -c 'import sys; sys.path.insert(0,"lab/mu1005_route3_dispatch"); import inspect; assert hasattr(inspect,"signature")'
       - name: Fetch exact upstream MHI2 extractor and QNX6 reader
         run: |
           set -euxo pipefail
@@ -67,7 +70,7 @@ jobs:
       - name: Inspect only missing original driver descriptor and dispatch slot
         run: |
           /tmp/mu1005-extract-venv/bin/pip install capstone==5.0.3 pyelftools==0.31
-          /tmp/mu1005-extract-venv/bin/python lab/mu1005_route3_dispatch/inspect.py "$RUNNER_TEMP/combined" evidence/route3-dispatch.json
+          /tmp/mu1005-extract-venv/bin/python lab/mu1005_route3_dispatch/driver_dispatch.py "$RUNNER_TEMP/combined" evidence/route3-dispatch.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

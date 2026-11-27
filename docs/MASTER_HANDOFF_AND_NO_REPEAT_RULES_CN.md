@@ -204,3 +204,6 @@ run46021591240/job140582324465 SUCCESS，实际日志 ROUTE2_NEW_CALLBACK_SNAPSH
 
 ## 37. R105.175 新2限定收口、新3专项
 用户在建议新2软件范围收口后回复1，按继续口令执行。新2限定完成，实际原厂owner、回调锁与生命周期接入证据保留在新6/8/9，不认为已连通。新3原23复用R105.011/013/018/019/020、R105.115/132等：已知mm-ipod mount/io_msg薄转发、device+0x38 context及+0x24回调槽、外层Transport +0x14/28/2c不同对象，不重跑USB加载、IPC拒绝、全固件扫描。新增1路只从已保留固件取精确mm-ipod和driver SHA，追原厂driver ipod_module+0x20 relocation及候选接口+0x24槽，结合mm-ipod driver_init/iface_find已有函数区间核实对象关系，记录候选函数及opcode立即数。不能把单一槽位或立即数认定为实际分派；不能把原厂USB transport当BT。未改原厂代码、无安装、不启动QEMU。待实际结果，新3未完成，不启动新4。32限定完成、5部分、29待；正式评分不变。NO INSTALL。
+
+## 38. R105.176 新3专项工具导入冲突修复
+R105.175 run46023609556/job140589224873实际失败：本地inspect.py遮蔽Python标准库inspect，pyelftools经pprint/dataclasses循环导入probe，未执行原厂descriptor分析。将工具改名driver_dispatch.py并删除原inspect.py，更新同一专项workflow调用，在提取前增加标准库inspect.signature检查，原分析逻辑不变。只触发同一专项1路，不重复其他测试。新3仍部分，未开始新4，NO INSTALL。
