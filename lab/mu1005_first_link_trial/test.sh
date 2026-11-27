@@ -12,11 +12,10 @@ ln -s "$tmp/system" "$tmp/active"
 target="$tmp/system/connectivity.json";alias="$tmp/active/connectivity.json";backup="$tmp/backup"
 cat >"$tmp/bin/pidin" <<'EOF'
 #!/bin/sh
-case "$2" in
-btstack|bluetooth|smartphone_integrator) printf '%s\n' "1 2 /eso/bin/apps/$2" "SECRET_KEY=fixture";;
-mm-ipod) if [ "${USB_BUSY:-0}" = 1 ];then printf '%s\n' "3 4 /usr/sbin/mm-ipod";else exit 1;fi;;
-*)exit 1;;
-esac
+[ "$#" = 1 ] && [ "$1" = ar ] || exit 2
+printf '%s\n' 'pid Arguments' '1 procnto-smp-instr' '1208409 /eso/bin/apps/btstack btstack 1' '1265702 /eso/bin/apps/bluetooth bluetooth 4' '1028131 ./bin/apps/smartphone_integrator -sm-name smartphone_integrator' '65069175 grep -Ei mm-ipod dio_manager SECRET_KEY=fixture'
+if [ "${USB_BUSY:-0}" = 1 ];then printf '%s\n' '67620983 mm-ipod -d iap2,config=/etc/mm/iap2.cfg' '67608697 /mnt/app/eso/bin/apps/dio_manager';fi
+exit 0
 EOF
 chmod 700 "$tmp/bin/pidin"
 export PATH="$tmp/bin:$PATH"

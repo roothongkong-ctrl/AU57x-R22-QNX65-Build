@@ -19,10 +19,23 @@ resolve_config(){
  d=$(CDPATH= cd -- "$(dirname "$1")" && pwd -P)
  printf '%s/connectivity.json\n' "$d"
 }
+# R106 real pidin ar: PID and executable are columns 1/2. The mem
+# view truncates names, and grep/argument text is not a process identity.
+# Query once, preserve no raw arguments. Failed/unknown enumeration stops.
+snapshot_processes(){
+ raw=$(pidin ar 2>/dev/null) || die PROCESS_QUERY_FAILED
+ processes=$(printf '%s\n' "$raw" | awk '
+  NF==0{next}
+  $1=="pid" && $2=="Arguments"{header++;next}
+  $1 !~ /^[0-9]+$/ || NF<2 {bad=1;next}
+  {if($1==1)kernel=1;x=$2;sub(/^.*\//,"",x)
+   if(x=="btstack"||x=="bluetooth"||x=="smartphone_integrator"||x=="mm-ipod"||x=="dio_manager") print x}
+  END{if(bad||header!=1||!kernel)exit 2}
+ ') || die PROCESS_QUERY_FORMAT_UNKNOWN
+ unset raw
+}
 process_seen(){
- pidin -p "$1" mem 2>/dev/null | awk -v name="$1" '
- {for(i=1;i<=NF;i++){x=$i;sub(/^.*\//,"",x);if(x==name)seen=1}}
- END{exit !seen}'
+ printf '%s\n' "$processes" | grep -Fxq "$1"
 }
 observe(){
  for name in btstack bluetooth smartphone_integrator mm-ipod dio_manager;do
@@ -38,6 +51,7 @@ action=$1
 if [ "$action" = observe ];then
  [ "$#" -eq 1 ] || die USAGE
  command -v pidin >/dev/null 2>&1 || die PIDIN_UNAVAILABLE
+ snapshot_processes
  observe;exit 0
 fi
 [ "$#" -eq 5 ] || die 'usage: prepare|apply|restore TARGET ACTIVE_ALIAS BACKUP CONFIRM_EXPERIMENT'
@@ -55,6 +69,7 @@ if [ "$action" = restore ];then
 fi
 [ "$hash" = "$ORIGINAL" ] || die CONFIG_NOT_EXACT_ORIGINAL
 command -v pidin >/dev/null 2>&1 || die PIDIN_UNAVAILABLE
+snapshot_processes
 for name in btstack bluetooth smartphone_integrator;do
  process_seen "$name" || die "OEM_PROCESS_NOT_OBSERVED_$name"
 done
