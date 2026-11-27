@@ -2,7 +2,7 @@ name: MU1005 OEM app image extraction (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/mu1005-oem-app-extract.yml, tools/mu1005_extract_app70.py]
+    paths: [.github/workflows/mu1005-oem-app-extract.yml, tools/mu1005_extract_app70.py, tools/mu1005_first_link_stock.py]
   workflow_dispatch:
     inputs:
       nas_run_id:
@@ -61,6 +61,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/mu1005_oem_inventory.py "${RUNNER_TEMP}/app70-tree/filesystems" --out evidence/oem-app70-inventory.json
+      - name: Generate minimal original Bluetooth configuration candidate for first link
+        if: success()
+        run: |
+          set -euo pipefail
+          python3 tools/mu1005_first_link_stock.py "${RUNNER_TEMP}/app70-tree/filesystems" "${RUNNER_TEMP}/first-link-stock" evidence/first-link-stock-manifest.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
