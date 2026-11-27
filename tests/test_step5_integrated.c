@@ -299,6 +299,9 @@ int main(void){
   assert(!stock.bound&&!cert_calls&&!sig_calls);
  }
  cp_cloud_init(&cloud);
+#ifdef AU57X_AP_FIRST_LINK_TEST
+ assert(cp_cloud_require_live_ap_refresh(&cloud)==CP_CLOUD_OK);
+#endif
  assert(cp_cloud_bind_bootstrap(&cloud,&s,&config,&identity)==CP_CLOUD_OK);
  assert(cp_s4_tcp_init(&t,&s,allow,&o)==CP_LK_OK);
  o.fd=-1;
@@ -412,6 +415,24 @@ int main(void){
  assert(s.wifi_request_pending&&!s.wireless_pending);
  o.hotspot=1;
 #ifdef AU57X_AP_FIRST_LINK_TEST
+ /* Force the original scheduling race: AP is up, but the live
+  * credentials have not been committed yet. */
+ assert(!cloud.live_ap_config);
+ const char *ordering_case=getenv("AP_CASE");
+ int ordering_mode=ordering_case?atoi(ordering_case):0;
+ if(ordering_mode==9){
+  for(unsigned i=0;i<3;i++){assert(cp_s4_wireless_pump(&s)>=0);assert(!s.wireless_pending);}
+ }
+ if(ordering_mode==11){
+  assert(cp_cloud_radio_result(&cloud,1,0)==CP_CLOUD_PROOF);
+  assert(!cloud.live_ap_config);
+ }
+ assert(cp_s4_wireless_pump(&s)>=0);
+ assert(!s.wireless_pending&&s.wifi_request_pending);
+ o.associated=1;
+ assert(cp_cloud_radio_result(&cloud,1,0)==CP_CLOUD_PROOF);
+ o.associated=0;
+ assert(cp_cloud_require_live_ap_refresh(&cloud)==CP_CLOUD_ORDER);
  struct mu_ap_refresh_slot live_slot={0};
  struct mu_ap_ie_lease live_lease={0};
  struct ap_fixture live_fixture={0};

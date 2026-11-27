@@ -51,6 +51,7 @@ static int actual_wireless_proof(void *opaque,uint32_t epoch,uint32_t generation
  /* A live AP in a different band must not cause 5703/4301 to
   * advertise the stale channel in the previously bound configuration. */
  out->live_hotspot=(!p->radio_failure_pending&&p->bootstrap->wireless.session&&
+     (!p->require_live_ap_refresh||p->live_ap_config==p->bootstrap->wireless.session)&&
      cp_radio_channel_band(p->bootstrap->wireless.session->wifi.channel)==p->band&&
      p->radio.epoch==epoch&&p->band!=CP_RADIO_NONE&&
      p->radio.selected==p->band&&
@@ -386,6 +387,12 @@ int cp_cloud_confirm_bootstrap_auth(struct cp_cloud_pipeline *s){
     CP_HO_EV_BOOTSTRAP_MFI_AUTHENTICATED,1)!=CP_HO_OK)return stop(s);
  return CP_CLOUD_OK;
 }
+/* Explicit live AP mode for an original-owner first-link integration.
+ * Legacy callers retain their existing externally verified config path. */
+int cp_cloud_require_live_ap_refresh(struct cp_cloud_pipeline *s){
+ if(!s||s->started||s->stopped)return CP_CLOUD_ORDER;
+ s->require_live_ap_refresh=1;s->live_ap_config=NULL;return CP_CLOUD_OK;
+}
 int cp_cloud_radio_start(struct cp_cloud_pipeline *s){
  enum cp_radio_band band=CP_RADIO_NONE;
  if(!eligible(s,1))return stop(s);
@@ -394,6 +401,7 @@ int cp_cloud_radio_start(struct cp_cloud_pipeline *s){
  if(!s->bootstrap||!cp_s4_authenticated(s->bootstrap))return stop(s);
  if(cp_radio_select(&s->radio,s->epoch,1,&band)!=CP_RADIO_OK)
   return CP_CLOUD_ORDER;
+ s->live_ap_config=NULL;
  if(s->owner.ap_prepare(s->owner.ctx,s->epoch,band)!=1)return stop(s);
  if(cp_radio_connect_requested(&s->radio,s->epoch,1)!=CP_RADIO_OK)return stop(s);
  s->band=band;s->radio_failure_pending=0;
@@ -427,6 +435,7 @@ int cp_cloud_refresh_ap_config(struct cp_cloud_pipeline *s,const struct cp_sessi
  /* Preserve the request/availability state. Only update the source of
   * credentials; phone may request config again after the physical switch. */
  b->wireless.session=cfg;
+ s->live_ap_config=cfg;
  return CP_CLOUD_OK;
 }
 int cp_cloud_radio_report_failure(struct cp_cloud_pipeline*s,uint32_t epoch,
@@ -438,7 +447,7 @@ int cp_cloud_radio_report_failure(struct cp_cloud_pipeline*s,uint32_t epoch,
  if(s->handoff.phase!=CP_HO_BOOTSTRAP_AUTH||
     s->radio.phase!=CP_RADIO_CONNECTING||s->radio.selected!=band)
   return CP_CLOUD_ORDER;
- s->radio_failure_pending=1;
+ s->radio_failure_pending=1;s->live_ap_config=NULL;
  return CP_CLOUD_OK;
 }
 int cp_cloud_radio_result(struct cp_cloud_pipeline *s,int success,int disconnected){

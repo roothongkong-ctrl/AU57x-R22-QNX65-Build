@@ -28,8 +28,8 @@ static int ap_verify(void*v,uint32_t e,uint32_t g,enum cp_radio_band band,const 
 }
 static void ap_handoff(struct cp_cloud_pipeline*p,struct mu_ap_refresh_slot*s,struct mu_ap_ie_lease*l,struct ap_fixture*f){
  const char *env=getenv("AP_CASE");int mode=env?atoi(env):0;
- assert(mode>=0&&mode<=7);
- f->mode=mode;f->allowed=1;f->proof=1;
+ assert(mode>=0&&mode<=11);
+ f->mode=mode>=8?0:mode;f->allowed=1;f->proof=1;
  if(mode==1)f->installed=1;
  struct mu_ap_ie_ops ops={f,ap_query,ap_write,ap_exclusive};
  int r=mu_ap_refresh_prepare_first_link(s,p,l,&ops,ap_bt,ap_id);
@@ -47,7 +47,12 @@ static void ap_handoff(struct cp_cloud_pipeline*p,struct mu_ap_refresh_slot*s,st
   f->mode=0;
   assert(mu_ap_refresh_prepare_first_link(s,p,l,&ops,ap_bt,ap_id)==CP_CLOUD_OK);
  }
+ if(mode==10){
+  f->proof=0;assert(mu_ap_refresh_commit(s,p,ap_verify,f)==CP_CLOUD_PROOF);
+  assert(!p->live_ap_config);f->proof=1;
+ }
  assert(mu_ap_refresh_commit(s,p,ap_verify,f)==CP_CLOUD_OK);
+ assert(p->live_ap_config==&s->session);
  assert(p->bootstrap->wireless.session==&s->session&&s->session.wifi.channel==11);
  assert(!strcmp(s->session.wifi.passphrase,"refreshed-fixture"));
  assert(mu_ap_refresh_clear(s,p)==CP_CLOUD_BAD);

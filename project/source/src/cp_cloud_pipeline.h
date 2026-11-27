@@ -82,6 +82,10 @@ struct cp_cloud_pipeline {
  struct cp_cloud_owner owner;
  uint32_t epoch,bt_generation;
  enum cp_radio_band band;
+ /* Opt-in live snapshot mode: never send the initial placeholder config.
+  * Pointer borrows the caller-owned immutable session, reset per AP attempt. */
+ int require_live_ap_refresh;
+ const struct cp_session *live_ap_config;
  int radio_failure_pending; /* explicit current attempt failure; await physical teardown */
  char iface[CP_CLOUD_IFACE_MAX+1];
  int started,stopped;
@@ -157,6 +161,7 @@ int cp_cloud_bind_bootstrap(struct cp_cloud_pipeline *,
   struct cp_step04_session *,const struct cp_session *,
   const struct cp_identification *);
 int cp_cloud_confirm_bootstrap_auth(struct cp_cloud_pipeline *);
+int cp_cloud_require_live_ap_refresh(struct cp_cloud_pipeline *);
 int cp_cloud_radio_start(struct cp_cloud_pipeline *);
 /* Rebind a caller-owned immutable AP snapshot after a verified band
  * change, before association/start. No credential generation or radio I/O. */
