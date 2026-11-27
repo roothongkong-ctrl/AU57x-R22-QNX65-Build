@@ -1,4 +1,4 @@
-name: R105.188 reuse original inbound service and ACK lifecycle (NO INSTALL)
+name: R105.189 reuse accepted probes and MIB workflow (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -8,64 +8,33 @@ permissions:
   contents: read
   actions: read
 jobs:
-  route8-9-native-inbound-ack:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - name: Test explicit ACK opt-in with existing real TCP and OEM event fixture
-        run: |
-          set -euxo pipefail
-          s=project/source/legacy_mu1005/bluetooth
-          cc -std=gnu99 -D_DEFAULT_SOURCE -Wall -Wextra -Werror -fsanitize=undefined -I"$s" "$s"/{inbound,inbound_r5,mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump}.c lab/mu1005_route4_5/test_native_ack.c -o "$RUNNER_TEMP/native-ack"
-          timeout 15 "$RUNNER_TEMP/native-ack"
-      - uses: ./.github/actions/mu1005-qnx-image
-        with:
-          require-cache: 'true'
-      - name: Compile new native attachment entry only for QNX ARM
-        run: |
-          set -euxo pipefail
-          mkdir -p evidence
-          s=project/source/legacy_mu1005/bluetooth
-          for n in inbound_r5 native_binding; do
-            docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -I"$s" -c "$s/$n.c" -o "/src/evidence/$n.o"
-            readelf -h "evidence/$n.o" | grep -E 'Machine:.*ARM'
-          done
-          echo ROUTE8_9_ACK_ATTACH_ARM_COMPILE_ONLY
-      - uses: actions/upload-artifact@v4
-        with:
-          name: R105188-NATIVE-ACK-NO-INSTALL
-          path: evidence/
-  route6-retained-boot-boundary:
+  assemble-existing-readonly:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - name: Join previously verified boot and original identity evidence, no new extraction
+      - name: Reuse existing accepted ARM binaries, not recompile
         run: |
-          set -euo pipefail
-          mkdir -p evidence/boot evidence/identity
-          gh run download 46027944302 --repo "$GITHUB_REPOSITORY" --name R105186-ROUTE6-BOOT-NO-INSTALL --dir evidence/boot
-          gh run download 46028235774 --repo "$GITHUB_REPOSITORY" --name R105187-ROUTE4-IDENTITY-READONLY --dir evidence/identity
-          (cd evidence/identity && sha256sum -c SHA256SUMS)
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          x=json.loads(Path("evidence/boot/route6.json").read_text())
-          rows={r["name"]:r for r in x["files"]}
-          assert not x["missing"] and x["factory_launch_verified"] is False
-          assert "connectivity_launcher" in rows["framework.json"]["anchors"]
-          assert "connectivity_launcher" in rows["dsistartup.json"]["anchors"]
-          assert "reset_bt.sh" in rows["connectivity.json"]["anchors"]
-          assert rows["reset_bt.sh"]["sha256"]=="3bc29953afbf3a2a37dc8d7260fc4874e24ed27909eb2338b2a9a9048321df7c"
-          ref=json.loads(Path("evidence/identity/reference_manifest.json").read_text())
-          assert next(r for r in ref if r["name"]=="connectivity.json")["sha256"]==rows["connectivity.json"]["sha256"]
-          Path("evidence/launch_boundary.json").write_text(json.dumps({"scope":"STATIC_BOOT_FILES_JOINED","files":list(rows),"config_hash_matches_reference":True,"factory_launch_verified":False,"restore_verified":False,"installable":False},indent=2))
-          print("ROUTE6_RETAINED_STOCK_BOOT_BOUNDARY_JOINED_NOT_RUNTIME")
-          PY
+          set -euxo pipefail
+          mkdir -p input/identity input/config package/mod/au57x-readonly
+          gh run download 46028235774 --repo "$GITHUB_REPOSITORY" --name R105187-ROUTE4-IDENTITY-READONLY --dir input/identity
+          gh run download 46020545537 --repo "$GITHUB_REPOSITORY" --name R105173-ROUTE1-READ-ONLY-PROBE --dir input/config
+          (cd input/identity && sha256sum -c SHA256SUMS)
+          (cd input/config && sha256sum -c SHA256SUMS)
+          p=package/mod/au57x-readonly
+          cp input/identity/observe-identity input/config/config-path-probe "$p/"
+          cp input/identity/reference_manifest.json "$p/"
+          cp lab/mu1005_stock_reuse/observe.sh "$p/observe_stock.sh"
+          cp lab/mu1005_route4_5/custom_readonly.sh "$p/"
+          cp lab/mu1005_route4_5/SIMPLE_REUSE_CN.md package/README_CN.md
+          chmod +x "$p/observe-identity" "$p/config-path-probe"
+          sh -n "$p/custom_readonly.sh"
+          sh -n "$p/observe_stock.sh"
+          (cd "$p" && sha256sum observe-identity config-path-probe reference_manifest.json observe_stock.sh custom_readonly.sh > SHA256SUMS && sha256sum -c SHA256SUMS)
+          echo ROUTE4_5_6_EXISTING_READONLY_PACKAGE_NOT_RUNTIME
       - uses: actions/upload-artifact@v4
         with:
-          name: R105188-BOOT-BOUNDARY-NO-INSTALL
-          path: evidence/launch_boundary.json
+          name: R105189-MU1005-READONLY-NO-INSTALL
+          path: package/
