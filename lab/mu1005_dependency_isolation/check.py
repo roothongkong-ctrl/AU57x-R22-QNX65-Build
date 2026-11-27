@@ -6,7 +6,12 @@ log=Path(sys.argv[2]).read_text()
 rows=re.findall(r"^DEP_RESULT ([A-Za-z0-9_.+-]+) (EXIT_\d+|SIGNAL_\d+|TIMEOUT|WAIT_FAIL|SPAWN_FAIL|OTHER)$",log,re.M)
 assert [n for n,_ in rows]==expected["direct_needed"],"missing/duplicate/out of order dependency results"
 assert "DEP_END_NOT_SERVICE_READY" in log
+attempts=re.findall(r"^DEP_ATTEMPT ([A-Za-z0-9_.+-]+)$",log,re.M)
+assert attempts==expected["direct_needed"],"each dependency must actually enter child"
+assert all(r not in ("SPAWN_FAIL","WAIT_FAIL","OTHER","EXIT_8","EXIT_9") for _,r in rows),"invalid harness/provider result"
 success=set(re.findall(r"^DEP_LOAD_OK ([A-Za-z0-9_.+-]+)$",log,re.M))
+assert "libc.so.3" in success and ("libc.so.3","EXIT_0") in rows,"baseline libc load must pass"
+assert all((n in success)==(r=="EXIT_0") for n,r in rows),"dlopen/exit mismatch"
 report={"program":expected["program"],"scope":"DIRECT_DEPENDENCY_ISOLATION_NOT_OEM_SERVICE","rows":[{"library":n,"process_result":r,"dlopen_ok":n in success} for n,r in rows],"wireless_verified":False,"service_ready":False}
 Path(sys.argv[3]).write_text(json.dumps(report,indent=2)+"\n")
 print("DEP_ISOLATION_COMPLETE",expected["program"],len(rows))

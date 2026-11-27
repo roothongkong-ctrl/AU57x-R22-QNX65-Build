@@ -80,6 +80,8 @@ for i in "${!pids[@]}"; do
   out="$ROOT/qnx-runtime-evidence/$lane"
   if [ -f "$out/trial-result.txt" ];then cat "$out/trial-result.txt";fi
   if [ -f "$out/linker.json" ];then cat "$out/linker.json";fi
+  if [ -f "$out/isolated-result.json" ];then cat "$out/isolated-result.json";fi
+  if [ "$failed" != 0 ];then tail -12 "$base/$lane-host.log" || true;fi
   if [ ! -f "$out/trial-result.txt" ];then echo "NO_GUEST_RESULT $lane";fi
 done
 exit "$failed"

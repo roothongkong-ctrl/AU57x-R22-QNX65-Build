@@ -3,7 +3,7 @@
 #error QNX ARM required
 #endif
 #include <dlfcn.h>
-#include <process.h>
+#include <errno.h>
 #include <sys/wait.h>
 #include <signal.h>
 #include <stdio.h>
@@ -14,9 +14,9 @@
 static int test(unsigned i){
  if(i>=sizeof(deps)/sizeof(deps[0])-1)return 8;
  const char *n=deps[i];char path[256];
+ printf("DEP_ATTEMPT %s\n",n);
  void *p=dlopen(LAB_PRELOAD,RTLD_NOW|RTLD_GLOBAL);
  if(!p||!dlsym(p,"slogf")){puts("PIC_PROVIDER_CHILD_FAIL");return 9;}
- printf("DEP_ATTEMPT %s\n",n);
  if(snprintf(path,sizeof path,"/proc/boot/%s",n)>=(int)sizeof path)return 8;
  void *h=dlopen(path,RTLD_NOW|RTLD_LOCAL);
  if(!h){
@@ -32,16 +32,17 @@ static int test(unsigned i){
  /* No dlclose: process exit isolates original constructors/destructors. */
  return 0;
 }
-int main(int argc,char **argv){
+int main(void){
  setvbuf(stdout,NULL,_IONBF,0);
- if(argc==2)return test((unsigned)strtoul(argv[1],NULL,10));
  unsigned count=sizeof(deps)/sizeof(deps[0])-1;
  printf("DEP_BEGIN %u\n",count);
  for(unsigned i=0;i<count;i++){
-  char index[16];snprintf(index,sizeof index,"%u",i);
-  char *args[]={argv[0],index,NULL};
-  pid_t pid=spawnv(P_NOWAIT,"/proc/boot/mu1005-oem-launch",args);
-  if(pid<0){printf("DEP_RESULT %s SPAWN_FAIL\n",deps[i]);continue;}
+  /* Parent never loads an OEM library. Fork avoids the IFS self-exec path
+   * which failed for every dependency in R105.151. Each child has a clean
+   * inherited base loader state; _exit avoids unrelated destructor failures. */
+  pid_t pid=fork();
+  if(pid==0)_exit(test(i));
+  if(pid<0){printf("DEP_FORK_ERRNO %s %d\n",deps[i],errno);printf("DEP_RESULT %s SPAWN_FAIL\n",deps[i]);continue;}
   int status=0,done=0;
   for(unsigned t=0;t<30;t++){
    pid_t n=waitpid(pid,&status,WNOHANG);
