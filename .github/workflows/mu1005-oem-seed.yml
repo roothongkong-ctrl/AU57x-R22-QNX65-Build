@@ -1,0 +1,20 @@
+name: MU1005 OEM seed verification (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [oem_inputs/mu1005/**, .github/workflows/mu1005-oem-seed.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify uploaded OEM seed
+        run: |
+          if [ ! -f oem_inputs/mu1005/MU1005_private_OEM_seed.zip ]; then
+            echo "::notice::OEM seed not uploaded; runtime unavailable"
+            exit 0
+          fi
+          python3 oem_inputs/mu1005/verify_seed.py "${RUNNER_TEMP}/mu1005-oem"

@@ -1,0 +1,25 @@
+{
+  "firmware": "MHI2_CN_AU57x_K1006_2 / MU1005",
+  "seed_archive": "MU1005_private_OEM_seed.zip",
+  "required": [
+    {
+      "path": "oem/eso/bin/apps/btstack",
+      "bytes": 1846436,
+      "sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566"
+    }
+  ],
+  "direct_dependencies": [
+    "libxml2.so.1",
+    "libicuuc.so.58",
+    "libz.so.2",
+    "libcomm.so",
+    "libosal.so",
+    "libutil.so",
+    "libiplcommon.so",
+    "libecpp-ne.so.4",
+    "libc.so.3",
+    "libm.so.2",
+    "libsocket.so.3"
+  ],
+  "dependency_files_included": false
+}
