@@ -33,6 +33,7 @@ void n112_destroy(struct n112_session *s){
 }
 int n112_prepare(struct n112_session *s,const struct n112_proof *p,
     uint64_t sid,const char *uuid,const char *map_uuid,
+    const char *map_url,
     unsigned w,unsigned h,c112_decrypt_t decrypt,void *crypto){
  struct sockaddr_in sa;socklen_t n=sizeof(sa);
  int fd;
@@ -41,6 +42,10 @@ int n112_prepare(struct n112_session *s,const struct n112_proof *p,
  if(!p->explicit_opt_in||!p->ios_112_observed||
     !p->distinct_aes_context||!p->codec_and_decoder_ready||
     !p->overlay_alpha_ready||!p->full_and_partial_teardown_verified)
+    return N112_NO_PROOF;
+ /* A second original card is useful only if 111 shows the card-free map.
+  * Otherwise the user sees two large navigation cards. Fail closed. */
+ if(!map_url||strcmp(map_url,"maps:/car/instrumentcluster/map")!=0)
     return N112_NO_PROOF;
  if(!sid||!w||!h||w>2048||h>1024||!decrypt||
     !valid_uuid(uuid)||!valid_uuid(map_uuid)||!strcmp(uuid,map_uuid))
@@ -62,7 +67,7 @@ int n112_prepare(struct n112_session *s,const struct n112_proof *p,
  s->display.max_fps=30;
  memcpy(s->display.uuid,uuid,37);
  strcpy(s->display.initial_url,N112_URL);
- s->receiver.decrypt=decrypt;s->receiver.crypto=crypto;
+ s->session_decrypt=decrypt;s->session_crypto=crypto;
  s->offered=1;return N112_OK;
 }
 int n112_offer(const struct n112_session *s,struct n112_descriptor *out){
@@ -76,7 +81,7 @@ int n112_setup(struct n112_session *s,unsigned type,uint64_t sid,
  if(!s||!response||type!=112||!cid||!sid)return N112_INVALID;
  if(!s->offered||sid!=s->session_id||s->listener<0)return N112_STALE;
  if(s->started)return N112_DUPLICATE;
- cb=s->receiver.decrypt;ctx=s->receiver.crypto;
+ cb=s->session_decrypt;ctx=s->session_crypto;
  if(!cb)return N112_NO_PROOF;
  rc=c112_begin(&s->receiver,sid,cid,cb,ctx);
  if(rc!=0)return N112_NO_PROOF;
@@ -103,15 +108,12 @@ int n112_receive_one(struct n112_session *s){
 }
 int n112_teardown(struct n112_session *s,unsigned type,uint64_t sid,
     uint64_t cid){
- c112_decrypt_t cb;void *ctx;
  if(!s||!sid)return N112_INVALID;
  if(type==110||type==111)return N112_NOT_READY;
  if(type!=112||sid!=s->session_id||!cid||cid!=s->connection_id)
    return N112_STALE;
- cb=s->receiver.decrypt;ctx=s->receiver.crypto;
  if(s->client>=0){shutdown(s->client,SHUT_RDWR);close(s->client);s->client=-1;}
  c112_end(&s->receiver);
- s->receiver.decrypt=cb;s->receiver.crypto=ctx;
  s->started=0;s->connection_id=0;
  /* Keep /info offer socket ready to service another 112 SETUP in this session. */
  return N112_OK;

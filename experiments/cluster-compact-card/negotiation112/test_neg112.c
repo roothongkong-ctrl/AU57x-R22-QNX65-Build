@@ -33,6 +33,7 @@ static int connect_local(unsigned port){
 int main(void){
  const char *mapid="b7e6c5a0-2222-4000-8000-000000000002";
  const char *cardid="b7e6c5a0-2222-4000-8000-000000000003";
+ const char *mapurl="maps:/car/instrumentcluster/map";
  const uint8_t avcc[]={1,0x64,0,0x1e,0xff,0xe1,0,4,0x67,0x64,0,0x1e,1,0,2,0x68,0xee};
  const uint8_t idr[]={0,0,0,3,0x65,0x88,0x84};
  struct n112_session s;struct n112_descriptor desc;struct n112_setup reply;
@@ -50,11 +51,13 @@ int main(void){
   if(i==3)q.codec_and_decoder_ready=0;
   if(i==4)q.overlay_alpha_ready=0;
   if(i==5)q.full_and_partial_teardown_verified=0;
-  assert(n112_prepare(&s,&q,70,cardid,mapid,800,298,crypt,&key)==N112_NO_PROOF);
+  assert(n112_prepare(&s,&q,70,cardid,mapid,mapurl,800,298,crypt,&key)==N112_NO_PROOF);
   assert(n112_offer(&s,&desc)==N112_NOT_READY);
  }
- assert(n112_prepare(&s,&p,70,mapid,mapid,800,298,crypt,&key)==N112_INVALID);
- assert(n112_prepare(&s,&p,70,cardid,mapid,800,298,crypt,&key)==N112_OK);
+ assert(n112_prepare(&s,&p,70,mapid,mapid,mapurl,800,298,crypt,&key)==N112_INVALID);
+ assert(n112_prepare(&s,&p,70,cardid,mapid,"maps:/car/instrumentcluster",800,298,crypt,&key)==N112_NO_PROOF);
+ assert(n112_prepare(&s,&p,70,cardid,mapid,"maps:/car/instrumentcluster/instructioncard",800,298,crypt,&key)==N112_NO_PROOF);
+ assert(n112_prepare(&s,&p,70,cardid,mapid,mapurl,800,298,crypt,&key)==N112_OK);
  assert(n112_offer(&s,&desc)==N112_OK);
  assert(desc.type==112 && desc.width==800&&desc.height==298);
  assert(!strcmp(desc.initial_url,"maps:/car/instrumentcluster/instructioncard"));
@@ -92,8 +95,32 @@ int main(void){
   close(fd);
   assert(s.receiver.video.count==0&&map.source_aus==0);
  }
+ /* Real protocol bug found in R6: malformed VIDEO_FRAME clears c112's
+  * decrypt callback; owner must be retained outside the receiver so that
+  * the next SETUP can recover. Test 250 bad-packet reconnects. */
+ for(i=0;i<250;++i){
+  uint64_t cid=3000+i;
+  assert(n112_setup(&s,112,70,cid,&reply)==N112_OK);
+  fd=connect_local(reply.data_port);
+  assert(n112_accept(&s)==N112_OK);
+  packet(fd,9,NULL,0,0); /* invalid opcode, 112 only */
+  assert(n112_receive_one(&s)==C112_INVALID);
+  assert(s.started==0 && s.client==-1 && s.receiver.video.count==0);
+  close(fd);
+  assert(map.source_aus==0);
+ }
+ assert(n112_setup(&s,112,70,9999,&reply)==N112_OK);
+ fd=connect_local(reply.data_port);
+ assert(n112_accept(&s)==N112_OK);
+ assert(alt111_video_attach(&s.receiver.video)==ALT111_OK);
+ packet(fd,1,avcc,sizeof(avcc),0);
+ packet(fd,0,idr,sizeof(idr),1);
+ assert(n112_receive_one(&s)==C112_CONFIG);
+ assert(n112_receive_one(&s)==C112_FRAME);
+ assert(n112_teardown(&s,112,70,9999)==N112_OK);
+ close(fd);
  n112_destroy(&s);
  assert(alt111_video_end(&map,stream)==ALT111_OK);
  alt111_video_destroy(&map);
- puts("PASS: opt-in 112 descriptor, handshake response port, actual TCP H264 ingest, 110/111 unchanged, 300 partial teardowns");
+ puts("PASS: opt-in 112 descriptor, handshake response port, actual TCP H264 ingest, 110/111 unchanged, 300 partial teardowns, 250 malformed-packet recovery cycles, 111 never changed");
 }

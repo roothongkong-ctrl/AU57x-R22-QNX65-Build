@@ -26,11 +26,15 @@ struct n112_session {
  uint64_t session_id,connection_id;
  unsigned offered,started,port;
  struct n112_descriptor display;
+ /* Owner survives private VIDEO_FRAME corruption and receiver resets. */
+ c112_decrypt_t session_decrypt;
+ void *session_crypto;
  struct c112_receiver receiver;
 };
 void n112_init(struct n112_session *s);
 int n112_prepare(struct n112_session *s,const struct n112_proof *proof,
     uint64_t session_id,const char *uuid,const char *map_uuid,
+    const char *map_url,
     unsigned width,unsigned height,c112_decrypt_t decrypt,void *crypto);
 int n112_offer(const struct n112_session *s,struct n112_descriptor *out);
 int n112_setup(struct n112_session *s,unsigned type,uint64_t session_id,

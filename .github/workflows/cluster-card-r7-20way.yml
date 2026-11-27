@@ -1,9 +1,10 @@
 name: ClusterCard R7 20 tests for ONE original card - NO INSTALL
 on:
   push:
-    branches: [experiment/cluster-card-r7-parallel20]
+    branches: [experiment/cluster-card-r7-parallel20, experiment/cluster-card-r8-single-card]
     paths:
       - '.github/workflows/cluster-card-r7-20way.yml'
+      - 'experiments/cluster-compact-card/negotiation112/**'
   workflow_dispatch:
 permissions:
   contents: read
