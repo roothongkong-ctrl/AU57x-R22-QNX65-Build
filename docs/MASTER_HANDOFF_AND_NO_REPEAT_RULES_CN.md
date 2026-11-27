@@ -61,7 +61,7 @@ R106 实车已有：原厂进程、2.4GHz AP association、有线 CarPlay 视频
 - 实际代码、测试、构建脚本、技术报告、CI 与可复用产物放仓库/Actions；聊天只汇报本轮关键变化、真实结果、阻塞、下一任务及链接。不要整段贴反汇编、完整日志、历史长表。
 - 每轮完成一个有效研发增量或拿到关键新结果后，**在回复用户前更新本主交接文件**：功能基线 SHA、版本、证据等级、run/job/artifact ID、当前阻塞和唯一下一任务。使用最新 blob SHA 防止覆盖并发修改；冲突先重读合并。纯文档提交不应重复触发无关 CI。
 - 主交接文件只保留当前快照和简明索引；长技术历史放专项报告和 Git 历史，不能每轮无上限追加。Actions artifact 可能过期：重要的脱敏结果与摘要长期写入仓库；原厂专有固件、密钥、账号、私人日志不得提交到公开仓库。
-- 独立工作可并行约15路、最多20路；以有效任务为准，不凑数量。已通过的同输入 CI 直接复用，除非相关输入变更、证据冲突或产物确实丢失。优先复用成熟 GitHub 源码及已有原厂文件；确实缺失才一次性列出路径/镜像/用途。
+- 独立工作每轮尽量充分利用最多20个并行云端job的预算；能独立执行的有效研发和测试一次性安排，不再默认15路；不凑数量。提交前检查现有运行及排队的任务、自动触发的回归和矩阵展开数，将新增并行任务限制在剩余预算内；单矩阵max-parallel不超过20且须为其他工作流预留容量。存在依赖的测试按先后执行，不为并行而破坏依赖；不重复已通过的相同输入测试。实际并发由GitHub调度和外部任务决定，不保证20路同时运行。已通过的同输入 CI 直接复用，除非相关输入变更、证据冲突或产物确实丢失。优先复用成熟 GitHub 源码及已有原厂文件；确实缺失才一次性列出路径/镜像/用途。
 - 区分 STATIC_CONFIRMED、HOST_TESTED、QNX_ARM_BUILT、QNX_GUEST_EXECUTED、VEHICLE_VERIFIED。编译、模拟或加载通过不等于真实服务运行，更不等于真实 iPhone 无线连接。保留原厂有线优先及 MFi；不将未知硬件能力写成已验证。
 - 安装门禁：installable=false；safe_to_flash=false；vehicle_verified=false；mfi_apple_verified=false；wireless_carplay_e2e=false。未取得真实首连和恢复证据前保持 NO INSTALL。
 - GitHub 写入失败或无法读取真实结果必须明确告知用户，不能宣称已同步/已通过。不会依赖会话即将耗尽时才交接，也不保证未运行的会话自动更新。
@@ -124,3 +124,5 @@ R106 实车已有：原厂进程、2.4GHz AP association、有线 CarPlay 视频
 - 复用本仓库现有 tools/mu1005_efs_launcher_stage.py 的原厂 launcher.btstack.exec 单字段离线适配及 tools/r94_launcher_audit.py 的固定原厂launcher SHA。R105.157新增 lab/mu1005_donor_launcher/trace.py，针对不同的原厂程序 connectivity_launcher，定位 setExecutable/JSONReader 直接调用及配置路径引用，拒绝不匹配的ELF；不再重复Bluetooth enableIap静态扫描。代码提交 3fb80582，CI配置提交 e493fada6；工作流 .github/workflows/r105157-donor-launcher.yml 复用已校验NAS artifact，仅提取app70，不重编QNX，不安装或修改OEM。当前新CI最终结果未取得。
 - [joeyQuery MU0678 roadmap](https://github.com/joeyQuery/MHI2-wirelessCarPlay/blob/3db007ae20226adc3e1aab4ca85c6626c09178f8/docs/roadmap.md) 明确enableIap是Bluetooth topology/reconnect policy而非btstack启动/端点创建开关；仅作另一版本证据，不直接推定MU1005同义。
 - 本轮第01项保持3/5（60%），第一阶段可沿原厂launcher适配路线推进；下一任务检查R105.157真实CI结果，按实际调用证据决定能否复用既有启动适配，原厂接入/实车读取生效未闭环。任何静态候选/诊断通过均不计实车生效。NO INSTALL。
+
+用户最新确认：每轮尽量一次性安排所有可独立进行的有效攻关和云端测试，总计划并行预算不超过20路；汇报通过/失败/运行中的实际数量。
