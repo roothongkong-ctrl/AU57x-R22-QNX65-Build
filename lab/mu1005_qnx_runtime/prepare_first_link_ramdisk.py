@@ -6,7 +6,8 @@ def replace(a,b):
     global s
     if s.count(a)!=1:raise SystemExit("unexpected launcher anchor: "+a)
     s=s.replace(a,b)
-replace('    display_msg "@@QNXRUN-START@@"','''    /proc/boot/devb-ram ram capacity=1 blk ramdisk=10m,cache=512k,vnode=256 &
+replace('    display_msg "@@QNXRUN-START@@"','''    display_msg "R105095 RAMDISK START: internal io-blk, no redundant cache or dummy format"
+    /proc/boot/devb-ram cam quiet disk name=labdummy ram capacity=28,nodinit blk cache=0,ramdisk=10m,vnode=256 &
     waitfor /dev/ram0 15
     /proc/boot/dinit /dev/ram0
     /proc/boot/mount -tqnx4 /dev/ram0 /tmp
