@@ -228,3 +228,7 @@ R105.181 run46026036834/job140597562155 SUCCESS，artifact15211247798（978字�
 
 ## 45. R105.182实测及R105.183复用已有ACK协议
 R105.182 run46026319903/job140598516034 SUCCESS，artifact15212925067；日志确认 ROUTE3_EXISTING_RF_FULL_FRAME_RECEIPT_FIXTURE_PASS_NOT_NATIVE、QNX_COMPLETE_IMAGE_CACHE_HIT、ROUTE3_RF_RECEIPT_ARM_COMPILE_ONLY_NOT_LIVE。自动集成46026319865四路成功；46026319969六路host及upstream-graft成功，native-library仍在运行，collect待后续。进一步核对发现已有cp_step2_ipc_link.c/h支持type4零长度、同radio generation的SDK完成ACK，故不发明新协议、不新建独立socket。R105.183在既有mu1005_rf_ingress增加显式首连前opt-in，最后一段完成后才排入既有type4，默认关闭保持原有type1/2/3消费者兼容；队列满关闭，失败不发布成功回执；现有cp_step2_ipc_link接收端不修改。新增真实本机socketpair连接两端源码，验证默认无ACK、分段不提前确认、整帧确认及失败拒绝、ACK不计RX credit；SDK完成仍为夹具，非实车。尚未证明原厂运行时owner或将opt-in绑定到实际启动，不能安装。计划新增1专项+既有自动回归最多14路，另前一版本最多2路剩余，合计不超20。新3未完成，未启动新4。NO INSTALL。
+
+## 46. 用户新增强制规则：每项先查GitHub、优先复用（2026-11-27）
+今后新路线每一项及关键技术阻塞，必须先检索GitHub相关开源源码、最新分支/提交、issue、PR、实车成功记录以及本工程已有成果，再决定研发方案。优先顺序：同平台同固件直接复用（确认许可证及版本/ABI）；类似平台少量适配复用；复用原厂接口及已有模块；确实没有合适实现才自研缺失部分。每项记录上游仓库、固定版本/提交、可复用模块、适配差异、证据级别及未解决事项，避免重复检索已知未变化内容和重跑已通过测试。同平台实车记录与其他平台参考区别对待；不直接套用不同固件绝对地址，不绕过原厂MFi，不把静态/夹具测试称为实车成功。
+第3项本轮公开GitHub检索候选：luka-dev/mib2q-carplay-rgi（现有主线与已复用协议/蓝牙graft）；congobg/MHI2Q_WiFi_CarPlay（QNX6.5 ARMv7、保留原厂receiver/iAP2 client，3638/5092异平台参考）；joeyQuery/MHI2-wirelessCarPlay（更接近MHI2，MU0678，明确蓝牙endpoint到resmgr仍未闭环，不能当成功方案）；chefranov/mhi2-au37x-carplay（HARMAN iAP2适配参考，未证明无线首连）；oguzkarcan/EntryNav2-CarPlay（BMW异平台，协议边界参考）。优先核对congobg的蓝牙接入与joeyQuery最新trace，对照本工程原厂数据路径，只复用合适且许可允许的实现。本轮仅登记检索结果和强制规则，不新增代码、测试或宣称兼容通过；R105.183原有专项保持不变。
