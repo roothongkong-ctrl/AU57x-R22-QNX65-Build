@@ -35,8 +35,23 @@ def test_native_owner_path_only_adopts_worker_prepared_fd():
 
 def test_native_adopt_dispatch_never_creates_socket():
     b=code_only(body("adopt_dispatch"))
-    assert "au98_adopt_stock_native(" in b
-    assert "socket(" not in b and "connect(" not in b and "poll(" not in b
+    assert "adopt_stock_common(" in b
+    for name in ("adopt_dispatch","adopt_stock_common","au98_adopt","au98_adopt_with_ack","adopt_common"):
+        code=code_only(body(name))
+        assert not re.search(r"\b(?:socket|connect|connected|au98_prepare_daemon_socket|au98_publish)\s*\(",code),name
+        # socket_ready uses only zero-timeout polling; the adoption call chain
+        # must never perform its own waiting poll.
+        assert not re.search(r"\bpoll\s*\(",code),name
+    common=code_only(body("adopt_stock_common"))
+    assert "au98_adopt_with_ack(" in common and "au98_adopt(" in common
+    assert "mu_bt_native_attach_ack_context" in common
+    ready=code_only(body("socket_ready"))
+    assert re.search(r"\bpoll\s*\(\s*&p\s*,\s*1\s*,\s*0\s*\)",ready)
+    assert "MSG_PEEK" in ready
+    for name in ("au98_drive_stock_native","au98_drive_stock_native_ack"):
+        code=code_only(body(name))
+        assert "au98_drive(" in code and "adopt_dispatch" in code
+        assert "au98_publish(" not in code and "au98_bind_stock_native(" not in code
 
 def test_blocking_connect_is_worker_only_api():
     b=code_only(body("au98_prepare_daemon_socket"))

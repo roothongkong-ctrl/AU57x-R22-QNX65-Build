@@ -1,4 +1,4 @@
-name: R105.191 existing owner dispatch selects ACK only on explicit daemon support (NO INSTALL)
+name: R105.192 reuse stock trace and queue bootstrap (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -8,32 +8,31 @@ permissions:
   contents: read
   actions: read
 jobs:
-  owner-ack-context:
+  route6-source-to-bootstrap:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Test new ACK witness and owner context via existing real TCP handoff
+      - name: Validate revised nonblocking call chain and new trace source handoff
         run: |
           set -euxo pipefail
+          python3 tests/test_r105_owner_nonblocking_gate.py
           s=project/source/legacy_mu1005/bluetooth
-          cc -std=gnu99 -D_DEFAULT_SOURCE -DAU57X_R98_HOST_TEST=1 -Wall -Wextra -Werror -fsanitize=undefined -I"$s" "$s"/{bt_iap2_owner_handoff,rf_arg_experiment,bt_route_gate}.c lab/mu1005_route4_5/test_ack_handoff.c -o "$RUNNER_TEMP/ack-handoff"
-          timeout 15 "$RUNNER_TEMP/ack-handoff"
+          cc -std=gnu99 -D_DEFAULT_SOURCE -Wall -Wextra -Werror -fsanitize=undefined -I"$s" "$s"/{bt_startup_watch,bt_startup_snapshot,bt_trace_latch}.c lab/mu1005_route4_5/test_startup_source.c -o "$RUNNER_TEMP/startup"
+          "$RUNNER_TEMP/startup"
       - uses: ./.github/actions/mu1005-qnx-image
         with:
           require-cache: 'true'
-      - name: Compile only changed QNX native glue
+      - name: Compile changed original startup bridge and check real queue dependency
         run: |
           set -euxo pipefail
           mkdir -p evidence
           s=project/source/legacy_mu1005/bluetooth
-          for n in native_binding bt_iap2_owner_handoff bt_notify_bridge; do
-            docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -I"$s" -c "$s/$n.c" -o "/src/evidence/$n.o"
-            readelf -h "evidence/$n.o" | grep -E 'Machine:.*ARM'
-          done
-          readelf -Ws evidence/bt_notify_bridge.o | grep -w au98_drive_stock_native_ack
-          echo ROUTE6_8_9_ACK_DISPATCH_ARM_COMPILE_ONLY
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -I"$s" -c "$s/bt_startup_watch.c" -o /src/evidence/bt_startup_watch.o
+          readelf -h evidence/bt_startup_watch.o | grep -E 'Machine:.*ARM'
+          readelf -Ws evidence/bt_startup_watch.o | grep -w mu_bt_queue_bootstrap
+          echo ROUTE6_STARTUP_SOURCE_TO_QUEUE_ARM_COMPILE_ONLY
       - uses: actions/upload-artifact@v4
         with:
-          name: R105191-OWNER-ACK-CONTEXT-NO-INSTALL
+          name: R105192-STARTUP-BRIDGE-NO-INSTALL
           path: evidence/
