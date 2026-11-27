@@ -26,6 +26,9 @@ int main(void){
  void *h=dlopen("/proc/boot/ipod-drvr-iap2.so",RTLD_NOW|RTLD_LOCAL);
  if(h){puts("IAP2_ORIGINAL_PLUGIN_DLOPEN_OK");dlclose(h);}
  else puts("IAP2_ORIGINAL_PLUGIN_DLOPEN_BLOCKED");
+ h=dlopen("/proc/boot/ipod-transport-usbdevice.so",RTLD_NOW|RTLD_LOCAL);
+ if(h){puts("IAP2_ORIGINAL_USB_TRANSPORT_DLOPEN_OK");dlclose(h);}
+ else puts("IAP2_ORIGINAL_USB_TRANSPORT_DLOPEN_BLOCKED");
  char *args[]={"mm-ipod","-d","iap2,config=/etc/mm/iap2.cfg,probe,ppsdir=/ramdisk/pps/iap2","-a","i2c,addr=0x11,path=/dev/i2c8,speed=50000","-t","usbdevice,path=/dev/io-usb/otg_dev","-l","/dev/shmem/iap2.log","-vvvvvv",NULL};
  int pid=spawnv(P_NOWAIT,"/proc/boot/mm-ipod",args);
  if(pid<0){printf("IAP2_SPAWN_BLOCKED errno=%d\n",errno);puts("IAP2_DIAGNOSTIC_COMPLETE_NO_PHONE");return 0;}

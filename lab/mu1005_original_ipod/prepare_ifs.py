@@ -9,8 +9,10 @@ subprocess.run([sys.executable,str(src/"prepare_ifs.py"),str(p),str(out),"layout
 s=p.read_text();marker="\n$NAME\nEOF"
 if s.count(marker)!=1:raise ValueError("manifest anchor")
 extra=["[type=dir] /ramdisk","[type=dir] /ramdisk/pps","[type=dir] /ramdisk/pps/iap2"]
-for a in aliases:
+for line in aliases:
+    a,module=line.split(" ",1)
+    if module not in ("ipod-drvr-iap2.so","ipod-transport-usbdevice.so"):raise ValueError("unknown module")
     if not re.fullmatch(r"/(?:[A-Za-z0-9_.+-]+/)*[A-Za-z0-9_.+-]+",a) or ".." in a.split("/"):raise ValueError("invalid alias")
-    extra.append("[type=link] "+a+"=/proc/boot/ipod-drvr-iap2.so")
+    extra.append("[type=link] "+a+"=/proc/boot/"+module)
 s=s.replace(marker,"\n"+"\n".join(extra)+"\n[perms=0555]"+marker)
 p.write_text(s)

@@ -1,0 +1,2 @@
+# R105.132 原厂 iAP2 双插件有线基线
+复用已存在的 R105 STEP03 静态原厂审计（device_transport_init 0x103510、device_drvr_init 0x1035f4、ipod-transport-%s.so、ipod-drvr-%s.so）。R105.131 只准备了 driver；本轮增加实际同固件 ipod-transport-usbdevice.so，唯一 SHA、ARM ELF、动态 ipod_module 36-byte GLOBAL descriptor，及 mm-ipod 精确历史 SHA。两个模块分别映射原始路径并递归准备唯一依赖，独立 dlopen 和节点观察。只验证真实有线基线，不把 USB transport 当作 BT，其他 transport 候选仅输出名称/数量。原厂 MFi 和 USB OTG 不模拟成功。R105.130 12路和R105.131 driver-only 控制保持原提交运行，本轮新任务尚未验收。NO INSTALL。

@@ -1,4 +1,4 @@
-name: R105.131 original mm-ipod dynamic plugin and device witness (NO INSTALL)
+name: R105.132 original iAP2 driver and USB transport baseline (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -115,7 +115,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r105131-original-ipod-evidence-NO-INSTALL
+          name: r105132-original-ipod-transport-evidence-NO-INSTALL
           path: |
             qnx-runtime-evidence/staged.json
             qnx-runtime-evidence/ipod-result.txt
