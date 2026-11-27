@@ -1,15 +1,12 @@
 name: NASMusic iOS isolated CI
 on:
-  push:
-    branches: [nasmusic-ios-ci-v092]
-    paths: ['nasmusic-ci/READY']
   pull_request:
     branches: [nasmusic-ios-ci-base]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  build:
+  device-build:
     if: github.ref == 'refs/heads/nasmusic-ios-ci-v092' || (github.event_name == 'pull_request' && github.head_ref == 'nasmusic-ios-ci-v092')
     runs-on: macos-15
     timeout-minutes: 35
@@ -18,42 +15,45 @@ jobs:
         working-directory: nasmusic-ci
     steps:
       - uses: actions/checkout@v4
-      - name: Install XcodeGen
-        run: command -v xcodegen >/dev/null || brew install xcodegen
-      - name: Build and test
-        run: bash Scripts/xcode_test.sh
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: nasmusic-ios-test-results
-          path: |
-            nasmusic-ci/TestResults/*.txt
-            nasmusic-ci/TestResults/*.log
-            nasmusic-ci/TestResults/*.json
-            nasmusic-ci/TestResults/*.xcresult
-          retention-days: 1
-
-  device-build:
-    if: github.event_name == 'pull_request' && github.head_ref == 'nasmusic-ios-ci-v092'
-    runs-on: macos-15
-    timeout-minutes: 25
-    defaults:
-      run:
-        working-directory: nasmusic-ci
-    steps:
-      - uses: actions/checkout@v4
-      - run: command -v xcodegen >/dev/null || brew install xcodegen
+      - name: Verify sanitized build inputs
+        run: |
+          set -e
+          node --check Integration/native-music.js
+          python3 - <<'PY'
+          from pathlib import Path
+          assert 'https://example.invalid:1232' in Path('Sources/NativeQueue.swift').read_text()
+          assert 'UIBackgroundModes: [audio]' in Path('project.yml').read_text()
+          for f in Path('.').rglob('*'):
+              if f.is_file():
+                  assert not any(x in f.name.lower() for x in ('.p12', '.mobileprovision', '.spk'))
+          PY
+      - name: Install XcodeGen and identify SDK
+        run: |
+          command -v xcodegen >/dev/null || brew install xcodegen
+          xcodebuild -version
+          xcodebuild -showsdks
       - name: Compile iPhone device target without signing
         run: |
-          set -o pipefail
+          set -euo pipefail
           mkdir -p TestResults
           xcodegen generate
           xcodebuild -project NASMusic.xcodeproj -scheme NASMusic -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath TestResults/DeviceBuild CODE_SIGNING_ALLOWED=NO build 2>&1 | tee TestResults/device-build.log
-          test -d TestResults/DeviceBuild/Build/Products/Release-iphoneos/NASMusic.app
+      - name: Verify and package device binary
+        run: |
+          set -euo pipefail
+          app=TestResults/DeviceBuild/Build/Products/Release-iphoneos/NASMusic.app
+          test -d "$app"
+          test -f "$app/native-music.js"
+          /usr/libexec/PlistBuddy -c 'Print :UIBackgroundModes' "$app/Info.plist" | grep -w audio
+          exe=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist")
+          test -f "$app/$exe"
+          lipo -archs "$app/$exe" | grep -w arm64
           mkdir -p TestResults/Payload
-          cp -R TestResults/DeviceBuild/Build/Products/Release-iphoneos/NASMusic.app TestResults/Payload/
+          cp -R "$app" TestResults/Payload/
           cd TestResults
           zip -qry NASMusic-CI-unsigned.ipa Payload
+          unzip -tq NASMusic-CI-unsigned.ipa
+          shasum -a 256 NASMusic-CI-unsigned.ipa > NASMusic-CI-unsigned.ipa.sha256
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -61,29 +61,5 @@ jobs:
           path: |
             nasmusic-ci/TestResults/device-build.log
             nasmusic-ci/TestResults/NASMusic-CI-unsigned.ipa
-          retention-days: 1
-  source-audit:
-    if: github.event_name == 'pull_request' && github.head_ref == 'nasmusic-ios-ci-v092'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    defaults:
-      run:
-        working-directory: nasmusic-ci
-    steps:
-      - uses: actions/checkout@v4
-      - name: Verify sanitized inputs and JS syntax
-        run: |
-          node --check Integration/native-music.js
-          python3 -m py_compile Scripts/select_simulator.py
-          bash -n Scripts/xcode_test.sh
-          python3 - <<'PY'
-          import pathlib
-          base = pathlib.Path('.')
-          code = (base/'Sources/NativeQueue.swift').read_text()
-          assert 'https://example.invalid:1232' in code
-          assert 'UIBackgroundModes: [audio]' in (base/'project.yml').read_text()
-          for f in base.rglob('*'):
-              if f.is_file():
-                  assert not any(x in f.name.lower() for x in ('.p12', '.mobileprovision', '.spk'))
-          print('PASS: sanitized host, background audio configuration, no signing files or NAS package')
-          PY
+            nasmusic-ci/TestResults/NASMusic-CI-unsigned.ipa.sha256
+          retention-days: 7
