@@ -7,7 +7,7 @@ on:
     inputs:
       nas_run_id:
         description: "Successful NAS acquisition run id"
-        default: "45921008217"
+        default: ""
         type: string
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 120
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE_RUN: ${{ inputs.nas_run_id || '45921008217' }}
+      SOURCE_RUN: ${{ inputs.nas_run_id }}
     steps:
       - uses: actions/checkout@v4
       - name: Verify dependency metadata resolution without host symlinks

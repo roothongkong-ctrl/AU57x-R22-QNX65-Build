@@ -1,0 +1,2 @@
+# R105.092 NAS HTTP/2 中断针对性修复
+run 45921008217: HTTP 200、532152320 bytes、1055.472112 seconds、curl exit 92；下载失败，app70 与 stage2 任务相应失败。R105.090 metadata alias 单元测试实际通过（45922072199）。最新 host/native 12 项通过，1 项汇总排队，first-link QNX 尚构建。修复：单任务强制 HTTP/1.1、限制单次时间、瞬时错误保留 .part 同 runner curl -C - 续传，服务器不支持 Range 时仅重启一次，严格总大小/总时限、HTTPS 证书校验保持、每20秒记录真实字节数。完整 7z t、SHA 和留存仍由原 workflow 执行，失败不作为完整文件，不声称此前下载可跨 runner 续传。两提取任务使用同提交的新 NAS run，app70 按锁定上游 requirements 更新 kaitaistruct 与 link-map，允许阶段分镜像的局部 inventory；真实 config 生成仍须实际文件。没有新增真实车机功能验收。原始 NAS 分享地址不写入新报告，原 workflow 的既有授权临时地址仍使用，成功后需撤销分享。

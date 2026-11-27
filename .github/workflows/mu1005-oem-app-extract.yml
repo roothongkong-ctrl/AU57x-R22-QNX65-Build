@@ -59,7 +59,7 @@ jobs:
           git -C qnxmount checkout --detach FETCH_HEAD
           test "$(git -C qnxmount rev-parse HEAD)" = 0379c064975d5bbe3595ac7e3d149ea789406794
           python3 -m venv /tmp/mu1005-extract-venv
-          /tmp/mu1005-extract-venv/bin/pip install kaitaistruct==0.10 crcmod==1.7
+          /tmp/mu1005-extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
           command -v 7z || { sudo apt-get update -qq && sudo apt-get install -y p7zip-full; }
       - name: Extract variant 70 using upstream read-only QNX6 implementation
         run: |
@@ -70,7 +70,11 @@ jobs:
       - name: Locate exact original Bluetooth and CarPlay ELF inputs
         run: |
           set -euo pipefail
-          python3 tools/mu1005_oem_inventory.py "${RUNNER_TEMP}/app70-tree/filesystems" --out evidence/oem-app70-inventory.json
+          rc=0
+          python3 tools/mu1005_oem_inventory.py "${RUNNER_TEMP}/app70-tree/filesystems" --link-map "${RUNNER_TEMP}/app70-tree/filesystems/MMX2/app/70/default/app.img" "${RUNNER_TEMP}/app70-tree/metadata/mmx2-app-70.json" --out evidence/oem-app70-inventory.json || rc=$?
+          # btstack may live in stage2; a partial inventory is valid evidence,
+          # not proof of a complete OEM runtime.
+          test "$rc" -eq 0 || test "$rc" -eq 2
       - name: Generate minimal original Bluetooth configuration candidate for first link
         if: success()
         run: |
