@@ -1,24 +1,43 @@
-# 无线 CarPlay 项目｜主交接总表与防重复研发规则
+# 无线 CarPlay｜唯一主交接入口
 
-更新日期：2026-11-26
-唯一开发分支：`mu1005-si-cprx-real-review`
-本次整理基线 commit：`2f5adce342796b7e8beeb122804cf730a373f588`
-适配目标：2017 Audi A6L C7 PA / MHI2_CN_AU57x_K1006_2 / MU1005 / QNX 6.5 ARM32
-发布边界：SOURCE REVIEW ONLY / NO INSTALL / NOT VEHICLE VERIFIED
+更新：2026-11-27（本轮文档交接）
+研发分支：`mu1005-si-cprx-real-review`
+最近核实的功能研发基线：**R105.156 / 88b0ceace9e8da91b03f33188eb61f9271a2cc95**
+状态：**SOURCE REVIEW ONLY / NO INSTALL / NOT VEHICLE VERIFIED**
 
-## 0. 本文件的用途
+## 1. 新会话先读这里（不依赖旧聊天）
 
-本文件是后续对话与研发的唯一交接入口。先读本文件，再按链接读取对应原始报告；不得从旧聊天摘要重新猜状态。除非出现新原厂文件哈希、新源码提交或新的实车日志，不重复已经完成的静态审计、依赖检查和 CI。
+- 用户发“1”或“继续”：按本文件最新下一任务接续研发，不重做已完成工作。新会话首次先读取本文件、实际分支 HEAD；若 HEAD 已推进，只检查本基线之后的差异及相关 Actions 结果，不能回退到旧版本。
+- 目标：2017 Audi A6L C7 PA，MHI2_CN_AU57x_K1006_2 / MU1005 / QNX 6.5 ARM32，纯软件无线 CarPlay，保留有线，蓝牙引导 + Wi-Fi，5GHz 优先、2.4GHz 回退，不绕过 MFi。先打通首连，再优化；不与仪表地图项目混合。
+- MIB Toolbox 3.8、SSH、原厂蓝牙及热点已有。5GHz 真实硬件能力未知。最终 SD 安装、备份、校验、回滚需真实证据；目前禁止安装。
+- 项目事实以 GitHub 文件、提交、Actions 原始日志、明确来源的实车证据为准，不以聊天摘要或主观百分比为验收依据。
 
-## 1. 先纠正进度数字：正式主计划是 22 步，不是 25 步
+## 2. 当前状态和下一任务（R105.156 → 后续）
 
-- 当前仓库 README 与 `integration/mu1005_si_native/README.md` 明确使用 **22-step execution**。
-- 之前回复中的“25 步计划”没有在当前主分支找到对应的权威计划文件，属于错误计数，废止。
-- R95/R96 的“步骤 3–20”是更早一套离线集成/安装候选工作分解；它与当前 R105 的 22-step 原厂 Transport/owner 路线不是同一套编号，禁止把两套编号混合相加或互相换算。
-- R105.017–R105.020 是对 mm-ipod / libiap2client / Resource Manager 同一数据通道的连续深挖；R105.021–R105.026 是 AirPlay / Wi-Fi 数据面专项报告。这些 R105.x 小版本号不是新的主计划步骤。
+**下一任务：先核实 R105.156 的 reader-targets / boot-path 两路实际结果，再决定后续修改。** 当前连接器只返回 PR 触发的 commit runs，未找到此次 push workflow；不能认定运行完成或失败。可在 [Actions 工作流](../.github/workflows/r105156-config-reader.yml) 对应的 Actions 页面查询；若权限允许，按真实 run ID 检查 jobs、必要日志和 artifact。不重复触发已成功任务。
 
-### 22 步主计划当前状态（严格口径）
+- R105.156：[报告](R105156_CONFIG_READER_CN.md)。Bluetooth enableIap 已知调用链继续追踪 0x15619c → 0x21d814 / 0x21cc68，另核对 stage2 启动路径，避免再次全量 marker/ABI/NAS 扫描。
+- 若两路提供新 reader/路径证据，记录实际结果及仍缺的运行时生效证明；若无新证据，停止同类反复扫描，将只读配置路径、真实 reader、生效和受控回滚验证合并为一次实车探测待办，转向 RFCOMM/iAP2 真实接入、原厂 MFi、AP owner、AirPlay 首连。不允许以静态候选代替运行证据。
+- “首连配置第03步”按 R105.156 报告仍为 90%（研发估算，不是实车成功率）；它不是 22 步主表第03步 mm-ipod loader，不能混合编号。
+- 当前无已验证的真实无线 iPhone 端到端连接，无生产安装包。
 
+## 3. 最近关键证据（完整报告按需打开）
+
+| 版本 | 已知结果及范围 | 证据 |
+|---|---|---|
+| R105.144/145 | 15 路静态候选检查 11/15；下一调用链及失败搜索已记录；不是功能测试 | [144](R105144_15_FIRST_LINK_CN.md) / [145](R105145_FIRST_LINK_PATHS_CN.md) |
+| R105.149/150 | 8/8 及累计 12/12 host socket fixture；真实 TCP/Unix socket，radio/MFi/DIO witness 为模拟 | [149](R105149_LIVE_AP_CHAIN_CN.md) / [150](R105150_LIVE_AP_ORDER_CN.md) |
+| R105.152 | 原始 QNX job 140483784256 有双频回退标记及 exit0，workflow 曾红；artifact 15194312845；非真实 RF | [152](R105152_QNX_LIVE_AP_CN.md) / [154](R105154_CI_EVIDENCE_CN.md) |
+| R105.153 | 4/4 新增及 12/12 回归通过（仓库报告）；热点控制权仍需 OEM provider | [153](R105153_AP_OWNER_CN.md) |
+| R105.154 | R105.156 报告记录 31/31 原厂直接依赖在 fork 子进程 dlopen NOW 成功；旧 R105.151 31 次 SPAWN_FAIL 不算成功；不是 OEM 服务正常运行 | [154](R105154_CI_EVIDENCE_CN.md) / [156](R105156_CONFIG_READER_CN.md) |
+| R105.155 | 已直接查询 GitHub：host-fixture 和 qnx-read-only-probe 两项成功；报告记载 probe exit0，artifact 15196840612；未在实车运行 | [报告](R105155_CONFIG_PATH_CN.md) / [run 45995760126](https://github.com/roothongkong-ctrl/AU57x-R22-QNX65-Build/actions/runs/45995760126) |
+| R105.156 | 本轮确认源码已提交，push run 最终结果未核实 | [报告](R105156_CONFIG_READER_CN.md) / [commit](https://github.com/roothongkong-ctrl/AU57x-R22-QNX65-Build/commit/88b0ceace9e8da91b03f33188eb61f9271a2cc95) |
+
+R106 实车已有：原厂进程、2.4GHz AP association、有线 CarPlay 视频音频等证据；没有真实无线 CarPlay、真实无线 MFi、真实 5GHz 的成功证据。
+
+## 4. 固定22步主表及历史资料
+
+保持原22步编号。原交接只明确列出 01–06，07–22 尚未逐项映射，不虚构完整表或进度。
 | 主步骤 | 当前状态 | 已有证据 | 尚缺的闭环 |
 |---|---|---|---|
 | 01 外层 Transport ABI | STATIC REVIEW DONE | loader、7 个 OEM USB donor callback 槽位、ARM32 layout host gate | callback 原型/生命周期、运行时插件实例 |
@@ -31,127 +50,20 @@
 
 **当前有效结论：前 5 步完成的是静态审计/主机结构门禁，不是无线功能完成；第 6 步仍在进行；第 7–22 步没有在本轮整理中虚报完成。** 因此本文件不使用“10/22”“6/25”这类把报告数量当成生产步骤的进度数字。
 
-## 2. 现有成果地图：已做过什么，不要重做
+上表为 2026-11-26 历史静态基线，不能当作当前逐项重新验收结果。后续依据新增证据更新正式表，不按研发报告编号计算完成数。
 
-### A. 上游协议与无线引导
-- R103：复用 luka-dev 上游 iAP2 LinkEngine；host Rust/C bridge 测试通过。它是协议层，不是原厂 RFCOMM owner。
-- R45/R88/R89/R90/R91/R92/R93/R97/R98/R101/R102：已积累 MU1005 蓝牙、RFCOMM、HFP/SIM、thread/preload、SDP、MFi gate、EIR、owner handoff 等静态与 host 研究。
-- R87：参考 MHI2Q 的 Bluetooth-first bootstrap 已做成 owner-attested 模型；真实 MU1005 client-open/cancel callback 仍未绑定。
-- R100：factory/graft 选择与 owner 边界；不得禁用 MFi、替换原厂 btstack 或绕开认证。
-- 不能把 HFP=7、SIM=4 或其他 profile channel 直接当成 iAP2 SCN；真实 iAP2 SCN/owner 未证明。
+[上一版完整主交接（固定历史快照）](https://github.com/roothongkong-ctrl/AU57x-R22-QNX65-Build/blob/88b0ceace9e8da91b03f33188eb61f9271a2cc95/docs/MASTER_HANDOFF_AND_NO_REPEAT_RULES_CN.md)：包含 R45–R106、上游 LinkEngine、mm-ipod、ASI、SI/DIO、AirPlay、恢复事务、历史 CI 和防重复规则。旧版 R105.027 下一任务已过时，不再执行。专项报告均在仓库中按需读取，不搬入聊天。
 
-### B. mm-ipod / iAP2 client-server 深挖
-- R105.011–016：主步骤 01–06 的静态审计基础。
-- R105.017：`libiap2client.so.1` 的 `iap2_connect` 先 `open(path)` 再 `MsgSendv`；`iap2_raw_msg_send` 也走 QNX MsgSendv，不是直接 RFCOMM socket write。0x9999/0x3000 的服务端语义未闭环。
-- R105.018：`mm-ipod` 真实注册 QNX Resource Manager endpoint，配置 io_open/io_read/io_devctl 等 handler。
-- R105.019：`io_msg` 组装 QNX 消息后转给 device context `+0x24` callback；该 callback 的写入者尚未定位。
-- R105.020：`ipod_main` 顺序为 mount → ACP init → driver init → transport init；`device_transport_init` 通过 `iface_find("Transport")` 取插件并调用 iface `+0x14` 初始化。具体无线插件实例仍未知。
-- 下一条最短静态路线：找到 context `+0x24` callback 的初始化写入点，解析 0x9999/0x3000，再追到 `ipod-drvr-iap2.so` transport send/receive 和外层 Transport producer。
+## 5. 每轮研发必须同步 GitHub（减少会话长度）
 
-### C. AirPlay / Wi-Fi 数据面
-- R86：原厂 DIO → libairplay server/session delegate 两级注册结构已 SHA 固定；60/56-byte delegate layout 和 callback slots 已静态确认。
-- R105.021：修正旧依赖状态；`libcomm.so`、`libutil.so`、`libosal.so`、`libiplcommon.so` 已有哈希/加载器证据，不得重新列为缺失；`libirc_mmx_adapter.so` 也已从 ImageFS 提取。ASI IapDeviceServices raw bridge 已关闭。
-- R105.022：复用公开 MHI2Q Wi-Fi CarPlay 参考架构，提取 Bluetooth bootstrap → Wi-Fi AirPlay → iAP2 inside AirPlay session；禁止照搬 QC 的地址、接口名、GOT/offset。
-- R105.023：梳理 Event Channel 单读者/无 CSeq wire-order 风险与 Bluetooth bootstrap gap。
-- R105.024：复用 R86 delegate 证据；真实 session callback 是 `s_handleSessionControl @ 0x1594EC`，不再重新寻找 delegate owner。
-- R105.025：该 callback 将 CFLString/CFLDictionary 送入事件构造路径并等待结果；自身未见直接解码 iAPSendMessage。
-- R105.026：`0x159598` 是 event receiver 暂存/转交候选，tail-call `0x16DBE4`；函数语义和字段 schema 未完成。
-- 下一条最短静态路线：只分析 `0x16DBE4` 的函数边界、参数流、读写字段、下游 handler 和返回路径；确认后再决定是否接入 inner_airplay。不要重扫 R86 delegate。
+- 实际代码、测试、构建脚本、技术报告、CI 与可复用产物放仓库/Actions；聊天只汇报本轮关键变化、真实结果、阻塞、下一任务及链接。不要整段贴反汇编、完整日志、历史长表。
+- 每轮完成一个有效研发增量或拿到关键新结果后，**在回复用户前更新本主交接文件**：功能基线 SHA、版本、证据等级、run/job/artifact ID、当前阻塞和唯一下一任务。使用最新 blob SHA 防止覆盖并发修改；冲突先重读合并。纯文档提交不应重复触发无关 CI。
+- 主交接文件只保留当前快照和简明索引；长技术历史放专项报告和 Git 历史，不能每轮无上限追加。Actions artifact 可能过期：重要的脱敏结果与摘要长期写入仓库；原厂专有固件、密钥、账号、私人日志不得提交到公开仓库。
+- 独立工作可并行约15路、最多20路；以有效任务为准，不凑数量。已通过的同输入 CI 直接复用，除非相关输入变更、证据冲突或产物确实丢失。优先复用成熟 GitHub 源码及已有原厂文件；确实缺失才一次性列出路径/镜像/用途。
+- 区分 STATIC_CONFIRMED、HOST_TESTED、QNX_ARM_BUILT、QNX_GUEST_EXECUTED、VEHICLE_VERIFIED。编译、模拟或加载通过不等于真实服务运行，更不等于真实 iPhone 无线连接。保留原厂有线优先及 MFi；不将未知硬件能力写成已验证。
+- 安装门禁：installable=false；safe_to_flash=false；vehicle_verified=false；mfi_apple_verified=false；wireless_carplay_e2e=false。未取得真实首连和恢复证据前保持 NO INSTALL。
+- GitHub 写入失败或无法读取真实结果必须明确告知用户，不能宣称已同步/已通过。不会依赖会话即将耗尽时才交接，也不保证未运行的会话自动更新。
 
-### D. SI/DIO 与恢复
-- R71–R85：SI/DIO 单 owner、session epoch、媒体证据、Unix peer admission、START/STOP、wired takeover 和恢复屏障已存在源码/host tests；OEM 生产 callback 仍未绑定。
-- `inner_iap2.c`、`inner_socket.c`、`inner_airplay.c`、`cprx_service.c` 是可复用实现，不要另起一套 parser/IPC/lifecycle。
-- `inner_airplay` 的 host fake CFL 测试只验证适配器逻辑，不等于 OEM AirPlay callback 已经接入。
+## 6. 用户新对话只需发送
 
-### E. R95/R96 离线安装事务
-- R95：步骤 3–17 的 15/15 host contract tests 通过；若干使用 OEM/MFi mock。C transaction `trial/recover`、SHA/权限清单和 11 个边界/负面测试通过。
-- R96：主机 oneclick/rollback harness 与确定性 review ZIP 已完成；这不是车机生产 installer。生产进程 stop/start、真实 QNX 文件系统、启动健康检查和 boot recovery 未验证。
-- R95/R96 是旧离线计划与工具成果，可复用，不作为当前 22 步无线功能完成数。
-
-## 3. 实车已有证据（仅用来界定边界）
-
-R106 用户上传日志已分析：
-- QNX 6.5 / ARM / Tegra T30。
-- `btstack`、`bluetooth`、`smartphone_integrator` 进程运行；不等于 iAP2 RFCOMM 注册成功。
-- `uap0` AP channel 11 / 2.4 GHz active，并出现 station association；不等于 AirPlay 或 CarPlay 会话成功。
-- USB `mm-ipod -d iap2 -t usbdevice` 启动；`carplay0`、DIO AirPlay `_airplay._tcp`/5000、SI `CARPLAYVERIFIED`、视频 READY、音频播放均有强证据。这证明原厂有线 CarPlay 路径，不证明无线路径。
-- R106 OEM file copy 返回 0 个文件；不能据此说车机没有 OEM 文件。此前已上传的 app.img/固件/原厂 ELF 应优先复用。
-- 5GHz 硬件能力未知；保留“5GHz 优先、不可用回退 2.4GHz”的设计目标，但不得宣称硬件已支持。
-
-## 4. GitHub 能做与不能做的测试边界
-
-### 统一放到 GitHub Actions（不要求上车）
-1. C/C++ strict compile、静态链接/未解析符号检查、ELF class/arch/ABI 检查。
-2. 锁版本 QNX ARM cross compile/link；产物必须标记 QNX-target-built，不等于在车机运行。
-3. Rust iAP2 LinkEngine tests、C RFCOMM framing、iAP2 SYN/LSP/ACK 状态机测试。
-4. 模拟 BlueSDK/BT owner callback 的协议和生命周期测试（明确 HOST MOCK）。
-5. MFi 消息顺序/状态机 mock、拒绝路径、错误证书/超时测试；不能生成或伪造 Apple/OEM 凭据，也不能声称真 MFi 通过。
-6. Wi-Fi handover、2.4/5GHz capability policy、mDNS/DNS-SD、IP/端口发现模拟。
-7. AirPlay command envelope、CFDictionary/CFData fake adapter、event channel 单 reader、无 CSeq wire-order、背压/partial I/O/timeout/drop/reconnect 测试。
-8. SI/DIO AF_UNIX peer admission、generation/epoch/session、START/STOP、wired priority、rollback barrier 测试。
-9. SD manifest、SHA256、权限/路径穿越/符号链接检查、host trial/recover/boot-failure rollback 测试。
-10. ZIP 确定性、artifact manifest、SHA256、NO_INSTALL 标记和发布门禁。
-
-### 必须保留为真实设备/真实 iPhone 验收
-1. QNX 6.5 目标上实际加载/运行的 ABI、进程 owner、线程/回调、socket 与 Resource Manager 行为。
-2. BlueSDK 真实 RFCOMM 注册、iPhone 配对、真实 iAP2 握手和真实 OEM MFi 授权。
-3. 车机 AP 与 iPhone 的真实 association、DHCP/IP/Bonjour 发现、AirPlay session 建立。
-4. 真正 iAPSendMessage 双向数据、真实音视频、Siri/方向盘/MMI/仪表输出。
-5. USB 与无线互斥、断线/重启/恢复、真实 SD 写入与车机开机健康检查。
-
-GitHub 不能模拟真实 RF、Apple 设备认证、车机硬件、真实 QNX kernel/device drivers、真实 MFi credentials。QEMU/host mock 通过不得替代这些验收。
-
-## 5. 当前 GitHub CI 状态（截至本次整理）
-
-分支 HEAD：`2f5adce342796b7e8beeb122804cf730a373f588`。
-
-- Unified parallel development run `45808426661`：SUCCESS。包含 QNX ARM toolchain build、SI/CPRX ARM compile/link、6 个 host lanes（radio/media/stock-config/recovery/transport/authentication）、upstream graft 7/7、review artifact collection。
-- SI real CPRX integration run `45808426598`：SUCCESS。包含真实源码构建和 host lifecycle/callback 测试；其中 OEM callback 使用测试夹具，不能视为车机运行。
-- R105 host regression run `45805562311`：SUCCESS。Rust upstream tests、C framing、owner nonblocking gate、Step01–06 metadata gates、AirPlay envelope host fake test 均通过。
-- 早先 run `45803795533` 曾失败，原因是新增 shell command 的续行写法；修复后 `45805562311` 对应 workflow 已 SUCCESS。以后以修复后的 run 为准，不再重复跑旧失败版本。
-- 当前 branch HEAD 最新统一任务 run `45808426661` 和 SI run `45808426598` 均成功；报告文档提交不触发所有 workflow，除非匹配其 path filter。
-
-### CI 去重规则
-- 仅在相关源文件、构建脚本、工具链锁定版本或测试定义变更时运行对应 workflow。
-- 纯 Markdown 文档更新不跑编译和全量 host suites。
-- 仅测试脚本变更时运行该测试 lane，不重跑无关 QNX toolchain build。
-- 共享基础库变更才运行受影响的所有依赖 lane；release candidate 才跑一次全量矩阵。
-- CI artifact 带 commit SHA、toolchain SHA、source SHA、测试名称、HOST_MOCK/NO_INSTALL 范围标签。
-- 同一 commit 同一 workflow 的 SUCCESS 可复用；不得为了“给用户看”反复重跑。
-
-## 6. 研发防重复规则（必须执行）
-
-1. 每个发现写入本文件或其对应专项报告，并记录原厂文件 SHA、函数 VA、证据级别、CI run ID。
-2. 状态分四类：`STATIC_CONFIRMED`、`HOST_TESTED`、`QNX_ARM_BUILT`、`VEHICLE_VERIFIED`。禁止把前三级合并成最后一级。
-3. 对已 `STATIC_CONFIRMED` 的同一 ELF 哈希，不重扫同一函数/同一 relocation；只在新证据冲突时复核。
-4. 对已 `HOST_TESTED` 的同一 commit/test，不重复运行；代码变化只跑受影响 tests。
-5. 对已 `QNX_ARM_BUILT` 的同一源码和 toolchain SHA，不重复下载/重编；除非构建输入变化或 artifact 丢失。
-6. 不再向用户索取已经上传且哈希一致的 app.img、dio_manager、libairplay、mm-ipod、ipod-drvr-iap2、libiap2client、btstack 等文件。
-7. 只有确实缺失且不能从已交付固件/交接包恢复的精确文件，才一次性列出路径、文件名、所在镜像和用途。
-8. 每轮必须先提交真实源码/测试/构建改动；如果只做静态研究，要明确说没有新增功能代码，不把报告篇数当进度。
-9. 任何主机 mock 必须在报告和 CI 名称中标注 HOST MOCK；不允许让 mock 伪造 OEM owner/MFi/media witness 后触发生产成功状态。
-10. 安装包始终 fail-closed：没有生产 owner callback、真实恢复屏障、文件路径/哈希和 QNX 启动健康证明前，`installable=false`、`safe_to_flash=false`。
-
-## 7. 当前唯一下一任务（整理结束后的第一个开发任务）
-
-**R105.027：只拆解 MU1005 原厂 dio_manager VA `0x16DBE4`。**
-
-交付必须是：
-- 函数边界/大小/调用约定；
-- 输入参数和从 event 暂存区读取的字段；
-- 关键下游 call graph；
-- CFLString/CFLDictionary/response dictionary 的实际读写；
-- 是否能证明它处理 AirPlay control 命令，是否包含 iAPSendMessage 分支；
-- 如果不包含，继续追踪真实 iAP2 数据通道，不要强行把控制事件当 raw transport。
-
-本任务不重新跑 R86 delegate audit、不重跑 R105.017–020 已确认的 MsgSendv/ResMgr/loader 静态检查、不重复跑已通过 CI。只有新增 adapter/test code 后，才触发相关 GitHub workflow。
-
-## 8. 当前状态（不可越界）
-
-`installable=false`  
-`safe_to_flash=false`  
-`vehicle_verified=false`  
-`mfi_apple_verified=false`  
-`wireless_carplay_e2e=false`
-
-本文件整理完成不代表研发继续已获授权；用户明确要求先整理好再继续。后续先以本文件作为交接依据，等待用户确认后再开展 R105.027。
+> 继续无线 CarPlay 研发。读取 GitHub 仓库 roothongkong-ctrl/AU57x-R22-QNX65-Build，分支 mu1005-si-cprx-real-review 的 docs/MASTER_HANDOFF_AND_NO_REPEAT_RULES_CN.md，核实最新 HEAD 和相关测试，按最新下一任务继续；每轮更新交接文档，不重复研究。
