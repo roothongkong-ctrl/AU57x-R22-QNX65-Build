@@ -42,17 +42,30 @@ int cp_stock_mfi_bind(struct cp_stock_mfi *s,void *lib,
 static void release(struct cp_stock_mfi *s,uint8_t *ptr){
  if(ptr&&s->owner.release_oem)s->owner.release_oem(s->owner.opaque,ptr);
 }
+/* OEM call may block long enough for wired ownership or generation to
+ * change. Release the original allocation once even when revoked; never
+ * publish its bytes for a stale session. Serialized owner contract remains. */
+static int finish_oem(struct cp_stock_mfi *s,int r,uint8_t *owned,size_t size,
+ uint8_t *dst,size_t cap,size_t limit,size_t *n){
+ if(!cp_stock_mfi_live(s)){
+  release(s,owned);cp_stock_mfi_invalidate(s);return CP_STOCK_OWNER;
+ }
+ if(r!=0){release(s,owned);return CP_STOCK_VENDOR;}
+ if(!owned||!size||size>limit||size>cap){release(s,owned);return CP_STOCK_OVERFLOW;}
+ memcpy(dst,owned,size);release(s,owned);
+ if(!cp_stock_mfi_live(s)){
+  volatile uint8_t *p=dst;for(size_t i=0;i<size;i++)p[i]=0;
+  cp_stock_mfi_invalidate(s);return CP_STOCK_OWNER;
+ }
+ *n=size;return CP_STOCK_OK;
+}
 int cp_stock_mfi_cert(struct cp_stock_mfi *s,uint8_t *dst,size_t cap,size_t *n){
  uint8_t *owned=NULL;size_t size=0;int r;
  if(n)*n=0;
  if(!s||!dst||!n||!s->copy_certificate)return CP_STOCK_INVALID;
  if(!cp_stock_mfi_live(s))return CP_STOCK_OWNER;
  r=s->copy_certificate(&owned,&size);
- if(r!=0){release(s,owned);return CP_STOCK_VENDOR;}
- if(!owned||!size||size>CP_STOCK_CERT_MAX||size>cap){
-  release(s,owned);return CP_STOCK_OVERFLOW;
- }
- memcpy(dst,owned,size);release(s,owned);*n=size;return CP_STOCK_OK;
+ return finish_oem(s,r,owned,size,dst,cap,CP_STOCK_CERT_MAX,n);
 }
 int cp_stock_mfi_sign(struct cp_stock_mfi *s,const uint8_t *challenge,size_t len,
                       uint8_t *dst,size_t cap,size_t *n){
@@ -62,10 +75,6 @@ int cp_stock_mfi_sign(struct cp_stock_mfi *s,const uint8_t *challenge,size_t len
     !s->create_signature)return CP_STOCK_INVALID;
  if(!cp_stock_mfi_live(s))return CP_STOCK_OWNER;
  r=s->create_signature(challenge,len,&owned,&size);
- if(r!=0){release(s,owned);return CP_STOCK_VENDOR;}
- if(!owned||!size||size>CP_STOCK_SIGNATURE_MAX||size>cap){
-  release(s,owned);return CP_STOCK_OVERFLOW;
- }
- memcpy(dst,owned,size);release(s,owned);*n=size;return CP_STOCK_OK;
+ return finish_oem(s,r,owned,size,dst,cap,CP_STOCK_SIGNATURE_MAX,n);
 }
 void cp_stock_mfi_invalidate(struct cp_stock_mfi *s){if(s)memset(s,0,sizeof *s);}
