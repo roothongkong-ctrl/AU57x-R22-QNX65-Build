@@ -1,0 +1,2 @@
+# R105.105 四路并行推进
+R105.104 三路成功，真实配置临时文件生成、读回校验、字节恢复、源文件不变均已验证。slogf 有原厂与SDK动态导出候选，尚未证明在btstack加载范围内，不能计作实际链接。新增 provider-scope 直接复用报告追溯可达依赖；wifi-driver 真实驱动及能力字符串/接口证据；connectivity-launch 查原厂文本启动引用，排除ELF与提取器元数据。独立 QNX 运行线改用官方6.5 devf-ram/flashctl，在一次性虚拟机系统RAM中创建临时文件系统，完全绕开失败的io-blk块缓存；不改变首连真实AF_UNIX、认证、视频和退出状态断言。官方 https://www.qnx.com/developers/docs/6.5.0SP1.update/com.qnx.doc.neutrino_utilities/d/devf-ram.html 。新测试未通过前不计正式验收；所有产物 NO INSTALL。
