@@ -1,0 +1,47 @@
+name: ClusterCard R6 Type112 handshake descriptor with real TCP - NO INSTALL
+on:
+  push:
+    branches: [experiment/cluster-card-r6-112-handshake]
+    paths:
+      - 'experiments/cluster-compact-card/negotiation112/**'
+      - '.github/workflows/cluster-card-r6-negotiation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  handshake-lab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load real upstream v1.2.14 H264 state machine
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/mib-r6-core
+          curl -fsSL https://raw.githubusercontent.com/MacsInSpace/mib-cluster-map/v1.2.14/thirdparty/mhi2_altscreen_carplay/include/alt111.h -o /tmp/mib-r6-core/alt111.h
+          curl -fsSL https://raw.githubusercontent.com/MacsInSpace/mib-cluster-map/v1.2.14/thirdparty/mhi2_altscreen_carplay/src/alt111_video.c -o /tmp/mib-r6-core/alt111_video.c
+      - name: Compile handshake plus real network receiver with address/UB sanitizers
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcc -O1 -g -std=c99 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I/tmp/mib-r6-core -Iexperiments/cluster-compact-card/receiver112 \
+            experiments/cluster-compact-card/receiver112/c112_ingest.c \
+            /tmp/mib-r6-core/alt111_video.c \
+            experiments/cluster-compact-card/negotiation112/neg112.c \
+            experiments/cluster-compact-card/negotiation112/test_neg112.c \
+            -o /tmp/cluster-r6-neg112
+          for n in 1 2 3; do
+            ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 /tmp/cluster-r6-neg112
+          done
+      - name: Source-only reviewed bundle - no installable QNX binaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClusterCard-R6-HANDSHAKE-LAB-SOURCE-NO-INSTALL
+          path: |
+            experiments/cluster-compact-card/negotiation112/
+            experiments/cluster-compact-card/receiver112/
+          if-no-files-found: warn
+          retention-days: 14
