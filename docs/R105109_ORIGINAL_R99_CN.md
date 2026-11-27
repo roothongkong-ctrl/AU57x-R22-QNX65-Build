@@ -1,0 +1,2 @@
+# R105.109 原厂配置路线接入旧R99准备/验收工具
+复用早期mu1005_efs_launcher_stage原厂注释JSON解析器及R105.102精确字节差异。R99仅对CN原厂SHA专用分支保持注释格式，独立解析比较仅bluetooth.enableIap变化。iap2.cfg保持原样，原厂蓝牙和驱动SHA及标记仍必查，原始R99 verifier复用生成器检查完整stage和篡改拒绝。真实固件与旧fixture回归并行，不发布OEM原文，不安装。R105.108 QNX应答两路仍在运行，统一9项和源码5项回归通过。NO INSTALL。

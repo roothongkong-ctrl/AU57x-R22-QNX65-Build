@@ -60,6 +60,23 @@ def no_duplicates(pairs):
 def stage_bluetooth_json(raw: bytes) -> tuple[bytes, dict]:
     if len(raw) > MAX_FILE or b'\x00' in raw:
         raise ValueError('invalid original Bluetooth config')
+    # Exact original CN production configuration uses hash-commented JSON.
+    # Retain formatting and independently compare parsed semantics.
+    from mu1005_efs_launcher_stage import CONFIG_SHA, parse
+    if sha(raw) == CONFIG_SHA:
+        from mu1005_config_review import delta
+        import copy
+        before = parse(raw)
+        if before['bluetooth']['enableIap'] is not False:
+            raise ValueError('unexpected pinned original enableIap')
+        candidate, report = delta(raw)
+        expected = copy.deepcopy(before)
+        expected['bluetooth']['enableIap'] = True
+        if parse(candidate) != expected or report['line'] != 216:
+            raise ValueError('unexpected original config semantic change')
+        return candidate, {'selected_key':'bluetooth.enableIap [nested]',
+                           'before':False,'after':True,'preserved_original_format':True,
+                           'changed_line':216}
     try:
         config = json.loads(raw.decode('utf-8'), object_pairs_hook=no_duplicates)
     except (UnicodeError, json.JSONDecodeError) as exc:
