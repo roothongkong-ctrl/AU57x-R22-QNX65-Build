@@ -23,6 +23,9 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <time.h>
+#ifdef AU57X_AP_FIRST_LINK_TEST
+#include "ap_first_link_fixture.h"
+#endif
 struct original {
  int fd;
  uint32_t epoch,gen;
@@ -408,9 +411,15 @@ int main(void){
  r90_send_data(client,&w,iap_frame,iap_len,131);
  assert(s.wifi_request_pending&&!s.wireless_pending);
  o.hotspot=1;
+#ifdef AU57X_AP_FIRST_LINK_TEST
+ struct mu_ap_refresh_slot live_slot={0};
+ struct mu_ap_ie_lease live_lease={0};
+ struct ap_fixture live_fixture={0};
+ ap_handoff(&cloud,&live_slot,&live_lease,&live_fixture);
+#endif
  assert(cp_s4_wireless_pump(&s)==CP_WL_OK);
  assert(cp_s4_socket_poll(&w,133)==CP_LK_OK);
- assert(cp_encode_wifi_5703(&config.wifi,expected,sizeof expected,&size)==CP_OK);
+ assert(cp_encode_wifi_5703(&s.wireless.session->wifi,expected,sizeof expected,&size)==CP_OK);
  seq=observe_csm(client,expected,size);
  assert(s.wireless_pending);
  iap_len=r90_packet(iap_frame,0x40,48,seq,0,NULL,0);
@@ -444,7 +453,7 @@ int main(void){
  o.bonjour=1;
  assert(cp_s4_wireless_pump(&s)==CP_WL_OK);
  assert(cp_s4_socket_poll(&w,clock++)==CP_LK_OK);
- assert(cp_encode_start_4301(&config,expected,sizeof expected,&size)==CP_OK);
+ assert(cp_encode_start_4301(s.wireless.session,expected,sizeof expected,&size)==CP_OK);
  seq=observe_csm(client,expected,size);
  assert(s.wireless_pending&&cloud.handoff.phase==CP_HO_WIFI_ASSOCIATED);
  for(unsigned i=0;i<20;i++)drive_receiver(&cloud,&rx,clock++);

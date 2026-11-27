@@ -41,3 +41,20 @@ int mu_ap_refresh_commit(struct mu_ap_refresh_slot*s,struct cp_cloud_pipeline*p,
  struct verify_ctx v={s,fn,ctx};
  return cp_cloud_refresh_ap_config(p,&s->session,verify,&v);
 }
+
+/* Worker-only: use the existing stock AP snapshot and Device IE adapter
+ * before publishing a live configuration to the authenticated bootstrap.
+ * The caller owns the serialized OEM radio lease. A failed/uncertain write
+ * retains lease state for explicit recovery; never clear foreign slots. */
+int mu_ap_refresh_prepare_first_link(struct mu_ap_refresh_slot*s,
+ const struct cp_cloud_pipeline*p,struct mu_ap_ie_lease*lease,
+ const struct mu_ap_ie_ops*ops,const uint8_t bt[6],const uint8_t id[6]){
+ int r;
+ if(!s||!p||!lease||lease->state||!ops||!ops->query||!ops->exclusive)return CP_CLOUD_BAD;
+ r=mu_ap_refresh_prepare(s,p,ops->query,ops->ctx);
+ if(r!=CP_CLOUD_OK)return r;
+ if(s->band!=CP_RADIO_24||mu_ap_ie_install_first_free(lease,ops,&s->ap,bt,id)<0){
+  mu_ap_live_clear(s,sizeof *s);return CP_CLOUD_PROOF;
+ }
+ return CP_CLOUD_OK;
+}

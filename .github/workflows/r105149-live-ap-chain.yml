@@ -1,0 +1,33 @@
+name: R105.149 live AP adapter to full first-session TCP integration (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105149-live-ap-chain.yml, lab/mu1005_first_link_integration/**, integration/mu1005_si_native/ap_live/ap_refresh.*, tests/test_step5_integrated.c, ci/host_step5_live_ap.sh]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  first-session:
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        case: [0, 1, 2, 3, 4, 5, 6, 7]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test live AP config to peer ACK and first session on actual sockets
+        env:
+          AP_CASE: ${{ matrix.case }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          bash ci/host_step5_live_ap.sh | tee evidence/chain.log
+          grep -Fx "R105149_AP_HANDOFF_CASE_PASS $AP_CASE FIXTURE_ONLY" evidence/chain.log
+          grep -Fx STEP5_FIRST_AUTHENTICATED_SESSION_AND_IMMEDIATE_DISCONNECT_FIXTURE_PASS_NO_OEM evidence/chain.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r105149-live-ap-case-${{ matrix.case }}-NO-INSTALL
+          path: evidence/chain.log

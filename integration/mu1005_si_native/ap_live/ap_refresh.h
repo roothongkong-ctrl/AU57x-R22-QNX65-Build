@@ -17,4 +17,8 @@ typedef int (*mu_ap_verify_current)(void*,uint32_t,uint32_t,enum cp_radio_band,c
 int mu_ap_refresh_prepare(struct mu_ap_refresh_slot*,const struct cp_cloud_pipeline*,mu_ap_query,void*);
 int mu_ap_refresh_commit(struct mu_ap_refresh_slot*,struct cp_cloud_pipeline*,mu_ap_verify_current,void*);
 int mu_ap_refresh_clear(struct mu_ap_refresh_slot*,const struct cp_cloud_pipeline*);
+/* Worker stage: snapshot live AP and select/install its exact 2.4 GHz
+ * advertisement. Commit on serialized owner loop with independent current
+ * AP/IE proof, as before. Caller retains lease even on failure. */
+int mu_ap_refresh_prepare_first_link(struct mu_ap_refresh_slot*,const struct cp_cloud_pipeline*,struct mu_ap_ie_lease*,const struct mu_ap_ie_ops*,const uint8_t[6],const uint8_t[6]);
 #endif
