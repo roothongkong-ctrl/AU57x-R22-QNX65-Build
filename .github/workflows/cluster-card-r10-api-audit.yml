@@ -1,0 +1,47 @@
+name: R10 verify real MIB v1.2.14 card resize API (audit only)
+on:
+  push:
+    branches: [experiment/cluster-card-r10-card-size-api-audit]
+    paths:
+      - '.github/workflows/cluster-card-r10-api-audit.yml'
+      - 'experiments/cluster-compact-card/r10/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-audit:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [real-source, negative-control, r9-baseline]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reopen exact upstream v1.2.14 source
+        run: git clone -q --depth 1 --branch v1.2.14 https://github.com/MacsInSpace/mib-cluster-map.git /tmp/mib-v1214
+      - name: Run selected verification
+        shell: bash
+        env:
+          MODE: ${{ matrix.mode }}
+        run: |
+          set -euo pipefail
+          case "$MODE" in
+            real-source)
+              python3 experiments/cluster-compact-card/r10/check_upstream_card_controls.py /tmp/mib-v1214 --json
+              ;;
+            negative-control)
+              printf '\nCLUSTERMAP_CARPLAY_CARD_SCALE=70\n' >> /tmp/mib-v1214/config/gal_dualscreen.conf
+              if python3 experiments/cluster-compact-card/r10/check_upstream_card_controls.py /tmp/mib-v1214; then
+                echo "FAIL: fake unsupported card percent parameter went undetected"
+                exit 1
+              fi
+              echo "PASS: fake card-only option is not accepted as original"
+              ;;
+            r9-baseline)
+              g++ -std=c++11 -O2 -Wall -Wextra -Werror -pedantic \
+                experiments/cluster-compact-card/r9/test_r9.cpp -o /tmp/r9-test
+              /tmp/r9-test
+              ;;
+            *) exit 2;;
+          esac
+          echo "PASS R10/$MODE, RESEARCH ONLY, NO INSTALL"
