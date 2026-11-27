@@ -10,6 +10,10 @@ static int queued(AuRfIngress*s,uint8_t kind,const uint8_t*data,size_t n){
  w->len=n+8;s->tail=(s->tail+1)%AU_RF_QSIZE;++s->count;return 0;
 }
 void au_rf_init(AuRfIngress*s,AuRfSdkSend f,void*ctx){if(!s)return;memset(s,0,sizeof(*s));s->sdk_send=f;s->sdk_ctx=ctx;}
+int au_rf_enable_completion_ack(AuRfIngress*s){
+ if(!s||!s->sdk_send||s->failed||s->connected||s->generation||s->count||s->tx_busy||s->completion_ack_enabled)return -1;
+ s->completion_ack_enabled=1;return 0;
+}
 void au_rf_abort(AuRfIngress*s){if(!s)return;s->failed=1;s->connected=0;s->tx_cancelled=1;s->head=s->tail=s->count=0;/* Do NOT free busy SDK-owned storage before async completion. */}
 int au_rf_connected(AuRfIngress*s,const uint8_t peer[6]){
  if(!s||!peer||s->failed||s->connected||s->count||s->tx_busy)return -1;
@@ -66,6 +70,13 @@ int au_rf_send_complete(AuRfIngress*s,int ok){
  if(s->tx_receipt.sequence==UINT64_MAX){
   s->tx_busy=0;s->tx_len=s->tx_offset=s->tx_inflight=0;
   au_rf_abort(s);return -1;
+ }
+ /* Reuse the existing receiver's type-4, zero-length ACK format.
+  * Queue only after all SDK chunks complete. Queue exhaustion fails closed
+  * without publishing a successful local receipt. */
+ if(s->completion_ack_enabled&&queued(s,4,0,0)){
+  s->tx_busy=0;s->tx_len=s->tx_offset=s->tx_inflight=0;
+  return -1;
  }
  ++s->tx_receipt.sequence;
  s->tx_receipt.generation=s->generation;

@@ -1,4 +1,4 @@
-name: R105.182 route 3 existing RF full-frame receipt (NO INSTALL)
+name: R105.183 route 3 reuse existing type4 completion ACK (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -7,30 +7,30 @@ on:
 permissions:
   contents: read
 jobs:
-  rf-receipt:
+  ack-wire:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Test new full-frame receipt on existing RF ingress
+      - name: Test opt-in type4 ACK using existing sender and receiver
         run: |
           set -euxo pipefail
           s=project/source/legacy_mu1005/bluetooth
           l=lab/mu1005_route3_dispatch
-          cc -std=c99 -Wall -Wextra -Werror -fsanitize=undefined -I"$s" -I"$l" "$s"/mu1005_rf_ingress.c "$l"/test_rf_receipt.c -o "$RUNNER_TEMP/route3"
+          cc -std=c99 -Wall -Wextra -Werror -fsanitize=undefined -I"$s" -I"$l" -Iproject/source/src "$s"/{mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump}.c project/source/src/{cp_bt_bridge,cp_bt_stream,cp_step2_transport,cp_step2_ipc_link}.c "$l"/test_ack_wire.c -o "$RUNNER_TEMP/route3"
           "$RUNNER_TEMP/route3"
       - uses: ./.github/actions/mu1005-qnx-image
         with:
           require-cache: 'true'
-      - name: Compile updated existing RF ingress for QNX ARM
+      - name: Compile updated opt-in RF ACK for QNX ARM
         run: |
           set -euxo pipefail
           mkdir -p evidence
           docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -Iproject/source/legacy_mu1005/bluetooth -c project/source/legacy_mu1005/bluetooth/mu1005_rf_ingress.c -o /src/evidence/rf_receipt.o
           readelf -h evidence/rf_receipt.o | grep -E 'Machine:.*ARM'
-          echo ROUTE3_RF_RECEIPT_ARM_COMPILE_ONLY_NOT_LIVE
+          echo ROUTE3_ACK_ARM_COMPILE_ONLY_NOT_LIVE
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: R105182-ROUTE3-REVIEW-NO-INSTALL
+          name: R105183-ROUTE3-REVIEW-NO-INSTALL
           path: evidence/rf_receipt.o

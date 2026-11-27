@@ -26,6 +26,7 @@ typedef struct {
  size_t tx_len,tx_offset,tx_inflight,max_payload;
  AuRfSdkSend sdk_send;void *sdk_ctx;
  AuRfTxReceipt tx_receipt;
+ int completion_ack_enabled;
 } AuRfIngress;
 void au_rf_init(AuRfIngress*,AuRfSdkSend,void*);
 int au_rf_connected(AuRfIngress*,const uint8_t[6]);
@@ -36,6 +37,10 @@ int au_rf_take(AuRfIngress*,AuRfWire*);
 int au_rf_daemon_data(AuRfIngress*,const uint8_t*,size_t);
 int au_rf_send_complete(AuRfIngress*,int);
 void au_rf_abort(AuRfIngress*);
+/* Opt-in only BEFORE first connection; both endpoints must use existing
+ * cp_step2_ipc_link type-4 semantics and one outstanding submission.
+ * Default legacy wire format stays unchanged. No negotiation is implied. */
+int au_rf_enable_completion_ack(AuRfIngress*);
 /* Serialized owner only. Returns 1 for a new receipt of the current live
  * generation, 0 when absent. Never use an old receipt for a new submission.
  * Caller records sequence before sending, allows only one outstanding frame,
