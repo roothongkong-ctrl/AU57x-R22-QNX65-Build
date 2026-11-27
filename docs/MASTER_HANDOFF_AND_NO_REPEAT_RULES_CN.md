@@ -162,3 +162,6 @@ R105.163完整缓存验证run46010604447 2/2成功。job140544815944编译与保
 
 ## 23. R105.166 第8项四路方案
 R105.165 run46013467170 4/4及回归46013466993 4/4成功；原始日志 parser-a/b r3=0、parser-b UnicodeString8::utf8 0x117958、Provider附近JSONReader字样及snprintf 0x1280a8、fopen后fclose；未得到目标文件实参。用户同意四方向：锁定omonob原始源码接入点审查（不执行、不复制授权绕过）、已知UnicodeString与Provider对象/寄存器来源、精确原厂配置语义对比、QNX原厂libutil真实dlopen/dlsym预检和只读fixture哈希一致。复用已验证镜像，require-cache=true；未知C++对象布局/参数契约不得猜测调用，故本轮原厂parser只预检导出而非原厂parse执行，实际解析调用和文件关联仍待证。现有host对比复用原配置验证作为新预检基线，不以重复校验增加进度。4专项+4自动回归计划，第8项部分完成，第9项不启动。NO INSTALL。
+
+## 24. R105.167 第8项对象上游与真实解析库ABI
+R105.166 run46014286871：donor job140557318887、config-contract job140557318270、reader-object job140557319018成功。donor仅证明原方案有connectivity.json事务与btstack wrapper，不证明MU1005运行；原始配置对比只改exec，原厂parser未执行。原始指令parser-b 0x11799c r1=sl、0x1179a0 r2=sp+0x110、0x1179a4 r3=0、0x1179a8 r0=fp，sl来自UnicodeString utf8返回对象分支；0x117954 r1=[sp+0xe0]。Provider入口0x128058，构造0x1280f0 r1=sb来自[r8+8]、r2=r8来自[sl+8]，初始r8=r1、sl=r2。新专项追踪0x128058直接调用者、sp+dc/e0写入及原厂libutil.so真实定义的构造/析构/parseFileToArray ABI。只保留静态证据，不猜对象尺寸或执行未知ABI，不重复R105.165/166。现有native-preflight job140557318911仍运行，已进入缓存后的QEMU环境步骤；新增2路专项加4路自动回归及现有1路，预算7。第8项未完成，下一项未开始。若无上游关联，停止同类扫描，采用原厂只读运行证据。NO INSTALL。
