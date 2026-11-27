@@ -1,0 +1,2 @@
+# R105.098 原厂库实际符号验证
+R105.097 dependency job 140268035313 success，31依赖25已有候选，剩余 libc.so.3/libecpp-ne.so.4/libm.so.2/libsocket.so.3/libnvos.so/libnvrm.so。libcomm/libosal/libutil/libiplcommon 位于 stage2/eso/lib，libicuuc 位于 app70/eso/lib，libnvaudio 仍两份不同哈希。新增独立原厂 btstack 强导入与真实库动态符号匹配任务，按 R105.097 证据路径和 SHA 重验，不把名称匹配当 ABI 验证，不执行 OEM，不替代 MFi。复用原 GitHub archive，不再访问 NAS；4个 SDK 候选及2个 NVIDIA 依赖仍不能认定原厂匹配。测试待结果，NO INSTALL。
