@@ -1,0 +1,73 @@
+name: R9 original white card 70pct on MIB v1.2.14 (SOURCE ONLY)
+on:
+  workflow_dispatch:
+  push:
+    branches: [experiment/cluster-card-r9-single-stream-overlay]
+    paths:
+      - '.github/workflows/cluster-card-r9-real-player.yml'
+      - 'experiments/cluster-compact-card/r9/**'
+permissions:
+  contents: read
+jobs:
+  test:
+    name: ${{ matrix.scenario }} / ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        scenario: [card-yuv-and-failclosed, stock-v1214-compile, stock-v1214-patch-diff]
+        compiler: [gcc-debug, gcc-release, gcc-sanitize, clang-release]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install player compile dependencies
+        if: matrix.scenario == 'stock-v1214-compile'
+        run: |
+          for f in /etc/apt/sources.list.d/*; do
+            if [ -f "$f" ] && grep -q 'packages.microsoft.com' "$f"; then sudo rm -f "$f"; fi
+          done
+          sudo apt-get -qq update
+          sudo apt-get -qq -y install libgles2-mesa-dev libglfw3-dev libavcodec-dev libavformat-dev libavutil-dev
+      - name: Run code and original player tests
+        shell: bash
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+          COMPILER: ${{ matrix.compiler }}
+        run: |
+          set -euo pipefail
+          CXX=g++
+          FLAGS="-O0 -g"
+          case "$COMPILER" in
+            gcc-debug) FLAGS="-O0 -g";;
+            gcc-release) FLAGS="-O2 -g";;
+            gcc-sanitize) FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer";;
+            clang-release) CXX=clang++;FLAGS="-O2 -g";;
+            *) exit 2;;
+          esac
+          cd experiments/cluster-compact-card/r9
+          mkdir -p /tmp/r9
+          case "$SCENARIO" in
+            card-yuv-and-failclosed)
+              $CXX -std=c++11 -Wall -Wextra -Werror -pedantic $FLAGS test_r9.cpp -o /tmp/r9/card-test
+              /tmp/r9/card-test
+              ;;
+            stock-v1214-compile|stock-v1214-patch-diff)
+              git clone --quiet --depth 1 --branch v1.2.14 https://github.com/MacsInSpace/mib-cluster-map.git /tmp/r9/upstream
+              cp compact_card_r9.h /tmp/r9/upstream/player/
+              python3 inject_v1214.py /tmp/r9/upstream/player/opengl_gpu.cc
+              git -C /tmp/r9/upstream diff --check
+              grep -Fq "if (g_bufferedReader && w == 800 && h == 298)" /tmp/r9/upstream/player/opengl_gpu.cc
+              test "$(git -C /tmp/r9/upstream diff --name-only)" = "player/opengl_gpu.cc"
+              if [ "$SCENARIO" = stock-v1214-patch-diff ]; then
+                echo "PASS: exact upstream one-source-only patch (no changes to Audi stock files)"
+              else
+                cd /tmp/r9/upstream
+                $CXX -std=gnu++11 $FLAGS -Wall -Wextra -Wno-unused-function -Wno-deprecated-declarations -Iplayer -c player/opengl_gpu.cc -o /tmp/r9/player.o
+                test -s /tmp/r9/player.o
+                echo "PASS: actual upstream v1.2.14 player compiles with R9 (host only)"
+              fi
+              ;;
+            *)exit 2;;
+          esac
+          echo "PASS $SCENARIO / $COMPILER -- no live iPhone map-only feed, no QNX ARM build"
