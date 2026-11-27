@@ -1638,5 +1638,16 @@ static void r87_cloud_bootstrap(void){
  reset_fixture();
 }
 
+#ifdef MU1005_QNX_FIRST_LINK_FIXTURE
+/* Same first-video state machine and AF_UNIX transaction as the host test.
+ * Radio, original MFi and native DIO callbacks remain explicit fixtures. */
+int main(void){
+ native_remote_owner_cloud_pipeline();
+ puts("MU1005_QNX_FIRST_LINK_PIPELINE_PASS_FIXTURE_ONLY");
+ return 0;
+}
+#else
 int main(void){r87_cloud_bootstrap();successful_dual_fallback();only_24();revoked_mfi_no_new_ap();no_cert_no_radio();radio_to_airplay_proof();automatic_native_carplay_start();native_dio_bound_pipeline();native_rx_media_contract();native_graceful_stop_protocol();native_graceful_pipeline_end();native_si_owner_loss_recovery();native_abandoned_mutation_rollback();native_remote_process_boundary();native_r83_corrupt_session_snapshot();native_remote_owner_cloud_pipeline();native_r85_wired_remote_rollback();
  puts("AU57X_R47_CLOUD_04_05_06_07_08_09_OWNER_GATES_PASS");return 0;}
+
+#endif

@@ -1,0 +1,2 @@
+# R105.085 一次云端联合首次连接
+复用已验证 QNX joint ARM 工具链及实际 io-pkt 网络环境，原有 BT fixture 之后以同一 revision 源码编译并运行 cp_cloud_drive_first_connect 完整路径；实际 AF_UNIX socket、iAP2 ACK envelope、远端 DIO START/status 与 first-video witness，允许音频和控制尚未开始。明确原厂/MFi/射频/视频回调仍是 fixture，不声明真正手机接通。另修复 SDK 搜索仅依赖 GCC -print-file-name 的漏查，直接从现有 qemu-run.sh 已证实的 target/armle-v7/lib 和 usr/lib 获取精确名候选（不作为 OEM 替代）。NAS 原下载任务仍进行中，提取任务等待，未取得完整原厂依赖，不能运行真实 btstack。所有并行任务按 push path 触发，非保证同时执行。没有安装或车辆写入。

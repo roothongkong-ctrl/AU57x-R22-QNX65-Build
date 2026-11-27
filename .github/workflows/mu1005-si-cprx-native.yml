@@ -107,7 +107,11 @@ jobs:
             set -eu
             C=arm-unknown-nto-qnx6.5.0eabi-gcc
             for n in libxml2.so.1 libicuuc.so.58 libz.so.2 libcomm.so libosal.so libutil.so libiplcommon.so libecpp-ne.so.4 libc.so.3 libm.so.2 libsocket.so.3; do
+              T=/opt/qnx650/target/qnx6/armle-v7
               f=$("$C" -print-file-name="$n")
+              # GCC -print-file-name does not include every QNX target lib.
+              if test -f "$T/lib/$n"; then f="$T/lib/$n"
+              elif test -f "$T/usr/lib/$n"; then f="$T/usr/lib/$n"; fi
               if test -f "$f"; then cp -L "$f" ".oem-sdk-candidates/$n"; else
                 echo "SDK_EXACT_NAME_MISSING:$n"
               fi

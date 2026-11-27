@@ -82,6 +82,23 @@ jobs:
           grep -F 'R105057_JOINT_OWNER_RFCOMM_TWO_SESSIONS_PASS_FIXTURE_ONLY_NO_INSTALL' qnx-runtime-evidence/bt-joint-runtime.log
           grep -E 'Process [0-9]+ \(mu1005-bt-joint\) exited status=0' qnx-runtime-evidence/bt-joint-serial.log
           printf '%s\n' "revision=$GITHUB_SHA" 'QNX ARM real TCP and pthread, RFCOMM fixture events, no OEM attachment, no radio, no installation' > qnx-runtime-evidence/result.txt
+      - name: Execute single first-connect pipeline through video on actual QNX ARM
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            set -eux
+            c=project/source/src
+            a=project/source/legacy_mu1005/airplay
+            b=project/source/legacy_mu1005/bluetooth
+            arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -Wno-unused-function -O2 -DMU1005_QNX_FIRST_LINK_FIXTURE -Wl,-E -I"$c" -I"$a" -I"$b" tests/test_cloud_pipeline.c "$c"/{cp_cloud_pipeline,cp_wcp_autoconnect,cp_wcp_handoff,cp_radio_policy,cp_session_handoff,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_oem_boundary,cp_wireless,cp_event,cp_csm}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" -lsocket -lc -o qnx-runtime-evidence/mu1005-first-link
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW qnx-runtime-evidence/mu1005-first-link
+          ' 2>&1 | tee qnx-runtime-evidence/first-link-build.log
+          export QNX_TEST_INNER_LIB="$PWD/previous-native/payload/libmu1005_inner_iap2_review.so"
+          QEMU_KEEP_LOG="$PWD/qnx-runtime-evidence/first-link-serial.log" QEMU_TIMEOUT=120 QEMU_RUN_SECS=75 sh toolchain/tests/qemu-run.sh "$PWD/qnx-runtime-evidence/mu1005-first-link" 8.5 2>&1 | tee qnx-runtime-evidence/first-link-runtime.log
+          grep -F 'PASS first-connect remote AirPlay: inner auth, BT release, video before optional channels' qnx-runtime-evidence/first-link-runtime.log
+          grep -F 'MU1005_QNX_FIRST_LINK_PIPELINE_PASS_FIXTURE_ONLY' qnx-runtime-evidence/first-link-runtime.log
+          grep -E 'Process [0-9]+ \(mu1005-first-link\) exited status=0' qnx-runtime-evidence/first-link-serial.log
+          printf '%s\n' 'FIRST_LINK_PIPELINE_EXECUTED_ON_QNX; OEM callbacks/radio/MFi/video are fixtures; no phone or display' > qnx-runtime-evidence/first-link-result.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
