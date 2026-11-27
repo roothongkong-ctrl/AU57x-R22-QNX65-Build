@@ -69,7 +69,8 @@ jobs:
           set -euo pipefail
           /tmp/mu1005-extract-venv/bin/pip install capstone==5.0.3 pyelftools==0.31
           /tmp/mu1005-extract-venv/bin/python lab/mu1005_iap_callchain/callchain.py --selftest
-          /tmp/mu1005-extract-venv/bin/python lab/mu1005_iap_consumer/trace.py "${RUNNER_TEMP}/combined" evidence/iap-callchain.json
+          /tmp/mu1005-extract-venv/bin/python lab/mu1005_iap_callchain/callchain.py "${RUNNER_TEMP}/combined" evidence/iap-callchain.json
+          python3 -c 'import json; d=json.load(open("evidence/iap-callchain.json")); assert d["scope"]=="STATIC_DIRECT_CALL_CANDIDATES" and d["anchor"]=="0x1562f4" and d["nearby_calls"]; print("REAL_IAP_CALLCHAIN_EVIDENCE_OK")'
       - uses: actions/upload-artifact@v4
         if: always()
         with:

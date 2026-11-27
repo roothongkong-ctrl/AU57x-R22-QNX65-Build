@@ -1,0 +1,48 @@
+name: R105.143 SDK link execution repair (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105143-sdk-retry.yml, lab/mu1005_sdk_retry/**]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  sdk-link-boundary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned public toolchain only (no QEMU)
+        run: |
+          set -euxo pipefail
+          mkdir -p qnx-runtime-evidence
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+      - uses: actions/cache/restore@v4
+        id: gnu-cache
+        with:
+          path: ~/.cache/au57x-gnu
+          key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
+      - name: Configure reusable compiler build cache
+        uses: docker/setup-buildx-action@v3
+      - name: Build verified toolchain
+        run: |
+          set -euxo pipefail
+          bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee qnx-runtime-evidence/gnu.log
+          docker buildx build --load --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 --cache-from type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1 --cache-to type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1,mode=min,ignore-error=true -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee qnx-runtime-evidence/compiler.log
+          docker run --rm --platform linux/amd64 qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc --version | tee qnx-runtime-evidence/compiler-version.log
+      - name: Try direct real SDK archive member linkage and preserve error
+        run: |
+          mkdir -p qnx-runtime-evidence
+          bash lab/mu1005_sdk_retry/sdk_link.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r105143-sdk-link-NO-INSTALL
+          path: |
+            qnx-runtime-evidence/sdk-link.log
+            qnx-runtime-evidence/sdk-result.txt

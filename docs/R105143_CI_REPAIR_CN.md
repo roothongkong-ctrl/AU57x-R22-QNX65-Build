@@ -1,0 +1,3 @@
+# R105.143 CI execution repair (NO INSTALL)
+R105.142 run 45985172175 job 140458817450 was green but actual firmware step invoked old trace.py, only new selftest ran. Fix command and require exact callchain schema, anchor and nonempty nearby calls. No new static result claimed until run.
+R105.140 run 45984378652 SDK job 140456114423 built GCC successfully but had empty script output and 303-byte evidence ZIP. Root cause inferred from missing docker -i on heredoc. Fix interactive stdin, explicitly use bash entrypoint, assert entry marker and trace commands. Independent retry only, no re-run of completed native endpoint scan. No OEM process readiness, no MFi or wireless connection claimed. Acceptance still 5/10.
