@@ -127,3 +127,9 @@ jobs:
           cc -std=c99 -O2 -Wall -Wextra -Werror -DTRACE_LATCH_STANDALONE -I"$b" "$b/bt_trace_latch.c" tests/test_bt_trace_latch.c -o "$RUNNER_TEMP/latch"
           "$RUNNER_TEMP/latch" | tee latch.log
           grep -F MU1005_TRACE_LATCH_COALESCING_PASS_FIXTURE_ONLY latch.log
+      - name: Trace before startup and bounded leased retry
+        run: |
+          set -euxo pipefail
+          b=project/source/legacy_mu1005/bluetooth
+          cc -std=c99 -O2 -Wall -Wextra -Werror -DSTARTUP_WATCH_STANDALONE -I"$b" "$b"/{bt_startup_watch,bt_trace_latch,bt_startup_snapshot}.c tests/test_bt_startup_watch.c -o "$RUNNER_TEMP/watch"
+          "$RUNNER_TEMP/watch"
