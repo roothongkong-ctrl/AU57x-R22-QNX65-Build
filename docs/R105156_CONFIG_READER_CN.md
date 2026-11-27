@@ -1,0 +1,2 @@
+# R105.156 第03步原厂 reader 最后一次定向追踪
+R105.155 45995760126 两项通过，QNX probe 真正 exit0，artifact 15196840612。R105.154 三组 31/31 直接依赖 dlopen NOW 在 fork 子进程中实际成功，不能证明原厂进程正常运行。R105.145 已定位 Bluetooth enableIap caller -> 0x15619c -> 0x21d814 / 0x21cc68，停止重复标记扫描，直接解码尚未处理的两个 callee entry，附已确认直接依赖中的 config/property/setting 导出候选；另外只检查 stage2 文字启动配置中的路径操作语句，不输出原厂文件内容。两项独立证据，不伪造 config reader、实际挂载或无线成功。R105.155 只读产物可复用，不重复编译。若无真实 reader 证明，第03步保留90%，实车确认才可收口。
