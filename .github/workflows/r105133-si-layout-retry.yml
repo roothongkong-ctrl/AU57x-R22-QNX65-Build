@@ -1,4 +1,4 @@
-name: R105.133 retry SI layout with isolated apt and linker evidence (NO INSTALL)
+name: R105.135 SI pinned SDP runtime dependency trial (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -88,6 +88,10 @@ jobs:
           fi
           qemu-system-arm --version | tee qnx-runtime-evidence/qemu-version.log
           sha256sum toolchain/tests/qemu/{startup-virt,libstartup.a,devc-serdebug,u-boot.bin} toolchain/tests/qemu-run.sh | tee qnx-runtime-evidence/boot-inputs.sha256
+      - name: Verify and stage missing QNX SDP runtime for isolated guest
+        run: |
+          set -euo pipefail
+          python3 lab/mu1005_runtime_diagnosis/stage_si_sdk.py toolchain "$RUNNER_TEMP/oem-launch-private" qnx-runtime-evidence/sdk-candidate.json qnx-runtime-evidence/staged.json
       - uses: actions/cache/restore@v4
         id: gnu-cache
         with:
@@ -132,9 +136,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r105133-si-layout-evidence-NO-INSTALL
+          name: r105135-si-sdk-runtime-evidence-NO-INSTALL
           path: |
             qnx-runtime-evidence/staged.json
             qnx-runtime-evidence/*-result.txt
             qnx-runtime-evidence/linker.json
+            qnx-runtime-evidence/sdk-candidate.json
           retention-days: 30

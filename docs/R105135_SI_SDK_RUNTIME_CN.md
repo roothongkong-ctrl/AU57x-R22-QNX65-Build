@@ -1,0 +1,2 @@
+# R105.135 SI 缺库定向试验（NO INSTALL）
+R105.133 run 45976294961 真实 QNX 结果：SI exit1，linker 分类为 libecpp-ne.so.4 缺失。原始固件 staging missing1/ambiguous0。锁定原先使用的 luka-dev/qnx65-armv7-toolchain commit baa45224f18ae6b13c2e9c77c6663bb8181eb6a1 的 SDP ARMv7 lib/libecpp-ne.so.4，Git blob a01457f59746ed4914108046dd5bf5a308989c99。仅实验 guest：校验原始报告、blob、ARM32 shared ELF、SONAME 和直接依赖，禁止覆盖原厂库，独立记录 SDK 来源和 SHA256。未宣称 ABI 与原车相同，不安装，不改变认证。只重试 SI lane；R105.134 独立实验保持运行。若缺失新依赖或仍退出，保留真实错误并继续定向修复。
