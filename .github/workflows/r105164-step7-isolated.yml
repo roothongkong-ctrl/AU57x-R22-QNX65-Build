@@ -1,0 +1,79 @@
+name: R105.164 step 7 isolated QNX cases cached compiler (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105164-step7-isolated.yml, lab/mu1005_step7_isolated/**]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  qnx-shell-argv:
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - {case: none, id: 1}
+          - {case: missing, id: 2}
+          - {case: exit, id: 3}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for existing compiler image validation, never rebuild here
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          timeout 1800 gh run watch 46010604447 --repo "$GITHUB_REPOSITORY" --exit-status --interval 20
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - run: mkdir -p qnx-runtime-evidence
+      - name: Fetch locked public QNX boot environment and QEMU
+        run: |
+          set -euxo pipefail
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          for f in startup-virt libstartup.a devc-serdebug u-boot.bin; do test -s "toolchain/tests/qemu/$f"; done
+          if ! command -v qemu-system-arm >/dev/null; then
+            aptopts=(-o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+            sudo apt-get "${aptopts[@]}" update -qq
+            sudo apt-get "${aptopts[@]}" install -y -qq qemu-system-arm
+          fi
+          qemu-system-arm --version | tee qnx-runtime-evidence/qemu-version.log
+          sha256sum toolchain/tests/qemu/{startup-virt,libstartup.a,devc-serdebug,u-boot.bin} toolchain/tests/qemu-run.sh | tee qnx-runtime-evidence/boot-inputs.sha256
+      - name: Execute existing wrapper in actual QNX guest with harmless target
+        run: |
+          set -euo pipefail
+          mkdir -p qnx-runtime-evidence/step7
+          python3 lab/mu1005_step7/argv_test.py render-qnx qnx-runtime-evidence/step7/step7-wrap
+          for name in step7-target step7-supervisor; do
+            flags=(-DSTEP7_CASE_ID=${{ matrix.id }})
+            if [ "$name" = step7-target ]; then flags+=(-DTARGET); fi
+            docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 "${flags[@]}" lab/mu1005_step7_isolated/qnx_argv.c -o "qnx-runtime-evidence/step7/$name"
+          done
+          chmod +x qnx-runtime-evidence/step7/step7-wrap
+          python3 lab/mu1005_step7/extend_runner.py toolchain/tests/qemu-run.sh
+          export STEP7_FIXTURE="$PWD/qnx-runtime-evidence/step7"
+          QEMU_KEEP_LOG="$PWD/qnx-runtime-evidence/serial.log" QEMU_TIMEOUT=85 QEMU_RUN_SECS=35 sh toolchain/tests/qemu-run.sh "$STEP7_FIXTURE/step7-supervisor" 8.5 | tee qnx-runtime-evidence/runtime.log
+          grep -F 'R105164_QNX_ISOLATED_ARGV_PASS_NO_OEM' qnx-runtime-evidence/serial.log
+          grep -E 'Process [0-9]+ \(step7-supervisor\) exited status=0' qnx-runtime-evidence/serial.log
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          s=Path("qnx-runtime-evidence/serial.log").read_text()
+          a=dict(re.findall(r"STEP7_TARGET (\w+) pid=(\d+)",s))
+          b=dict(re.findall(r"STEP7_QNX_ARGV_PASS (\w+) pid=(\d+)",s))
+          assert set(a)=={"${{ matrix.case }}"} and a==b,(a,b)
+          print("R105164_QNX_ISOLATED_SAME_PID_PASS")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r105164-step7-qnx-${{ matrix.case }}-evidence
+          path: qnx-runtime-evidence/*.log
