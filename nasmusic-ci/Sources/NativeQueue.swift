@@ -4,7 +4,15 @@ import MediaPlayer
 import UIKit
 
 @MainActor final class NativeQueue: NSObject {
-    static let base = URL(string:"https://example.invalid:1232")!
+    // The unsigned CI package may be personalized privately before signing.
+    static let base: URL = {
+        if let raw = Bundle.main.object(forInfoDictionaryKey: "NASMusicServerURL") as? String,
+           let c = URLComponents(string: raw), c.scheme == "https",
+           let host = c.host, !host.isEmpty, c.user == nil, c.password == nil,
+           c.query == nil, c.fragment == nil, c.path.isEmpty,
+           let url = c.url { return url }
+        return URL(string:"https://example.invalid:1232")!
+    }()
     static func allowed(_ u: URL) -> Bool { u.scheme == "https" && u.host == base.host && u.port == base.port && u.user == nil && u.password == nil && ["/api/music/play-file","/api/music/private-audio"].contains(u.path) }
     struct Track: Codable {
         var slot: Int; var title: String; var artist: String; var duration: Double?
