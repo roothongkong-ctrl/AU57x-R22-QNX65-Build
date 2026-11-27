@@ -277,3 +277,6 @@ run46033436233两路SUCCESS：job140622748616 artifact15215541990，实际合并
 
 ## 61. R105.196 用户实车日志直接复用
 用户上传001(7).zip，已实际解压核对20快照及路径、挂载、argv。详见docs/R105196_R106_LIVE_PATH_CN.md。此前观察工具不再要求单独实车运行；实际缺项留到最终同次验收。根据真实pidin ar布局修复已有trial.sh进程判断，查询失败不再误当有线未运行，实际命令名而不是任意token，单次采样。专项1路（新格式），旧5路只手动，不重跑已验证固件生成恢复。没有原厂真实配置消费、owner或无线证据，35/66限定完成，新6/8/9均未100%。NO INSTALL。
+
+## 62. R105.197 用户批准15项集中决策，补齐队列dispatch生命周期边界
+用户回复1，15项推荐全部批准，详情docs/R105197_USER_DECISIONS_CN.md。今后已定方向无需重复问；共同核心问题仍要完成真实provider，不可用选择代替证据。R105.196两workflow SUCCESS。修复真实代码：原有producer持lease但AO dispatch未持有，现mu_bt_pulse_dispatch_leased非阻塞取得同一lease并覆盖owner/service验证及SDK dispatch；关闭中失效则跳过，start/retire owner检查在lease内。明确真实原厂stop/destruction provider尚未实现，非阻塞lease禁止假证据。1项新增专项加自动回归，35/66限定完成，新6/8/9未100%，NO INSTALL。

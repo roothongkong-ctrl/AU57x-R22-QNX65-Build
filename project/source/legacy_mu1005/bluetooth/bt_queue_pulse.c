@@ -10,6 +10,17 @@ int mu_bt_pulse_execute(MuBtPulse*p,int(*run)(void*),void*ctx){
  if(!p||!run||!__sync_bool_compare_and_swap(&p->pending,1u,2u))return 0;
  return load(&p->active)==1u&&run(ctx)==1?1:0;
 }
+/* Nonblocking lifetime acquisition on OEM dispatch. Never wait for a
+ * shutdown thread that may be joining this AO. All reads and calls in
+ * run() must use this lease, not recursively acquire it. */
+int mu_bt_pulse_dispatch_leased(MuBtPulse*p,int(*enter)(void*),void(*leave)(void*),void*lease,
+ int(*run)(void*),void*ctx){
+ if(!p||!enter||!leave||!run||load(&p->active)!=1u||enter(lease)!=1)return 0;
+ int rc=0;
+ if(load(&p->active)==1u)rc=run(ctx)==1;
+ leave(lease);
+ return rc;
+}
 void mu_bt_pulse_release(MuBtPulse*p){if(p)__sync_lock_release(&p->pending);}
 void mu_bt_pulse_disable(MuBtPulse*p){if(p)__sync_lock_release(&p->active);}
 int mu_bt_pulse_idle(MuBtPulse*p){return p&&load(&p->pending)==0;}
@@ -32,7 +43,7 @@ static struct {
  int attempted,started,stopped,held,valid_share,bootstrap_needed;
 } q;
 static uint32_t tid(void){return (uint32_t)(uintptr_t)pthread_self();}
-static int dispatch(void*p){
+static int dispatch_under_lease(void*p){
  (void)p;
  /* Never treat the startup thread's authority as event thread authority. */
  if(tid()!=q.thread.tid||!q.b.owner.owner_ready||
@@ -48,6 +59,11 @@ static int dispatch(void*p){
   q.bootstrap_needed=0;
  }
  return mu_bt_notify_periodic_dispatch()==0;
+}
+static int dispatch(void*p){
+ (void)p;
+ if(tid()!=q.thread.tid)return 0;
+ return mu_bt_pulse_dispatch_leased(&q.pulse,q.b.enter,q.b.leave,q.b.lease_context,dispatch_under_lease,NULL);
 }
 static int run(void*p){(void)p;(void)mu_bt_pulse_execute(&q.pulse,dispatch,NULL);return 0;}
 static int matches(void*p,const void*other){(void)p;(void)other;return 0;}
@@ -107,8 +123,8 @@ static int begin(const MuBtQueuePulseBinding*b,const MuBtNotifyBinding*boot,int(
     boot->owner.comm_load_bias!=o->comm_load_bias||
     !boot->proof.original_image_verified||boot->proof.original_image_verified(boot->proof.opaque)!=1||
     au100_route_select(boot->proof.route_evidence)!=AU100_GRAFT_RFCOMM_ROUTE))return -1;
- if(!boot&&o->owner_ready(o->opaque)!=1)return -1;
  if(b->enter(b->lease_context)!=1)return -1;
+ if(!boot&&o->owner_ready(o->opaque)!=1){b->leave(b->lease_context);return -1;}
  /* Use the actual initialized stock instance instead of requiring an
   * externally guessed pointer. Resolve under the existing lifetime lease.
   * Copy both bindings; q stores them by value before this call returns. */
@@ -168,8 +184,8 @@ int mu_bt_queue_pulse_stop(void){
 }
 int mu_bt_queue_pulse_retire(void){
  if(!q.held||!q.valid_share||!q.stopped||!mu_bt_pulse_idle(&q.pulse)||tid()!=q.thread.tid||
-    q.b.owner.owner_ready(q.b.owner.opaque)!=1||q.b.enter(q.b.lease_context)!=1)return -1;
- if(!mu_bt_osapi_identity_matches(&q.thread,tid(),q.b.owner.read_live,q.b.owner.opaque)){
+    q.b.enter(q.b.lease_context)!=1)return -1;
+ if(q.b.owner.owner_ready(q.b.owner.opaque)!=1||!mu_bt_osapi_identity_matches(&q.thread,tid(),q.b.owner.read_live,q.b.owner.opaque)){
   q.b.leave(q.b.lease_context);return -1;}
  q.destroy(&q.ao);q.held=0;q.b.leave(q.b.lease_context);return 0;
 }

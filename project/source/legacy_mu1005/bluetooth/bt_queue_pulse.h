@@ -6,12 +6,18 @@
 typedef struct {volatile unsigned pending,active;} MuBtPulse;
 int mu_bt_pulse_request(MuBtPulse*);
 int mu_bt_pulse_execute(MuBtPulse*,int(*)(void*),void*);
+/* A successful nonblocking enter must exclude original stop/destruction
+ * until leave; if unavailable, skip all SDK reads and operations. */
+int mu_bt_pulse_dispatch_leased(MuBtPulse*,int(*enter)(void*),void(*leave)(void*),void*,
+ int(*run)(void*),void*);
 void mu_bt_pulse_release(MuBtPulse*);
 void mu_bt_pulse_disable(MuBtPulse*);
 int mu_bt_pulse_idle(MuBtPulse*);
 /* Native candidate. Genuine mapped-image proof and a lifetime lease
  * excluding OEM ActiveObject stop/destruction are mandatory. enter/leave
- * may run on producer; no SDK lock held over enqueue. Start/retire on
+ * MUST be nonblocking try-acquire on producer and AO; no SDK lock held
+ * over enqueue. The lease covers the entire dispatch and all owner checks;
+ * nested callbacks must not reacquire the same lease. Start/retire on
  * verified owner, stop on supervisor; keep DSO mapped until process exit. */
 typedef struct{
  MuBtOwner owner;uint32_t util_load_bias;void *lease_context;
