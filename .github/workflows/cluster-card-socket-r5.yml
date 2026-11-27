@@ -1,0 +1,29 @@
+name: ClusterCard R5 real socket H264 receiver NO INSTALL
+on:
+  push:
+    branches: [experiment/cluster-compact-card-r2-dualstream]
+    paths:
+      - 'experiments/cluster-compact-card/receiver112/**'
+      - '.github/workflows/cluster-card-socket-r5.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  socket-and-codec:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact upstream v1.2.14 H264 parser sources
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/mibcodec
+          curl -fsSL https://raw.githubusercontent.com/MacsInSpace/mib-cluster-map/v1.2.14/thirdparty/mhi2_altscreen_carplay/include/alt111.h -o /tmp/mibcodec/alt111.h
+          curl -fsSL https://raw.githubusercontent.com/MacsInSpace/mib-cluster-map/v1.2.14/thirdparty/mhi2_altscreen_carplay/src/alt111_video.c -o /tmp/mibcodec/alt111_video.c
+          grep -Fq ALT111_AU_LIMIT /tmp/mibcodec/alt111.h
+      - name: Compile actual socket receive and upstream codec, triple ASan UBSan
+        run: |
+          set -euo pipefail
+          cd experiments/cluster-compact-card/receiver112
+          gcc -std=c99 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer -I/tmp/mibcodec c112_ingest.c /tmp/mibcodec/alt111_video.c test_c112.c -o /tmp/receive112
+          for n in 1 2 3; do ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=halt_on_error=1 /tmp/receive112; done
