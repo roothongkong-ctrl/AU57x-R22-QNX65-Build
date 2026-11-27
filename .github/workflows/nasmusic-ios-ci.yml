@@ -3,12 +3,14 @@ on:
   push:
     branches: [nasmusic-ios-ci-v092]
     paths: ['nasmusic-ci/READY']
+  pull_request:
+    branches: [nasmusic-ios-ci-base]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   build:
-    if: github.ref == 'refs/heads/nasmusic-ios-ci-v092'
+    if: github.ref == 'refs/heads/nasmusic-ios-ci-v092' || (github.event_name == 'pull_request' && github.head_ref == 'nasmusic-ios-ci-v092')
     runs-on: macos-15
     timeout-minutes: 35
     defaults:
