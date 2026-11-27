@@ -1050,7 +1050,15 @@ static void native_remote_process_boundary(void){
  endpoint.si_owner_verified=r81_si_owner;
  endpoint.dio_server_verified=r81_dio_server;
  int changes[2],acks[2];
+#ifdef __QNXNTO__
+ /* Fixture synchronization only: QEMU IFS has no pipe resource manager.
+  * Keep two separate channels and fork, use the verified AF_UNIX manager.
+  * This is not the production CPRX transport or an admission bypass. */
+ assert(socketpair(AF_UNIX,SOCK_STREAM,0,changes)==0&&
+        socketpair(AF_UNIX,SOCK_STREAM,0,acks)==0);
+#else
  assert(pipe(changes)==0&&pipe(acks)==0);
+#endif
  pid_t pid=fork();assert(pid>=0);
  if(pid==0){
   close(changes[0]);close(acks[1]);
