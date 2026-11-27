@@ -1,0 +1,64 @@
+name: MU1005 NAS firmware acquisition (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/mu1005-oem-nas.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mu1005-nas-acquire
+  cancel-in-progress: false
+jobs:
+  acquire:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore archive cache
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .oem-cache/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z
+          key: mu1005-oem-archive-v2
+      - name: Download via owner-provided HTTPS secret
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          NAS_URL: ${{ secrets.MU1005_NAS_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p .oem-cache nas-evidence
+          if [ -z "$NAS_URL" ]; then
+            echo "NAS_URL_SECRET_MISSING"
+            exit 2
+          fi
+          python3 -c 'import os,urllib.parse; u=urllib.parse.urlsplit(os.environ["NAS_URL"]); assert u.scheme=="https" and u.hostname and not u.username and not u.password'
+          archive=.oem-cache/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z
+          # Keep URL, redirect locations and response headers out of public logs.
+          rc=0
+          curl --fail --silent --location --max-redirs 5 --proto '=https' --proto-redir '=https' --connect-timeout 30 --max-time 1200 --max-filesize 1200000000 --output "$archive.part" --write-out 'HTTP %{http_code}; bytes %{size_download}\n' "$NAS_URL" 2>/dev/null | tee nas-evidence/download.log || rc=$?
+          if [ "$rc" -ne 0 ]; then
+            echo "NAS_DOWNLOAD_FAILED curl_exit=$rc"
+            exit "$rc"
+          fi
+          python3 -c 'import sys; f=open(sys.argv[1],"rb"); assert f.read(6)==bytes.fromhex("377abcaf271c"), "NAS_DOWNLOAD_NOT_7Z"' "$archive.part"
+          mv "$archive.part" "$archive"
+      - name: Validate full 7z archive and extract image candidates
+        run: |
+          set -euo pipefail
+          mkdir -p nas-evidence
+          command -v 7z || { sudo apt-get update -qq && sudo apt-get install -y p7zip-full; }
+          python3 oem_inputs/mu1005/inspect_firmware.py .oem-cache/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z "${RUNNER_TEMP}/mu1005-extracted" | tee nas-evidence/inspect.log
+          cp "${RUNNER_TEMP}/mu1005-extracted/inventory.json" nas-evidence/
+      - name: Cache integrity-checked archive
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .oem-cache/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z
+          key: mu1005-oem-archive-v2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mu1005-nas-acquisition-evidence
+          path: nas-evidence/
+          retention-days: 14
