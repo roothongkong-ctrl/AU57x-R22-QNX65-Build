@@ -198,3 +198,6 @@ R105.172 run46019620969两路实际成功：job140575558757 NEW_COMBINED_OBSERVE
 
 ## 35. R105.174 新1收口、新2单项推进
 用户在明确建议将实际路径确认并入新4后回复1，按既定继续口令执行：新1限定离线准备完成，实际路径与读取仍需新4/5及新7验证，任何写入前不得省略路径核实。新2原16开始。复用R38/R39、R98、既有OSAPI notify/owner及已验证回调布局，不重复旧测试。发现native_binding.c原厂回调进入后直接读取event头并将原始指针传入mu38_dispatch，绕过已存在checked read_live边界；本次改为一次16字节有界复制并重新检查owner，后续全用本地快照；读取失败时若仍为认证owner且链路活跃，沿现有IN_DIRTY/au_ipc_socket_lost逻辑断开，不伪造消息。无修改原厂程序、无新增签名/授权、无安装。仅新增1路，测试新快照失败、地址溢出、复制隔离并ARM编译实际改动，不重跑其他4路集成；该两个文件专属workflow覆盖后续单独修改。实际原厂owner及回调生命周期证据仍缺，不能称已接通。新3未开始。31限定完成、6部分、29待；36路线不再重编号。NO INSTALL。
+
+## 36. R105.174 新2专项结果与真实接入边界
+run46021591240/job140582324465 SUCCESS，实际日志 ROUTE2_NEW_CALLBACK_SNAPSHOT_TEST_PASS_FIXTURE_ONLY、QNX_COMPLETE_IMAGE_CACHE_HIT、ROUTE2_CHANGED_CALLBACK_ARM_COMPILE_PASS_NOT_LIVE_BINDING。源代码变更还触发统一开发workflow run46021591144，9路全SUCCESS（native-library、6类parallel-host、upstream-graft、collect-review）；这是已有通用CI自动触发，不误称只实际运行1路。已复核native_event/native_binding、R105.014原厂owner边界、BT_NOTIFY_BINDING、R92预加载：回调16字节布局及软件适配已有，真实原厂iAP2 owner、锁/生命周期及服务注册仍未取得，现有预加载探针只能证明进入进程及线程创建，不能代替owner。没有新车机数据；不重复已通过测试，不新增模拟owner。建议用户确认后将真实owner/回调接入联验并入新6/8/9；新2按软件范围收口，未获确认前仍部分，未开始新3。此次仅记录结果。NO INSTALL。
