@@ -1,0 +1,2 @@
+# R105.138 两个真实 HID 缺失符号定向恢复（NO INSTALL）
+R105.136 artifact 15188633539 已读取：driver 91 strong imports，11 个 mm-ipod 宿主提供，78 其他候选，剩 hid_remote_voldown / hid_remote_volup 两项精确名称。独立 dlopen 缺少宿主导出不是生产环境等价。复用旧证据，只查这两个符号，使用 PT_DYNAMIC 兼容 readelf -D -sW。仅接受唯一真实共享 ELF 同时导出两个符号且依赖闭环，在一次性 guest 中尝试原厂 mm-ipod 真实宿主加载，保留原厂认证；否则停止，不重复构建 QNX。R105.136 Bluetooth 同样已越过 libecpp-ne，仍报 slogf；现有 R105.137 四路修复保持执行。不得伪造 HID 函数、认证或设备节点。
