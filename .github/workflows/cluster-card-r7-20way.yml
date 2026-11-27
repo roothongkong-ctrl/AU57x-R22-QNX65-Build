@@ -1,0 +1,111 @@
+name: ClusterCard R7 20 tests for ONE original card - NO INSTALL
+on:
+  push:
+    branches: [experiment/cluster-card-r7-parallel20]
+    paths:
+      - '.github/workflows/cluster-card-r7-20way.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    name: ${{ matrix.target }} / ${{ matrix.mode }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include:
+          - { target: original-card-pixels, mode: gcc-debug }
+          - { target: original-card-pixels, mode: gcc-release }
+          - { target: original-card-pixels, mode: gcc-sanitize }
+          - { target: original-card-pixels, mode: clang-release }
+          - { target: preserve-console-and-map, mode: gcc-debug }
+          - { target: preserve-console-and-map, mode: gcc-release }
+          - { target: preserve-console-and-map, mode: gcc-sanitize }
+          - { target: preserve-console-and-map, mode: clang-release }
+          - { target: independent-card-socket, mode: gcc-debug }
+          - { target: independent-card-socket, mode: gcc-release }
+          - { target: independent-card-socket, mode: gcc-sanitize }
+          - { target: independent-card-socket, mode: clang-release }
+          - { target: card-session-teardown, mode: gcc-debug }
+          - { target: card-session-teardown, mode: gcc-release }
+          - { target: card-session-teardown, mode: gcc-sanitize }
+          - { target: card-session-teardown, mode: clang-release }
+          - { target: minimal-v1214-patch, mode: gcc-debug }
+          - { target: minimal-v1214-patch, mode: gcc-release }
+          - { target: minimal-v1214-patch, mode: gcc-sanitize }
+          - { target: minimal-v1214-patch, mode: clang-release }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install FFmpeg OpenGLES headers (original player only)
+        if: matrix.target == 'minimal-v1214-patch'
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq -y install libgles2-mesa-dev libglfw3-dev libavcodec-dev libavformat-dev libavutil-dev
+      - name: Run independent source-only test
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          MODE: ${{ matrix.mode }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          C=gcc
+          CXX=g++
+          FLAGS="-O0 -g"
+          case "$MODE" in
+            gcc-debug) FLAGS="-O0 -g";;
+            gcc-release) FLAGS="-O2 -g";;
+            gcc-sanitize) FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer";;
+            clang-release) C=clang; CXX=clang++; FLAGS="-O2 -g";;
+            *) echo "Unknown compiler mode $MODE";exit 2;;
+          esac
+          mkdir -p /tmp/r7 /tmp/r7/core
+          case "$TARGET" in
+            original-card-pixels)
+              cd experiments/cluster-compact-card
+              $CXX -std=c++11 $FLAGS -Wall -Wextra -Werror -pedantic test_compose.cpp -o /tmp/r7/card-base
+              $CXX -std=c++11 $FLAGS -Wall -Wextra -Werror -pedantic test_stress.cpp -o /tmp/r7/card-stress
+              /tmp/r7/card-base
+              /tmp/r7/card-stress
+              ;;
+            preserve-console-and-map)
+              cd experiments/cluster-compact-card/dualstream
+              $C -std=c99 $FLAGS -Wall -Wextra -Werror -pedantic test_gate.c -o /tmp/r7/state
+              /tmp/r7/state
+              ;;
+            independent-card-socket|card-session-teardown)
+              curl -fLsS --retry 3 https://raw.githubusercontent.com/MacsInSpace/mib-cluster-map/v1.2.14/thirdparty/mhi2_altscreen_carplay/include/alt111.h -o /tmp/r7/core/alt111.h
+              curl -fLsS --retry 3 https://raw.githubusercontent.com/MacsInSpace/mib-cluster-map/v1.2.14/thirdparty/mhi2_altscreen_carplay/src/alt111_video.c -o /tmp/r7/core/alt111_video.c
+              if [ "$TARGET" = independent-card-socket ];then
+                cd experiments/cluster-compact-card/receiver112
+                $C -std=c99 $FLAGS -Wall -Wextra -Werror -pedantic -I/tmp/r7/core c112_ingest.c /tmp/r7/core/alt111_video.c test_c112.c -o /tmp/r7/socket
+                /tmp/r7/socket
+              else
+                $C -std=c99 $FLAGS -Wall -Wextra -Werror -pedantic -I/tmp/r7/core -Iexperiments/cluster-compact-card/receiver112 \
+                  experiments/cluster-compact-card/receiver112/c112_ingest.c /tmp/r7/core/alt111_video.c \
+                  experiments/cluster-compact-card/negotiation112/neg112.c \
+                  experiments/cluster-compact-card/negotiation112/test_neg112.c -o /tmp/r7/handshake
+                /tmp/r7/handshake
+              fi
+              ;;
+            minimal-v1214-patch)
+              git clone --quiet --depth 1 --branch v1.2.14 https://github.com/MacsInSpace/mib-cluster-map.git /tmp/r7/upstream
+              cp experiments/cluster-compact-card/v1214-integration/player/compact_card_layer.h /tmp/r7/upstream/player/
+              p="$GITHUB_WORKSPACE/experiments/cluster-compact-card/v1214-integration/patches/0001-player-optional-card-layer.patch"
+              git -C /tmp/r7/upstream apply --check "$p"
+              git -C /tmp/r7/upstream apply "$p"
+              git -C /tmp/r7/upstream diff --check
+              changes="$(git -C /tmp/r7/upstream diff --numstat -- player/opengl_gpu.cc | awk '{print $1 " " $2}')"
+              test "$changes" = "3 0"
+              grep -Fq 'CLUSTERMAP_CARD_INPUT' /tmp/r7/upstream/player/compact_card_layer.h
+              cd /tmp/r7/upstream
+              $CXX -std=gnu++11 $FLAGS -Wall -Wextra -Wno-unused-function -Wno-deprecated-declarations -Iplayer -c player/opengl_gpu.cc -o /tmp/r7/player.o
+              test -s /tmp/r7/player.o
+              echo 'PASS exact v1.2.14 source compile; just 3 original lines added, none removed'
+              ;;
+            *) echo "Unknown test target $TARGET";exit 2;;
+          esac
+          echo "PASS $TARGET / $MODE (SOURCE ONLY, not a real iPhone 112 test)"
