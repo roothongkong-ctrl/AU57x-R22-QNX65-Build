@@ -2,7 +2,7 @@ name: MU1005 unified parallel development (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/mu1005-si-cprx-native.yml, integration/mu1005_si_native/**, integration/mu1005_swdl_review/**, tools/review_txn/**, project/source/legacy_mu1005/**, project/source/src/**, tools/ci/mu1005_gnu_mirrors.sh, tools/mu1005_oem_inventory.py, tests/**, ci/**]
+    paths: [.github/workflows/mu1005-si-cprx-native.yml, integration/mu1005_si_native/**, integration/mu1005_swdl_review/**, tools/review_txn/**, project/source/legacy_mu1005/**, project/source/src/**, tools/ci/mu1005_gnu_mirrors.sh, tools/mu1005_oem_inventory.py, tools/mu1005_qnx_dependency_probe.py, tests/**, ci/**]
   workflow_dispatch:
 permissions:
   contents: read
@@ -98,6 +98,23 @@ jobs:
           set -euxo pipefail
           docker image inspect qnx65-armv7-toolchain:8.5 --format '{{.Id}}' | tee review/evidence/compiler.log
           docker run --rm --platform linux/amd64 qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc --version | tee -a review/evidence/compiler.log
+      - name: Compare actual OEM btstack imports with available QNX SDK libraries
+        run: |
+          set -euxo pipefail
+          mkdir -p .oem-sdk-candidates
+          python3 oem_inputs/mu1005/verify_seed.py "$RUNNER_TEMP/seed-for-sdk"
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            set -eu
+            C=arm-unknown-nto-qnx6.5.0eabi-gcc
+            for n in libxml2.so.1 libicuuc.so.58 libz.so.2 libcomm.so libosal.so libutil.so libiplcommon.so libecpp-ne.so.4 libc.so.3 libm.so.2 libsocket.so.3; do
+              f=$("$C" -print-file-name="$n")
+              if test -f "$f"; then cp -L "$f" ".oem-sdk-candidates/$n"; else
+                echo "SDK_EXACT_NAME_MISSING:$n"
+              fi
+            done
+          '
+          python3 tools/mu1005_qnx_dependency_probe.py "$RUNNER_TEMP/seed-for-sdk/oem/eso/bin/apps/btstack" .oem-sdk-candidates review/evidence/oem-sdk-dependencies.json
+          rm -rf .oem-sdk-candidates
       - name: Compile and link tested SI and actual CPRX transport on QNX ARM
         run: |
           set -euxo pipefail
