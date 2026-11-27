@@ -271,3 +271,6 @@ R105.193 run46032818633 job140620634723 SUCCESS，6/6组合测试，artifact1521
 
 ## 59. R105.194验收及R105.195真实C/Rust联合移植
 R105.194 run46033208663/job140621972391 SUCCESS，artifact15214369795，实际Rust daemon在真实TCP上正确接收ACK、拒绝错代及旧模式ACK、超时退出，日志MU1005_DONOR_ACK_REAL_TCP_OPT_IN_AND_LEGACY_PASS_NO_OEM。R105.195复用同一LuKa GPL固定20c94f51c0f0ae88b154c12e4f604643ba23022c，合并既有adapt_live_ap、adapt_receiver_unix、adapt_mfi_sequence及已过ACK适配。复用原bridge_peer C代码只增显式ACK/receipt核验，实际C ingress/IPC/socket pump连接合并后的Rust daemon，两TCP四代marker/SYN及分段SDK完成夹具，不重复单项测试。另用已有Rust QNX工具链构建完整合并ARM程序，只编译新组合，不重跑历史PHDR或QNX启动夹具。QNX编译不等于真实运行，保持默认真实硬件认证、不启动车机。新6实际启动/生命周期及daemon FD身份provider未完成；新8/9真实注册/无线传输未完成，35/66限定完成。2路专项，NO INSTALL。
+
+## 60. R105.195实际验收及停止重复实验决定
+run46033436233两路SUCCESS：job140622748616 artifact15215541990，实际合并Rust守护程序+C RF ingress/socket，在两个TCP连接上四代均35 bytes/8 fragments marker/SYN PASS，ACK receipt夹具通过；job140622749269 artifact15215267512，完整合并QNX ARM ELF32 release编译成功。不可将合成SDK事件当作实车RF、MFi或无线认证。已通过组合构建、恢复顺序、原厂配置单字段、协议ACK不再重跑。剩余共同阻塞是原厂真实生命周期启动/关闭互斥、有效配置实际消费、真实owner/daemon admission。用户已批准四路线按安全顺序尝试；优先原厂单字段配置路线复用R105.109/119/146（iap2.cfg保持原样），实车实际MIB备份、独立恢复入口及路径/写权限验证完成前不得写；其他路线继续复用现有组件，不再新增无实质突破的外围模拟。此次仅记录已实证验收，不伪称新代码或增加总完成数。35/66限定完成，新6/8/9未100%；NO INSTALL。
