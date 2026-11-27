@@ -4,6 +4,9 @@ on:
     branches: [mu1005-si-cprx-real-review]
     paths-ignore:
       - 'lab/mu1005_step8_*/**'
+      - 'lab/mu1005_stock_reuse/**'
+      - '.github/workflows/r105172-stock-reuse.yml'
+      - 'docs/R105172_STOCK_REUSE_CN.md'
       - '.github/workflows/r*-step8-*.yml'
       - '.github/workflows/mu1005-si-cprx-real-review.yml'
       - 'docs/MASTER_HANDOFF_AND_NO_REPEAT_RULES_CN.md'
