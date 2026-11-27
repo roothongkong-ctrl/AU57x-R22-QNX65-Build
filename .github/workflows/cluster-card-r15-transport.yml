@@ -1,0 +1,59 @@
+name: 'R15 actual AVCC to TCP to H264 decode bridge (SOURCE ONLY)'
+on:
+  workflow_dispatch:
+  push:
+    branches: [experiment/cluster-card-r15-local-video-transport]
+    paths:
+      - 'experiments/cluster-compact-card/r15/**'
+      - 'experiments/cluster-compact-card/r13/**'
+      - 'experiments/cluster-compact-card/r14/**'
+      - '.github/workflows/cluster-card-r15-transport.yml'
+permissions:
+  contents: read
+jobs:
+  test:
+    name: ${{ matrix.cc }} / ${{ matrix.mode }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc, clang]
+        mode: [hook, transport, sanitizer]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch exact original MIB
+        run: git clone -q --depth 1 --branch v1.2.14 https://github.com/MacsInSpace/mib-cluster-map.git /tmp/mib
+      - name: Install decoder development packages
+        if: matrix.mode != 'hook'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libavcodec-dev libavutil-dev ffmpeg pkg-config
+      - name: Compile actual hook or run full transport test
+        env:
+          CC: ${{ matrix.cc }}
+          MODE: ${{ matrix.mode }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          A=/tmp/mib/thirdparty/mhi2_altscreen_carplay
+          R=experiments/cluster-compact-card
+          if [ "$MODE" = hook ]; then
+            cp "$R/r13/r13_112_probe.inc" "$R/r15/r15_wire.h" "$A/"
+            python3 "$R/r13/patch_real_v1214.py" "$A/libaltscreen111_gen2.c"
+            git -C /tmp/mib diff --check
+            "$CC" -std=gnu99 -O1 -Werror=implicit-function-declaration -I"$A/include" -c "$A/libaltscreen111_gen2.c" -o /tmp/off.o
+            "$CC" -std=gnu99 -O1 -Werror=implicit-function-declaration -I"$A/include" -DCLUSTERMAP_R13_112_LAB -c "$A/libaltscreen111_gen2.c" -o /tmp/on.o
+            strings /tmp/on.o | grep -Fq C112
+            echo 'PASS: actual MIB v1.2.14 hook integrated; host build, not QNX'
+          else
+            CXX=g++
+            [ "$CC" != clang ] || CXX=clang++
+            FLAGS="-O1 -g"
+            [ "$MODE" != sanitizer ] || FLAGS="$FLAGS -fsanitize=address,undefined -fno-omit-frame-pointer"
+            ffmpeg -loglevel error -y -f lavfi -i 'color=c=white:s=800x298:r=10' -vf 'drawbox=x=180:y=22:w=60:h=40:color=black:t=fill' -frames:v 1 -pix_fmt yuv420p -c:v libx264 -preset ultrafast -x264-params keyint=1:bframes=0 -f h264 /tmp/card.h264
+            python3 "$R/r15/make_avcc.py" /tmp/card.h264 /tmp/config.avcc /tmp/card.au
+            "$CC" -std=c99 $FLAGS -I"$A/include" -c "$A/src/alt111_video.c" -o /tmp/upstream-video.o
+            "$CXX" -std=c++11 -pthread $FLAGS -Wall -Wextra -Werror -I"$A/include" $(pkg-config --cflags libavcodec libavutil) "$R/r15/test_r15.cpp" /tmp/upstream-video.o $(pkg-config --libs libavcodec libavutil) -o /tmp/test-r15
+            /tmp/test-r15 /tmp/config.avcc /tmp/card.au
+          fi
