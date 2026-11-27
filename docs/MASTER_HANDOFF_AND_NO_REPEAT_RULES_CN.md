@@ -168,3 +168,6 @@ R105.166 run46014286871：donor job140557318887、config-contract job14055731827
 
 ## 25. R105.168 第8项原厂库预检路径修复
 R105.166 native-preflight job140557318911实际失败：SDK_CONFIRMED_PIC_LINK_OK，BT_PINNED_SDK_RUNTIME_STAGED，REAL_LOGGING_PROVIDER_STAGED均成功；ARM链接器cannot open output file /home/runner/work/.../qnx-runtime-evidence/reader/step8-parser: No such file or directory。宿主绝对路径错误传入容器，实际映射/src。只改编译输出为/src/qnx-runtime-evidence/reader/step8-parser，宿主检查产物非空，保留原QNX预检，不改变原厂文件/ABI，不重复其他三路。R105.167 run46014738003两路成功，producer实际发现Provider入口直接调用者0x122e88、0x123548；UnicodeString栈槽只得到读取，未找到写入；native-abi输出libraries=[]，尚未找到带非零大小的定义函数，不能说解析库ABI确认。该项仍未完成。新增1专项+4自动回归，require-cache=true，无完整编译器重建；不启动第9项。NO INSTALL。
+
+## 26. R105.168 两路原厂库预检成功与用户同意收口方案
+实际run46015546454/job140561611027及run46015546355/job140561611649均SUCCESS；原始日志两路均QNX_COMPLETE_IMAGE_CACHE_HIT、R105168_CONTAINER_OUTPUT_PATH_OK、STEP8_NATIVE_EXPORT_OK 0/1/2/3、STEP8_FIXTURE_READ size=8699 fnv=a82094ed、两个进程exit0、R105166_QNX_NATIVE_EXPORT_PREFLIGHT_PASS。故原厂libutil真实加载及4个导出接口、独立只读配置副本读取通过；未执行原厂parseFileToArray，未证明原厂解析器与connectivity.json实际调用关联。另重复触发旧workflow是共享脚本路径匹配所致，不再重复预检。用户同意保留原厂读取机制、复用成熟接入方案、验证配置兼容性，不重写解析器，不继续无休止静态逆向；第8项只需取得调用链有效证据，第9项验证实际路径、第11项实车生效。第8项仍部分完成；下一步以原厂读取的只读证据为主，不猜C++ ABI，不提前开始第9项。总表28完成4部分34待完成。NO INSTALL。
