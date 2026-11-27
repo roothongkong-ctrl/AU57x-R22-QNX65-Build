@@ -144,3 +144,6 @@ R105.159 run 46007850122：12/12主机参数转发及精确原厂配置job 14053
 
 ## 17. R105.161 第7项针对失败修复
 R105.159 QNX job140535457283最终FAILURE，原始日志实际 STEP7_TARGET factory pid=4 argc=2、exit0、STEP7_QNX_ARGV_PASS factory pid=4，证明确实在QNX guest内完成第一例数字参数转发且同PID；第二例spawnv shell ENOENT，supervisor exit1，不能认定其余4例通过。artifact15201469833。其余R105.159/160累计23/24 jobs成功（其中4路重复自动回归，并非新功能）。R105.160 run46008695322原始日志：ProcessTNG::start 4个调用点0x10ffe0/0x11ca28/0x11cb20/0x11f470；btstack main 0x118868、strtol 0x118a40，argc/argv来源仍为候选，不是实际参数生产证明。R105.161新QNX专用workflow只运行剩余4例，fork/execve替换实验supervisor spawnv，逐例独立结果、stat/errno诊断，既有wrapper/目标不改，保留原成功证据。不假定已找到ENOENT根因。另一路使用原固件直接依赖唯一OSAL provider的ProcessTNG::start符号追踪实际spawn入口，禁止重复旧全量扫描。当前计划2路专项+4路自动回归（提交前无活动run），第7项仍部分完成，NO INSTALL；仅验证实际结果，后续8未启动。
+
+## 18. R105.162 第7项原厂provider查找修复
+R105.161回归46009278216 4/4成功；QNX修复run46009278959/job140540320980仍在构建，不重复运行。原厂provider run46009278340/job140540317849失败，实际错误expected unique original ProcessTNG provider, found 0。旧程序仅搜app70中名称带osal且有非零大小的直接依赖，范围不充分。此次增加精确stage2/EFS，解析真实ELF SONAME及定义符号（含零大小），按SHA去重，保留多候选而非猜唯一，不执行原厂程序。若仍零命中，记录原厂参数来源尚需运行时证据，不再扩大同类扫描；原样参数转发软件验收与原厂启动接入后续验收分开。新增1路专项，另预留4路回归，加原QNX一路共6路计划。第7项保持部分完成，NO INSTALL，不进入第8项。
