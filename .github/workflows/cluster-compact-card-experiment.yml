@@ -1,0 +1,45 @@
+name: Cluster Original Card 70 percent simulator - NO INSTALL
+on:
+  push:
+    branches: [experiment/cluster-compact-card-r1]
+    paths:
+      - 'experiments/cluster-compact-card/**'
+      - '.github/workflows/cluster-compact-card-experiment.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-compile-and-preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build native C++ pixel compositor and run regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd experiments/cluster-compact-card
+          g++ -std=c++11 -O2 -Wall -Wextra -Werror -pedantic -o /tmp/cluster_card_test test_compose.cpp
+          /tmp/cluster_card_test
+          g++ -std=c++11 -O2 -Wall -Wextra -Werror -pedantic -o /tmp/cluster_card_demo demo.cpp
+      - name: Render reproducible mock before-and-after images
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user Pillow
+          cd experiments/cluster-compact-card
+          python3 make_mock.py
+          /tmp/cluster_card_demo mock/map.rgba mock/card.rgba mock/after70.rgba 800 298 16 18 338 126 70
+          /tmp/cluster_card_demo mock/map.rgba mock/card.rgba mock/after100.rgba 800 298 16 18 338 126 100
+          python3 render_preview.py
+          test -s mock/compact_card_before_after.png
+      - name: Publish simulation proof, NOT a car install package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClusterCard-R1-SIMULATION-NO-INSTALL
+          path: |
+            experiments/cluster-compact-card/mock/*.png
+            experiments/cluster-compact-card/mock/test_report.json
+          if-no-files-found: warn
+          retention-days: 14
