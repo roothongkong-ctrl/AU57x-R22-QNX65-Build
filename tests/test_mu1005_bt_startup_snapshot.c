@@ -24,7 +24,21 @@ static int lifecycle_read(void*ctx,uint32_t a,void*p,size_t n){
  for(unsigned i=0;i<10;i++)if(a==addr[i]){put(p,val[i]^(*(unsigned*)ctx==i+1));return 1;}
  return 0;
 }
+static int trace_read(void*ctx,uint32_t a,void*p,size_t n){
+ const char msg[]="%s(%d): Primary DID registered";
+ unsigned bad=*(unsigned*)ctx;
+ if(a==0x11ed10u&&n==4){put(p,0xebffe04bu^(bad==1));return 1;}
+ if(a==0x2c18fcu&&n==4){put(p,0x400000u+(bad==2?4:0));return 1;}
+ if(a==0x27cf94u&&n==sizeof msg){memcpy(p,msg,n);if(bad==3)((char*)p)[0]='!';return 1;}
+ return 0;
+}
 int main(void){
+ unsigned wrong=0;
+ assert(mu_bt_sdk_start_trace(0x11ed14,0x400000,0x27cf94,trace_read,&wrong));
+ assert(!mu_bt_sdk_start_trace(0x11ee14,0x400000,0x27cf94,trace_read,&wrong));
+ assert(!mu_bt_sdk_start_trace(0x11ed14,0x400000,0x27cfb4,trace_read,&wrong));
+ for(wrong=1;wrong<=3;wrong++)assert(!mu_bt_sdk_start_trace(0x11ed14,0x400000,0x27cf94,trace_read,&wrong));
+ puts("PASS MU1005 Device-ID startup trace provenance (fixture only)");
  unsigned bad=0;assert(mu_bt_sdk_lifecycle_sites(lifecycle_read,&bad)==1);
  for(bad=1;bad<=10;bad++)assert(!mu_bt_sdk_lifecycle_sites(lifecycle_read,&bad));
  puts("PASS exact OEM startup and shutdown instruction sites (fixture; lease still required)");

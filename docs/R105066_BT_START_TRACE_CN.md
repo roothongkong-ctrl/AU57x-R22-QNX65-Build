@@ -1,0 +1,5 @@
+# R105.066 — congobg Device-ID trace route, MU1005 source preparation
+
+Reference: congobg/MHI2Q_WiFi_CarPlay 223b42f90bf7c15fbbbef23259da36caa9bd4994, Technical Reference §5. The author reports stock btstack preload and uses the Device-ID success log as startup trigger. Public repo provides pack and docs, not full bthook C source.
+
+Locally checked supplied stock btstack SHA256 51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566 with readelf/llvm-objdump. CN MU1005 startBtStack: 0x11ecdc registers primary DID; successful branch may log via 0x11ed10 BL 0x116e44, return 0x11ed14. Format VA 0x27cf94, trace channel GOT 0x2c18fc (R_ARM_GLOB_DAT __tracing__channel_CON_BTSTACK_BTSERVICES), logCV PLT GOT 0x2c12c8. Trace can be filtered and occurs before final started store 0x11ec98; not proof of successful full startup. New read-only predicate uses exact LR, format, instruction and live channel, then existing SDK snapshot remains separate. No variadic interposer or threshold adjustment installed; need safe ABI forwarding, synchronized startup/stop lease and real owner attachment. NO INSTALL.

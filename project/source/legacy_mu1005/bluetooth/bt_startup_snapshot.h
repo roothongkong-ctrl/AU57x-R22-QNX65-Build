@@ -13,4 +13,9 @@ uint32_t mu_bt_sdk_service_address(int(*read_live)(void*,uint32_t,void*,size_t),
 /* Check pinned start/stop instruction sites before admitting a production
  * queue. This is provenance only, not a lease or proof of stop exclusion. */
 int mu_bt_sdk_lifecycle_sites(int(*read_live)(void*,uint32_t,void*,size_t),void*);
+/* Read-only Device-ID success trace witness. Exact ARM LR, format and live
+ * trace-channel GOT value required. Does NOT prove SDK started or lease.
+ * Caller must pin mapped OEM image and use a checked reader. */
+int mu_bt_sdk_start_trace(uint32_t lr,uint32_t channel,uint32_t format,
+ int(*read_live)(void*,uint32_t,void*,size_t),void*);
 #endif
