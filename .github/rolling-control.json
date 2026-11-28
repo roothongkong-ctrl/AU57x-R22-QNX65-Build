@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.251",
+    "version": "R105.252",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 5
+      "dependent_not_yet_listed": 6
     },
     "runs": [],
     "verified_prior": [
@@ -510,10 +510,18 @@
           46109738332
         ],
         "evidence": "All three workflows complete success; actual native startup caller still absent."
+      },
+      {
+        "version": "R105.251",
+        "runs": [
+          46109969879,
+          46109969799
+        ],
+        "evidence": "Exact original extraction, all native guards and original PLT resolution, actual upstream source C compilation completed. Link failed because ld.lld absent on runner. SI workflow success. No direct binary produced."
       }
     ],
-    "discovery": "Direct upstream LuKa full graft startup and RFCOMM registration compiled into a disposable exact original MU1005 ELF, preserving original startup instruction and resolved PLT. Remote accept deliberately disabled pending real OEM security callback and supervised endpoint. No vehicle writes or installable binary exported. Actual runtime unproven.",
-    "expected_jobs": 5,
+    "discovery": "Install actual ARM linker and parallel independent upstream source link with exact original ELF build. Correct duplicate initial credit grant and prohibit false connected frames in non-accepting review build. Actual phone acceptance/security and supervised endpoint remain incomplete. No installation.",
+    "expected_jobs": 6,
     "pending_prior": []
   },
   "read_strategy": {
@@ -550,7 +558,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "integration/mu1005_vehicle_stage/congo_port_table.json"
       ],
-      "evidence": "R105.251 direct-source startup graft build replaces incremental startup wrappers. Remaining actual callback security, supervised ACK endpoint and original shutdown/wired lifecycle. Do not claim phone link."
+      "evidence": "R105.252 direct startup compile/link retry; exact firmware path and source build run independently; native callbacks, real supervised endpoint and original lifecycle still must be integrated. 20 max parallel jobs; no padding or repeat vehicle probes."
     }
   ],
   "rules": [

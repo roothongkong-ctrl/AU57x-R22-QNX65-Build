@@ -4,7 +4,7 @@ Registration build only: remote accepts remain disabled until the existing
 MU1005 native security callback and supervised transport are connected.
 No original bytes or modified OEM executable are exported from CI.
 """
-import hashlib,json,re,struct,subprocess,sys,tempfile
+import hashlib,json,re,shutil,struct,subprocess,sys,tempfile
 from pathlib import Path
 from elftools.elf.elffile import ELFFile
 from elftools.elf.relocation import RelocationSection
@@ -67,6 +67,12 @@ def adapt(s,m):
     # Keep the entire donor registration, callback and worker in the candidate,
     # but do not accept a handset on the unverified direct callback.
     s=rep(s,"(void)RF_ACCEPT(channel, ready);","(void)ready; (void)RF_ACCEPT(channel, 0); /* review only; OEM security bridge not yet wired */")
+    # MU1005 registration gives four initial credits; donor originally
+    # passed zero and refilled four on first CONNECTED. Do not double grant.
+    s=rep(s,"(void)RF_CREDIT(&s->channel, 4);","/* MU1005 initial credits already granted by registration */")
+    # This isolated build has no genuine accepted session. No later event
+    # may produce a false connected notification or forward handset data.
+    s=rep(s,"    if (event->code == 2u) {","    if (event->code == 2u) { return; /* no authorized connection in review build */")
     # The old EIR trampoline is firmware-specific; do not install it.
     # The registered SDP records and original refresh are reused.
     start=s.index("/* At 0x12A710:")
@@ -86,6 +92,37 @@ __attribute__((naked,used)) void graft_hook(void) {
 }
 '''
     return s
+def compile_graft(source,donor):
+    with tempfile.TemporaryDirectory() as tmp:
+        t=Path(tmp)
+        (t/"graft.c").write_text(source)
+        # eir.c is reused for the donor's helper; the original hook is omitted.
+        for name,src in [("graft",t/"graft.c"),("eir",donor/"wireless/graft/eir.c")]:
+            subprocess.run(["clang","-target","armv7-none-eabi","-march=armv7-a","-marm","-O2","-ffreestanding","-fno-builtin","-fno-unwind-tables","-fno-asynchronous-unwind-tables","-fno-stack-protector","-fno-pic","-ffunction-sections","-fdata-sections","-c",str(src),"-o",str(t/(name+".o"))],check=True)
+        (t/"graft.ld").write_text(f"ENTRY(graft_hook)\nSECTIONS {{ . = {ENTRY:#x}; .graft : {{ *(.text*) *(.rodata*) *(.data*) }} /DISCARD/ : {{ *(.ARM.exidx*) *(.ARM.extab*) *(.comment*) *(.note*) }} }}\n")
+        linker=shutil.which("ld.lld") or shutil.which("ld.lld-18")
+        need(linker is not None,"ARM linker missing; install lld")
+        subprocess.run([linker,"-flavor","gnu","-m","armelf","-T",str(t/"graft.ld"),"--no-undefined",str(t/"graft.o"),str(t/"eir.o"),"-o",str(t/"graft.elf")],check=True)
+        elf=ELFFile(BytesIO((t/"graft.elf").read_bytes()))
+        sec=elf.get_section_by_name(".graft")
+        code=sec.data()
+        syms=elf.get_section_by_name(".symtab")
+        hook=int(syms.get_symbol_by_name("graft_hook")[0]["st_value"])
+        need(sec["sh_addr"]==ENTRY and ENTRY+len(code)<STATE,"graft placement")
+        need(ENTRY<=hook<ENTRY+len(code),"hook placement")
+        need(not any(isinstance(x,RelocationSection) for x in elf.iter_sections()),"unresolved relocations")
+    return code,hook
+
+def source_build(donor,out):
+    need(subprocess.check_output(["git","-C",str(donor),"rev-parse","HEAD"],text=True).strip()==DONOR,"wrong donor")
+    # Compile/link same source transformations without re-extracting the
+    # original firmware. Placeholder PLTs are never executed or exported.
+    m=MAP|{name:0x100000+i*4 for i,name in enumerate(IMPORTS)}
+    source=adapt((donor/"wireless/graft/graft.c").read_text(),m)
+    code,hook=compile_graft(source,donor)
+    out.write_text(json.dumps(dict(scope="SOURCE_LINK_ONLY_NO_ORIGINAL_PLT_NO_RUNTIME",code_size=len(code),hook=hex(hook),installable=False),indent=2)+"\n")
+    print("DIRECT_DONOR_SOURCE_LINK_PASS_NO_RUNTIME")
+
 def main(stock,donor,out,private):
     b=stock.read_bytes()
     need(sha(b)==PIN,"wrong original")
@@ -100,22 +137,7 @@ def main(stock,donor,out,private):
     need(word(b,MAP["EIR_REQUEST"])==0xe92d4010,"EIR guard")
     m=MAP|imports(b)
     source=adapt((donor/"wireless/graft/graft.c").read_text(),m)
-    with tempfile.TemporaryDirectory() as tmp:
-        t=Path(tmp)
-        (t/"graft.c").write_text(source)
-        # eir.c is reused for the donor's helper; the original hook is omitted.
-        for name,src in [("graft",t/"graft.c"),("eir",donor/"wireless/graft/eir.c")]:
-            subprocess.run(["clang","-target","armv7-none-eabi","-march=armv7-a","-marm","-O2","-ffreestanding","-fno-builtin","-fno-unwind-tables","-fno-asynchronous-unwind-tables","-fno-stack-protector","-fno-pic","-ffunction-sections","-fdata-sections","-c",str(src),"-o",str(t/(name+".o"))],check=True)
-        (t/"graft.ld").write_text(f"ENTRY(graft_hook)\nSECTIONS {{ . = {ENTRY:#x}; .graft : {{ *(.text*) *(.rodata*) *(.data*) }} /DISCARD/ : {{ *(.ARM.exidx*) *(.ARM.extab*) *(.comment*) *(.note*) }} }}\n")
-        subprocess.run(["ld.lld","-flavor","gnu","-m","armelf","-T",str(t/"graft.ld"),"--no-undefined",str(t/"graft.o"),str(t/"eir.o"),"-o",str(t/"graft.elf")],check=True)
-        elf=ELFFile(BytesIO((t/"graft.elf").read_bytes()))
-        sec=elf.get_section_by_name(".graft")
-        code=sec.data()
-        syms=elf.get_section_by_name(".symtab")
-        hook=int(syms.get_symbol_by_name("graft_hook")[0]["st_value"])
-        need(sec["sh_addr"]==ENTRY and ENTRY+len(code)<STATE,"graft placement")
-        need(ENTRY<=hook<ENTRY+len(code),"hook placement")
-        need(not any(isinstance(x,RelocationSection) for x in elf.iter_sections()),"unresolved relocations")
+    code,hook=compile_graft(source,donor)
     # Same original PHDR layout strategy as the existing MU1005 observer.
     n=7;off=align(len(b),4096);payload=bytearray(0x100);payload.extend(code)
     stateoff=align(off+len(payload),4096)
@@ -132,4 +154,7 @@ def main(stock,donor,out,private):
     out.write_text(json.dumps(dict(scope="DIRECT_DONOR_REGISTRATION_BUILD_REVIEW_ONLY",original_sha256=PIN,generated_sha256=sha(result),donor=DONOR,startup=hex(HOOK),hook=hex(hook),resume="0x11ec9c",native={k:hex(v) for k,v in m.items()},native_guard_count=len(checked),code_size=len(code),original_loads_preserved=True,remote_accept=False,installable=False,vehicle_verified=False,runtime_verified=False,remaining=["native security callback and paired authorization","supervised endpoint and wire ACK","lifecycle stop and wired handoff"]),indent=2)+"\n")
     print("DIRECT_MU1005_DONOR_STARTUP_BUILD_ONLY_NO_INSTALL")
 if __name__=="__main__":
-    main(*(Path(x).resolve() for x in sys.argv[1:]))
+    if len(sys.argv)==4 and sys.argv[1]=="--source-build":
+        source_build(Path(sys.argv[2]).resolve(),Path(sys.argv[3]).resolve())
+    else:
+        main(*(Path(x).resolve() for x in sys.argv[1:]))
