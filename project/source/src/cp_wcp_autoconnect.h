@@ -69,6 +69,11 @@ int cp_wcp_bt_acl_up(struct cp_wcp_autoconnect *,uint32_t generation,uint64_t no
  * only a fully torn-down owner may construct a fresh controller. */
 int cp_wcp_bt_rearm(struct cp_wcp_autoconnect *,uint32_t generation,uint64_t now_ms,
  int (*old_release_verified)(void *,uint32_t previous_generation));
+/* Reuse a still-connected ACL after verified USB teardown and old wireless
+ * callback drain. Caller proves the completed USB cycle and same phone.
+ * Fresh wireless authentication remains mandatory. */
+int cp_wcp_bt_resume_wired(struct cp_wcp_autoconnect *,uint32_t,uint64_t,
+ int (*old_release_verified)(void *,uint32_t));
 /* Call from the original serialized owner loop; never inside SDK callbacks. */
 int cp_wcp_bt_tick(struct cp_wcp_autoconnect *,uint32_t generation,uint64_t now_ms);
 /* Disconnect or wired priority requires OEM cancel acknowledgement first. */

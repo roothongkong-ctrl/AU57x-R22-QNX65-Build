@@ -33,3 +33,26 @@ int mu_paired_start_tick(MuPairedStart*s,uint64_t now){
  if(b->state==CP_WCP_BLOCKED)return cp_wcp_bt_rearm(b,gen,now,s->released);
  return cp_wcp_bt_acl_up(b,gen,now);
 }
+
+int mu_paired_start_usb_ended(MuPairedStart*s,uint64_t cycle,uint64_t now,
+ int(*verify)(void*,uint64_t,uint32_t)){
+ uint32_t gen=0,again=0;
+ if(!s||!cycle||!verify||!s->snapshot||!s->released)return CP_WCP_INVALID;
+ if(cycle<=s->last_usb_cycle)return CP_WCP_STALE;
+ if(s->snapshot(s->ctx,&gen)!=1||!gen||
+    verify(s->ctx,cycle,gen)!=1||
+    s->snapshot(s->ctx,&again)!=1||again!=gen)
+  return CP_WCP_DENIED;
+ struct cp_wcp_autoconnect*b=&s->bt;
+ if(b->state==CP_WCP_RESTORE_PENDING)return CP_WCP_WAIT;
+ int rc;
+ if(b->state==CP_WCP_BLOCKED&&gen==b->generation)
+  rc=cp_wcp_bt_resume_wired(b,gen,now,s->released);
+ else if(b->state==CP_WCP_BLOCKED)
+  rc=cp_wcp_bt_rearm(b,gen,now,s->released);
+ else if(b->state==CP_WCP_IDLE)
+  rc=cp_wcp_bt_acl_up(b,gen,now);
+ else return CP_WCP_WAIT;
+ if(rc==CP_WCP_OK)s->last_usb_cycle=cycle;
+ return rc;
+}

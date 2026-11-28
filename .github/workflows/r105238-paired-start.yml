@@ -1,4 +1,4 @@
-name: R105.238 paired owner start integration (NO INSTALL)
+name: R105.274 reuse paired ACL after USB CarPlay (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -19,3 +19,30 @@ jobs:
           l=lab/mu1005_paired_start
           cc -std=c99 -Wall -Wextra -Werror -g -fsanitize=address,undefined -fno-omit-frame-pointer -no-pie -I"$s" -I"$b" -I"$l" "$l"/paired_start.c "$l"/test.c "$s"/cp_wcp_autoconnect.c "$b"/bt_trace_latch.c -o /tmp/paired-start
           /tmp/paired-start
+  qnx:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Compile same-phone USB to wireless resume
+        run: |
+          set -euxo pipefail
+          mkdir -p output
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 bash -ec '
+            C=arm-unknown-nto-qnx6.5.0eabi-gcc
+            s=project/source/src
+            b=project/source/legacy_mu1005/bluetooth
+            l=lab/mu1005_paired_start
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -I"$s" -I"$b" -I"$l" -c "$l/paired_start.c" -o output/paired_start.o
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -I"$s" -I"$b" -I"$l" -c "$s/cp_wcp_autoconnect.c" -o output/autoconnect.o
+            "$C" -nostdlib -r output/*.o -o output/usb-resume-arm.o
+            arm-unknown-nto-qnx6.5.0eabi-nm output/usb-resume-arm.o | grep -E " T (mu_paired_start_usb_ended|cp_wcp_bt_resume_wired)$"
+          '
+          printf '%s\n' 'Requires genuine USB lifecycle and same-phone proof, fresh wireless authentication. NO INSTALL.' > output/README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105274-usb-resume-arm-NO-INSTALL
+          path: output/

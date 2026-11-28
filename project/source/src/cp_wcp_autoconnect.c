@@ -49,6 +49,23 @@ int cp_wcp_bt_rearm(struct cp_wcp_autoconnect *s,uint32_t gen,uint64_t now,
  if(old_release_verified(s->ops.ctx,s->generation)!=1)return CP_WCP_DENIED;
  return begin_acl(s,gen,now);
 }
+int cp_wcp_bt_resume_wired(struct cp_wcp_autoconnect *s,uint32_t gen,uint64_t now,
+ int (*released)(void *,uint32_t)){
+ uint64_t until;
+ if(!s||!gen||!released||!s->ops.stock_owner_verified||
+    !s->ops.paired_acl_verified||!s->ops.wired_idle_verified||
+    !s->ops.stock_iap2_connected)return CP_WCP_INVALID;
+ if(s->state!=CP_WCP_BLOCKED||s->requested||gen!=s->generation)
+  return CP_WCP_DENIED;
+ if(now<s->last_ms||!deadline(now,CP_WCP_INITIAL_MS,&until))return CP_WCP_CLOCK;
+ if(!owner(s)||!idle(s)||s->ops.paired_acl_verified(s->ops.ctx,gen)!=1||
+    released(s->ops.ctx,gen)!=1||
+    s->ops.stock_iap2_connected(s->ops.ctx,gen)!=0||
+    !owner(s)||!idle(s)||s->ops.paired_acl_verified(s->ops.ctx,gen)!=1)
+  return CP_WCP_DENIED;
+ s->last_ms=now;s->deadline_ms=until;s->attempts=0;s->state=CP_WCP_DELAY;
+ return CP_WCP_OK;
+}
 /* Never silently forget an outstanding native open. If cancel cannot be
  * proven, do not advertise IDLE or let a new generation take the channel. */
 int cp_wcp_bt_abort(struct cp_wcp_autoconnect *s,uint32_t gen,int wired){
