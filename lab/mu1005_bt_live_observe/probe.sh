@@ -12,6 +12,13 @@ out="$here/bt-live-result.txt"
 # pidin output is not logged. Native helper independently verifies process image.
 pids=$(pidin -p btstack ar 2>/dev/null | awk '$1 ~ /^[0-9]+$/ {if(!seen[$1]++)print $1}')
 set -- $pids
-[ "$#" -eq 1 ] || { echo BTSTACK_PID_NOT_UNIQUE; exit 2; }
-(set -C; "$here/bt-live-observe" "$1" > "$out") || { echo OBSERVATION_FAILED_SEE_REPORT; exit 2; }
+(set -C
+ {
+  echo MU1005_ONE_SHOT_BEGIN
+  if [ "$#" -eq 1 ]; then
+   "$here/bt-live-observe" "$1" || echo BTSTACK_SNAPSHOT_UNAVAILABLE
+  else echo BTSTACK_PID_NOT_UNIQUE; fi
+  sh "$here/observe_stock.sh" || echo STOCK_PROVIDER_OBSERVATION_UNAVAILABLE
+  echo MU1005_ONE_SHOT_END_NOT_INSTALL_AUTHORIZATION
+ } > "$out") || { echo OBSERVATION_FAILED_SEE_REPORT; exit 2; }
 echo "Read-only result: $out"

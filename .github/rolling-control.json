@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.221",
+    "version": "R105.222",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -221,22 +221,21 @@
           46092922008
         ],
         "evidence": "Exact full donor ARM executable reached real config-check main, expected AP absence refusal; QNX loader verified. No live OEM AP or RF."
+      },
+      {
+        "version": "R105.221",
+        "passed": 4,
+        "failed": 1,
+        "runs": [
+          46093474773,
+          46093474748
+        ],
+        "evidence": "Native ARM observer compiled and readelf confirmed ARM. Packaging failed solely because Docker output inode is root-owned, chmod failed. No actual vehicle observation."
       }
     ],
-    "discovery": "R105.221 stops repeated static searches: one-shot actual parked-vehicle read-only original btstack lifecycle and OSAPI snapshot tool, reuses verified snapshot functions, verifies exact stock executable path/file hash and mapped anchors; emits booleans only. No debug stop or OEM call, no lifecycle lease, no install. Requires actual car report for real state, cannot infer from CI.",
+    "discovery": "R105.222 repairs root-owned package file via runner-owned copy, preserves executable modes in tar.gz, combines already tested stock fixed-path/FD observation with new live btstack snapshot into one SD result even if btstack unavailable. Congo 46092734687 failed on same four original libraries; do not repeat extraction or invent substitutes. Main blocker real stock owner/lifetime, report observational only.",
     "expected_jobs": 5,
-    "pending_prior": [
-      {
-        "version": "Congo",
-        "runs": [
-          46092734687
-        ],
-        "observed": {
-          "running": 1
-        },
-        "note": "original ImageFS alias resolution pending actual extraction, fixture passed"
-      }
-    ]
+    "pending_prior": []
   },
   "read_strategy": {
     "first_parallel": [
@@ -271,7 +270,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "Full LuKa ARM loads, QNX inherited FD works. Live stock startup/OSAPI/owner evidence absent. Use R105.221 one-shot read-only report if available; not lease. Continue Congo actual dependency results."
+      "evidence": "R105.221 observer ARM compiled, packaging failed on chmod; R105.222 fixes delivery and combines stock provider report. Actual owner lease remains unproved, no installation."
     },
     {
       "priority": 2,

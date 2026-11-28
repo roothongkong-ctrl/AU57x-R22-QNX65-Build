@@ -1,4 +1,4 @@
-name: R105.221 original running Bluetooth service one-shot observation (NO INSTALL)
+name: R105.222 combined original Bluetooth and provider read-only package (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -25,10 +25,21 @@ jobs:
           readelf -h package/bt-live-observe | grep -E 'Machine:.*ARM'
           cp lab/mu1005_bt_live_observe/{probe.sh,README_CN.md} package/
           sh -n package/probe.sh
-          chmod 0555 package/bt-live-observe package/probe.sh
-          (cd package && sha256sum bt-live-observe probe.sh README_CN.md > SHA256SUMS && sha256sum -c SHA256SUMS)
+          # Compiler container owns its output; copy to runner-owned inode.
+          cp package/bt-live-observe package/bt-live-observe.runner
+          mv -f package/bt-live-observe.runner package/bt-live-observe
+          cp lab/mu1005_stock_reuse/observe.sh package/observe_stock.sh
+          sh -n package/observe_stock.sh
+          chmod 0555 package/bt-live-observe package/probe.sh package/observe_stock.sh
+          (cd package && sha256sum bt-live-observe probe.sh observe_stock.sh README_CN.md > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - name: Retain executable permissions in a portable archive
+        run: |
+          set -euxo pipefail
+          mkdir -p delivery
+          tar -czf delivery/MU1005-one-shot-readonly.tar.gz -C package .
+          tar -tvf delivery/MU1005-one-shot-readonly.tar.gz
       - uses: actions/upload-artifact@v4
         with:
-          name: R105221-MU1005-BT-READ-ONLY-PROBE
-          path: package/
+          name: R105222-MU1005-ONE-SHOT-READ-ONLY
+          path: delivery/
           retention-days: 30
