@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.233",
+    "version": "R105.234",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 1
+      "dependent_not_yet_listed": 2
     },
     "runs": [],
     "verified_prior": [
@@ -327,10 +327,20 @@
           46105440865
         ],
         "evidence": "Current ARM payload package and four SI host regressions passed; exact original Congo map: 12 direct callers to CMGR candidate, HCI distinct helper, ACL trace slot still unresolved; not native activation."
+      },
+      {
+        "version": "R105.233",
+        "passed": 11,
+        "runs": [
+          46105722271,
+          46105722185,
+          46105722197
+        ],
+        "evidence": "New DNS witness host test and six backup/four SI host regressions succeeded; no live binding."
       }
     ],
-    "discovery": "Record exact Congo evidence as static candidates only; add original DNSServiceResolve callback adapter with interface/instance/host/port and owner checks. No new registration, no production binding.",
-    "expected_jobs": 1,
+    "discovery": "Consolidate actual OEM stock config and core backup/restore into one exact-firmware cloud rehearsal; package prior compiled fallback separately, verify prior manifest, no live write. Still need real wireless trigger and original transport entry.",
+    "expected_jobs": 2,
     "pending_prior": []
   },
   "read_strategy": {
@@ -397,7 +407,7 @@
         35
       ],
       "task": "并行组装可恢复最小首连候选，复用MIB；实际配置、备份恢复、安全及有线保留仍需确认；不启用未验收安装。",
-      "evidence": "R105.232 current binary and stock configuration replacement/restore packaged in review payload; no vehicle activation."
+      "evidence": "R105.234 two integrated jobs, exact original config/core transaction and verified stock-first/fallback packaging; pending. No live activation."
     }
   ],
   "rules": [
@@ -447,6 +457,13 @@
       "真实接线及首次实车证据",
       "NO INSTALL直到受控候选门槛通过"
     ],
-    "scope": "研发决策自动选择，不表示已实现车机自动切换，也不是聊天结束后自主开发。"
+    "scope": "研发决策自动选择，不表示已实现车机自动切换，也不是聊天结束后自主开发。",
+    "execution_steps": [
+      "既有蓝牙触发无线CarPlay",
+      "原厂热点及Wi-Fi参数交换",
+      "无线传输接入既有CarPlay",
+      "SD整合及云测",
+      "同一次实车首连验收"
+    ]
   }
 }

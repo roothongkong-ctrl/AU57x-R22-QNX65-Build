@@ -1,0 +1,80 @@
+name: R105.234 consolidated stock-first and wireless fallback (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105234-stock-first-integrated.yml','integration/mu1005_vehicle_stage/stock_first_rehearse.sh','integration/mu1005_vehicle_stage/pack_stock_first.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  exact-oem-transaction:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover already retained exact firmware and pinned extractors
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir firmware evidence
+          gh run download 45923122041 --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
+          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  $archive" | sha256sum -c -
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          git init qnxmount
+          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
+          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
+          git -C qnxmount checkout --detach FETCH_HEAD
+          python3 -m venv /tmp/extract-venv
+          /tmp/extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          python3 tools/mu1005_extract_app70.py "$archive" "$RUNNER_TEMP/app70/app.img"
+          /tmp/extract-venv/bin/python extractor/tools/extract_firmware.py --source "$RUNNER_TEMP/app70/app.img" --output "$RUNNER_TEMP/original/app70" --variant 70 --qnxmount-root "$PWD/qnxmount" > /tmp/app-summary.json
+          /tmp/extract-venv/bin/python tools/mu1005_extract_stage2.py "$archive" "$RUNNER_TEMP/original/stage2" --toolkit extractor --qnxmount qnxmount --report /tmp/stage2-summary.json
+      - name: Rehearse one transaction against the actual original files
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY'
+          import hashlib,os,pathlib,shutil
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])
+          tree=root/'original'
+          def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+          def choose(name,pin=None):
+              paths=sorted(p for p in tree.rglob(name) if p.is_file() and not p.is_symlink())
+              if pin:paths=[p for p in paths if sha(p)==pin]
+              assert paths and len({sha(p) for p in paths})==1,name
+              return paths[0]
+          src=root/'inputs';src.mkdir()
+          for name,pin in [('connectivity.json','56c14940455215233f9ead5a8cd3e3a9dc984f372b0d7421ba26ff8e8f579470'),('iap2.cfg',None),('btstack','51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566'),('bluetooth',None),('smartphone_integrator',None),('dio_manager',None)]:
+              shutil.copy2(choose(name,pin),src/name)
+          PY
+          root=$(mktemp -d);touch "$root/LAB_ONLY"
+          trap 'rm -rf "$root" "$RUNNER_TEMP/inputs"' EXIT
+          sh integration/mu1005_vehicle_stage/stock_first_rehearse.sh "$root" "$RUNNER_TEMP/inputs/connectivity.json" "$RUNNER_TEMP/inputs/iap2.cfg" "$RUNNER_TEMP/inputs" | tee evidence/transaction.log
+          grep -Fx EXACT_OEM_STOCK_FIRST_TRANSACTION_AND_RECOVERY_PASS_NO_VEHICLE evidence/transaction.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105234-stock-transaction-evidence-NO-INSTALL
+          path: evidence/transaction.log
+  combined-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and reuse existing compiled payload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir old
+          gh run download 46105440844 --repo "$GITHUB_REPOSITORY" --name MU1005-R105232-first-link-payload-NO-INSTALL --dir old
+          python3 integration/mu1005_vehicle_stage/pack_stock_first.py old/MU1005-R105232-first-link-payload-NO-INSTALL.zip MU1005-R105234-combined-review-NO-INSTALL.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MU1005-R105234-combined-review-NO-INSTALL
+          path: MU1005-R105234-combined-review-NO-INSTALL.zip
+          retention-days: 14
