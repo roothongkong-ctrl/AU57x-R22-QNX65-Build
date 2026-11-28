@@ -1,4 +1,4 @@
-name: R105.199 batch A remaining software boundaries (NO INSTALL)
+name: R105.200 batch B startup and transport error boundaries (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -7,39 +7,37 @@ on:
 permissions:
   contents: read
 jobs:
-  mfi-owner-revoke:
-    strategy:
-      fail-fast: false
-      max-parallel: 4
-      matrix:
-        case: [0, 1, 2, 3]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - name: Test actual existing MFi wrapper after OEM call and release
-        env:
-          CASE: ${{ matrix.case }}
-        run: |
-          set -euxo pipefail
-          s=project/source/src
-          cc -std=c99 -Wall -Wextra -Werror -rdynamic -I"$s" "$s/cp_step04_stock_mfi.c" lab/mu1005_route4_5/test_batch_mfi.c -ldl -o /tmp/mfi-test
-          /tmp/mfi-test "$CASE"
-  receiver-registration:
+  startup-provider-error:
     strategy:
       fail-fast: false
       max-parallel: 3
       matrix:
         case: [0, 1, 2]
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Test actual existing receiver registration verification
+      - name: Test actual startup watcher error handling
         env:
           CASE: ${{ matrix.case }}
         run: |
           set -euxo pipefail
-          s=integration/mu1005_si_native
-          cc -std=c99 -Wall -Wextra -Werror -I"$s" "$s"/{si_mu1005_registration,si_mu1005_layout}.c lab/mu1005_route4_5/test_batch_registration.c -o /tmp/reg-test
-          /tmp/reg-test "$CASE"
+          s=project/source/legacy_mu1005/bluetooth
+          cc -std=gnu99 -Wall -Wextra -Werror -I"$s" "$s"/{bt_startup_watch,bt_startup_snapshot,bt_trace_latch}.c lab/mu1005_route4_5/test_batch_startup_error.c -o /tmp/startup
+          /tmp/startup "$CASE"
+  ipc-terminal:
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        case: [0, 1, 2]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test existing IPC parser terminal and counter boundaries
+        env:
+          CASE: ${{ matrix.case }}
+        run: |
+          set -euxo pipefail
+          s=project/source/src
+          cc -std=c99 -Wall -Wextra -Werror -I"$s" "$s"/{cp_bt_bridge,cp_bt_stream,cp_step2_transport,cp_step2_ipc_link}.c lab/mu1005_route4_5/test_batch_ipc_close.c -o /tmp/ipc
+          /tmp/ipc "$CASE"

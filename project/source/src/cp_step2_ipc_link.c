@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "cp_step2_ipc_link.h"
 #include <string.h>
+#include <limits.h>
 
 static uint32_t read32(const uint8_t *p){
     return (uint32_t)p[0] | ((uint32_t)p[1]<<8) |
@@ -91,6 +92,7 @@ static int frame(struct cp_step2_ipc_link *s){
         if (!size) return poison(s);
         rc=cp_step2_transport_rx(&s->transport,s->local_generation,p+8,size);
         if (rc!=CP_BT_OK)return poison(s);
+        if(s->rx_frames==ULONG_MAX)return poison(s);
         s->rx_frames++;
         return CP_BT_OK;
     case 3:
@@ -104,6 +106,7 @@ static int frame(struct cp_step2_ipc_link *s){
         if (size)return poison(s);
         rc=cp_step2_transport_tx_done(&s->transport,s->local_generation,1);
         if (rc!=CP_BT_OK)return poison(s);
+        if(s->tx_confirmed==ULONG_MAX)return poison(s);
         s->tx_confirmed++;
         return CP_BT_OK;
     default:return poison(s);
@@ -132,6 +135,9 @@ int cp_step2_ipc_feed(struct cp_step2_ipc_link *s,const uint8_t *p,size_t n){
             int rc=frame(s);
             if (rc!=CP_BT_OK) return rc;
             s->used=0;s->expected=8;
+            /* A terminal frame consumes the whole stream. Even a partial
+             * subsequent header in this same read is a protocol violation. */
+            if(s->finished&&n)return poison(s);
         }
     }
     return CP_BT_OK;

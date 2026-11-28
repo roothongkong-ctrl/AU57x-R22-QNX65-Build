@@ -6,10 +6,14 @@ int mu_bt_startup_watch_tick_source(MuBtStartupWatch *w,int(*take)(void*),void *
  int(*read_live)(void*,uint32_t,void*,size_t),void(*ready)(void*,uint32_t),void *ctx){
  if(!w||!take||!ticks||ticks>100u||!enter||!leave||!read_live||!ready)return -1;
  /* A new trace does not indefinitely extend a pending startup window. */
- if(take(source)==1&&!w->remaining)w->remaining=ticks;
+ int event=take(source);
+ if(event!=0&&event!=1){w->remaining=0;return -1;}
+ if(event==1&&!w->remaining)w->remaining=ticks;
  if(!w->remaining)return 0;
  --w->remaining;
- if(!enter(ctx))return 0;
+ int acquired=enter(ctx);
+ if(acquired==0)return 0;
+ if(acquired!=1){w->remaining=0;return -1;}
  uint32_t service=0;
  if(mu_bt_sdk_lifecycle_sites(read_live,ctx))
      service=mu_bt_sdk_service_address(read_live,ctx);
