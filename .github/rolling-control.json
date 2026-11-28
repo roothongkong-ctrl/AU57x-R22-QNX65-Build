@@ -3,7 +3,7 @@
   "project": "AU57x MU1005 纯软件无线CarPlay",
   "branch": "mu1005-si-cprx-real-review",
   "command": "1 = 查状态、验收、修失败、立即补位；无需重复读取全部历史",
-  "goal": "首次真实不插USB无线CarPlay：iPhone原厂认证完成、2.4GHz无线会话建立、MMI出现CarPlay画面；保留有线与恢复。双频、自动重连和体验优化后置。",
+  "goal": "首次真实不插USB无线CarPlay：以用户已配对的原厂蓝牙和正常有线CarPlay为基线，仅补无线启动、iAP2 Wi-Fi参数及无线传输到既有原厂会话的差异；2.4GHz首连、MMI画面，保留有线与恢复。原厂认证正常执行但不是独立研发任务。",
   "budget": {
     "max_jobs": 20,
     "count": [
@@ -44,7 +44,7 @@
       24,
       35
     ],
-    "note": "此前12项统计未计入部分MFi等的交叉依赖；按实际任务登记为准。上述13个编号含第12项跨实车的联合接线，不代表13个独立开发工程。实际完成必须按证据更新，不凭测试数推算。",
+    "note": "保留原66项历史台账与35项限定软件完成，不虚报。原厂MFi第14项及Bonjour、接收器按原厂复用联合验收，不再列为独立首连研发；若真实无线链路证明缺失才做差异适配。",
     "install_allowed": false,
     "vehicle_evidence_required": true
   },
@@ -351,7 +351,7 @@
         8,
         9
       ],
-      "task": "Stock first: reuse existing pairing and original bluetooth.enableIap; preserve iap2.cfg (status reporting, not transport switch). Use pinned Congo/LuKa only for missing RFCOMM wireless startup and receiver adaptation. Do not redevelop pairing; no install until reversible complete candidate.",
+      "task": "既有配对后无线引导：原厂无线启动配置与已有蓝牙服务优先；若缺无线专用RFCOMM通道才复用Congo/LuKa，不重新配对或开发蓝牙全栈。仅追踪能实际接通的入口。",
       "paths": [
         "lab/mu1005_route4_5/parallel_native.py",
         "lab/mu1005_route4_5/cleanup_callees.py",
@@ -372,18 +372,7 @@
       "priority": 2,
       "steps": [
         11,
-        12
-      ],
-      "task": "复用已有driver/transport ABI与IPC字节确认，完成实际producer接线；依赖原厂owner，不重复已通过的字节模型。",
-      "paths": [
-        "lab/mu1005_route3_dispatch/ipc_finish.c",
-        "project/source/src/cp_step2_ipc_link.c"
-      ]
-    },
-    {
-      "priority": 3,
-      "steps": [
-        14,
+        12,
         17,
         18,
         21,
@@ -391,9 +380,10 @@
         23,
         24
       ],
-      "task": "优先独立真实原厂provider与接收器/Bonjour入口绑定，复用已通过适配；只有新增实际接线或新证据才开启专项。",
+      "task": "沿正常有线CarPlay的既有SI/iAP2会话复用认证、接收器、音视频及输入；只处理无线iAP2引导、真实AP参数和Wi-Fi数据传输的差异。Bonjour及原厂接收器默认复用；仅当实际路径证实缺失时补最小接口。禁止重复原厂已有模块的模拟。",
       "paths": [
-        "project/source/src/cp_step04_stock_mfi.c",
+        "lab/mu1005_route3_dispatch/ipc_finish.c",
+        "project/source/src/cp_step2_ipc_link.c",
         "integration/mu1005_si_native/ap_live/ap_refresh.c",
         "project/source/legacy_mu1005/airplay/mu1005_r34_ap_server.c",
         "lab/mu1005_stock_reuse/dns_provider.py",
@@ -402,11 +392,11 @@
       "evidence": "R105.233 original DNSServiceResolve witness source added; host regression pending; exact original DNS export and live DIO binding still required."
     },
     {
-      "priority": 4,
+      "priority": 3,
       "steps": [
         35
       ],
-      "task": "Prepare reversible first-link candidate in parallel, not after first physical phone link. Keep installation disabled until actual modified components and recovery are integrated; defer nonessential optimizations.",
+      "task": "并行组装可恢复最小首连候选，复用MIB；实际配置、备份恢复、安全及有线保留仍需确认；不启用未验收安装。",
       "evidence": "R105.232 current binary and stock configuration replacement/restore packaged in review payload; no vehicle activation."
     }
   ],
@@ -416,7 +406,8 @@
     "GitHub成熟代码优先，记录commit/license；不可绕过MFi",
     "下一轮不等待全批完成，有独立可执行任务即补位；无独立任务不凑数",
     "GitHub测试可自行运行；聊天结束后不会自主写新代码；控制文件非后台AI调度器",
-    "用户授权为首连目标自主改变研发路线，不为每项技术选型请求确认；安全与原厂认证不变。"
+    "用户授权为首连目标自主改变研发路线，不为每项技术选型请求确认；安全与原厂认证不变。",
+    "2026-11-28用户再次明确：手机与车机已完成原厂蓝牙配对，有线CarPlay正常；不再独立研发原厂认证或其他既有模块。只研发无线引导和无线传输差异，原厂认证照常执行，不绕过。此条优先于旧任务分组。"
   ],
   "history": [
     "docs/WIRELESS_FIRST_LINK_TASK_REGISTER_CN.md",
@@ -427,26 +418,27 @@
     "toolchain": "luka-dev/qnx65-armv7-toolchain@baa45224f18ae6b13c2e9c77c6663bb8181eb6a1"
   },
   "first_link_strategy": {
-    "priority": "first real wireless connection, not cosmetic polish or test counts",
+    "priority": "最小无线差异优先；已有蓝牙配对与有线CarPlay不重做，不把原厂认证、接收器、Bonjour独立重建作为首连前置",
     "routes": [
       {
         "name": "factory",
-        "action": "原厂隐藏功能与原厂认证/传输入口优先；有真实接线证据才继续"
+        "action": "已配对蓝牙触发原厂无线启动；优先复用原有SI/iAP2、MFi、AirPlay、Bonjour和热点，沿原厂有线会话已有入口寻找无线传输选项，只补缺失差异。"
       },
       {
         "name": "upstream-graft",
-        "action": "原厂路径遇到不可证明或不兼容的关键接口，切换已复用LuKa graft/daemon适配，仍使用原厂MFi"
+        "action": "原厂无线入口不足时复用已固定版本Congo/LuKa的无线引导和传输桥，保留原厂认证及原有接收器；不得把蓝牙配对等同无线会话。"
       },
       {
         "name": "hybrid",
-        "action": "独立复用已验证的原厂认证、上游iAP2桥及原厂AirPlay/SI接收器；按接口实际证据选择"
+        "action": "若原厂入口不能接收无线传输，最小适配已有桥到同一原厂会话，按实证处理阻塞，不预先独立重建各provider。"
       }
     ],
     "switch_rule": "每次研发优先一个能改变首连结论的实质动作；若某路线无可用原厂证据、不能兼容或重复无新证据，记录阻塞并推进替代路线；不强制把一条路线全部做完，不重复无效实验。独立工作并行，切换前清理原有资源，不并发占用原厂服务。",
     "defer": [
       "5GHz",
       "自动重连体验优化",
-      "非首连所需功能优化"
+      "非首连所需功能优化",
+      "独立MFi provider/Bonjour/接收器重建或重复认证实验，除非原厂路径实际证明缺失"
     ],
     "retain": [
       "原厂MFi",
