@@ -1,0 +1,19 @@
+name: R105.241 existing stock registry peer snapshot (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['lab/mu1005_paired_start/peer_snapshot.*','lab/mu1005_paired_start/test_peer_snapshot.c','.github/workflows/r105241-peer-snapshot.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  peer-snapshot:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -euxo pipefail
+          b=project/source/legacy_mu1005/bluetooth
+          l=lab/mu1005_paired_start
+          cc -std=c99 -D_DEFAULT_SOURCE -Wall -Wextra -Werror -g -fsanitize=address,undefined -fno-omit-frame-pointer -no-pie -I"$b" -I"$l" "$l"/peer_snapshot.c "$l"/test_peer_snapshot.c "$b"/native_event.c "$b"/inbound.c "$b"/inbound_r5.c "$b"/mu1005_rf_ingress.c "$b"/mu1005_ipc_stream.c "$b"/mu1005_socket_pump.c -o /tmp/peer-snapshot
+          /tmp/peer-snapshot

@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.240",
+    "version": "R105.241",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 1
+      "dependent_not_yet_listed": 6
     },
     "runs": [],
     "verified_prior": [
@@ -385,10 +385,20 @@
           46106786486
         ],
         "evidence": "Exact original static callers remote=43, RF client=5, SDP query=1, parse=32. All five RF callers compare r0 to 2; no runtime ABI."
+      },
+      {
+        "version": "R105.240",
+        "passed": 14,
+        "runs": [
+          46107105812,
+          46107105769,
+          46107105809
+        ],
+        "evidence": "Native library and original client pending contract, SI and unified review passed. No OEM runtime connection."
       }
     ],
-    "discovery": "Apply original five-callsite pending return contract to existing autoconnect, avoid treating uncertain raw vendor return as released, maintain cancellation. Native call/peer/descriptor owner still not implemented.",
-    "expected_jobs": 1,
+    "discovery": "Actual bounded selected peer association lookup in existing stock RFCOMM registry using existing native registry and bond metadata readers. Does not infer ACL from old bond, no credentials. Requires selected phone and native owner lifetime, no actual call yet.",
+    "expected_jobs": 6,
     "pending_prior": [
       46106440500
     ]
@@ -426,9 +436,10 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h",
         "lab/mu1005_paired_start/paired_start.c",
-        "lab/mu1005_paired_start/client_contract.py"
+        "lab/mu1005_paired_start/client_contract.py",
+        "lab/mu1005_paired_start/peer_snapshot.c"
       ],
-      "evidence": "R105.239 exact static caller evidence accepted; R105.240 existing controller normalizes return 2 to pending, uncertain result waits for original release; no real native provider."
+      "evidence": "R105.241 original registry selected-peer association search added; no new pairing or auth. Caller still needs original selected-phone and lifetime/ACL provider; RFCOMM client call unresolved."
     },
     {
       "priority": 2,
