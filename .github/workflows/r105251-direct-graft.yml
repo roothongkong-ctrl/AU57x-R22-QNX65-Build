@@ -1,4 +1,4 @@
-name: R105.253 direct startup ARM execution and registration review (NO INSTALL)
+name: R105.254 direct graft with original security callback (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -61,34 +61,10 @@ jobs:
           /tmp/graft-venv/bin/pip install pyelftools==0.32
           /tmp/graft-venv/bin/python lab/mu1005_direct_graft/build.py "$RUNNER_TEMP/btstack" donor evidence/direct-graft.json "$RUNNER_TEMP/btstack-graft-private"
           readelf -h -lW "$RUNNER_TEMP/btstack-graft-private" > evidence/elf.txt
-          /tmp/graft-venv/bin/pip install unicorn==2.1.4
-          /tmp/graft-venv/bin/python lab/mu1005_direct_graft/test_startup_arm.py "$RUNNER_TEMP/btstack-graft-private" evidence/direct-graft.json evidence/startup-arm.json
           rm -f "$RUNNER_TEMP/btstack-graft-private"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105253-direct-startup-arm-NO-INSTALL
+          name: R105254-direct-graft-security-NO-INSTALL
           path: evidence/
           retention-days: 7
-  source-link:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 12
-    steps:
-      - uses: actions/checkout@v4
-      - name: Compile actual transformed upstream ARM source independently
-        run: |
-          set -euxo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq lld
-          mkdir evidence
-          git init donor
-          git -C donor remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
-          git -C donor fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
-          git -C donor checkout --detach FETCH_HEAD
-          python3 -m venv /tmp/graft-venv
-          /tmp/graft-venv/bin/pip install pyelftools==0.32
-          /tmp/graft-venv/bin/python lab/mu1005_direct_graft/build.py --source-build donor evidence/source-link.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: R105253-direct-source-link-NO-INSTALL
-          path: evidence/

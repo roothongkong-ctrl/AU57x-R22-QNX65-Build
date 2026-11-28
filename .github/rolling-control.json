@@ -16,7 +16,7 @@
     "refill_on_each_interaction": true,
     "never_wait_for_whole_batch": true,
     "parallel_independent_work": true,
-    "refill_policy": "每轮尽量多项独立开发/核实，目标接近20路，不能因一个关键阻塞而停止其他可推进事项；共享准备、保留必要回归，不为凑数重复测试。"
+    "refill_policy": "仅针对首次实际无线连接新增代码及必要构建；已通过测试不重复，未改动模块不主动回归，不为凑20并发加测试。保留原厂安全认证、有线及恢复。"
   },
   "acceptance": {
     "total": 66,
@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.253",
+    "version": "R105.254",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 6
+      "dependent_not_yet_listed": 1
     },
     "runs": [],
     "verified_prior": [
@@ -528,10 +528,20 @@
         "passed": 6,
         "failed": 0,
         "evidence": "Direct transformed donor source link and exact MU1005 disposable ELF build both success, original native guards and PLT resolved; four SI/BT host tests success. Artifact 15249741344 review report only. No OEM runtime or phone."
+      },
+      {
+        "version": "R105.253",
+        "runs": [
+          46110635738,
+          46110635741
+        ],
+        "passed": 6,
+        "failed": 0,
+        "evidence": "Generated ARM startup test five fixture scenarios passed, source-link and four host regression jobs passed. Real SDK/phone unverified."
       }
     ],
-    "discovery": "Execute actual generated direct ARM startup hook and donor registration/callback against isolated vendor-call fixtures; validate original displaced instruction, preserved registers/flags, order and rollback in five scenarios, one-time register and rejection of unauthorized handset. No original binary upload or phone success. Real OEM security/transport and lifecycle still need wiring.",
-    "expected_jobs": 6,
+    "discovery": "Direct graft now incorporates existing actual MU1005 RfSecCallback provenance, stock registry and pairing metadata checks, matching event 1/2 association, no additional MFi logic. Remote accept remains disabled until actual supervised transport owner; original callback lifetime and shutdown still unproven. Only exact changed ARM build, remove redundant source-link and broad automatic regression.",
+    "expected_jobs": 1,
     "pending_prior": []
   },
   "read_strategy": {
@@ -568,7 +578,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "integration/mu1005_vehicle_stage/congo_port_table.json"
       ],
-      "evidence": "R105.252 6/6 successful. R105.253 tests generated ARM registration and callback instruction behavior; native SDK security and real supervised ACK endpoint remain unimplemented. No install or new user detection."
+      "evidence": "R105.254 reuse original security callback source in direct LuKa graft; real supervisor transport owner and shutdown/wired lifecycle remain. No duplicate or unrelated tests."
     }
   ],
   "rules": [

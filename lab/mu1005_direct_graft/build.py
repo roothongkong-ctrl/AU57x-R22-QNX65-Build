@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Direct LuKa graft port to an exact private MU1005 copy.
-Registration build only: remote accepts remain disabled until the existing
-MU1005 native security callback and supervised transport are connected.
+Registration review: original MU1005 security checks are integrated into the
+callback. Remote acceptance remains disabled until supervised transport exists.
 No original bytes or modified OEM executable are exported from CI.
 """
 import hashlib,json,re,shutil,struct,subprocess,sys,tempfile
@@ -57,6 +57,53 @@ def imports(b):
         need(len(matches)==1,"missing/ambiguous PLT "+name)
         result[macro]=matches[0]
     return result
+def original_security_source():
+    # Reuse the existing audited pure functions, not an invented security policy.
+    p=ROOT/"project/source/legacy_mu1005/bluetooth/native_event.c"
+    text=p.read_text()
+    lo=text.index("/* Original ET_EXEC bt symbol")
+    # Only these three pure helpers and the original registry/bond/security checks.
+    prefix=text[text.index("static uint32_t le32("):text.index("int mu38_resolve_peer(")]
+    local=r'''
+typedef u8 uint8_t;
+typedef u32 uint32_t;
+typedef unsigned size_t;
+#define UINT32_MAX 0xffffffffu
+static int mu_memcmp(const void *a,const void *b,size_t n){
+    const u8*x=a,*y=b;for(size_t i=0;i<n;i++)if(x[i]!=y[i])return (int)x[i]-(int)y[i];return 0;
+}
+#define memcmp mu_memcmp
+'''
+    return local+prefix+text[lo:]+r'''
+/* Direct graft: only called at the original RFCOMM SDK callback boundary.
+ * The fixed stock reads below are restricted to the exact previously pinned
+ * code/data, or our own channel object. Never read stored Bluetooth keys.
+ * Review only: callback lifetime, supervisor transport and shutdown must
+ * be integrated before any remote acceptance is enabled. */
+static int mu_graft_read(void *ctx,u32 address,void *out,unsigned n) {
+    struct GraftState *s=ctx;
+    u32 ch=(u32)&s->channel;
+    if(!n || address>0xffffffffu-(n-1))return 0;
+    int permitted=(address>=0x100000u && address<0x2b97dcu && n<=0x2b97dcu-address) ||
+       (address>=0x2c0000u && address<0x508780u && n<=0x508780u-address) ||
+       (address>=ch && address-ch<sizeof s->channel && n<=sizeof s->channel-(address-ch));
+    if(!permitted)return 0;
+    bytes_copy(out,(const u8*)address,n);
+    return 1;
+}
+static int mu_graft_peer(struct GraftState*s,const struct RfEvent*e,u8 mac[6]) {
+    u32 a=(u32)e->data;
+    if(!a || (a&3u) || a>0xffffffffu-18u ||
+       !mu38_registry_association((u32)&s->channel,a,mu_graft_read,s))return 0;
+    /* The original synchronous SDK callback owns the associated object.
+     * Restrict this disposable graft to the exact registered peer pointer. */
+    bytes_copy(mac,(const u8*)a+13u,6);
+    return mu38_stock_bond_present(mac,mu_graft_read,s) &&
+        mu38_registry_association((u32)&s->channel,a,mu_graft_read,s);
+}
+
+'''
+
 def adapt(s,m):
     s=rep(s,"#define STATE_ADDR 0x510000u",f"#define STATE_ADDR {STATE:#x}u")
     for macro,va in m.items():
@@ -64,15 +111,46 @@ def adapt(s,m):
         s,n=re.subn(pattern,lambda x:x[1]+f"{va:#x}u"+x[2],s)
         need(n==1,"upstream macro "+macro)
     s=rep(s,"RF_REGISTER(&s->channel, &s->granted_channel, 0)","RF_REGISTER(&s->channel, &s->granted_channel, 4)")
-    # Keep the entire donor registration, callback and worker in the candidate,
-    # but do not accept a handset on the unverified direct callback.
-    s=rep(s,"(void)RF_ACCEPT(channel, ready);","(void)ready; (void)RF_ACCEPT(channel, 0); /* review only; OEM security bridge not yet wired */")
+    # Preserve donor state layout by appending the new fields.
+    s=rep(s,"    u8 peer_address[6], peer_valid;","    u8 peer_address[6], peer_valid;\\n    volatile u32 transport_owner_verified;\\n    u32 pending_association;")
+    # Reuse the real MU1005 original security callback and paired-record check.
+    # No writer exists for transport_owner_verified yet: actual remote acceptance
+    # remains disabled until the independently supervised endpoint is wired.
+    s=rep(s,"void graft_rf_callback(void *channel, const struct RfEvent *event) {",original_security_source()+r'''
+static void graft_rf_dispatch(void*,const struct RfEvent*,u32,u32) __attribute__((used,noinline));
+__attribute__((naked,noinline)) void graft_rf_callback(void *channel __attribute__((unused)),const struct RfEvent *event __attribute__((unused))) {
+    __asm__ volatile(
+        "mov r2, lr\n"
+        "mov r3, #0\n"
+        "ldr r12, =0x203d54\n"
+        "cmp lr, r12\n"
+        "ldreq r3, [sp, #44]\n"
+        "b graft_rf_dispatch\n"
+    );
+}
+static void graft_rf_dispatch(void *channel,const struct RfEvent *event,u32 lr,u32 caller) {
+''')
+    s=rep(s,"        (void)RF_ACCEPT(channel, ready);",r'''        u8 mac[6];
+        int allow=ready && !event->status && !s->connected && !s->pending_association &&
+            __atomic_load_n(&s->transport_owner_verified,__ATOMIC_ACQUIRE)==1u &&
+            mu38_stock_rf_security_request((u32)channel,lr,caller,mu_graft_read,s) &&
+            mu_graft_peer(s,event,mac);
+        if(allow)s->pending_association=(u32)event->data;
+        if(RF_ACCEPT(channel,allow)!=2){s->pending_association=0;__atomic_store_n(&s->overflow,1u,__ATOMIC_RELEASE);}
+''')
     # MU1005 registration gives four initial credits; donor originally
     # passed zero and refilled four on first CONNECTED. Do not double grant.
     s=rep(s,"(void)RF_CREDIT(&s->channel, 4);","/* MU1005 initial credits already granted by registration */")
-    # This isolated build has no genuine accepted session. No later event
-    # may produce a false connected notification or forward handset data.
-    s=rep(s,"    if (event->code == 2u) {","    if (event->code == 2u) { return; /* no authorized connection in review build */")
+    s=rep(s,"    if (event->code == 2u) {",r'''    if (event->code == 2u) {
+        u8 mac[6];
+        if(event->status || lr!=0x203d54u || !s->pending_association ||
+           s->pending_association!=(u32)event->data ||
+           __atomic_load_n(&s->transport_owner_verified,__ATOMIC_ACQUIRE)!=1u ||
+           !mu_graft_peer(s,event,mac)) {s->pending_association=0;return;}
+        s->pending_association=0;
+''')
+    s=rep(s,"        s->peer_valid = event->data != 0;\\n        if (s->peer_valid) bytes_copy(s->peer_address,(const u8 *)event->data+13,6);","        s->peer_valid = 1;\\n        bytes_copy(s->peer_address,mac,6);")
+    s=rep(s,"    if (event->code == 4u) {","    if (event->code == 4u) { s->pending_association=0;")
     # The old EIR trampoline is firmware-specific; do not install it.
     # The registered SDP records and original refresh are reused.
     start=s.index("/* At 0x12A710:")
@@ -135,6 +213,10 @@ def main(stock,donor,out,private):
     checked={int(a,16):int(w,16) for a,w in re.findall(r"\{(0x[0-9a-f]+)u,(0x[0-9a-f]+)u\}",guards)}
     for a,w in checked.items():need(word(b,a)==w,"native guard "+hex(a))
     need(word(b,MAP["EIR_REQUEST"])==0xe92d4010,"EIR guard")
+    # Reuse the original security anchor table from native_event.c.
+    sec=(ROOT/"project/source/legacy_mu1005/bluetooth/native_event.c").read_text().split("int mu38_stock_rf_security_request(",1)[1]
+    for a,w in re.findall(r"\{(0x[0-9a-f]+)u,(0x[0-9a-f]+)u\}",sec):
+        need(word(b,int(a,16))==int(w,16),"original security guard "+a)
     m=MAP|imports(b)
     source=adapt((donor/"wireless/graft/graft.c").read_text(),m)
     code,hook=compile_graft(source,donor)
@@ -151,7 +233,7 @@ def main(stock,donor,out,private):
     result.extend(bytes(off-len(result)));result.extend(payload);result.extend(bytes(stateoff-len(result)))
     need(headers(result)==new and stock.read_bytes()==b,"postbuild validation")
     private.write_bytes(result)
-    out.write_text(json.dumps(dict(scope="DIRECT_DONOR_REGISTRATION_BUILD_REVIEW_ONLY",original_sha256=PIN,generated_sha256=sha(result),donor=DONOR,startup=hex(HOOK),hook=hex(hook),resume="0x11ec9c",native={k:hex(v) for k,v in m.items()},native_guard_count=len(checked),code_size=len(code),original_loads_preserved=True,remote_accept=False,installable=False,vehicle_verified=False,runtime_verified=False,remaining=["native security callback and paired authorization","supervised endpoint and wire ACK","lifecycle stop and wired handoff"]),indent=2)+"\n")
+    out.write_text(json.dumps(dict(scope="DIRECT_DONOR_REGISTRATION_BUILD_REVIEW_ONLY",original_sha256=PIN,generated_sha256=sha(result),donor=DONOR,startup=hex(HOOK),hook=hex(hook),resume="0x11ec9c",native={k:hex(v) for k,v in m.items()},native_guard_count=len(checked),code_size=len(code),original_loads_preserved=True,remote_accept=False,installable=False,vehicle_verified=False,runtime_verified=False,security_callback_source_integrated=True,remaining=["actual supervised transport ownership and wire ACK","callback lifetime and original shutdown/wired handoff"]),indent=2)+"\n")
     print("DIRECT_MU1005_DONOR_STARTUP_BUILD_ONLY_NO_INSTALL")
 if __name__=="__main__":
     if len(sys.argv)==4 and sys.argv[1]=="--source-build":
