@@ -1,8 +1,8 @@
-name: R105.252 direct LuKa startup graft build (NO INSTALL)
+name: R105.253 direct startup ARM execution and registration review (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: ['.github/workflows/r105251-direct-graft.yml','lab/mu1005_direct_graft/build.py']
+    paths: ['.github/workflows/r105251-direct-graft.yml','lab/mu1005_direct_graft/**']
   workflow_dispatch:
 permissions:
   contents: read
@@ -61,11 +61,13 @@ jobs:
           /tmp/graft-venv/bin/pip install pyelftools==0.32
           /tmp/graft-venv/bin/python lab/mu1005_direct_graft/build.py "$RUNNER_TEMP/btstack" donor evidence/direct-graft.json "$RUNNER_TEMP/btstack-graft-private"
           readelf -h -lW "$RUNNER_TEMP/btstack-graft-private" > evidence/elf.txt
+          /tmp/graft-venv/bin/pip install unicorn==2.1.4
+          /tmp/graft-venv/bin/python lab/mu1005_direct_graft/test_startup_arm.py "$RUNNER_TEMP/btstack-graft-private" evidence/direct-graft.json evidence/startup-arm.json
           rm -f "$RUNNER_TEMP/btstack-graft-private"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105252-direct-donor-build-review-NO-INSTALL
+          name: R105253-direct-startup-arm-NO-INSTALL
           path: evidence/
           retention-days: 7
   source-link:
@@ -88,5 +90,5 @@ jobs:
           /tmp/graft-venv/bin/python lab/mu1005_direct_graft/build.py --source-build donor evidence/source-link.json
       - uses: actions/upload-artifact@v4
         with:
-          name: R105252-direct-source-link-NO-INSTALL
+          name: R105253-direct-source-link-NO-INSTALL
           path: evidence/

@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.252",
+    "version": "R105.253",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -518,9 +518,19 @@
           46109969799
         ],
         "evidence": "Exact original extraction, all native guards and original PLT resolution, actual upstream source C compilation completed. Link failed because ld.lld absent on runner. SI workflow success. No direct binary produced."
+      },
+      {
+        "version": "R105.252",
+        "runs": [
+          46110222736,
+          46110222769
+        ],
+        "passed": 6,
+        "failed": 0,
+        "evidence": "Direct transformed donor source link and exact MU1005 disposable ELF build both success, original native guards and PLT resolved; four SI/BT host tests success. Artifact 15249741344 review report only. No OEM runtime or phone."
       }
     ],
-    "discovery": "Install actual ARM linker and parallel independent upstream source link with exact original ELF build. Correct duplicate initial credit grant and prohibit false connected frames in non-accepting review build. Actual phone acceptance/security and supervised endpoint remain incomplete. No installation.",
+    "discovery": "Execute actual generated direct ARM startup hook and donor registration/callback against isolated vendor-call fixtures; validate original displaced instruction, preserved registers/flags, order and rollback in five scenarios, one-time register and rejection of unauthorized handset. No original binary upload or phone success. Real OEM security/transport and lifecycle still need wiring.",
     "expected_jobs": 6,
     "pending_prior": []
   },
@@ -558,7 +568,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "integration/mu1005_vehicle_stage/congo_port_table.json"
       ],
-      "evidence": "R105.252 direct startup compile/link retry; exact firmware path and source build run independently; native callbacks, real supervised endpoint and original lifecycle still must be integrated. 20 max parallel jobs; no padding or repeat vehicle probes."
+      "evidence": "R105.252 6/6 successful. R105.253 tests generated ARM registration and callback instruction behavior; native SDK security and real supervised ACK endpoint remain unimplemented. No install or new user detection."
     }
   ],
   "rules": [
