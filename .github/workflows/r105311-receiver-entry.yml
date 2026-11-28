@@ -1,0 +1,31 @@
+name: R105.311 original receiver launcher and v75gen fault investigation (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105311-receiver-entry.yml','lab/mu1005_receiver_entry/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-provider:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Analyze exact public companion files and crash address
+        run: |
+          set -euxo pipefail
+          mkdir evidence
+          git init donor
+          git -C donor remote add origin https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps.git
+          git -C donor fetch --depth 1 origin aec37f5b1c87a0d961d16fe4328ac3638d0a833e
+          git -C donor checkout --detach FETCH_HEAD
+          test "$(git -C donor rev-parse HEAD)" = aec37f5b1c87a0d961d16fe4328ac3638d0a833e
+          python3 -m venv /tmp/receiver-entry
+          /tmp/receiver-entry/bin/pip install pyelftools==0.31 capstone==5.0.3
+          /tmp/receiver-entry/bin/python lab/mu1005_receiver_entry/inspect.py donor evidence/receiver-entry.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R105311-original-entry-NO-INSTALL
+          path: evidence/
