@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.217",
+    "version": "R105.218",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 2
+      "dependent_not_yet_listed": 1
     },
     "runs": [],
     "verified_prior": [
@@ -174,24 +174,32 @@
           46091835544
         ],
         "evidence": "15/15 passed, full ARM build. DIO direct callsites only known 0x15df68/88/bc; new StopController vtable relocation 0x1a7710. Driver 47 paired stores, only four non-SP, all unrelated packet/medialib functions; no descriptor producer proved. R105.212 dispatch loads object table at +0x40 before slot +0x28/+0x2c."
-      }
-    ],
-    "discovery": "R105.217 actual QNX spawn and inherited socket FD3/reap test, isolated helper (not donor RF), using pinned upstream boot and reused SDK socket-manager bootstrap, plus host equivalent. R105.216 still active, no repeat. No OEM lifecycle binding or iPhone evidence.",
-    "expected_jobs": 2,
-    "pending_prior": [
+      },
       {
         "version": "R105.216",
+        "passed": 15,
         "runs": [
           46092077540,
           46092077400,
           46092077382
         ],
+        "evidence": "15/15 jobs passed. StopController vtable 0x1a44e0 (32 bytes), six stripped candidate functions, one direct caller 0x1262fc to 0x125f48. Actual +0x40 stores only two unrelated medialib/config functions; no transport descriptor producer confirmed. No further blind scan."
+      }
+    ],
+    "discovery": "R105.218 switches priority to complete upstream donor ARM build including previously host-proven ACK and inherited stream plus earlier 3 adaptations. Uses existing pinned Rust build workflow and default features, no native-api-lab. Artifact not deployable. R105.216 static provider candidates not sufficient for runtime binding.",
+    "expected_jobs": 1,
+    "pending_prior": [
+      {
+        "version": "R105.217",
+        "runs": [
+          46092198242,
+          46092198190
+        ],
         "observed": {
-          "success": 10,
-          "running": 4,
-          "pending": 1
+          "success": 5,
+          "running": 1
         },
-        "note": "4 SI host and 6 parallel host success at inspection; original provider and ARM build still running; do not claim full pass."
+        "note": "Host real process, SI host regressions passed; actual QNX supervisor test running."
       },
       {
         "version": "Congo",
@@ -200,7 +208,8 @@
         ],
         "observed": {
           "running": 1
-        }
+        },
+        "note": "recursive dependency unit test passed, toolchain still building"
       }
     ]
   },
@@ -237,7 +246,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.216 pending provider results. R105.217 checks actual QNX child process/FD transfer/reap, previously only host + ARM build. Reuse evidence and avoid more static scans without a concrete candidate."
+      "evidence": "R105.216 no original transport provider; R105.217 host actual FD supervisor success, QNX run pending. R105.218 compiles full adapted production donor with ACK and inherited FD, prioritizing upstream/hybrid path. No real OEM lease, MFi or RF."
     },
     {
       "priority": 2,
