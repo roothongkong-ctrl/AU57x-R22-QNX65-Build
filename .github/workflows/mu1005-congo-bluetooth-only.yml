@@ -2,11 +2,14 @@ name: Congo Bluetooth-only QNX runtime and SDK symbols (NO INSTALL)
 on:
   push:
     branches: [mu1005-congo-bluetooth-only-runtime]
+    paths: ['.github/workflows/mu1005-congo-bluetooth-only.yml']
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   independent:
+    # Do not consume runners on known-unavailable environments.
+    if: vars.QNX65_RUNNER_LABEL != '' || vars.QNX65_EXISTING_IMAGE != ''
     runs-on: ${{ vars.QNX65_RUNNER_LABEL || 'ubuntu-24.04' }}
     timeout-minutes: 60
     strategy:
@@ -131,12 +134,21 @@ jobs:
           a='$NAME\nEOF\n'
           assert s.count(a)==1
           s=s.replace(a,'$NAME\nlibbthook.so\nEOF\n')
+          # U-Boot can consume the first input before the autoboot prompt.
+          # Send bounded repeated ENTERs and wait before issuing disk commands.
+          a="( printf '\\n'; sleep 4"
+          assert s.count(a)==1
+          s=s.replace(a,"( for i in 1 2 3 4 5 6 7 8 9 10; do printf '\\r'; sleep 1; done; sleep 2")
+          # Retain serial log even when U-Boot never reaches the program.
+          a='if ! grep -q \'@@QNXRUN-START@@\' "$LOG"; then'
+          assert s.count(a)==1
+          s=s.replace(a,'[ -z "${QEMU_KEEP_LOG:-}" ] || cp "$LOG" "$QEMU_KEEP_LOG"\n'+a)
           a='qemu-system-arm -M virt'
           assert s.count(a)==1
           s=s.replace(a,'qemu-system-arm -nic none -M virt')
           p.with_name("qemu-hook.sh").write_text(s)
           PY
-          HOOK_FILE="$PWD/stage/libbthook.so" QEMU_KEEP_LOG="$PWD/evidence/qemu.log" QEMU_RUN_SECS=10 QEMU_TIMEOUT=60 bash toolchain/tests/qemu-hook.sh "$PWD/probe" 8.5 | tee evidence/probe.log
+          HOOK_FILE="$PWD/stage/libbthook.so" QEMU_KEEP_LOG="$PWD/evidence/qemu.log" QEMU_RUN_SECS=20 QEMU_TIMEOUT=95 bash toolchain/tests/qemu-hook.sh "$PWD/probe" 8.5 | tee evidence/probe.log
           grep -Fq HOOK_LOAD_OK_NO_STOCK_BTSTACK_NO_PHONE evidence/probe.log
       - uses: actions/upload-artifact@v4
         if: always()
