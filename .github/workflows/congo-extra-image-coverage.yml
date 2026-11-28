@@ -1,0 +1,38 @@
+name: Congo previously excluded original MMX image coverage (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-congo-extra-images]
+    paths: [.github/workflows/congo-extra-image-coverage.yml, lab/congo_extra_image/**]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-extra-images:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read retained archive, without repeating app70/stage2/EFS extraction
+        run: |
+          set -euxo pipefail
+          mkdir -p firmware
+          gh run download 45923122041 --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
+          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  $archive" | sha256sum -c -
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          test "$(git -C extractor rev-parse HEAD)" = 64a44fe23dbaa08771440d69642d2874d7028295
+          python3 -m venv /tmp/congo-venv
+          /tmp/congo-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          /tmp/congo-venv/bin/python lab/congo_extra_image/inspect.py "$archive" extractor evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: congo-extra-image-coverage-metadata-only
+          path: evidence/*.json
+          retention-days: 7
