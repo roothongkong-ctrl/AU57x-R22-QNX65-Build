@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.243",
+    "version": "R105.244",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 9
+      "dependent_not_yet_listed": 5
     },
     "runs": [],
     "verified_prior": [
@@ -416,13 +416,23 @@
           46107516710
         ],
         "evidence": "Host contract and SI/paired controller pass; ARM fails size_t missing, not runtime. R105.243 adds sys/types.h."
+      },
+      {
+        "version": "R105.243",
+        "passed": 10,
+        "runs": [
+          46107619849,
+          46107619785,
+          46107619822,
+          46107619770,
+          46107619843
+        ],
+        "evidence": "Both original adapters ARM compile and exact original guards passed. Old separate R105.237 joint run 46106440500 failed QEMU tmp mkdtemp, Bluetooth fixture markers passed; not actual vehicle."
       }
     ],
-    "discovery": "Fix QNX size_t header; implement QNX-only original RFCOMM open adapter using independently certified CMGR/SDP/client descriptor, original entry checks, native raw return. Exact firmware guard verification in parallel. No actual production caller/descriptor or link yet.",
-    "expected_jobs": 9,
-    "pending_prior": [
-      46106440500
-    ]
+    "discovery": "Stop incremental mock/adapter churn. Package one original-route review session using existing exact config transaction, existing compiled observer and original backup. Apply disabled until vehicle path/rollback review. If stock cannot supply service, switch to full mature donor integration instead of additional isolated wrappers.",
+    "expected_jobs": 5,
+    "pending_prior": []
   },
   "read_strategy": {
     "first_parallel": [
@@ -440,33 +450,7 @@
       "steps": [
         6,
         8,
-        9
-      ],
-      "task": "既有配对后无线引导：原厂无线启动配置与已有蓝牙服务优先；若缺无线专用RFCOMM通道才复用Congo/LuKa，不重新配对或开发蓝牙全栈。仅追踪能实际接通的入口。",
-      "paths": [
-        "lab/mu1005_route4_5/parallel_native.py",
-        "lab/mu1005_route4_5/cleanup_callees.py",
-        "lab/mu1005_route4_5/lifecycle_cfg.py",
-        "project/source/legacy_mu1005/bluetooth/bt_queue_pulse.c",
-        "project/source/legacy_mu1005/bluetooth/bt_startup_watch.c",
-        "integration/mu1005_si_native/BT_QUEUE_BOOTSTRAP_CN.md",
-        "lab/mu1005_route4_5/daemon_supervisor.c",
-        "project/source/legacy_mu1005/bluetooth/bt_notify_bridge.c",
-        "lab/mu1005_route4_5/supervised_notify.c",
-        "lab/mu1005_route4_5/supervised_notify.h",
-        "lab/mu1005_route4_5/supervised_startup.c",
-        "lab/mu1005_route4_5/supervised_startup.h",
-        "lab/mu1005_paired_start/paired_start.c",
-        "lab/mu1005_paired_start/client_contract.py",
-        "lab/mu1005_paired_start/peer_snapshot.c",
-        "lab/mu1005_paired_start/cmgr_peer.c",
-        "lab/mu1005_paired_start/rf_client.c"
-      ],
-      "evidence": "R105.243 actual native client open call candidate added with R105.242 CMGR and original normalized return. Requires genuine original descriptor and SDP owner; ARM compilation and exact original guard verification pending."
-    },
-    {
-      "priority": 2,
-      "steps": [
+        9,
         11,
         12,
         17,
@@ -474,27 +458,41 @@
         21,
         22,
         23,
-        24
-      ],
-      "task": "沿正常有线CarPlay的既有SI/iAP2会话复用认证、接收器、音视频及输入；只处理无线iAP2引导、真实AP参数和Wi-Fi数据传输的差异。Bonjour及原厂接收器默认复用；仅当实际路径证实缺失时补最小接口。禁止重复原厂已有模块的模拟。",
-      "paths": [
-        "lab/mu1005_route3_dispatch/ipc_finish.c",
-        "project/source/src/cp_step2_ipc_link.c",
-        "integration/mu1005_si_native/ap_live/ap_refresh.c",
-        "project/source/legacy_mu1005/airplay/mu1005_r34_ap_server.c",
-        "lab/mu1005_stock_reuse/dns_provider.py",
-        "lab/mu1005_stock_reuse/dns_resolve.c",
-        "lab/mu1005_route3_dispatch/route3_fd.c"
-      ],
-      "evidence": "R105.236 real QNX ARM raw FD runtime passed. Original plugin producer still missing."
-    },
-    {
-      "priority": 3,
-      "steps": [
+        24,
         35
       ],
-      "task": "并行组装可恢复最小首连候选，复用MIB；实际配置、备份恢复、安全及有线保留仍需确认；不启用未验收安装。",
-      "evidence": "R105.234 exact original configuration/core recovery and combined review both passed; install gate remains false."
+      "task": "一次原厂首连试验候选：固定现有配对及有线正常；复用 R105.146/R105.222/R105.234；核实 active config path、实际消费、备份及回滚。禁止新孤立适配器；review 包 apply 禁用直到真实路径及恢复审查。",
+      "paths": [
+        "integration/mu1005_vehicle_stage/first_link_session.sh",
+        "lab/mu1005_first_link_trial/trial.sh",
+        "lab/mu1005_first_link_config/first_link_config.sh",
+        "lab/mu1005_bt_live_observe/probe.sh"
+      ],
+      "evidence": "R105.244 package CI pending. No physical trial, no install authorization."
+    },
+    {
+      "priority": 2,
+      "steps": [
+        6,
+        8,
+        9,
+        11,
+        12,
+        17,
+        18,
+        21,
+        22,
+        23,
+        24,
+        35
+      ],
+      "task": "原厂路线不成立则整体复用成熟 Congo/LuKa 无线桥；只做真正运行入口及端到端绑定，不新增无真实提供者的 wrapper。",
+      "paths": [
+        "integration/mu1005_vehicle_stage/congo_port_table.json",
+        "lab/mu1005_route4_5/supervised_startup.c",
+        "lab/mu1005_route3_dispatch/route3_fd.c"
+      ],
+      "evidence": "R105.231 full ARM donor already built; actual owner and session entry not connected."
     }
   ],
   "rules": [
@@ -504,7 +502,8 @@
     "下一轮不等待全批完成，有独立可执行任务即补位；无独立任务不凑数",
     "GitHub测试可自行运行；聊天结束后不会自主写新代码；控制文件非后台AI调度器",
     "用户授权为首连目标自主改变研发路线，不为每项技术选型请求确认；安全与原厂认证不变。",
-    "2026-11-28用户再次明确：手机与车机已完成原厂蓝牙配对，有线CarPlay正常；不再独立研发原厂认证或其他既有模块。只研发无线引导和无线传输差异，原厂认证照常执行，不绕过。此条优先于旧任务分组。"
+    "2026-11-28用户再次明确：手机与车机已完成原厂蓝牙配对，有线CarPlay正常；不再独立研发原厂认证或其他既有模块。只研发无线引导和无线传输差异，原厂认证照常执行，不绕过。此条优先于旧任务分组。",
+    "2026-11-28 用户指出进度停滞：R105.244 起停止单模块凑进度；只报告实际链路突破，冻结不相关回归及重复QEMU网络问题。"
   ],
   "history": [
     "docs/WIRELESS_FIRST_LINK_TASK_REGISTER_CN.md",
@@ -515,7 +514,7 @@
     "toolchain": "luka-dev/qnx65-armv7-toolchain@baa45224f18ae6b13c2e9c77c6663bb8181eb6a1"
   },
   "first_link_strategy": {
-    "priority": "最小无线差异优先；已有蓝牙配对与有线CarPlay不重做，不把原厂认证、接收器、Bonjour独立重建作为首连前置",
+    "priority": "实际首连优先：冻结已通过的外围组件，原厂配置单次真实受控试验优先，失败则成熟 donor 全链路移植。",
     "routes": [
       {
         "name": "factory",
@@ -530,7 +529,7 @@
         "action": "若原厂入口不能接收无线传输，最小适配已有桥到同一原厂会话，按实证处理阻塞，不预先独立重建各provider。"
       }
     ],
-    "switch_rule": "每次研发优先一个能改变首连结论的实质动作；若某路线无可用原厂证据、不能兼容或重复无新证据，记录阻塞并推进替代路线；不强制把一条路线全部做完，不重复无效实验。独立工作并行，切换前清理原有资源，不并发占用原厂服务。",
+    "switch_rule": "禁止以编译、夹具、地址扫描或增加文件作为首连进展；同一缺口无实质进展即停止；优先真实原厂服务入口和端到端候选，无法离线判断则明确一次实车试验。",
     "defer": [
       "5GHz",
       "自动重连体验优化",
