@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.239",
+    "version": "R105.240",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -375,9 +375,19 @@
           46106618323
         ],
         "evidence": "Existing paired ACL coordinator and four SI host tests passed. Snapshot provider and RF client native calls not integrated."
+      },
+      {
+        "version": "R105.239",
+        "passed": 6,
+        "runs": [
+          46106786427,
+          46106786423,
+          46106786486
+        ],
+        "evidence": "Exact original static callers remote=43, RF client=5, SDP query=1, parse=32. All five RF callers compare r0 to 2; no runtime ABI."
       }
     ],
-    "discovery": "Focused actual original peer / SDP / RFCOMM client caller argument and return audit, using exact retained firmware and pinned extraction. No more controller rewrites. Native ABI not assumed.",
+    "discovery": "Apply original five-callsite pending return contract to existing autoconnect, avoid treating uncertain raw vendor return as released, maintain cancellation. Native call/peer/descriptor owner still not implemented.",
     "expected_jobs": 1,
     "pending_prior": [
       46106440500
@@ -418,7 +428,7 @@
         "lab/mu1005_paired_start/paired_start.c",
         "lab/mu1005_paired_start/client_contract.py"
       ],
-      "evidence": "R105.238 coordinator cloud success. R105.239 focuses on exact original current peer / SDP / RFCOMM client call arguments instead of new state machine. No native call or actual phone yet."
+      "evidence": "R105.239 exact static caller evidence accepted; R105.240 existing controller normalizes return 2 to pending, uncertain result waits for original release; no real native provider."
     },
     {
       "priority": 2,

@@ -2,6 +2,10 @@
 #include "cp_wcp_autoconnect.h"
 #include <string.h>
 
+int cp_wcp_stock_client_result(int raw,int no_request_proven){
+ if(raw==2)return CP_WCP_OPEN_PENDING;
+ return no_request_proven==1?CP_WCP_OPEN_REJECTED:CP_WCP_OPEN_UNCERTAIN;
+}
 static int owner(const struct cp_wcp_autoconnect *s){
  return s->ops.stock_owner_verified(s->ops.ctx,s->generation)==1;
 }
@@ -128,7 +132,11 @@ int cp_wcp_bt_tick(struct cp_wcp_autoconnect *s,uint32_t gen,uint64_t now){
   s->state=CP_WCP_BACKOFF;return CP_WCP_WAIT;
  }
  rc=s->ops.stock_open_iap2(s->ops.ctx,gen);
- if(rc==1){
+ if(rc==CP_WCP_OPEN_UNCERTAIN){
+  s->attempts++;s->requested=1;s->state=CP_WCP_RESTORE_PENDING;
+  return CP_WCP_WAIT;
+ }
+ if(rc==CP_WCP_OPEN_PENDING){
   s->attempts++;s->requested=1;
   if(!deadline(now,CP_WCP_OPEN_TIMEOUT_MS,&s->deadline_ms)){
    s->state=CP_WCP_RESTORE_PENDING;return CP_WCP_CLOCK;
@@ -136,7 +144,7 @@ int cp_wcp_bt_tick(struct cp_wcp_autoconnect *s,uint32_t gen,uint64_t now){
   s->state=CP_WCP_OPENING;
   return CP_WCP_WAIT;
  }
- if(rc==0){
+ if(rc==CP_WCP_OPEN_BUSY){
   if(!deadline(now,CP_WCP_RETRY_MS,&s->deadline_ms))return CP_WCP_CLOCK;
   s->state=CP_WCP_BACKOFF;return CP_WCP_WAIT;
  }

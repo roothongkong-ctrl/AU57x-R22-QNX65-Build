@@ -1,0 +1,19 @@
+name: R105.240 stock client pending and release contract (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105240-client-result.yml','project/source/src/cp_wcp_autoconnect.*','tests/test_wcp_autoconnect.c']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  controller:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -euxo pipefail
+          s=project/source/src
+          cc -std=c99 -Wall -Wextra -Werror -g -fsanitize=address,undefined -fno-omit-frame-pointer -no-pie -I"$s" "$s/cp_wcp_autoconnect.c" tests/test_wcp_autoconnect.c -o /tmp/client-result
+          /tmp/client-result | tee /tmp/test.log
+          grep -Fx MU1005_NATIVE_CLIENT_PENDING_AND_UNCERTAIN_RELEASE_PASS /tmp/test.log

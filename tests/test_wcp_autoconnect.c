@@ -99,6 +99,20 @@ int main(void){
  assert(cp_wcp_bt_tick(&s,7,UINT64_MAX)==CP_WCP_CLOCK);
  assert(s.state==CP_WCP_BLOCKED&&!s.requested&&f.cancels==1);
  assert(cp_wcp_bt_tick(&s,7,UINT64_MAX)==CP_WCP_DENIED&&f.cancels==1);
+ assert(cp_wcp_stock_client_result(2,0)==CP_WCP_OPEN_PENDING);
+ assert(cp_wcp_stock_client_result(2,1)==CP_WCP_OPEN_PENDING);
+ assert(cp_wcp_stock_client_result(0,0)==CP_WCP_OPEN_UNCERTAIN);
+ assert(cp_wcp_stock_client_result(0x13,0)==CP_WCP_OPEN_UNCERTAIN);
+ assert(cp_wcp_stock_client_result(0x13,1)==CP_WCP_OPEN_REJECTED);
+ setup(&s,&f);f.open_rc=cp_wcp_stock_client_result(0x13,0);f.cancel_rc=0;
+ assert(cp_wcp_bt_acl_up(&s,7,0)==CP_WCP_OK);
+ assert(cp_wcp_bt_tick(&s,7,4000)==CP_WCP_WAIT&&s.requested);
+ assert(s.state==CP_WCP_RESTORE_PENDING&&f.opens==1);
+ assert(cp_wcp_bt_tick(&s,7,50000)==CP_WCP_WAIT&&f.opens==1);
+ assert(cp_wcp_bt_restore_tick(&s,7)==CP_WCP_WAIT&&s.requested);
+ f.cancel_rc=1;assert(cp_wcp_bt_restore_tick(&s,7)==CP_WCP_OK&&!s.requested);
+ assert(s.state==CP_WCP_BLOCKED);
+ puts("MU1005_NATIVE_CLIENT_PENDING_AND_UNCERTAIN_RELEASE_PASS");
  printf("R87 WCP car-initiated original iAP2 state machine: PASS\n");
  return 0;
 }

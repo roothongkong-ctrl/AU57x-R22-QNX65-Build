@@ -24,6 +24,15 @@ enum cp_wcp_rc {
  CP_WCP_DENIED=-1,CP_WCP_STALE=-2,CP_WCP_CLOCK=-3,
  CP_WCP_INVALID=-4
 };
+/* Normalized result for stock_open_iap2, not native SDK return values. */
+enum cp_wcp_open_result {
+ CP_WCP_OPEN_REJECTED=-1,CP_WCP_OPEN_UNCERTAIN=-2,
+ CP_WCP_OPEN_BUSY=0,CP_WCP_OPEN_PENDING=1
+};
+/* R105.239: all five original RFCOMM callers compare result against 2.
+ * Non-2 is NOT yet classified for wireless. A real owner may assert
+ * no_request_proven only with independent original release evidence. */
+int cp_wcp_stock_client_result(int raw,int no_request_proven);
 struct cp_wcp_bt_ops {
  void *ctx;
  /* These are exact current OEM generation/owner observations, not BT
@@ -35,7 +44,9 @@ struct cp_wcp_bt_ops {
  /* 1 = verified phone-side SDP iAP2, 0 = confirmed absent, -1 = unknown. */
  int (*phone_iap2_sdp)(void *,uint32_t generation);
  /* Enqueue an original BlueSDK client-open on its owner thread;
-  * 1 success, 0 transient busy, <0 denied. No Bluetooth socket shortcuts. */
+  * CP_WCP_OPEN_PENDING=request accepted, not link ready; BUSY/REJECTED
+  * only before any native request is outstanding. UNCERTAIN requires
+  * original cancel/teardown acknowledgement. No Bluetooth shortcuts. */
  int (*stock_open_iap2)(void *,uint32_t generation);
  /* Cancel a previously requested operation. 1 = OEM confirms released. */
  int (*stock_cancel_iap2)(void *,uint32_t generation);
