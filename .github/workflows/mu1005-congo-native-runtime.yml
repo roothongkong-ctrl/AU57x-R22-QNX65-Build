@@ -1,10 +1,11 @@
-name: Congo direct donor with genuine MU1005 dependencies (NO INSTALL)
+name: Congo original ImageFS aliases and cached QNX runtime (NO INSTALL)
 on:
   push:
     branches: [mu1005-congo-pairing-native]
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 env:
   DONOR: 223b42f90bf7c15fbbbef23259da36caa9bd4994
   TOOLCHAIN: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
@@ -32,7 +33,18 @@ jobs:
           done
           sudo apt-get update -qq
           sudo apt-get install -y -qq qemu-system-arm
-          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee evidence/toolchain.log
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: toolchain
+          platforms: linux/amd64
+          target: base-env
+          build-args: BASE=base-8.5
+          tags: qnx65-armv7-toolchain:8.5
+          load: true
+          push: false
+          cache-from: type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1
+          cache-to: type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1,mode=min,ignore-error=true
       - name: Extract pinned MU1005 archive for recursive dependency lookup
         env:
           GH_TOKEN: ${{ github.token }}
@@ -93,6 +105,19 @@ jobs:
               done
             done
           '
+          python3 - <<'PY'
+          import json,os,pathlib
+          root=pathlib.Path(os.environ["RUNNER_TEMP"])/"original"
+          names={"libnvdc.so","libnvos.so","libnvrm.so","libnvrm_graphics.so"}
+          report=[]
+          for p in root.rglob("stage2.json"):
+              for rec in json.loads(p.read_text()).get("entries",[]):
+                  name=pathlib.PurePosixPath(rec.get("path","")).name
+                  if name in names or any(name.startswith(x+".") for x in names):
+                      report.append({"metadata":str(p.relative_to(root)),**rec})
+          pathlib.Path("evidence/original-imagefs-library-records.json").write_text(json.dumps(report,indent=2)+"\n")
+          print(json.dumps(report,indent=2))
+          PY
           python3 integration/mu1005_congo_native/resolve_dependencies.py --stage stage --sdk sdk-libs --oem "$RUNNER_TEMP/original" --report evidence/native-dependency-closure.json
       - name: Run isolated QNX library and helper startup
         run: |
