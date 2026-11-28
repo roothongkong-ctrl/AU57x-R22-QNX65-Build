@@ -1,0 +1,53 @@
+name: R105.287 parallel OEM provider discovery (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105287-parallel-provider.yml','lab/mu1005_si_dio_owner/parallel_provider.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  provider:
+    name: ${{ matrix.lane }}
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        lane: [unwind-owner, launch-arguments, process-provider, config-entry, bluetooth-provider, wifi-provider]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover exact original MU1005 app70
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir firmware original-tools evidence
+          gh run download 45923122041 --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
+          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  $archive" | sha256sum -c -
+          git fetch --depth 1 origin 713fddea9bb11acfdb1df7eff02ca645011ad6d6
+          git archive FETCH_HEAD tools/mu1005_extract_app70.py | tar -x -C original-tools
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          git init qnxmount
+          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
+          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
+          git -C qnxmount checkout --detach FETCH_HEAD
+          python3 -m venv /tmp/extract-venv
+          /tmp/extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          python3 original-tools/tools/mu1005_extract_app70.py "$archive" "$RUNNER_TEMP/app70/app.img"
+          /tmp/extract-venv/bin/python extractor/tools/extract_firmware.py --source "$RUNNER_TEMP/app70/app.img" --output "$RUNNER_TEMP/original" --variant 70 --qnxmount-root "$PWD/qnxmount" > /tmp/app-summary.json
+      - name: Resolve independent OEM provider
+        run: |
+          set -euxo pipefail
+          /tmp/extract-venv/bin/pip install pyelftools==0.31 capstone==5.0.6
+          /tmp/extract-venv/bin/python lab/mu1005_si_dio_owner/parallel_provider.py "${{ matrix.lane }}" "$RUNNER_TEMP/original" "evidence/${{ matrix.lane }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105287-${{ matrix.lane }}-NO-INSTALL
+          path: evidence/${{ matrix.lane }}.json
