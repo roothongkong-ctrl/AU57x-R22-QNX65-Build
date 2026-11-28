@@ -17,7 +17,7 @@ assert s.count(a)==1
 s=s.replace(a,a+'cp "$MUSIC_FIXTURES/music_r25_test.sh" "$MUSIC_FIXTURES/music_r25_vector" "$WORK/"\n')
 a='\n$NAME\nEOF\n'
 assert s.count(a)==1
-s=s.replace(a,'\n$NAME\nsh\nmusic_r25_test.sh\nmusic_r25_vector\nEOF\n')
+s=s.replace(a,'\n$NAME\nsh\nmusic_r25_test.sh\nmusic_r25_vector\n[type=link] /bin/sh=/proc/boot/sh\nEOF\n')
 Path(sys.argv[2]).write_text(s)
 PY
 chmod +x "$UP/tests/qemu-run-music.sh"
