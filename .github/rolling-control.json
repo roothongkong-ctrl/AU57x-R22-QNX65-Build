@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.250",
+    "version": "R105.251",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 6
+      "dependent_not_yet_listed": 5
     },
     "runs": [],
     "verified_prior": [
@@ -491,13 +491,30 @@
           46109600130
         ],
         "evidence": "Host donor IE and SI/backup workflows success. Full ARM run 46109600160 in progress."
+      },
+      {
+        "version": "R105.249",
+        "runs": [
+          46109600131,
+          46109600108,
+          46109600130,
+          46109600160
+        ],
+        "evidence": "All four workflows complete success, full donor ARM built."
+      },
+      {
+        "version": "R105.250",
+        "runs": [
+          46109738369,
+          46109738352,
+          46109738332
+        ],
+        "evidence": "All three workflows complete success; actual native startup caller still absent."
       }
     ],
-    "discovery": "Optional DID trace is no longer mandatory in existing supervisor: bounded live initialized-service polling under independent lease, then existing startup authorization and queue bootstrap. No synthetic trace, actual runtime provider still missing, no installation.",
-    "expected_jobs": 6,
-    "pending_prior": [
-      46109600160
-    ]
+    "discovery": "Direct upstream LuKa full graft startup and RFCOMM registration compiled into a disposable exact original MU1005 ELF, preserving original startup instruction and resolved PLT. Remote accept deliberately disabled pending real OEM security callback and supervised endpoint. No vehicle writes or installable binary exported. Actual runtime unproven.",
+    "expected_jobs": 5,
+    "pending_prior": []
   },
   "read_strategy": {
     "first_parallel": [
@@ -533,7 +550,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "integration/mu1005_vehicle_stage/congo_port_table.json"
       ],
-      "evidence": "R105.250 eliminates optional DID log prerequisite; actual original lifecycle lease and runtime caller are still missing. Four grouped remaining stages: Bluetooth startup, Wi-Fi/session, install/recovery, vehicle acceptance."
+      "evidence": "R105.251 direct-source startup graft build replaces incremental startup wrappers. Remaining actual callback security, supervised ACK endpoint and original shutdown/wired lifecycle. Do not claim phone link."
     }
   ],
   "rules": [
