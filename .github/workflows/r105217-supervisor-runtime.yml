@@ -1,4 +1,4 @@
-name: R105.217 actual QNX supervisor process and socket (NO INSTALL)
+name: R105.219 QNX supervisor explicit child image (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -48,5 +48,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105217-QNX-process-NO-INSTALL
+          name: R105219-QNX-process-NO-INSTALL
           path: evidence/*.log

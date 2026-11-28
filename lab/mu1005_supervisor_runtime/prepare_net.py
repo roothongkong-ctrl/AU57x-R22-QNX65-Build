@@ -31,4 +31,6 @@ while [ -n "$pending" ]; do
 done
 export MKIFS_PATH=/w:$T/boot/sys:$T/bin:$T/sbin:$T/lib:$T/usr/lib'''.strip())
 replace("if ! grep -q '@@QNXRUN-START@@' \"$LOG\"; then",'[ -z "${QEMU_KEEP_LOG:-}" ] || cp "$LOG" "$QEMU_KEEP_LOG"\n'+"if ! grep -q '@@QNXRUN-START@@' \"$LOG\"; then")
+replace('cp "$BIN" "$WORK/$NAME"', 'cp "$BIN" "$WORK/$NAME"\ncp "$BIN" "$WORK/mu-child"')
+replace('$NAME\n[type=dir] /tmp','[+raw +page_align perms=0555] $NAME\n[+raw +page_align perms=0555] mu-child\n[type=dir] /tmp')
 p.write_text(s)

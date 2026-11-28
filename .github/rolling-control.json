@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.218",
+    "version": "R105.219",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 1
+      "dependent_not_yet_listed": 2
     },
     "runs": [],
     "verified_prior": [
@@ -184,32 +184,39 @@
           46092077382
         ],
         "evidence": "15/15 jobs passed. StopController vtable 0x1a44e0 (32 bytes), six stripped candidate functions, one direct caller 0x1262fc to 0x125f48. Actual +0x40 stores only two unrelated medialib/config functions; no transport descriptor producer confirmed. No further blind scan."
-      }
-    ],
-    "discovery": "R105.218 switches priority to complete upstream donor ARM build including previously host-proven ACK and inherited stream plus earlier 3 adaptations. Uses existing pinned Rust build workflow and default features, no native-api-lab. Artifact not deployable. R105.216 static provider candidates not sufficient for runtime binding.",
-    "expected_jobs": 1,
-    "pending_prior": [
+      },
       {
         "version": "R105.217",
+        "passed": 5,
+        "failed": 1,
         "runs": [
           46092198242,
           46092198190
         ],
-        "observed": {
-          "success": 5,
-          "running": 1
-        },
-        "note": "Host real process, SI host regressions passed; actual QNX supervisor test running."
+        "evidence": "Host real process and four SI host jobs passed. QNX ARM compiled and booted, failed before spawn: stat /proc/boot/mu-supervisor-test. Explicit raw separate child file needed; no FD or RF runtime pass."
       },
+      {
+        "version": "R105.218",
+        "passed": 5,
+        "runs": [
+          46092385570,
+          46092385370
+        ],
+        "evidence": "Full five-adapter default-feature QNX ARM Rust executable built and uploaded, artifact 15242186627. Inherited ACK and original SI requirement strings verified; no actual OEM/RF runtime."
+      }
+    ],
+    "discovery": "R105.219 corrects observed QNX child stat failure by staging separate explicit raw/page-aligned child path and diagnostic. No rerun of successful full Rust ARM build.",
+    "expected_jobs": 2,
+    "pending_prior": [
       {
         "version": "Congo",
         "runs": [
           46091673646
         ],
         "observed": {
-          "running": 1
+          "failed": 1
         },
-        "note": "recursive dependency unit test passed, toolchain still building"
+        "note": "Three of seven original missing libs recovered; four remain libnvdc.so libnvos.so libnvrm.so libnvrm_graphics.so. Investigating extractor link metadata instead of guessing."
       }
     ]
   },
@@ -246,7 +253,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.216 no original transport provider; R105.217 host actual FD supervisor success, QNX run pending. R105.218 compiles full adapted production donor with ACK and inherited FD, prioritizing upstream/hybrid path. No real OEM lease, MFi or RF."
+      "evidence": "R105.218 complete LuKa adapted ARM donor build succeeded; R105.219 fixes QNX supervisor laboratory child file, actual OEM provider still unbound. Congo missing four genuine dependencies."
     },
     {
       "priority": 2,

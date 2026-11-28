@@ -43,11 +43,15 @@ int main(int argc,char **argv){
   return 0;
  }
 #if defined(__QNXNTO__)
- const char *path="/proc/boot/mu-supervisor-test";
+ const char *path="/proc/boot/mu-child";
 #else
  const char *path=argv[0];
 #endif
- assert(path[0]=='/'&&stat(path,&expected)==0);
+ if(path[0]!='/'||stat(path,&expected)!=0){
+  fprintf(stderr,"SUPERVISOR_CHILD_STAT_FAILED path=%s errno=%d (%s)\n",path,errno,strerror(errno));
+  return 11;
+ }
+ printf("SUPERVISOR_CHILD_STAT_OK mode=%lo size=%ld\n",(unsigned long)expected.st_mode,(long)expected.st_size);
  char *env[]={"MU1005_BRIDGE_FD=3","PATH=/proc/boot:/bin","LD_LIBRARY_PATH=/proc/boot",NULL};
  MuDaemonSupervisor s={.fd=-1};int fd=-1,second=-1;
  assert(mu_daemon_supervisor_start(&s,path,env,verify,NULL)==0);
