@@ -5,8 +5,10 @@
 #include <stdint.h>
 /* Original SI supervisor only, holding its exclusive DIO launch/stop
  * authority across this call. Caller supplies the genuine original DIO
- * argv/environment and immutable verified native module path. No guessing
- * OEM arguments, no USB session preemption by an independent daemon. */
+ * environment and immutable verified native module path. R106 captured
+ * /mnt/app/eso/bin/apps/dio_manager without extra arguments; argv must
+ * match exactly, or NULL explicitly selects this observed form. No
+ * guessed environment or USB preemption by an independent daemon. */
 typedef struct {pid_t pid;uint64_t epoch;int attempted;} MuDioLaunch;
 int mu_dio_launch_wireless(MuDioLaunch*,uint64_t,char*const[],char*const[],
  const char*,int(*)(void*,uint64_t,const char*),void*);

@@ -16,6 +16,11 @@ jobs:
       - uses: ./.github/actions/mu1005-qnx-image
         with:
           require-cache: 'true'
+      - name: Validate R106 observed original launch arguments without executing OEM code
+        run: |
+          set -euxo pipefail
+          cc -std=c99 -Wall -Wextra -Werror -Ilab/mu1005_dio_launch lab/mu1005_dio_launch/dio_launch.c lab/mu1005_dio_launch/test_r106_argv.c -o /tmp/r106-argv
+          /tmp/r106-argv
       - name: Build original DIO launch adapter with actual QNX spawn
         run: |
           set -euxo pipefail
@@ -31,6 +36,8 @@ jobs:
           name: R105284-DIO-launch-NO-INSTALL
           path: output/
   receiver:
+    # Receiver code was already verified in run 46126456198. Only rerun on explicit dispatch.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

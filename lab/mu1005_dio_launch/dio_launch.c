@@ -19,12 +19,14 @@ static int path_ok(const char*p){
 }
 int mu_dio_launch_wireless(MuDioLaunch*s,uint64_t epoch,char*const argv[],char*const env[],
  const char*lib,int(*admit)(void*,uint64_t,const char*),void*ctx){
- char preload[280];char *child[128];unsigned n=0,a=0;
- if(!s||s->attempted||s->pid>0||!epoch||!argv||!argv[0]||!env||!path_ok(lib)||!admit)return -1;
- /* Only original process name; do not substitute a donor DIO binary. */
- const char*name=strrchr(argv[0],'/');name=name?name+1:argv[0];
- if(strcmp(name,"dio_manager"))return -1;
- for(;argv[a];++a)if(a>=63)return -1;
+ char preload[280];char *child[128];unsigned n=0;
+ char *observed_argv[]={STOCK,NULL};
+ if(!s||s->attempted||s->pid>0||!epoch||!env||!path_ok(lib)||!admit)return -1;
+ /* R106 actual wired process argv contains exactly this absolute path.
+  * NULL explicitly opts into that observed form. It is NOT evidence of
+  * launch authority or environment. Never invent a wireless command flag. */
+ if(!argv)argv=observed_argv;
+ if(!argv[0]||strcmp(argv[0],STOCK)||argv[1])return -1;
  /* The stock launch environment must be unambiguous. Ordinary USB is
   * never passed to this function; preexisting preload is not overwritten. */
  for(;env[n];++n){if(n>=124||reserved(env[n]))return -1;child[n]=env[n];}
