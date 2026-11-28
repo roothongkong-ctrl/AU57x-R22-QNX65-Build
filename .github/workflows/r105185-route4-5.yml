@@ -1,19 +1,67 @@
-name: R105.209 SI activation record continuity (NO INSTALL)
+name: R105.210 supervised donor to native notify binding (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/r105185-route4-5.yml, lab/mu1005_route4_5/test_activation_revoke.c, integration/mu1005_si_native/si_mu1005_activation.c]
+    paths: [.github/workflows/r105185-route4-5.yml, lab/mu1005_route4_5/**]
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  DONOR: 20c94f51c0f0ae88b154c12e4f604643ba23022c
+  TOOLCHAIN: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
 jobs:
-  activation-record:
+  combined-real-c-rust:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Test activation, revocation and record replacement
+      - name: Combine existing AP receiver MFi and ACK source adaptations
         run: |
           set -euxo pipefail
-          s=integration/mu1005_si_native
-          cc -std=c99 -Wall -Wextra -Werror -I"$s" "$s"/{si_mu1005_activation,si_mu1005_layout}.c lab/mu1005_route4_5/test_activation_revoke.c -o /tmp/activation
-          /tmp/activation
+          git init donor
+          git -C donor remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C donor fetch --depth 1 origin "$DONOR"
+          git -C donor checkout --detach FETCH_HEAD
+          for n in adapt_live_ap adapt_receiver_unix adapt_mfi_sequence; do
+            python3 "integration/mu1005_donor_daemon/$n.py" donor
+          done
+          python3 lab/mu1005_route4_5/adapt_donor_ack.py donor
+          python3 lab/mu1005_route4_5/adapt_inherited_stream.py donor
+          rustup toolchain install nightly-2026-07-21 --profile minimal
+          mkdir -p evidence fixture
+          cp donor/wireless/daemon/probes/dio_manager.fixture.json fixture/dio_manager.json
+          cargo +nightly-2026-07-21 build --offline --locked --bin mhi2q-wireless-daemon --manifest-path donor/wireless/daemon/Cargo.toml 2>&1 | tee evidence/build.txt
+          git -C donor diff -- wireless/daemon > evidence/combined.diff
+      - name: Run new C supervisor against actual adapted Rust daemon
+        run: |
+          set -euxo pipefail
+          l=lab/mu1005_route4_5
+          cc -std=c99 -Wall -Wextra -Werror -Iproject/source/legacy_mu1005/bluetooth "$l/daemon_supervisor.c" "$l/supervised_notify.c" "$l/test_daemon_supervisor.c" -o /tmp/supervisor
+          env -i PATH="$PATH" IPL_CONFIG_DIR_DIO_MANAGER="$PWD/fixture" MHI2Q_CP_MODEL=LAB-ONLY MHI2Q_CP_SERIAL=LAB-ONLY MHI2Q_CP_HARDWARE=LAB-ONLY MHI2Q_CP_BT_MAC=02:00:00:00:00:01 MHI2Q_CP_DEVICE_ID=02:00:00:00:00:02 MHI2Q_CP_SSID=LAB-ONLY MHI2Q_CP_PASSPHRASE=labfixturepassword MHI2Q_CP_CHANNEL=11 MHI2Q_CP_IP_ADDRESS=127.0.0.1 MHI2Q_CP_AIRPLAY_PORT=5000 MHI2Q_CP_RECEIVER=stock210 timeout 25 /tmp/supervisor "$PWD/donor/wireless/daemon/target/debug/mhi2q-wireless-daemon" | tee evidence/supervisor.log
+          grep -F MU1005_SUPERVISED_NOTIFY_EXACT_ACK_HANDOFF_PASS_NO_OEM evidence/supervisor.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R105210-SUPERVISOR-REAL-DONOR-NO-INSTALL
+          path: evidence/
+  qnx-arm-supervisor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Compile new native binding adapter
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -Iproject/source/legacy_mu1005/bluetooth -c lab/mu1005_route4_5/supervised_notify.c -o /src/evidence/supervisor.o
+          readelf -h evidence/supervisor.o | grep -E 'Machine:.*ARM'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105210-SUPERVISOR-ARM-NO-INSTALL
+          path: evidence/

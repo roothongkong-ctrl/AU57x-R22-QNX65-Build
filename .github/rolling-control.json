@@ -49,19 +49,15 @@
     "vehicle_evidence_required": true
   },
   "baseline": {
-    "commit": "146a01ff2403f26dd5fd99e2c643b7c44dcfb46f",
-    "version": "R105.209",
+    "commit": null,
+    "version": "R105.210",
     "observed_jobs": {
-      "success": 14,
+      "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 0
+      "dependent_not_yet_listed": 15
     },
-    "runs": [
-      46088562910,
-      46088562984,
-      46088562992
-    ],
+    "runs": [],
     "verified_prior": [
       {
         "version": "R105.201",
@@ -126,8 +122,8 @@
         "evidence": "all 14 cloud jobs succeeded; no actual iPhone wireless session or native lease established"
       }
     ],
-    "discovery": "1 focused activation record replacement test plus expected 13 automatic regressions; actual API count authoritative.",
-    "expected_jobs": 14
+    "discovery": "2 focused new supervisor-to-native-notify adapter tests plus expected 13 auto regressions; actual count authoritative.",
+    "expected_jobs": 15
   },
   "read_strategy": {
     "first_parallel": [
@@ -147,7 +143,7 @@
         8,
         9
       ],
-      "task": "首连优先：消费 R105.208 四路现存证据，选取有确切ABI的实际owner/driver接线；若缺真实lease，优先并行推进原厂隐藏入口和上游graft/hybrid替代路径，不重复生命周期静态扫描。",
+      "task": "Use R105.210 supervised_notify_prepare before queue bootstrap; no second legacy worker connection. Next actual OEM owner/lease and driver/receiver provider wiring, not redoing old static scans.",
       "paths": [
         "lab/mu1005_route4_5/parallel_native.py",
         "lab/mu1005_route4_5/cleanup_callees.py",
@@ -156,9 +152,11 @@
         "project/source/legacy_mu1005/bluetooth/bt_startup_watch.c",
         "integration/mu1005_si_native/BT_QUEUE_BOOTSTRAP_CN.md",
         "lab/mu1005_route4_5/daemon_supervisor.c",
-        "project/source/legacy_mu1005/bluetooth/bt_notify_bridge.c"
+        "project/source/legacy_mu1005/bluetooth/bt_notify_bridge.c",
+        "lab/mu1005_route4_5/supervised_notify.c",
+        "lab/mu1005_route4_5/supervised_notify.h"
       ],
-      "evidence": "R105.209 14/14 completed success. Remaining first-link blockers: OEM lifecycle lease, original driver producer, actual receiver wiring. No physical connection proof."
+      "evidence": "R105.208 logs show OSAPI timer stop and mutex pair, original driver resource mount and DIO AirPlay Create/SetDelegate/Control callsites; not live owner evidence. R105.210 connects existing donor supervisor endpoint directly to native notify binding with separate ACK/identity proof; cloud tests pending. Genuine OEM startup caller and lease remain open."
     },
     {
       "priority": 2,
