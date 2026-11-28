@@ -1,0 +1,101 @@
+name: R24-R26 parallel player QNX and recovery integration (REVIEW ONLY)
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [experiment/cluster-card-r22-parallel-preflight]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [experiment/cluster-card-r24-r26-integrated]
+    paths: ['experiments/cluster-compact-card/r24/**', '.github/workflows/cluster-card-r24-r26.yml']
+permissions:
+  contents: read
+jobs:
+  host-player:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, clang++]
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libavcodec-dev libavformat-dev libavutil-dev libglfw3-dev libgles2-mesa-dev pkg-config ffmpeg
+      - name: Real upstream player and sidecar regression
+        env:
+          CXX: ${{ matrix.compiler }}
+        run: |
+          set -euo pipefail
+          git clone -q --depth 1 --branch v1.2.14 https://github.com/MacsInSpace/mib-cluster-map.git upstream
+          python3 experiments/cluster-compact-card/r24/prepare_player.py upstream
+          PKG="$(pkg-config --cflags libavcodec libavformat libavutil glfw3 glesv2)"
+          "$CXX" -std=c++11 -pthread -O1 -Wall $PKG -fsyntax-only upstream/player/opengl_gpu.cc
+          "$CXX" -std=c++11 -pthread -O1 -Wall $PKG -DCLUSTERMAP_R17_CARD70_LAB -fsyntax-only upstream/player/opengl_gpu.cc
+          ffmpeg -loglevel error -y -f lavfi -i 'color=c=white:s=800x298:r=10' -vf 'drawbox=x=182:y=18:w=42:h=32:color=black:t=fill' -frames:v 5 -pix_fmt yuv420p -c:v libx264 -preset ultrafast -x264-params keyint=1:scenecut=0:bframes=0 -f h264 /tmp/card.h264
+          "$CXX" -std=c++11 -pthread -O1 -Wall -Wextra -Werror -pedantic -Iupstream/player/r17 $PKG experiments/cluster-compact-card/r17/test_player_sidecar.cpp $(pkg-config --libs libavcodec libavutil) -o /tmp/card-test
+          /tmp/card-test /tmp/card.h264
+  qnx-arm-player:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout upstream build and patch exact player
+        run: |
+          set -euo pipefail
+          git clone -q --depth 1 --branch v1.2.14 https://github.com/MacsInSpace/mib-cluster-map.git upstream
+          git -C upstream rev-parse HEAD
+          python3 experiments/cluster-compact-card/r24/prepare_player.py upstream
+      - name: Build upstream QNX 6.5 ARMv7 toolchain
+        run: |
+          git clone --depth 1 https://github.com/luka-dev/qnx65-armv7-toolchain.git qnx-toolchain
+          cd qnx-toolchain
+          ./host-scripts/qnx-run.sh build 8.5
+      - name: Build stock and opt-in player with upstream FFmpeg NEON audit
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          cd upstream
+          ./build_local.sh player 2>&1 | tee ../evidence/stock-build.log
+          cp build/stream-player ../evidence/stream-player.stock
+          cp build/neon_audit.txt ../evidence/stock-neon-audit.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("build_local.sh")
+          s=p.read_text()
+          a=" -DNDEBUG -I$FF -I. opengl_gpu.cc"
+          assert s.count(a)==1
+          p.write_text(s.replace(a," -DNDEBUG -DCLUSTERMAP_R17_CARD70_LAB -std=c++11 -I$FF -I. opengl_gpu.cc"))
+          PY
+          ./build_local.sh player 2>&1 | tee ../evidence/lab-build.log
+          cp build/stream-player ../evidence/stream-player.experimental
+          cp build/neon_audit.txt ../evidence/lab-neon-audit.txt
+          file ../evidence/stream-player.* | tee ../evidence/elf.txt
+          readelf -h -d ../evidence/stream-player.experimental | tee ../evidence/readelf.txt
+          readelf -h ../evidence/stream-player.experimental | grep -Eq 'Machine:.*ARM'
+          (cd ../evidence && sha256sum stream-player.* > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qnx-arm-player-review-NO-INSTALL
+          path: evidence/
+  upstream-sd-recovery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reuse original SD install, backup and uninstall simulation
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          git clone -q --depth 1 --branch v1.2.14 https://github.com/MacsInSpace/mib-cluster-map.git upstream
+          cd upstream
+          ./build_local.sh simtest 2>&1 | tee ../evidence/upstream-sd-recovery.log
+          cp docs/Install.md ../evidence/upstream-install.md
+          cp docs/CarPlay.md ../evidence/upstream-carplay.md
+          cp ../experiments/cluster-compact-card/r24/README_CN.md ../evidence/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upstream-sd-recovery-review-NO-INSTALL
+          path: evidence/
