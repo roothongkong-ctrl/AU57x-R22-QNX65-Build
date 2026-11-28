@@ -17,7 +17,8 @@
       "name": "startup_guard",
       "donor_file_offset": "0xbe40",
       "stock_va": "0x11ec60",
-      "status": "prior_static"
+      "status": "prior_static",
+      "note": "Donor guard mapping only: 0x11ec60 precedes original started store. Do not use as completion. Existing exact MU1005 0x11ec98 stores started, 0x11ec9c unwinds, 0x11eca0 returns. Use original completed startup and actual owner context for native bridge."
     },
     {
       "name": "eir_guard",
@@ -151,5 +152,11 @@
       "note": "R105.232 two original direct callers at 0x11d338 and 0x11ec80; 0x1dbb40 is distinct helper. Static candidate only."
     }
   ],
-  "policy": "Do not patch or activate donor from this table. Static matches are not callable ABI or runtime proof. Preserve original authentication and wired function."
+  "policy": "Do not patch or activate donor from this table. Static matches are not callable ABI or runtime proof. Preserve original authentication and wired function.",
+  "startup_completion": {
+    "stock_va": "0x11ec98",
+    "stock_word": "0xe5c531b0",
+    "resume_va": "0x11ec9c",
+    "status": "original instruction verified; actual activation not implemented"
+  }
 }

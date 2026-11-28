@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.248",
+    "version": "R105.249",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -471,13 +471,22 @@
           46109195611
         ],
         "evidence": "All three prior linking failures now pass, native-library and collection still pending on last check."
+      },
+      {
+        "version": "R105.248",
+        "runs": [
+          46109342084,
+          46109342049,
+          46109342056
+        ],
+        "passed": 4,
+        "failed": 2,
+        "evidence": "R105.247 unified completed success. R105.248 host and full ARM workflows fail Rust E0425 because insertion anchor spacing mismatch omitted helper. Also --check-config incorrectly requires manual slot. Fix both."
       }
     ],
-    "discovery": "Remove manual IE slot prerequisite in actual full donor executable. Query original uaputl, borrow matching slot or choose explicitly empty 0..3, reject absent/ambiguous/malformed slots, recheck before write and preserve existing rollback. No repeat vehicle collection; no claim of concurrent OEM exclusion or native runtime owner.",
+    "discovery": "Insert actual Rust slot-selection helper using exact verified anchor, add generation checks; remove mandatory IE index from daemon --check-config as well as runtime startup. Clarify exact original startup completion vs upstream early point. Congo/LuKa full donor integration remains priority; no repeat vehicle detection. No vehicle install.",
     "expected_jobs": 6,
-    "pending_prior": [
-      46109195611
-    ]
+    "pending_prior": []
   },
   "read_strategy": {
     "first_parallel": [
@@ -513,7 +522,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "integration/mu1005_vehicle_stage/congo_port_table.json"
       ],
-      "evidence": "R105.247 three link failures fixed. R105.248 actual donor AP slot automatic selection removes manual environment dependency, full ARM build pending; native startup provider still missing."
+      "evidence": "R105.249 correct missing source function and stale manual configuration prerequisite. Original startup-complete site 0x11ec98, not old upstream early 0x11ec60; actual owner and startup wiring not implemented yet."
     }
   ],
   "rules": [

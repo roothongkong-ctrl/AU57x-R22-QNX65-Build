@@ -23,6 +23,36 @@ fn mu1005_slot_state(output:&str,index:u8,expected:&[u8])->Result<bool,String>{
     Err("MU1005 IE slot owned by another configuration".into())
 }
 
+// Discover from the live driver response. An omitted index is not free.
+// Prefer borrowing the same advertisement over adding a duplicate.
+#[cfg(any(test,target_os="nto"))]
+fn mu1005_choose_slot(output:&str,expected:&[u8],requested:Option<u8>)->Result<(u8,bool),String>{
+    if !output.contains("Querying custom IE successful"){
+        return Err("MU1005 IE query failed".into());
+    }
+    if requested.is_some_and(|i|i>3){return Err("MU1005 IE index outside 0..3".into());}
+    let mut free=None;
+    let mut matching=None;
+    for index in 0u8..=3{
+        let label=format!("Index [{index}]");
+        let count=output.lines().filter(|l|l.trim()==label).count();
+        if count==0{continue;}
+        if count!=1{return Err("MU1005 ambiguous IE index".into());}
+        let slot=parse_custom_ie_slot(output,index)?;
+        if slot.mask==IE_MASK_REQUIRED_FRAMES && slot.bytes==expected{
+            if matching.replace(index).is_some(){return Err("MU1005 duplicate Device IE".into());}
+        }else if slot.mask==0 && slot.bytes.is_empty() &&
+                  requested.map_or(true,|wanted|wanted==index) && free.is_none(){
+            free=Some(index);
+        }
+    }
+    if let Some(i)=matching{
+        if requested.map_or(true,|wanted|wanted==i){return Ok((i,false));}
+        return Err("MU1005 Device IE already exists in another slot".into());
+    }
+    free.map(|i|(i,true)).ok_or_else(||"MU1005 no explicitly free IE slot".into())
+}
+
 #[cfg(target_os="nto")]
 pub struct Mu1005OwnedIe {
     binary:String,index:u8,expected:Vec<u8>,lease:ControlLease,
@@ -116,6 +146,9 @@ mod mu1005_ie_tests {
     }
 }
 '''
+assert s.count("fn mu1005_choose_slot(")==1
+assert s.count("fn mu1005_select_live_explicit_slot(")==1
+assert s.count("mu1005_choose_slot(&q,")==2
 p.write_text(s)
 p=d/"main.rs";s=p.read_text()
 def rep(a,b):
@@ -156,5 +189,19 @@ s=s[:a]+'''        #[cfg(target_os = "nto")]
             None=>Ok(()),
         };
 '''+s[z:]
+rep('''            let index = std::env::var("MHI2Q_CP_IE_INDEX").map_err(std::io::Error::other)?;
+            let index = index.parse::<u8>().map_err(std::io::Error::other)?;
+            if index > 3 {
+                return Err(std::io::Error::other("custom IE index must be 0..3"));
+            }''','''            match std::env::var("MHI2Q_CP_IE_INDEX") {
+                Ok(value) => {
+                    let index = value.parse::<u8>().map_err(std::io::Error::other)?;
+                    if index > 3 {
+                        return Err(std::io::Error::other("custom IE index must be 0..3"));
+                    }
+                }
+                Err(std::env::VarError::NotPresent) => {}
+                Err(error) => return Err(std::io::Error::other(error)),
+            }''')
 p.write_text(s)
 print("MU1005_DONOR_OWNED_IE_SOURCE_ADAPTED")
