@@ -1,0 +1,89 @@
+name: MU1005 full system integration staging (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/mu1005-full-system-stage.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  assemble:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reuse compiled native artifacts and independent Bluetooth evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p inputs/native inputs/unified inputs/bluetooth inputs/startup inputs/outbound
+          gh run download 46098063669 --repo "$GITHUB_REPOSITORY" --name mu1005-si-cprx-arm-NO-INSTALL --dir inputs/native
+          gh run download 46098063669 --repo "$GITHUB_REPOSITORY" --name MU1005-unified-review-NO-INSTALL --dir inputs/unified
+          gh run download 46100879149 --repo "$GITHUB_REPOSITORY" --pattern 'congo-port-table-*' --dir inputs/bluetooth
+          gh run download 46101176712 --repo "$GITHUB_REPOSITORY" --pattern 'congo-guard-*' --dir inputs/startup
+          gh run download 46101068865 --repo "$GITHUB_REPOSITORY" --name congo-mu1005-outbound-candidates --dir inputs/outbound
+      - name: Assemble versioned payload and actionable integration manifest
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, pathlib, hashlib, zipfile, struct, shutil
+          from collections import Counter
+          root=pathlib.Path("inputs")
+          out=pathlib.Path("stage");out.mkdir()
+          for lane in ("native","unified","bluetooth","startup","outbound"):
+              assert any(p.is_file() for p in (root/lane).rglob("*")), lane
+          rows=[]; arm=[]
+          for p in sorted(root.rglob("*")):
+              if not p.is_file():continue
+              assert not p.is_symlink()
+              rel=p.relative_to(root)
+              assert ".." not in rel.parts
+              data=p.read_bytes()
+              assert len(data)<64*1024*1024
+              dest=out/"components"/rel;dest.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copyfile(p,dest)
+              digest=hashlib.sha256(data).hexdigest()
+              rows.append({"path":str(dest.relative_to(out)),"sha256":digest,"bytes":len(data)})
+              if data[:6]==b"\x7fELF\x01\x01" and len(data)>20 and struct.unpack_from("<H",data,18)[0]==40:
+                  arm.append(str(dest.relative_to(out)))
+          maps=[]
+          for p in sorted((root/"bluetooth").rglob("port-table.json")):
+              d=json.loads(p.read_text());maps.extend(d["rows"])
+          assert len(maps)==19
+          resolved=[x for x in maps if x["candidate_in_prior_source"]]
+          missing=[x["function"] for x in maps if not x["candidate_in_prior_source"]]
+          assert len(resolved)==11
+          plan={
+              "target":"MHI2_CN_AU57x_K1006_2 / MU1005",
+              "installable":False,"vehicle_verified":False,
+              "goal":"One integrated software package before one vehicle test",
+              "lanes":{
+                  "bluetooth":{"status":"port candidates; not active","existing_candidates":resolved,"missing":missing},
+                  "authentication":{"status":"compiled research components; OEM MFi handshake not proven"},
+                  "wifi":{"status":"reuse stock hotspot, first connection 2.4 GHz; actual phone session unproven"},
+                  "receiver":{"status":"native candidate artifacts staged; OEM runtime binding unresolved"},
+                  "reconnect":{"status":"review artifacts; actual phone reconnect unproven"},
+                  "wired":{"status":"stock wired priority mandatory"},
+                  "recovery":{"status":"host-tested transaction components; vehicle activation and recovery not implemented"},
+                  "installation":{"status":"staging only; no flash commands or activation"}
+              },
+              "arm_elf_files":arm,"files":rows,
+              "donor":{"repo":"congobg/MHI2Q_WiFi_CarPlay","commit":"223b42f90bf7c15fbbbef23259da36caa9bd4994","distribution":"reference only; unmodified donor payload is not an MU1005 adaptation"}
+          }
+          (out/"manifest.json").write_text(json.dumps(plan,indent=2,ensure_ascii=False))
+          (out/"DO_NOT_INSTALL.txt").write_text("Review-only integrated staging. Do not execute or flash on vehicle. Components are not a connected production system.\n")
+          with zipfile.ZipFile("MU1005-full-system-STAGING-NO-INSTALL.zip","w",zipfile.ZIP_DEFLATED) as z:
+              for p in sorted(out.rglob("*")):
+                  if p.is_file(): z.write(p,p.relative_to(out))
+          with zipfile.ZipFile("MU1005-full-system-STAGING-NO-INSTALL.zip") as z:
+              assert z.testzip() is None
+              for row in rows:assert hashlib.sha256(z.read(row["path"])).hexdigest()==row["sha256"]
+          print(json.dumps({"staged_files":len(rows),"arm_elf_count":len(arm),"bluetooth_candidates":len(resolved),"missing":missing,"installable":False}))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MU1005-full-system-STAGING-NO-INSTALL
+          path: MU1005-full-system-STAGING-NO-INSTALL.zip
+          retention-days: 14
