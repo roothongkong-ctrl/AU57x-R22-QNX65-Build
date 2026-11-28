@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.229",
+    "version": "R105.230",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 10
+      "dependent_not_yet_listed": 5
     },
     "runs": [],
     "verified_prior": [
@@ -286,10 +286,20 @@
           46103867117
         ],
         "evidence": "Full actual donor host ownership test and EOF/error regression, plus four SI host regressions passed. No ARM build of ninth adapter."
+      },
+      {
+        "version": "R105.229",
+        "passed": 16,
+        "runs": [
+          46104138541,
+          46104138522,
+          46104138486
+        ],
+        "evidence": "Five exact config staging cases, package assembly, six backup cases and four native host regressions passed; no live installation."
       }
     ],
-    "discovery": "Added QNX shell-only exact pinned connectivity.json delta and byte-reversible SD staging, with CRLF and failure regressions. Assemble last proven full ARM donor and current native payload, explicitly distinguish R105.228 source fix from R105.225 ARM binary. No live activation. Actual OEM registration still missing.",
-    "expected_jobs": 10,
+    "discovery": "Compile actual full nine-adapter donor ARM via verified complete existing C/SDK image, no Docker SDK build. Restore/install only pinned Rust language runtime and upstream std port; target binary must include IE ownership fix. Previous package success; original Bluetooth and SI provider still missing.",
+    "expected_jobs": 5,
     "pending_prior": []
   },
   "read_strategy": {
@@ -365,7 +375,7 @@
         35
       ],
       "task": "Prepare reversible first-link candidate in parallel, not after first physical phone link. Keep installation disabled until actual modified components and recovery are integrated; defer nonessential optimizations.",
-      "evidence": "R105.229 config transaction stages original and candidate to SD, no live overwrite; first-link package includes actual ARM executable and native artifact. Tests pending."
+      "evidence": "R105.229 review package assembled successfully; R105.230 targets current ARM payload, not live installer."
     }
   ],
   "rules": [
