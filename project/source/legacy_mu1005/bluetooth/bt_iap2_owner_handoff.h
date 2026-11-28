@@ -55,12 +55,21 @@ int au98_withdraw(Au98Handoff*,int (*barrier)(void*,const Inbound*),void*);
 typedef struct {
  void *opaque;
  int (*original_image_verified)(void*);
+ /* For graft, this certifies the actual serialized original BlueSDK
+  * context that owns the new registration, not an already existing iAP2
+  * service. It must remain valid through original withdrawal. */
  int (*on_original_iap2_owner)(void*);
+ /* Reserved for factory/legacy integrations; not a prerequisite for
+  * creating a new graft service. No authentication is implied. */
  int (*original_iap2_service_verified)(void*);
  /* R100 explicit software-graft evidence; no endpoint/owner inference from HFP. */
  const Au100Evidence *route_evidence;
 } Au98OwnerProof;
 /* Legacy connect path may wait; never call from SDK event dispatch. */
+/* Independent exact image, owner lease, RF profile, exclusivity and
+ * recovery proof remain required. A factory iAP2 service is NOT required
+ * to create a replacement graft. This is admission only, not a connection. */
+int au98_graft_admission(const Au98OwnerProof*,const MuBtOwner*);
 int au98_bind_stock_native(Au98Handoff*,const Au98OwnerProof*,const MuBtOwner*);
 int au98_adopt_stock_native(Au98Handoff*,const Au98OwnerProof*,const MuBtOwner*,int,int(*)(void*,int),void*);
 /* After clean withdrawal and independent proof no old SDK callbacks can

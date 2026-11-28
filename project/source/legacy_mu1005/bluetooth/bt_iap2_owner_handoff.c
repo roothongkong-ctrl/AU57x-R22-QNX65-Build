@@ -246,6 +246,18 @@ int au98_guard_published_daemon(Au98Handoff*s,const Au98DispatchPolicy*p,
  return 0;
 }
 
+/* R105.246: graft publication must not require the missing service
+ * it is intended to create. Keep every independent route-gate witness
+ * and live SDK owner/transport check. No MFi/auth result is fabricated. */
+int au98_graft_admission(const Au98OwnerProof*p,const MuBtOwner*o){
+ if(!p||!o||!p->original_image_verified||!p->on_original_iap2_owner||
+    !o->owner_ready||!o->transport_ready||!o->read_live||
+    au100_route_select(p->route_evidence)!=AU100_GRAFT_RFCOMM_ROUTE)return 0;
+ return p->original_image_verified(p->opaque)==1&&
+        p->on_original_iap2_owner(p->opaque)==1&&
+        o->owner_ready(o->opaque)==1&&o->transport_ready(o->opaque)==1;
+}
+
 /* Native execution path of the R98 -> R45 bridge. Coded as real calls to
  * native_binding.c, not a function-pointer-only host placeholder.
  * Strictly unavailable outside the pinned QNX ARM32 target. */
@@ -271,11 +283,15 @@ int au98_bind_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*
 }
 static int adopt_stock_common(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*o,int fd,int(*verified)(void*,int),void*ctx,int ack){
  Au98Hooks h;
- if(!p||au100_route_select(p->route_evidence)!=AU100_GRAFT_RFCOMM_ROUTE)return -1;
+ if(!au98_graft_admission(p,o))return -1;
  memset(&h,0,sizeof h);
  h.opaque=p->opaque;h.original_image_verified=p->original_image_verified;
  h.on_original_iap2_owner=p->on_original_iap2_owner;
- h.original_iap2_service_verified=p->original_iap2_service_verified;
+ /* The generic handoff's third witness now tracks the graft's live
+  * SDK owner lifetime. Native owner_ready independently revalidates
+  * the registration context on every dispatch/withdrawal. The factory
+  * callback is deliberately not consulted in the graft-only path. */
+ h.original_iap2_service_verified=p->on_original_iap2_owner;
  h.attach=native_attach_adapter;h.tick=native_tick_adapter;h.withdraw=native_withdraw_adapter;
  return ack?au98_adopt_with_ack(s,&h,o,fd,57342,verified,ctx,mu_bt_native_attach_ack_context):
             au98_adopt(s,&h,o,fd,57342,verified,ctx);

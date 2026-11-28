@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.245",
+    "version": "R105.246",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 5
+      "dependent_not_yet_listed": 15
     },
     "runs": [],
     "verified_prior": [
@@ -438,10 +438,20 @@
           46107915409
         ],
         "evidence": "Consolidated review package artifact 15248561365 and host regressions success; no actual config activation."
+      },
+      {
+        "version": "R105.245",
+        "runs": [
+          46108008143,
+          46108008124,
+          46108008127,
+          46108008150
+        ],
+        "evidence": "Four workflows completed successfully, read-only artifact 15248073443. User explicitly declines repeat collection; existing R106 archive reused."
       }
     ],
-    "discovery": "Fix early-exit path observation and invoke existing compiled native observer in same session; preserve diagnostic report even if aliases missing. Prior vehicle R105.196 lacks connectivity.json path; no offline proof of live alias or independent rollback. Apply remains disabled.",
-    "expected_jobs": 5,
+    "discovery": "Native graft no longer depends on preexisting factory iAP2 service callback. Actual original owner and independent route evidence retained. No repeat vehicle collection. Full donor route prioritized; runtime provider, endpoint and phone remain unproven.",
+    "expected_jobs": 15,
     "pending_prior": []
   },
   "read_strategy": {
@@ -471,38 +481,14 @@
         24,
         35
       ],
-      "task": "一次原厂首连试验候选：固定现有配对及有线正常；复用 R105.146/R105.222/R105.234；核实 active config path、实际消费、备份及回滚。禁止新孤立适配器；review 包 apply 禁用直到真实路径及恢复审查。",
+      "task": "直接复用已有Congo/LuKa无线桥完整ARM daemon和原厂native接线，取消原厂服务已存在这一循环依赖；集中真实启动、owner、原厂会话及恢复，禁止再拆外围模块。优先利用R106既有实车日志及固件。",
       "paths": [
-        "integration/mu1005_vehicle_stage/first_link_session.sh",
-        "lab/mu1005_first_link_trial/trial.sh",
-        "lab/mu1005_first_link_config/first_link_config.sh",
-        "lab/mu1005_bt_live_observe/probe.sh"
-      ],
-      "evidence": "R105.244 package pass. R105.245 corrects premature exit and captures missing live config path plus original observer in a single SD read-only session. Actual path/consumer and rollback remain vehicle evidence, not cloud tests."
-    },
-    {
-      "priority": 2,
-      "steps": [
-        6,
-        8,
-        9,
-        11,
-        12,
-        17,
-        18,
-        21,
-        22,
-        23,
-        24,
-        35
-      ],
-      "task": "原厂路线不成立则整体复用成熟 Congo/LuKa 无线桥；只做真正运行入口及端到端绑定，不新增无真实提供者的 wrapper。",
-      "paths": [
-        "integration/mu1005_vehicle_stage/congo_port_table.json",
+        "project/source/legacy_mu1005/bluetooth/bt_iap2_owner_handoff.c",
+        "project/source/legacy_mu1005/bluetooth/bt_notify_bridge.c",
         "lab/mu1005_route4_5/supervised_startup.c",
-        "lab/mu1005_route3_dispatch/route3_fd.c"
+        "integration/mu1005_vehicle_stage/congo_port_table.json"
       ],
-      "evidence": "R105.231 full ARM donor already built; actual owner and session entry not connected."
+      "evidence": "R105.246 admission fix; actual provider and vehicle link not yet implemented."
     }
   ],
   "rules": [
@@ -513,7 +499,8 @@
     "GitHub测试可自行运行；聊天结束后不会自主写新代码；控制文件非后台AI调度器",
     "用户授权为首连目标自主改变研发路线，不为每项技术选型请求确认；安全与原厂认证不变。",
     "2026-11-28用户再次明确：手机与车机已完成原厂蓝牙配对，有线CarPlay正常；不再独立研发原厂认证或其他既有模块。只研发无线引导和无线传输差异，原厂认证照常执行，不绕过。此条优先于旧任务分组。",
-    "2026-11-28 用户指出进度停滞：R105.244 起停止单模块凑进度；只报告实际链路突破，冻结不相关回归及重复QEMU网络问题。"
+    "2026-11-28 用户指出进度停滞：R105.244 起停止单模块凑进度；只报告实际链路突破，冻结不相关回归及重复QEMU网络问题。",
+    "用户已明确取消重复检测；不将 R105.245 新实车报告作为研发前置。不得把既有日志缺失字段当成已证明。"
   ],
   "history": [
     "docs/WIRELESS_FIRST_LINK_TASK_REGISTER_CN.md",
@@ -524,7 +511,7 @@
     "toolchain": "luka-dev/qnx65-armv7-toolchain@baa45224f18ae6b13c2e9c77c6663bb8181eb6a1"
   },
   "first_link_strategy": {
-    "priority": "实际首连优先：冻结已通过的外围组件，原厂配置单次真实受控试验优先，失败则成熟 donor 全链路移植。",
+    "priority": "成熟无线桥整体移植优先；既有原厂蓝牙/有线会话复用，R106及原厂固件作为离线输入；不要求重复实车检测。",
     "routes": [
       {
         "name": "factory",

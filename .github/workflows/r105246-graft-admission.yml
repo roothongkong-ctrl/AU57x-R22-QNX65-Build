@@ -1,0 +1,39 @@
+name: R105.246 remove factory-service dependency from mature graft (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105246-graft-admission.yml','project/source/legacy_mu1005/bluetooth/bt_iap2_owner_handoff.*','project/source/legacy_mu1005/bluetooth/bt_notify_bridge.c','tests/test_r105246_graft_admission.c']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  admission:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -euxo pipefail
+          b=project/source/legacy_mu1005/bluetooth
+          cc -std=c99 -D_DEFAULT_SOURCE -Wall -Wextra -Werror -g -fsanitize=address,undefined -fno-omit-frame-pointer -no-pie -I"$b" tests/test_r105246_graft_admission.c "$b"/bt_iap2_owner_handoff.c "$b"/bt_route_gate.c "$b"/rf_arg_experiment.c -o /tmp/graft-admission
+          /tmp/graft-admission
+  arm-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - run: |
+          set -euxo pipefail
+          b=project/source/legacy_mu1005/bluetooth
+          mkdir -p evidence
+          for f in bt_iap2_owner_handoff bt_notify_bridge; do
+            docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -I"$b" -c "$b/$f.c" -o "evidence/$f.o"
+          done
+          readelf -h -sW evidence/*.o | tee evidence/arm.txt
+          grep -F au98_graft_admission evidence/arm.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105246-ARM-GRAFT-REVIEW-NO-INSTALL
+          path: evidence/

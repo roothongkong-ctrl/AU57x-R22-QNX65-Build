@@ -80,7 +80,7 @@ static int bind_common(const MuBtNotifyBinding*b,int queue_only){
  MuBtThreadIdentity id;
  if(!b||n.attempted||!b->handoff||b->handoff->state!=AU98_EMPTY||!b->prepared_fd||
  !b->policy.safe_dispatch||!b->policy.wired_idle||!b->policy.withdraw_barrier||!b->policy.reclaimed||
- !b->proof.original_image_verified||!b->proof.on_original_iap2_owner||!b->proof.original_iap2_service_verified||
+ !b->proof.original_image_verified||!b->proof.on_original_iap2_owner||
  !b->owner.owner_ready||!b->owner.read_live||!b->owner.transport_ready||
  !b->daemon_verified||
  au100_route_select(b->proof.route_evidence)!=AU100_GRAFT_RFCOMM_ROUTE||!safe(b)||
