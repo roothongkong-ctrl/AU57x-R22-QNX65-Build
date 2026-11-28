@@ -1,4 +1,4 @@
-name: R105.308 unmodified classic receiver QNX loader trial (NO INSTALL)
+name: R105.309 unmodified classic receiver QNX loader trial (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -63,10 +63,10 @@ jobs:
         run: |
           set -euo pipefail
           python3 lab/mu1005_classic_receiver/prepare.py toolchain/tests/qemu-run.sh
-          QNX_DONOR_RECEIVER="$PWD/stage/wcp_receiver" QEMU_KEEP_LOG="$PWD/evidence/serial.log" QEMU_TIMEOUT=90 QEMU_RUN_SECS=35 sh toolchain/tests/qemu-run.sh "$PWD/stage/receiver_probe" 8.5 | tee evidence/runtime.log
+          QNX_DONOR_RECEIVER="$PWD/stage/wcp_receiver" QEMU_KEEP_LOG="$PWD/evidence/serial.log" QEMU_TIMEOUT=110 QEMU_RUN_SECS=35 sh toolchain/tests/qemu-run.sh "$PWD/stage/receiver_probe" 8.5 | tee evidence/runtime.log
           grep -E 'DONOR_(EXIT|SIGNAL|ALIVE|SPAWN_FAILED)' evidence/runtime.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105308-receiver-${{ matrix.profile }}-NO-INSTALL
+          name: R105309-receiver-${{ matrix.profile }}-NO-INSTALL
           path: evidence/

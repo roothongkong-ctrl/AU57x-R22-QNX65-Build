@@ -10,7 +10,12 @@ assert s.count(a)==1
 s=s.replace(a,'\n$NAME\n[+raw +page_align perms=0555] wcp_receiver\nEOF\n')
 a='-display none -serial stdio'
 assert s.count(a)==1
-s=s.replace(a,'-nic none -display none -serial stdio')
+s=s.replace(a,'-nic user,restrict=on -display none -serial stdio')
+# Stop U-Boot autoboot even when early serial bytes are lost.
+# Keep the known working default NIC topology, restrict external networking.
+a="( printf '\\n'; sleep 4"
+assert s.count(a)==1
+s=s.replace(a,"( for _i in 1 2 3 4 5 6 7 8 9 10; do printf '\\n'; sleep 1; done")
 # Preserve serial even when the guest does not finish the probe.
 a='if ! grep -q \'@@QNXRUN-START@@\' "$LOG"; then'
 assert s.count(a)==1
