@@ -66,6 +66,48 @@ static int o_other(void *p,const uint8_t *v,size_t n){
  (void)p;(void)v;(void)n;return 1;
 }
 static void o_free(void *p,void *v){(void)p;free(v);}
+#ifdef MU_STOCK_COMBINED_TEST
+#include "cp_wcp_r45_cloud.h"
+static int unified_ap_calls;
+static int unified_caps(void*v,enum cp_radio_band band){
+ (void)v;return band==CP_RADIO_5||band==CP_RADIO_24;
+}
+static int unified_ap(void*v,uint32_t epoch,enum cp_radio_band band){
+ struct original*o=v;assert(epoch==o->epoch&&band==CP_RADIO_5);
+ ++unified_ap_calls;return 1;
+}
+static int unified_radio_wait(void*v,uint32_t epoch,enum cp_radio_band band){
+ (void)v;(void)epoch;(void)band;return 0;
+}
+static int unified_epoch(void*v,uint32_t epoch){
+ return ((struct original*)v)->epoch==epoch;
+}
+static int unified_iface(void*v,uint32_t e,const char*i){
+ (void)v;(void)e;(void)i;return 0;
+}
+static int unified_listener(void*v,uint32_t e,const char*i,unsigned port){
+ (void)v;(void)e;(void)i;(void)port;return 0;
+}
+static int unified_media(void*v,uint32_t e,enum cp_cloud_media channel){
+ (void)v;(void)e;(void)channel;return 0;
+}
+static const char*const unified_ip[]={"10.0.0.1"};
+static const uint8_t unified_mac[6]={2,4,6,8,10,12};
+static const uint16_t unified_sent[]={0xaa01,0xaa03,0x5703,0x4301};
+static const uint16_t unified_recv[]={0xaa00,0xaa02,0xaa05,0x5702,0x4300};
+static const struct cp_session unified_config={
+ .wifi={.ssid="R84_FIXTURE",.passphrase="not-a-real-key",.security=2,.channel=6},
+ .ip_addresses=unified_ip,.ip_address_count=1,.airplay_port=5000,
+ .public_key="only-a-host-test",.source_version="only-a-host-test"
+};
+static const struct cp_identification unified_id={
+ .name="R84",.model="MU1005",.manufacturer="Audi",.serial="not-real",
+ .firmware="MU1005",.hardware="offline",.bluetooth_name="offline-bt",
+ .wireless_ssid="R84_FIXTURE",.bluetooth_mac6=unified_mac,
+ .accessory_messages=unified_sent,.phone_messages=unified_recv,
+ .accessory_message_count=4,.phone_message_count=5
+};
+#endif
 static void r90_control_msg(uint8_t *msg,unsigned id,const uint8_t *data,size_t n){
  size_t count=n?n+10u:6u;
  msg[0]=0x40;msg[1]=0x40;
@@ -161,6 +203,19 @@ int main(void){
   assert(cp_s4_prepare_stock_mfi(&s,lib,&owner)==CP_LK_OK);
   assert(!stock.bound&&!cert_calls&&!sig_calls);
  }
+#ifdef MU_STOCK_COMBINED_TEST
+ struct cp_cloud_pipeline cloud;cp_cloud_init(&cloud);
+ struct cp_cloud_owner cloud_ops={
+  .ctx=&o,.bt_alive=o_owner,.wired_idle=o_wired,.radio_capability=unified_caps,
+  .ap_prepare=unified_ap,.ap_association=unified_radio_wait,.ap_disconnected=unified_radio_wait,
+  .carplay_request_sent=unified_epoch,.si_single_owner=unified_epoch,
+  .bonjour_identity_verified=unified_iface,.airplay_listener_verified=unified_listener,
+  .inner_iap2_mfi_verified=unified_epoch,.media_verified=unified_media,
+  .teardown_confirmed=unified_epoch,.ap_hotspot_verified=unified_radio_wait,
+  .airplay_session_connected=unified_listener
+ };
+ assert(cp_cloud_bind_bootstrap(&cloud,&s,&unified_config,&unified_id)==CP_CLOUD_OK);
+#endif
  assert(cp_s4_tcp_init(&t,&s,allow,&o)==CP_LK_OK);
  o.fd=-1;
  listener=cp_s4_listener_open();assert(listener>=0);
@@ -234,7 +289,17 @@ int main(void){
  iap_len=r90_packet(iap_frame,0x40,45,101,10,msg,6);
  r90_send_data(client,&w,iap_frame,iap_len,121);
  assert(cp_s4_authenticated(&s));
+#ifdef MU_STOCK_COMBINED_TEST
+ assert(cp_wcp_r45_cloud_tick(&r,&w,&t,&ops,&ac,&cloud,&cloud_ops,NULL,NULL,123)==CP_CLOUD_RETRY);
+ assert(cloud.started&&cloud.prefer_stock_dual_band&&cloud.require_live_ap_refresh);
+ assert(cp_wcp_r45_cloud_tick(&r,&w,&t,&ops,&ac,&cloud,&cloud_ops,NULL,NULL,124)==CP_CLOUD_RETRY);
+ assert(cp_wcp_r45_cloud_tick(&r,&w,&t,&ops,&ac,&cloud,&cloud_ops,NULL,NULL,125)==CP_CLOUD_RETRY);
+ assert(unified_ap_calls==1&&cloud.band==CP_RADIO_5&&!cloud.live_ap_config);
+ assert(!cloud.remote_phase&&!cp_cloud_first_session_seen(&cloud));
+ puts("R105299_REAL_TCP_TO_STOCK_DUAL_BAND_OWNER_ROUTE_FIXTURE_PASS");
+#else
  assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,123)==CP_WCP_OK);
+#endif
  puts("PASS unified TCP owner tick reaches authenticated bootstrap handoff (fixture)");
  /* Unlike the original R89 test, this is a synthetic OEM certificate/MFi
   * used only to prove C code ordering, NOT an Apple authentication. */
@@ -251,7 +316,7 @@ int main(void){
  assert(out.stock_iap2_connected(out.ctx,7)==1); /* iAP2, NOT MFi */
  /* Genuine socket loss: even intact heap data may not authorize session. */
  o.paired=0;
- assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,124)==CP_WCP_DENIED);
+ assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,130)==CP_WCP_DENIED);
  assert(!w.attached&&t.closed&&ac.state==CP_WCP_BLOCKED);
  assert(!stock.bound&&!stock.existing_library&&!stock.create_signature&&!stock.copy_certificate);
  assert(!cp_s4_authenticated(&s));

@@ -1,0 +1,2 @@
+# R105.299 第2–6项统一接入第一轮
+第6项 46130736450 三项全部成功。统一选择既有 R45 C 传输→原厂 MFi→CPRX 远程 DIO 代码路线，不能与占同一 TCP 57342 的独立 donor daemon 同时启动。新增单一协调入口 cp_wcp_r45_cloud_tick，调用已经存在的真实 socket 解析/原厂 MFi 接口、自动启用用户固定 5GHz 优先策略、推进原厂远程 DIO 会话及 wired restore；不新建接收器，不增加蓝牙配对请求，不跨进程传递原厂句柄。使用此前 R90 真实主机 TCP fixture 增加认证后交接到同一双频状态机的覆盖；ARM 统一链接使用已验证缓存。这里的 MFi/owner 仍为 fixture，尚未接上真实 OEM 调用方。重要实际阻塞：btstack 的原厂选中手机与 live ACL owner，SI 的有线生命周期与真实 DIO 启动归属，原厂 AP 当前接口/5GHz IE，DIO 内原厂 libairplay 的有效认证调用方及原厂媒体状态回调。不能在 SI 直接借用 DIO 私有句柄，也不把 fixture 当车机成功。下一轮解决实际进程调用点，不重复单项测试。NO INSTALL。
