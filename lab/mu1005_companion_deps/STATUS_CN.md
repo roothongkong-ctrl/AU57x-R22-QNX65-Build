@@ -1,0 +1,2 @@
+# R105.318 接收器真正执行后的依赖审计
+R105.317 run 46143270750：block /ramdisk errno89，停止该后端；flash /ramdisk 写入成功，原 launcher 完成正常 exec，实际 wcp_receiver SIGSEGV ip=0。原来的 exit11 已在隔离环境解决；新崩溃原因未证实。复用旧 SDK 符号表，不重新编译或重跑 QEMU，逐个核查启动器、receiver、maps、transport 的强弱导入、重定位、DT_NEEDED、初始化标签；缺失弱符号和动态调用均不能直接认作崩溃因果。仅正常依赖兼容审计，保留真实校验、认证和许可，不修改原文件，不安装。如果无法用合法完整组件解决，恢复既有原厂/Congo 路线。

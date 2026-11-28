@@ -1,0 +1,33 @@
+name: R105.318 exact companion dependency and initializer audit (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105318-companion-deps.yml','lab/mu1005_companion_deps/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reuse genuine retained SDK dynamic symbols and pinned public companions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir evidence retained
+          gh run download 46136093739 --repo "$GITHUB_REPOSITORY" --name R105308-receiver-790-NO-INSTALL --dir retained
+          git init donor
+          git -C donor remote add origin https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps.git
+          git -C donor fetch --depth 1 origin aec37f5b1c87a0d961d16fe4328ac3638d0a833e
+          git -C donor checkout --detach FETCH_HEAD
+          test "$(git -C donor rev-parse HEAD)" = aec37f5b1c87a0d961d16fe4328ac3638d0a833e
+          python3 lab/mu1005_companion_deps/audit.py donor/standalone/SD_ROOT/carplay/payload/wireless retained evidence/dependencies.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R105318-companion-dependencies-NO-INSTALL
+          path: evidence/
