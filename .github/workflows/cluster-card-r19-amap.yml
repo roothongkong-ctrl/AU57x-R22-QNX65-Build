@@ -1,0 +1,59 @@
+name: R19 official AMap demo Xcode simulator feasibility
+on:
+  workflow_dispatch:
+  push:
+    branches: [experiment/cluster-card-r19-amap-xcode]
+    paths: ['.github/workflows/cluster-card-r19-amap.yml']
+permissions:
+  contents: read
+jobs:
+  amap:
+    runs-on: macos-15
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        dependencies: [locked, refreshed]
+    steps:
+      - name: Check Xcode and boot an actual iPhone simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/r19"
+          xcodebuild -version | tee "$RUNNER_TEMP/r19/xcode.txt"
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/r19/devices.json"
+          UDID=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))["devices"]; print(next(x["udid"] for k,v in d.items() if "iOS" in k for x in v if x.get("isAvailable") and x["name"].startswith("iPhone")))' "$RUNNER_TEMP/r19/devices.json")
+          echo "R19_UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          defaults write com.apple.iphonesimulator CarPlayExtraOptions -bool YES
+      - name: Fetch actual official AMap source and inventory CarPlay interfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/amap-demo/iOS-HelloCarPlay.git "$RUNNER_TEMP/amap"
+          cd "$RUNNER_TEMP/amap"
+          git rev-parse HEAD > "$RUNNER_TEMP/r19/amap-source-sha.txt"
+          git grep -inE 'startEmulatorNavi|didConnectCarInterfaceController|CPTemplateApplicationInstrumentClusterScene|CPTemplateApplicationDashboardScene|CPMapTemplate|AMapNaviDriveView' -- '*.m' '*.h' '*.plist' > "$RUNNER_TEMP/r19/api-inventory.txt" || true
+          cat "$RUNNER_TEMP/r19/api-inventory.txt"
+          cp Podfile.lock "$RUNNER_TEMP/r19/original-pod-lock.txt"
+      - name: Compile real SDK sample for iPhone Simulator
+        shell: bash
+        env:
+          DEPS: ${{ matrix.dependencies }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/amap"
+          if [ "$DEPS" = refreshed ]; then rm -f Podfile.lock; fi
+          pod install --repo-update 2>&1 | tee "$RUNNER_TEMP/r19/pods.log"
+          cp Podfile.lock "$RUNNER_TEMP/r19/resolved-pod-lock.txt"
+          xcodebuild -workspace HelloCarPlay.xcworkspace -scheme HelloCarPlay -configuration Debug -sdk iphonesimulator -destination "id=$R19_UDID" -derivedDataPath "$RUNNER_TEMP/derived" CODE_SIGNING_ALLOWED=NO IPHONEOS_DEPLOYMENT_TARGET=13.0 build 2>&1 | tee "$RUNNER_TEMP/r19/build.log"
+          APP=$(find "$RUNNER_TEMP/derived/Build/Products" -maxdepth 2 -name HelloCarPlay.app -print -quit)
+          test -n "$APP"
+          xcrun simctl install "$R19_UDID" "$APP"
+          echo 'SDK demo built and installed; NOT proof of live navigation, instrument cluster or type112.' | tee "$RUNNER_TEMP/r19/scope.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: amap-r19-${{ matrix.dependencies }}
+          path: ${{ runner.temp }}/r19/
