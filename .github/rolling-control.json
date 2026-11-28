@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.235",
+    "version": "R105.236",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -337,13 +337,31 @@
           46105722197
         ],
         "evidence": "New DNS witness host test and six backup/four SI host regressions succeeded; no live binding."
+      },
+      {
+        "version": "R105.234",
+        "passed": 12,
+        "runs": [
+          46106096583,
+          46106096668,
+          46106096576
+        ],
+        "evidence": "Combined review and exact original config/core backup recovery transaction plus 10 regression jobs successful. No live activation."
+      },
+      {
+        "version": "R105.235",
+        "passed": 6,
+        "runs": [
+          46106222184,
+          46106222153,
+          46106222132
+        ],
+        "evidence": "Actual nonblocking FD child process exchange, existing IPC completion and four SI host jobs successful. No real original Bluetooth provider."
       }
     ],
-    "discovery": "Actual connected nonblocking FD adapter for original Type-3 raw byte transport candidate, reusing existing IPC framing and completion. Real child-process stream test. Not native OEM provider or real iPhone.",
+    "discovery": "Reuse cached QNX image and known boot harness for ARM build/runtime of existing raw FD adapter. Host success already accepted. Do not repeat other modules.",
     "expected_jobs": 1,
-    "pending_prior": [
-      46106096668
-    ]
+    "pending_prior": []
   },
   "read_strategy": {
     "first_parallel": [
@@ -402,7 +420,7 @@
         "lab/mu1005_stock_reuse/dns_resolve.c",
         "lab/mu1005_route3_dispatch/route3_fd.c"
       ],
-      "evidence": "R105.235 real FD adapter added to existing raw byte bridge; cloud regression pending. Still missing OEM producer/plugin entry. No separate auth work."
+      "evidence": "R105.235 real FD host and IPC ACK passed; R105.236 QNX ARM runtime pending. Original plugin producer still missing."
     },
     {
       "priority": 3,
@@ -410,7 +428,7 @@
         35
       ],
       "task": "并行组装可恢复最小首连候选，复用MIB；实际配置、备份恢复、安全及有线保留仍需确认；不启用未验收安装。",
-      "evidence": "R105.234 two integrated jobs, exact original config/core transaction and verified stock-first/fallback packaging; pending. No live activation."
+      "evidence": "R105.234 exact original configuration/core recovery and combined review both passed; install gate remains false."
     }
   ],
   "rules": [
