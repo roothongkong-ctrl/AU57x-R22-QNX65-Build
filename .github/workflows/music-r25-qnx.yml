@@ -1,0 +1,37 @@
+name: MusicSkin R25 QNX65 ARMv7 native checksum and shell
+on:
+  push:
+    branches: [mediasskin-r17]
+    paths:
+      - 'media_skin_r25/**'
+      - '.github/workflows/music-r25-qnx.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  music-qnx65:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare result directory
+        run: mkdir -p media_r25_result
+      - name: Reuse upstream QNX SDK toolchain
+        run: git clone --depth=1 https://github.com/luka-dev/qnx65-armv7-toolchain.git /tmp/qnx65-toolchain
+      - name: Build previously validated QNX ARMv7 environment
+        run: |
+          set -o pipefail
+          docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t au57x-qnx65-cc:8.5 /tmp/qnx65-toolchain 2>&1 | tee media_r25_result/toolchain.log
+      - name: Install QEMU
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+      - name: Execute real QNX shell and native checksum test
+        run: bash media_skin_r25/run_qnx.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: MusicSkin-R25-QNX-review-only
+          path: media_r25_result/
+          if-no-files-found: warn
+          retention-days: 14
