@@ -8,8 +8,9 @@
 #include <sys/wait.h>
 #define STOCK "/mnt/app/eso/bin/apps/dio_manager"
 static int reserved(const char*s){
- return !strncmp(s,"LD_PRELOAD=",11)||!strncmp(s,"WCP_DIO_WIRELESS=",17)||
- !strncmp(s,"MU1005_DIO_INTERFACE_REVIEW=",28);
+ return !strncmp(s,"LD_PRELOAD=",sizeof("LD_PRELOAD=")-1)||
+ !strncmp(s,"WCP_DIO_WIRELESS=",sizeof("WCP_DIO_WIRELESS=")-1)||
+ !strncmp(s,"MU1005_DIO_INTERFACE_REVIEW=",sizeof("MU1005_DIO_INTERFACE_REVIEW=")-1);
 }
 static int path_ok(const char*p){
  if(!p||p[0]!='/'||strlen(p)>240)return 0;
@@ -39,7 +40,8 @@ int mu_dio_launch_wireless(MuDioLaunch*s,uint64_t epoch,char*const argv[],char*c
  int map[]={0,1,2};
  s->pid=spawn(STOCK,3,map,NULL,argv,child);
 #else
- /* No host path execution; this is a QNX-only original process adapter. */
+ /* The host validates the constructed environment without launching OEM. */
+ (void)child;
  s->pid=-1;
 #endif
  if(s->pid<=0)return -1;
