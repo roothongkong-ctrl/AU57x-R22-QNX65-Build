@@ -1,0 +1,2 @@
+# R105.321 原厂 DIO iAP2 路径与 job 接入
+复用 R105.039/040 已定位的原厂 job producer/queue/listener 和 R105.112 真实库加载通过证据。下一关键未知是 config key10 的路径及原厂队列入口/监听实例。仅对精确 SHA 的原厂 DIO 调用点、配置取值、队列调用者及固件中 iAP2/ipod 设备路径做只读审计，避免重新编译 QNX 或重复原厂库加载；不猜测 /dev 路径、不伪造 EXLAP grant、不直接调用原厂私有函数。实际 live owner/无线认证尚未证实。NO INSTALL。
