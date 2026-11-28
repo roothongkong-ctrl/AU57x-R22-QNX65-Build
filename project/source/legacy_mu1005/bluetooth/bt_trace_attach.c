@@ -26,7 +26,13 @@ static Au97GotHook trace_hook;
 extern void mu_bt_trace_tail(void*,int,const char*,...);
 __attribute__((visibility("hidden")))
 MuBtTraceOriginal mu_bt_trace_target(void *channel,uintptr_t lr,const char *fmt){
- return mu_bt_trace_latch_observe(&latch,lr,(uintptr_t)channel,(uintptr_t)fmt);
+ /* The fixed slot is in the pinned resident main executable and was
+  * checked readable before hook publication. Only inspect it for the exact
+  * startup call. No procfs IPC, loader calls, locks or OEM SDK calls here. */
+ uintptr_t current=0;
+ if(lr==0x11ed14u&&(uintptr_t)fmt==0x27cf94u)
+  current=__atomic_load_n((const uint32_t*)(uintptr_t)0x2c18fcu,__ATOMIC_ACQUIRE);
+ return mu_bt_trace_latch_observe_live(&latch,lr,(uintptr_t)channel,(uintptr_t)fmt,current);
 }
 static int allow(void *unused,uint32_t address,size_t n){
  (void)unused;
@@ -61,9 +67,11 @@ int mu_bt_trace_attach(void){
  uint32_t channel=0,slot=0;
  int ok=mu_bt_self_reader_read(r,0x2c18fcu,&channel,4)&&
     mu_bt_self_reader_read(r,0x2c12c8u,&slot,4)&&slot==resolved&&
-    mu_bt_sdk_start_trace(0x11ed14u,channel,0x27cf94u,mu_bt_self_reader_read,r);
+    mu_bt_sdk_trace_site(mu_bt_self_reader_read,r);
  mu_bt_self_reader_close(r);
- if(!ok||!mu_bt_trace_latch_bind(&latch,channel,original))return 0;
+ /* Zero channel before C++ initialization is valid at attachment time.
+  * The actual call must match the then-current nonzero stock slot. */
+ if(!ok||!mu_bt_trace_latch_bind_deferred(&latch,original))return 0;
  /* Publish the tail only after original forwarding has been bound.
   * If lazy resolution or a competing slot change is present, do not attach. */
  return au97_got_replace(&trace_hook,(volatile uintptr_t*)0x2c12c8u,

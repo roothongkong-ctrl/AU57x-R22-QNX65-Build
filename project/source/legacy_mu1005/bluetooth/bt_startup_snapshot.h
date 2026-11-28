@@ -16,6 +16,8 @@ int mu_bt_sdk_lifecycle_sites(int(*read_live)(void*,uint32_t,void*,size_t),void*
 /* Read-only Device-ID success trace witness. Exact ARM LR, format and live
  * trace-channel GOT value required. Does NOT prove SDK started or lease.
  * Caller must pin mapped OEM image and use a checked reader. */
+/* Exact immutable instruction and format; usable before Channel construction. */
+int mu_bt_sdk_trace_site(int(*read_live)(void*,uint32_t,void*,size_t),void*);
 int mu_bt_sdk_start_trace(uint32_t lr,uint32_t channel,uint32_t format,
  int(*read_live)(void*,uint32_t,void*,size_t),void*);
 #endif

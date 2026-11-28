@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.225",
+    "version": "R105.226",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 6
+      "dependent_not_yet_listed": 13
     },
     "runs": [],
     "verified_prior": [
@@ -259,10 +259,19 @@
           46094482921
         ],
         "evidence": "Actual full host donor READY before C supervisor handoff and ARM build; 15/15 success including native build and regressions. OEM owner still unbound."
+      },
+      {
+        "version": "R105.225",
+        "passed": 6,
+        "runs": [
+          46094722505,
+          46094722406
+        ],
+        "evidence": "Actual full donor inherited EOF and malformed frame exit host regression and full ARM build, four SI host regressions success. No real RF."
       }
     ],
-    "discovery": "R105.225 actual donor main fixes ready write bypassing cleanup and inherited session errors reported as exit success. Independent reset/peer/IE cleanup, monitor stopped first, no speculative removal after failed installation, mandatory QNX inherited ready mode. Actual host EOF and invalid frame exit test + full ARM compile. Does not establish radio lease, OEM Bluetooth registration or real first link.",
-    "expected_jobs": 6,
+    "discovery": "New plan milestone 3 original Bluetooth registration first. Congo startup trace strategy compared with pinned MU1005; old preload constructor required already initialized original Channel pointer, which may not exist until after constructors. R105.226 removes that circular requirement, verifies immutable trace site at attachment, compares exact original Channel slot at actual callback, always forwards original. No claim trace fires, GOT resolved at ctor, OEM lease or registration; existing host and ARM checks. No more donor peripheral fixes until core Bluetooth advances.",
+    "expected_jobs": 13,
     "pending_prior": []
   },
   "read_strategy": {
@@ -298,7 +307,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.224 15/15 passed; R105.225 fixes real donor failure exit and cleanup. No repeated request for historical car data. OEM lifecycle provider remains missing."
+      "evidence": "R105.226 deferred original startup Channel binding in actual preload source. Still need original lifecycle lease/caller and real registration. Congo donor binary only 3638/5092, do not run on MU1005 without validated adaptation."
     },
     {
       "priority": 2,

@@ -13,5 +13,9 @@ typedef struct {
 } MuBtTraceLatch;
 int mu_bt_trace_latch_bind(MuBtTraceLatch*,uintptr_t,MuBtTraceOriginal);
 MuBtTraceOriginal mu_bt_trace_latch_observe(MuBtTraceLatch*,uintptr_t,uintptr_t,uintptr_t);
+/* Separate deferred mode: current is the live pinned stock channel slot
+ * at the exact original call, not an externally supplied identity. */
+int mu_bt_trace_latch_bind_deferred(MuBtTraceLatch*,MuBtTraceOriginal);
+MuBtTraceOriginal mu_bt_trace_latch_observe_live(MuBtTraceLatch*,uintptr_t,uintptr_t,uintptr_t,uintptr_t);
 int mu_bt_trace_latch_take(MuBtTraceLatch*);
 #endif

@@ -52,13 +52,15 @@ int mu_bt_sdk_lifecycle_sites(int(*r)(void*,uint32_t,void*,size_t),void*c){
 /* congobg's Device-ID trace strategy, adapted to the exact CN MU1005
  * executable. This observer recognizes a genuine success-path trace, not
  * completion of startBtStack; do not register or call the SDK here. */
-int mu_bt_sdk_start_trace(uint32_t lr,uint32_t channel,uint32_t format,
- int(*r)(void*,uint32_t,void*,size_t),void*c){
+int mu_bt_sdk_trace_site(int(*r)(void*,uint32_t,void*,size_t),void*c){
  static const char expected[]="%s(%d): Primary DID registered";
  uint8_t word[4];char s[sizeof expected];
- if(!r||lr!=0x11ed14u||format!=0x27cf94u||!ptr(channel))return 0;
- if(r(c,0x11ed10u,word,4)!=1||le(word)!=0xebffe04bu||
-    r(c,0x2c18fcu,word,4)!=1||le(word)!=channel||
-    r(c,format,s,sizeof s)!=1||memcmp(s,expected,sizeof s))return 0;
- return 1;
+ return r&&r(c,0x11ed10u,word,4)==1&&le(word)==0xebffe04bu&&
+    r(c,0x27cf94u,s,sizeof s)==1&&!memcmp(s,expected,sizeof s);
+}
+int mu_bt_sdk_start_trace(uint32_t lr,uint32_t channel,uint32_t format,
+ int(*r)(void*,uint32_t,void*,size_t),void*c){
+ uint8_t word[4];
+ return lr==0x11ed14u&&format==0x27cf94u&&ptr(channel)&&
+    mu_bt_sdk_trace_site(r,c)&&r(c,0x2c18fcu,word,4)==1&&le(word)==channel;
 }
