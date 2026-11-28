@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   independent:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.QNX65_RUNNER_LABEL || 'ubuntu-24.04' }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -40,17 +40,29 @@ jobs:
                   dest.write_bytes(t.extractfile(m).read())
           assert all((pathlib.Path("stage")/n).exists() for n in ("libbthook.so","wcpd","wcppaird"))
           PY
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
-        with:
-          context: toolchain
-          platforms: linux/amd64
-          target: base-env
-          build-args: BASE=base-8.5
-          tags: qnx65-armv7-toolchain:8.5
-          load: true
-          push: false
-          cache-from: type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1
+      - name: Reuse existing QNX environment; never rebuild
+        env:
+          EXISTING_IMAGE: ${{ vars.QNX65_EXISTING_IMAGE }}
+        run: |
+          set -euo pipefail
+          cat AGENTS.md
+          image=qnx65-armv7-toolchain:8.5
+          if docker image inspect "$image" >/dev/null 2>&1; then
+            echo "QNX_REUSE_LOCAL"
+          elif docker image inspect au57x-qnx65-cc:8.5 >/dev/null 2>&1; then
+            docker tag au57x-qnx65-cc:8.5 "$image"
+            echo "QNX_REUSE_LEGACY_LOCAL"
+          elif [ -n "$EXISTING_IMAGE" ]; then
+            [[ "$EXISTING_IMAGE" =~ @sha256:[a-f0-9]{64}$ ]] || { echo "Existing image must be pinned by digest"; exit 2; }
+            docker pull "$EXISTING_IMAGE"
+            docker tag "$EXISTING_IMAGE" "$image"
+            echo "QNX_REUSE_PINNED_IMAGE"
+          else
+            echo "::error::Existing QNX image not accessible on this runner. Configure the existing runner label or pinned existing image; automatic rebuild prohibited."
+            exit 3
+          fi
+          docker run --rm "$image" arm-unknown-nto-qnx6.5.0eabi-gcc --version
+          docker run --rm "$image" test -d /opt/qnx650/target/qnx6/armle-v7
       - name: Compare versioned imports with genuine QNX SDK libraries
         if: matrix.check != 'hook-load'
         env:
@@ -93,8 +105,7 @@ jobs:
         if: matrix.check == 'hook-load'
         run: |
           set -euxo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq qemu-system-arm
+          command -v qemu-system-arm >/dev/null || { echo 'Existing runner lacks QEMU'; exit 3; }
           cat > probe.c <<'EOF'
           #include <stdio.h>
           #include <dlfcn.h>
