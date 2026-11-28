@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.219",
+    "version": "R105.220",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 2
+      "dependent_not_yet_listed": 5
     },
     "runs": [],
     "verified_prior": [
@@ -205,18 +205,30 @@
         "evidence": "Full five-adapter default-feature QNX ARM Rust executable built and uploaded, artifact 15242186627. Inherited ACK and original SI requirement strings verified; no actual OEM/RF runtime."
       }
     ],
-    "discovery": "R105.219 corrects observed QNX child stat failure by staging separate explicit raw/page-aligned child path and diagnostic. No rerun of successful full Rust ARM build.",
-    "expected_jobs": 2,
+    "discovery": "R105.220 reuses byte-identical full LuKa R105.218 executable (artifact 15242186627, SHA256 0d2134b3d72069164cb3e821d2c143af51544b3193c98eacc720a1ecc9a94515), executes actual main --check-config under QNX guest without hardware; required explicit AP refusal and process exit 1, not an installation or first link. No repeated Rust build.",
+    "expected_jobs": 5,
     "pending_prior": [
+      {
+        "version": "R105.219",
+        "runs": [
+          46092706940,
+          46092706968
+        ],
+        "observed": {
+          "success": 5,
+          "running": 1
+        },
+        "note": "QNX child IFS explicit raw stage runtime pending."
+      },
       {
         "version": "Congo",
         "runs": [
-          46091673646
+          46092734687
         ],
         "observed": {
-          "failed": 1
+          "running": 1
         },
-        "note": "Three of seven original missing libs recovered; four remain libnvdc.so libnvos.so libnvrm.so libnvrm_graphics.so. Investigating extractor link metadata instead of guessing."
+        "note": "metadata alias resolver fixture passed, cache/build pending."
       }
     ]
   },
@@ -253,7 +265,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.218 complete LuKa adapted ARM donor build succeeded; R105.219 fixes QNX supervisor laboratory child file, actual OEM provider still unbound. Congo missing four genuine dependencies."
+      "evidence": "R105.219 QNX child runtime pending; R105.220 exact full production donor loader/config boundary test. Congo alias fix pending. Real OEM provider remains missing."
     },
     {
       "priority": 2,

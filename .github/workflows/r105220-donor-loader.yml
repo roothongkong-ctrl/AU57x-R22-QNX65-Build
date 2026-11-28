@@ -1,0 +1,63 @@
+name: R105.220 exact full donor QNX loader and configuration boundary (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105220-donor-loader.yml, lab/mu1005_donor_loader/**]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  exact-donor-loader:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: R105218-full-donor-arm-NO-INSTALL
+          run-id: 46092385570
+          github-token: ${{ github.token }}
+          path: exact-donor
+      - name: Verify immutable previously built executable
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          grep -Fx 'source=764bdded3284a50af5139d57c79a27f8940c29ce' exact-donor/STATUS.txt
+          echo '0d2134b3d72069164cb3e821d2c143af51544b3193c98eacc720a1ecc9a94515  exact-donor/donor-daemon-MU1005-INHERITED-ACK-NO-INSTALL.bin' | sha256sum -c -
+          cp exact-donor/donor-daemon-MU1005-INHERITED-ACK-NO-INSTALL.bin evidence/mu-donor
+          chmod 0555 evidence/mu-donor
+          readelf -h -dW evidence/mu-donor | tee evidence/elf.log
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Fetch pinned QNX boot environment
+        run: |
+          set -euxo pipefail
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+      - name: Load exact full donor and observe real configuration refusal
+        run: |
+          set -euxo pipefail
+          python3 lab/mu1005_donor_loader/prepare_ifs.py toolchain/tests/qemu-run.sh
+          # No OEM configuration, hardware, fake signer, or radio tool is staged.
+          # Expected: actual Rust main reaches read_stock and rejects absent AP.
+          set +e
+          QEMU_KEEP_LOG="$PWD/evidence/serial.log" QEMU_TIMEOUT=75 QEMU_RUN_SECS=25 sh toolchain/tests/qemu-run.sh "$PWD/evidence/mu-donor" 8.5 2>&1 | tee evidence/runtime.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          test "$rc" -eq 1
+          grep -F 'MU1005 live AP unavailable or changed' evidence/runtime.log
+          grep -E 'Process [0-9]+ \(mu-donor\) exited status=1' evidence/serial.log
+          ! grep -E 'terminated SIG|Could not load|Unable to load' evidence/serial.log
+          printf '%s\n' 'EXACT_FULL_DONOR_QNX_MAIN_REACHED_AP_REFUSAL_NO_OEM_NO_RF' | tee evidence/result.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R105220-exact-donor-loader-logs-NO-INSTALL
+          path: evidence/*.log
