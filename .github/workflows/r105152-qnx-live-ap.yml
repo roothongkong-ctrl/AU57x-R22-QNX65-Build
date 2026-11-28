@@ -2,7 +2,7 @@ name: R105.152 QNX ARM live AP dual-band fallback runtime (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/r105152-qnx-live-ap.yml, tests/test_cloud_pipeline.c, lab/mu1005_qnx_live_ap/**]
+    paths: [tests/test_cloud_pipeline.c, lab/mu1005_qnx_live_ap/**, project/source/src/cp_radio_policy.c, project/source/src/cp_cloud_pipeline.c, integration/mu1005_si_native/ap_live/**]
   workflow_dispatch:
 concurrency:
   group: mu1005-qnx-live-ap-${{ github.ref }}
@@ -54,10 +54,7 @@ jobs:
             arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW qnx-runtime-evidence/mu1005-live-ap
           ' 2>&1 | tee qnx-runtime-evidence/build.log
           QEMU_KEEP_LOG="$PWD/qnx-runtime-evidence/serial.log" QEMU_TIMEOUT=90 QEMU_RUN_SECS=45 sh toolchain/tests/qemu-run.sh "$PWD/qnx-runtime-evidence/mu1005-live-ap" 8.5 | tee qnx-runtime-evidence/runtime.log
-          grep -Fx 'PASS 5_TO_24_REFRESH_BEFORE_ASSOCIATION_NO_OEM' qnx-runtime-evidence/runtime.log
-          grep -Fx 'PASS 24_TO_5_REFRESH_BEFORE_ASSOCIATION_NO_OEM' qnx-runtime-evidence/runtime.log
-          grep -Fx R105152_QNX_LIVE_AP_BOTH_DIRECTIONS_FIXTURE_PASS qnx-runtime-evidence/runtime.log
-          grep -E 'Process [0-9]+ \(mu1005-live-ap\) exited status=0' qnx-runtime-evidence/serial.log
+          python3 lab/mu1005_stock_reconnect/verify_qnx_ap.py qnx-runtime-evidence
       - uses: actions/upload-artifact@v4
         if: always()
         with:

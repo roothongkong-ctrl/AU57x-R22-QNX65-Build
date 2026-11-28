@@ -1,0 +1,28 @@
+name: R105.297 verify already executed QNX dual-band evidence (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105297-qnx-ap-evidence.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  evidence-replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Confirm unchanged tested source and fixture
+        run: |
+          git diff --exit-code 3b040288824f0b6abfee71cde480906130a8671f HEAD -- project/source tests/test_cloud_pipeline.c integration/mu1005_si_native/ap_live lab/mu1005_qnx_live_ap
+      - name: Reuse original runtime artifact (no rerun or rebuild)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir -p qnx-runtime-evidence
+          gh run download 46130141073 --repo "$GITHUB_REPOSITORY" --name r105152-qnx-live-ap-NO-INSTALL --dir qnx-runtime-evidence
+          python3 lab/mu1005_stock_reconnect/verify_qnx_ap.py qnx-runtime-evidence
