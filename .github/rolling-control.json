@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.234",
+    "version": "R105.235",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 2
+      "dependent_not_yet_listed": 1
     },
     "runs": [],
     "verified_prior": [
@@ -339,9 +339,11 @@
         "evidence": "New DNS witness host test and six backup/four SI host regressions succeeded; no live binding."
       }
     ],
-    "discovery": "Consolidate actual OEM stock config and core backup/restore into one exact-firmware cloud rehearsal; package prior compiled fallback separately, verify prior manifest, no live write. Still need real wireless trigger and original transport entry.",
-    "expected_jobs": 2,
-    "pending_prior": []
+    "discovery": "Actual connected nonblocking FD adapter for original Type-3 raw byte transport candidate, reusing existing IPC framing and completion. Real child-process stream test. Not native OEM provider or real iPhone.",
+    "expected_jobs": 1,
+    "pending_prior": [
+      46106096668
+    ]
   },
   "read_strategy": {
     "first_parallel": [
@@ -397,9 +399,10 @@
         "integration/mu1005_si_native/ap_live/ap_refresh.c",
         "project/source/legacy_mu1005/airplay/mu1005_r34_ap_server.c",
         "lab/mu1005_stock_reuse/dns_provider.py",
-        "lab/mu1005_stock_reuse/dns_resolve.c"
+        "lab/mu1005_stock_reuse/dns_resolve.c",
+        "lab/mu1005_route3_dispatch/route3_fd.c"
       ],
-      "evidence": "R105.233 original DNSServiceResolve witness source added; host regression pending; exact original DNS export and live DIO binding still required."
+      "evidence": "R105.235 real FD adapter added to existing raw byte bridge; cloud regression pending. Still missing OEM producer/plugin entry. No separate auth work."
     },
     {
       "priority": 3,

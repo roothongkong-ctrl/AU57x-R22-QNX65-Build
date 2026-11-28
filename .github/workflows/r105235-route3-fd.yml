@@ -1,0 +1,20 @@
+name: R105.235 existing raw transport real FD bridge (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105235-route3-fd.yml','lab/mu1005_route3_dispatch/route3_fd.*','lab/mu1005_route3_dispatch/test_route3_fd.c']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-fd:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build actual IPC byte transport and exchange data with child process
+        run: |
+          set -eux
+          s=project/source/src
+          l=lab/mu1005_route3_dispatch
+          cc -std=c99 -D_DEFAULT_SOURCE -Wall -Wextra -Werror -g -fsanitize=address,undefined -fno-omit-frame-pointer -no-pie -I"$s" -I"$l" "$l"/route3_fd.c "$l"/test_route3_fd.c "$l"/ipc_finish.c "$l"/byte_contract.c "$s"/cp_step2_ipc_link.c "$s"/cp_step2_transport.c "$s"/cp_bt_bridge.c "$s"/cp_bt_stream.c -o /tmp/route3-fd
+          timeout 15 /tmp/route3-fd
