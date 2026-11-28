@@ -112,24 +112,66 @@ jobs:
           PY
       - name: Install successfully compiled SDK demo
         run: xcrun simctl install "$R19_UDID" "$R19_APP"
-      - name: Launch native SDK and verify real emulator callbacks
+      - name: Launch native SDK and preserve full emulator diagnostics
+        timeout-minutes: 6
         shell: bash
         run: |
           set -euo pipefail
-          # Fixed test coordinates; do not grant location permission.
-          xcrun simctl launch "$R19_UDID" "$R19_BUNDLE" -R19Lab | tee "$RUNNER_TEMP/r19/launch.txt"
-          for t in 1 2 3 4 5 6; do
-            sleep 10
-            xcrun simctl io "$R19_UDID" screenshot "$RUNNER_TEMP/r19/sdk-frame-$t.png"
-            xcrun simctl spawn "$R19_UDID" log show --last 5m --style compact --predicate 'eventMessage CONTAINS "R19_" OR eventMessage CONTAINS "R20_" OR eventMessage CONTAINS "R21_"' > "$RUNNER_TEMP/r19/navigation.log"
-            if grep -Eq "R19_ROUTE_FAILURE|R19_MANAGER_NIL|R19_PRIVACY_AWAITING_INTERACTION" "$RUNNER_TEMP/r19/navigation.log"; then break; fi
-            if grep -q R19_ROUTE_SUCCESS "$RUNNER_TEMP/r19/navigation.log" && grep -q R19_NAV_SAMPLE "$RUNNER_TEMP/r19/navigation.log" && grep -q R21_NATIVE_PAIR_CAPTURED "$RUNNER_TEMP/r19/navigation.log"; then break; fi
-          done
-          cat "$RUNNER_TEMP/r19/navigation.log"
-          grep -q 'R19_LAB_VIEWPORT 800x298' "$RUNNER_TEMP/r19/navigation.log"
-          grep -q R19_ROUTE_SUCCESS "$RUNNER_TEMP/r19/navigation.log"
-          grep -q R19_NAV_SAMPLE "$RUNNER_TEMP/r19/navigation.log"
-          echo 'Native SDK emulator callback observed, not a production AMap CarPlay type112 stream.'
+          python3 - <<'PY'
+          import os, pathlib, subprocess, time
+          out=pathlib.Path(os.environ["RUNNER_TEMP"])/"r19"
+          udid=os.environ["R19_UDID"]
+          bundle=os.environ["R19_BUNDLE"]
+          sim=["xcrun","simctl"]
+          def bounded(args, seconds, name):
+              with (out/name).open("ab") as log:
+                  try:
+                      return subprocess.run(sim+args,stdout=log,stderr=subprocess.STDOUT,timeout=seconds).returncode
+                  except subprocess.TimeoutExpired:
+                      log.write(b"\nTIMEOUT\n")
+                      return 124
+          with (out/"navigation.log").open("wb") as log:
+              # Capture from process start; no repeated log show with a sliding time window.
+              proc=subprocess.Popen(sim+["launch","--console",udid,bundle,"-R19Lab"],stdout=log,stderr=subprocess.STDOUT)
+              try:
+                  end=time.monotonic()+150
+                  t=0
+                  while time.monotonic()<end:
+                      time.sleep(5)
+                      t+=1
+                      content=(out/"navigation.log").read_text(errors="replace")
+                      if all(x in content for x in ("R19_ROUTE_SUCCESS","R19_NAV_SAMPLE","R21_NATIVE_PAIR_CAPTURED")):
+                          break
+                      if any(x in content for x in ("R19_ROUTE_FAILURE","R19_MANAGER_NIL","R19_PRIVACY_AWAITING_INTERACTION","R19_PRIVACY_DECLINED")):
+                          break
+                      if proc.poll() is not None:
+                          print("simctl launch console exited",proc.returncode,flush=True)
+                          break
+                      if t in (1,4,10,20):
+                          bounded(["io",udid,"screenshot",str(out/f"sdk-frame-{t}.png")],12,"screenshots.log")
+                  bounded(["io",udid,"screenshot",str(out/"sdk-frame-final.png")],12,"screenshots.log")
+                  bounded(["get_app_container",udid,bundle,"data"],10,"container.txt")
+              finally:
+                  if proc.poll() is None:
+                      proc.terminate()
+                      try: proc.wait(timeout=8)
+                      except subprocess.TimeoutExpired: proc.kill(); proc.wait()
+          # Supplement console with scoped unified logs. Retain original output even if log service stalls.
+          bounded(["spawn",udid,"log","show","--last","10m","--style","compact","--predicate",'process == "HelloCarPlay"'],30,"unified.log")
+          content=(out/"navigation.log").read_text(errors="replace")
+          # Append only relevant messages, not the log command itself.
+          if (out/"unified.log").exists():
+              extra="\n".join(x for x in (out/"unified.log").read_text(errors="replace").splitlines()
+                              if "HelloCarPlay" in x and any(k in x for k in ("R19_","R20_","R21_")))
+              if extra:
+                  with (out/"navigation.log").open("a") as log: log.write("\n"+extra+"\n")
+                  content+="\n"+extra
+          markers=["R19_LAB_VIEWPORT 800x298","R19_ROUTE_SUCCESS","R19_NAV_SAMPLE","R21_NATIVE_PAIR_CAPTURED"]
+          missing=[m for m in markers if m not in content]
+          (out/"navigation-status.txt").write_text("Missing markers: "+repr(missing)+"\n")
+          print("Missing markers:",missing,flush=True)
+          if missing: raise SystemExit(1)
+          PY
       - name: Collect actual SDK native card and 800x298 base; verify pixels
         shell: bash
         run: |
