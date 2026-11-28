@@ -244,6 +244,16 @@ static void r13_advertise(CFMutableArrayRef displays,CFDictionaryRef alt111)
 {
     CFMutableDictionaryRef card;
     if(!r13_enabled()||!displays||!alt111)return;
+    /*
+     * R15: 112 must not overlay the stock 111 composite (map + white card).
+     * The upstream AirPlay /info has already appended this mutable 111
+     * dictionary to 'displays'. Only in explicitly enabled R13 lab mode,
+     * request card-free 111 before offering the card-only second display.
+     * Otherwise we would display the original white card AND a smaller copy.
+     * This is a request to iOS, NOT evidence that GaoDe honors the two URLs.
+     */
+    set_str((CFMutableDictionaryRef)alt111,"initialURL",ALT_URL_MAP);
+    remove_key((CFMutableDictionaryRef)alt111,"altScreenSuggestUIURLs");
     card=dict_clone(alt111);
     if(!card)return;
     set_i64(card,"type",R13_STREAM_CARD);
@@ -253,7 +263,7 @@ static void r13_advertise(CFMutableArrayRef displays,CFDictionaryRef alt111)
     remove_key(card,"altScreenSuggestUIURLs");
     p_CFArrayAppendValue(displays,card);
     p_CFRelease(card);
-    logf_u2("R13 EXPERIMENTAL /info advertised stream112 card-only UUID=%s",R13_CARD_UUID);
+    logf_u2("R15 EXPERIMENTAL /info requested 111 map-only + 112 card-only UUID=%s (not phone-verified)",R13_CARD_UUID);
 }
 static void r13_setup(AirPlayReceiverSessionRef session,CFDictionaryRef request,
                       CFMutableDictionaryRef response)
