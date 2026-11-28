@@ -1,0 +1,47 @@
+name: R105.310 reuse retained SDK evidence for classic receiver symbol closure (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105310-receiver-symbols.yml','lab/mu1005_classic_receiver/sdk_symbols.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  symbol-closure:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include:
+          - profile: '790'
+            folder: AID10.5-17PM
+            sha: 396c73bcd7674483245776d0493552832f7ebbcefed399d7b9dd1182a5336c90
+          - profile: '791'
+            folder: AID12.3
+            sha: f195665b0e9fb8a592618e64b7201ddfc536a9b082c6dd35db214b99d5e01de1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reuse prior SDK readelf artifacts and exact public receiver
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROFILE: ${{ matrix.profile }}
+          FOLDER: ${{ matrix.folder }}
+          SHA: ${{ matrix.sha }}
+        run: |
+          set -euxo pipefail
+          mkdir evidence retained
+          gh run download 46136093739 --repo "$GITHUB_REPOSITORY" --name "R105308-receiver-$PROFILE-NO-INSTALL" --dir retained
+          git init donor
+          git -C donor remote add origin https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps.git
+          git -C donor fetch --depth 1 origin aec37f5b1c87a0d961d16fe4328ac3638d0a833e
+          git -C donor checkout --detach FETCH_HEAD
+          file="donor/standalone/SD_ROOT/carplay/payload/wireless/profiles/$FOLDER/wcp_receiver"
+          echo "$SHA  $file" | sha256sum -c -
+          python3 lab/mu1005_classic_receiver/sdk_symbols.py retained "$file" evidence/symbol-closure.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R105310-symbol-closure-${{ matrix.profile }}-NO-INSTALL
+          path: evidence/
