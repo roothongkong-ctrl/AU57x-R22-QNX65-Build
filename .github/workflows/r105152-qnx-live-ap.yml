@@ -4,13 +4,16 @@ on:
     branches: [mu1005-si-cprx-real-review]
     paths: [.github/workflows/r105152-qnx-live-ap.yml, tests/test_cloud_pipeline.c, lab/mu1005_qnx_live_ap/**]
   workflow_dispatch:
+concurrency:
+  group: mu1005-qnx-live-ap-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
   actions: read
 jobs:
   qnx-live-ap:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - run: mkdir -p qnx-runtime-evidence
@@ -30,18 +33,13 @@ jobs:
           fi
           qemu-system-arm --version | tee qnx-runtime-evidence/qemu-version.log
           sha256sum toolchain/tests/qemu/{startup-virt,libstartup.a,devc-serdebug,u-boot.bin} toolchain/tests/qemu-run.sh | tee qnx-runtime-evidence/boot-inputs.sha256
-      - uses: actions/cache/restore@v4
-        id: gnu-cache
+      - name: Restore existing verified QNX compiler (never rebuild SDK)
+        uses: ./.github/actions/mu1005-qnx-image
         with:
-          path: ~/.cache/au57x-gnu
-          key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
-      - name: Configure reusable compiler build cache
-        uses: docker/setup-buildx-action@v3
-      - name: Build verified toolchain
+          require-cache: 'true'
+      - name: Record existing compiler version
         run: |
           set -euxo pipefail
-          bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee qnx-runtime-evidence/gnu.log
-          docker buildx build --load --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 --cache-from type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1 --cache-to type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1,mode=min,ignore-error=true -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee qnx-runtime-evidence/compiler.log
           docker run --rm --platform linux/amd64 qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc --version | tee qnx-runtime-evidence/compiler-version.log
       - name: Build and execute live AP fallback under actual QNX ARM
         run: |
