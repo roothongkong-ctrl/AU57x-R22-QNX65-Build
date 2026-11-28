@@ -2,32 +2,154 @@
   "firmware": "MHI2_CN_AU57x_K1006_2 / MU1005",
   "stock_btstack_sha256": "51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566",
   "donor_libbthook_sha256": "c862fe0d8bfbabdd804e39858616436481b19ce6620a2e915428620853280ad8",
-  "source_runs": [46100879149,46101176712,46102256887,46102169022],
+  "source_runs": [
+    46100879149,
+    46101176712,
+    46102256887,
+    46102169022,
+    46105440865
+  ],
   "donor_table_5092_file_offset": "0xbe40",
   "native_runtime_verified": false,
   "installable": false,
   "entries": [
-    {"name":"startup_guard","donor_file_offset":"0xbe40","stock_va":"0x11ec60","status":"prior_static"},
-    {"name":"eir_guard","donor_file_offset":"0xbe4c","stock_va":"0x12a6a0","status":"prior_static"},
-    {"name":"RF_RegisterServerChannel","donor_file_offset":"0xbe64","stock_va":"0x277a18","status":"prior_static","note":"third argument semantic not verified for iAP2"},
-    {"name":"RF_DeregisterServerChannel","donor_file_offset":"0xbe68","stock_va":"0x2779b4","status":"prior_static"},
-    {"name":"SDP_AddRecord","donor_file_offset":"0xbe6c","stock_va":"0x207244","status":"prior_static"},
-    {"name":"SDP_RemoveRecord","donor_file_offset":"0xbe70","stock_va":"0x2071c4","status":"prior_static"},
-    {"name":"EIR_refresh","donor_file_offset":"0xbe74","stock_va":"0x1db4c8","status":"prior_static"},
-    {"name":"RF_RespondChannel","donor_file_offset":"0xbe78","stock_va":"0x27733c","status":"prior_static"},
-    {"name":"RF_CloseChannel","donor_file_offset":"0xbe7c","stock_va":"0x2773f8","status":"prior_static"},
-    {"name":"RF_SendData","donor_file_offset":"0xbe80","stock_va":"0x2771f8","status":"prior_static"},
-    {"name":"RF_FrameSize","donor_file_offset":"0xbe84","stock_va":"0x277074","status":"prior_static"},
-    {"name":"RF_AdvanceCredit","donor_file_offset":"0xbe88","stock_va":"0x27715c","status":"prior_static"},
-    {"name":"CMGR_RegisterHandler","donor_file_offset":"0xbe8c","stock_va":"0x243574","status":"candidate","witness":"0x152d88"},
-    {"name":"CMGR_CreateDataLink","donor_file_offset":"0xbe90","stock_va":null,"status":"unresolved","note":"predicted 0x24352c lies adjacent to possible entry 0x243530; do not infer ABI"},
-    {"name":"CMGR_GetRemoteDevice","donor_file_offset":"0xbe94","stock_va":"0x242670","status":"candidate","witness":"0x138438"},
-    {"name":"SDP_Query","donor_file_offset":"0xbe98","stock_va":"0x1d0c08","status":"candidate","witness":"0x26b03c"},
-    {"name":"SDP_ParseAttributes","donor_file_offset":"0xbe9c","stock_va":"0x1d0210","status":"candidate","witness":"0x151064"},
-    {"name":"RF_OpenClientChannel","donor_file_offset":"0xbea0","stock_va":"0x2774c4","status":"candidate","witness":"0x247370"},
-    {"name":"startup_trace_slot","donor_file_offset":"0xbf24","stock_va":"0x2c18fc","status":"prior_static"},
-    {"name":"acl_trace_slot","donor_file_offset":"0xbf28","stock_va":null,"status":"unresolved","witness":"0x13f6c4"},
-    {"name":"ME_SendHciCommandAsync","donor_file_offset":"0xbf34","stock_va":"0x1dbb4c","status":"candidate","witness":"0x11ec80"}
+    {
+      "name": "startup_guard",
+      "donor_file_offset": "0xbe40",
+      "stock_va": "0x11ec60",
+      "status": "prior_static"
+    },
+    {
+      "name": "eir_guard",
+      "donor_file_offset": "0xbe4c",
+      "stock_va": "0x12a6a0",
+      "status": "prior_static"
+    },
+    {
+      "name": "RF_RegisterServerChannel",
+      "donor_file_offset": "0xbe64",
+      "stock_va": "0x277a18",
+      "status": "prior_static",
+      "note": "third argument semantic not verified for iAP2"
+    },
+    {
+      "name": "RF_DeregisterServerChannel",
+      "donor_file_offset": "0xbe68",
+      "stock_va": "0x2779b4",
+      "status": "prior_static"
+    },
+    {
+      "name": "SDP_AddRecord",
+      "donor_file_offset": "0xbe6c",
+      "stock_va": "0x207244",
+      "status": "prior_static"
+    },
+    {
+      "name": "SDP_RemoveRecord",
+      "donor_file_offset": "0xbe70",
+      "stock_va": "0x2071c4",
+      "status": "prior_static"
+    },
+    {
+      "name": "EIR_refresh",
+      "donor_file_offset": "0xbe74",
+      "stock_va": "0x1db4c8",
+      "status": "prior_static"
+    },
+    {
+      "name": "RF_RespondChannel",
+      "donor_file_offset": "0xbe78",
+      "stock_va": "0x27733c",
+      "status": "prior_static"
+    },
+    {
+      "name": "RF_CloseChannel",
+      "donor_file_offset": "0xbe7c",
+      "stock_va": "0x2773f8",
+      "status": "prior_static"
+    },
+    {
+      "name": "RF_SendData",
+      "donor_file_offset": "0xbe80",
+      "stock_va": "0x2771f8",
+      "status": "prior_static"
+    },
+    {
+      "name": "RF_FrameSize",
+      "donor_file_offset": "0xbe84",
+      "stock_va": "0x277074",
+      "status": "prior_static"
+    },
+    {
+      "name": "RF_AdvanceCredit",
+      "donor_file_offset": "0xbe88",
+      "stock_va": "0x27715c",
+      "status": "prior_static"
+    },
+    {
+      "name": "CMGR_RegisterHandler",
+      "donor_file_offset": "0xbe8c",
+      "stock_va": "0x243574",
+      "status": "candidate",
+      "witness": "0x152d88"
+    },
+    {
+      "name": "CMGR_CreateDataLink",
+      "donor_file_offset": "0xbe90",
+      "stock_va": "0x24352c",
+      "status": "candidate",
+      "note": "R105.232 exact original: 12 direct BL to compare-before-prologue, none to 0x243530; donor delta 0x180. Static entry candidate, ABI still unverified."
+    },
+    {
+      "name": "CMGR_GetRemoteDevice",
+      "donor_file_offset": "0xbe94",
+      "stock_va": "0x242670",
+      "status": "candidate",
+      "witness": "0x138438"
+    },
+    {
+      "name": "SDP_Query",
+      "donor_file_offset": "0xbe98",
+      "stock_va": "0x1d0c08",
+      "status": "candidate",
+      "witness": "0x26b03c"
+    },
+    {
+      "name": "SDP_ParseAttributes",
+      "donor_file_offset": "0xbe9c",
+      "stock_va": "0x1d0210",
+      "status": "candidate",
+      "witness": "0x151064"
+    },
+    {
+      "name": "RF_OpenClientChannel",
+      "donor_file_offset": "0xbea0",
+      "stock_va": "0x2774c4",
+      "status": "candidate",
+      "witness": "0x247370"
+    },
+    {
+      "name": "startup_trace_slot",
+      "donor_file_offset": "0xbf24",
+      "stock_va": "0x2c18fc",
+      "status": "prior_static"
+    },
+    {
+      "name": "acl_trace_slot",
+      "donor_file_offset": "0xbf28",
+      "stock_va": null,
+      "status": "unresolved",
+      "witness": "0x13f6c4",
+      "note": "R105.232 original ELF JOBS_STARTSERVICE relocation 0x2c2258, object 0x2c3f64; not proven same ACL trace slot. Keep unresolved."
+    },
+    {
+      "name": "ME_SendHciCommandAsync",
+      "donor_file_offset": "0xbf34",
+      "stock_va": "0x1dbb4c",
+      "status": "candidate",
+      "witness": "0x11ec80",
+      "note": "R105.232 two original direct callers at 0x11d338 and 0x11ec80; 0x1dbb40 is distinct helper. Static candidate only."
+    }
   ],
-  "policy":"Do not patch or activate donor from this table. Static matches are not callable ABI or runtime proof. Preserve original authentication and wired function."
+  "policy": "Do not patch or activate donor from this table. Static matches are not callable ABI or runtime proof. Preserve original authentication and wired function."
 }

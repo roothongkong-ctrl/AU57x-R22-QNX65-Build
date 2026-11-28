@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.232",
+    "version": "R105.233",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 6
+      "dependent_not_yet_listed": 1
     },
     "runs": [],
     "verified_prior": [
@@ -317,10 +317,20 @@
           46105174013
         ],
         "evidence": "Original stock config apply/restore host cases, backup, SI host and full current nine-adapter QNX ARM Rust build all passed; artifact 15247486645. Actual owner and phone not established."
+      },
+      {
+        "version": "R105.232",
+        "passed": 6,
+        "runs": [
+          46105440844,
+          46105440854,
+          46105440865
+        ],
+        "evidence": "Current ARM payload package and four SI host regressions passed; exact original Congo map: 12 direct callers to CMGR candidate, HCI distinct helper, ACL trace slot still unresolved; not native activation."
       }
     ],
-    "discovery": "Use newest actual ARM donor binary from successful run 46105174013 in payload instead of old R105.225 binary; include config transaction and apply/restore source. Target only ambiguous Congo CMGR_CreateDataLink, ME_SendHciCommandAsync and ACL trace relocations, with actual OEM and donor fingerprints; no unknown ABI activation.",
-    "expected_jobs": 6,
+    "discovery": "Record exact Congo evidence as static candidates only; add original DNSServiceResolve callback adapter with interface/instance/host/port and owner checks. No new registration, no production binding.",
+    "expected_jobs": 1,
     "pending_prior": []
   },
   "read_strategy": {
@@ -356,7 +366,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.231 actual full ARM daemon built; targeted remaining Congo entry/trace evidence pending. Stock config route remains preferred; no genuine native registration yet."
+      "evidence": "R105.232 static CMGR candidate supported by 12 calls; HCI candidate distinguished, ACL trace slot still not proved; actual native registration remains missing."
     },
     {
       "priority": 2,
@@ -386,9 +396,10 @@
         "project/source/src/cp_step04_stock_mfi.c",
         "integration/mu1005_si_native/ap_live/ap_refresh.c",
         "project/source/legacy_mu1005/airplay/mu1005_r34_ap_server.c",
-        "lab/mu1005_stock_reuse/dns_provider.py"
+        "lab/mu1005_stock_reuse/dns_provider.py",
+        "lab/mu1005_stock_reuse/dns_resolve.c"
       ],
-      "evidence": "R105.223 original uap0 actual IPv4 added to live AP config and real StartSession; tests pending. No actual receiver binding or association."
+      "evidence": "R105.233 original DNSServiceResolve witness source added; host regression pending; exact original DNS export and live DIO binding still required."
     },
     {
       "priority": 4,

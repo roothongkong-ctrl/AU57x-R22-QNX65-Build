@@ -1,0 +1,19 @@
+name: R105.233 original Bonjour resolve witness (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['lab/mu1005_stock_reuse/dns_resolve.*','lab/mu1005_stock_reuse/test_dns_resolve.c','.github/workflows/r105233-stock-dns.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  resolve-witness:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test new original-DNS adapter boundary
+        run: |
+          set -eux
+          cd lab/mu1005_stock_reuse
+          cc -std=c99 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -no-pie -rdynamic dns_resolve.c test_dns_resolve.c -ldl -o /tmp/mu-dns-test
+          /tmp/mu-dns-test
