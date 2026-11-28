@@ -45,7 +45,7 @@ for p in paths:payload["source-review/"+p]=(root/p).read_bytes()
 payload["README_CN.txt"]=("MU1005 无线 CarPlay 集中整合复核包，不可装车。\n"
 "复用 R105.249 已编译的完整 QNX ARM 守护程序（原厂热点、自动 IE 槽位、ACK、继承通信端点），不重复编译。\n"
 "原厂蓝牙启动模块的最新构建报告、已有安全回调及通信监督源码、备份与恢复脚本一并归档。\n"
-"蓝牙与守护程序之间的真实运行时接线、停止及有线切换仍未完成；恢复脚本仅备份/暂存，不是自动恢复安装器。\n"
+"蓝牙侧改用继承端点消费和实际发送完成ACK；真实监督器交接、owner线程、停止及有线切换仍未完成；恢复脚本仅备份/暂存。\n"
 "禁止将本包放入自动安装目录。无需再次提交车机检测包。\n").encode()
 manifest={"scope":"CONSOLIDATED_REUSE_REVIEW_ONLY","installable":False,"vehicle_verified":False,
  "reused_daemon_run":46109600160,"reused_daemon_artifact":15248733614,

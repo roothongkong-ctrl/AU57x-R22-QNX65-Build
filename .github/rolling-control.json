@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.255",
+    "version": "R105.256",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -547,9 +547,18 @@
         "passed": 0,
         "failed": 1,
         "evidence": "Donor source transformation failed due to two escaped newline literals. No new binary. R105.253 remains last verified startup run."
+      },
+      {
+        "version": "R105.255",
+        "runs": [
+          46111163612
+        ],
+        "passed": 0,
+        "failed": 1,
+        "evidence": "Exact native address table and donor transformations resolved; compile failed undeclared le16 because native_event source slice began at le32."
       }
     ],
-    "discovery": "Fix literal newline anchors, resolve native address table from existing exact MU1005 metadata, standard imports from original ELF, avoid raw unbounded peer pointer read. Reuse full compiled R105.249 daemon and existing backup/recovery source; assemble one review archive without rebuilding donor or re-running host regressions. Actual activation and installation still incomplete.",
+    "discovery": "Include existing le16 helper; direct worker consumes inherited supervised FD instead of a second TCP connection; type4 ACK after actual event6 completion of all chunks. No publisher/actual owner dispatch yet, remote accept disabled. Reuse prior compiled daemon, no repeated tests.",
     "expected_jobs": 1,
     "pending_prior": []
   },
@@ -587,7 +596,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "integration/mu1005_vehicle_stage/congo_port_table.json"
       ],
-      "evidence": "R105.255 consolidate previous compiled daemon and changed direct graft review with existing source and recovery components. Do not repeat tests. Actual transport and OEM lifecycle are not connected; no install."
+      "evidence": "R105.256 fix le16, inherited endpoint consumer and wire completion ACK adapted. Actual supervisor publisher, OEM owner/lifetime, shutdown and wired handoff remain. No install."
     }
   ],
   "rules": [

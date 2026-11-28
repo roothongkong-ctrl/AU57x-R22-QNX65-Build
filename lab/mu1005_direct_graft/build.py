@@ -70,7 +70,7 @@ def original_security_source():
     text=p.read_text()
     lo=text.index("/* Original ET_EXEC bt symbol")
     # Only these three pure helpers and the original registry/bond/security checks.
-    prefix=text[text.index("static uint32_t le32("):text.index("int mu38_resolve_peer(")]
+    prefix=text[text.index("static unsigned le16("):text.index("int mu38_resolve_peer(")]
     local=r'''
 typedef u8 uint8_t;
 typedef u32 uint32_t;
@@ -176,7 +176,43 @@ __attribute__((naked,used)) void graft_hook(void) {
     );
 }
 '''
+    return inherited_transport(s)
+def inherited_transport(s):
+    s=rep(s,"#define FRAME_DISCONNECTED 3u","#define FRAME_DISCONNECTED 3u\n#define FRAME_TX_COMPLETE 4u")
+    s=rep(s,"    u32 pending_association;","    u32 pending_association;\n    volatile u32 supervised_fd_token;")
+    s=rep(s,"    const struct SockAddrIn endpoint = {\n        16, 2, (u8)(BRIDGE_PORT >> 8), (u8)BRIDGE_PORT,\n        {127,0,0,1}, {0,0,0,0}\n    };\n","")
+    s=rep(s,"    u32 tx_length = 0, tx_offset = 0, tx_generation = 0;","    u32 tx_length = 0, tx_offset = 0, tx_generation = 0, ack_generation = 0;")
+    s=rep(s,"            fd = SOCKET(2, 1, 0);\n            if (fd < 0 || CONNECT(fd, &endpoint, 16) != 0) {\n                if (fd >= 0) (void)CLOSE(fd);\n                fd = -1;\n                (void)USLEEP(200000);\n                continue;\n            }",r'''            /* Consume an already connected endpoint exclusively, once.
+             * The existing supervisor owns startup/READY and descriptor proof.
+             * Review build has no publisher; it never opens another listener
+             * or connects to an arbitrary process on the loopback port. */
+            u32 token=__atomic_exchange_n(&s->supervised_fd_token,0u,__ATOMIC_ACQ_REL);
+            if(token<4u || token>0x7fffffffu){
+                (void)USLEEP(200000);
+                continue;
+            }
+            fd=(int)(token-1u);''')
+    # Acknowledgements follow all actual chunk completions, not successful send().
+    s=rep(s,"    if (event->code == 6u && event->data == &s->tx_packet) {\n        __atomic_store_n(&s->tx_busy, 0u, __ATOMIC_RELEASE);\n    }",r'''    if (event->code == 6u && event->data == &s->tx_packet) {
+        if(event->status || !__atomic_load_n(&s->tx_busy,__ATOMIC_ACQUIRE))
+            __atomic_store_n(&s->overflow,1u,__ATOMIC_RELEASE);
+        __atomic_store_n(&s->tx_busy, 0u, __ATOMIC_RELEASE);
+    }''')
+    s=rep(s,"        /* A daemon frame is a byte stream, not one RFCOMM packet.",r'''        if (ack_generation && !__atomic_load_n(&s->tx_busy,__ATOMIC_ACQUIRE)) {
+            guard_lock(s);
+            int ack_ok=s->connected && s->generation==ack_generation &&
+                queue_push(s,FRAME_TX_COMPLETE,ack_generation,0,0);
+            guard_unlock(s);
+            if(!ack_ok)goto bridge_broken;
+            ack_generation=0;
+        }
+
+        /* A daemon frame is a byte stream, not one RFCOMM packet.''')
+    s=rep(s,"                if (tx_offset == tx_length) {\n                    tx_length = tx_offset = 0;","                if (tx_offset == tx_length) {\n                    ack_generation=tx_generation;\n                    tx_length = tx_offset = 0;")
+    s=rep(s,"        if (!tx_length && !__atomic_load_n(&s->tx_busy, __ATOMIC_ACQUIRE))","        if (!tx_length && !ack_generation && !__atomic_load_n(&s->tx_busy, __ATOMIC_ACQUIRE))")
+    s=rep(s,"bridge_broken:\n        __atomic_store_n(&s->bridge_ready, 0u, __ATOMIC_RELEASE);","bridge_broken:\n        __atomic_store_n(&s->transport_owner_verified,0u,__ATOMIC_RELEASE);\n        ack_generation=0;\n        __atomic_store_n(&s->bridge_ready, 0u, __ATOMIC_RELEASE);")
     return s
+
 def compile_graft(source,donor):
     with tempfile.TemporaryDirectory() as tmp:
         t=Path(tmp)
@@ -240,7 +276,7 @@ def main(stock,donor,out,private):
     result.extend(bytes(off-len(result)));result.extend(payload);result.extend(bytes(stateoff-len(result)))
     need(headers(result)==new and stock.read_bytes()==b,"postbuild validation")
     private.write_bytes(result)
-    out.write_text(json.dumps(dict(scope="DIRECT_DONOR_REGISTRATION_BUILD_REVIEW_ONLY",original_sha256=PIN,generated_sha256=sha(result),donor=DONOR,startup=hex(HOOK),hook=hex(hook),resume="0x11ec9c",native={k:hex(v) for k,v in m.items()},native_guard_count=len(checked),code_size=len(code),original_loads_preserved=True,remote_accept=False,installable=False,vehicle_verified=False,runtime_verified=False,security_callback_source_integrated=True,remaining=["actual supervised transport ownership and wire ACK","callback lifetime and original shutdown/wired handoff"]),indent=2)+"\n")
+    out.write_text(json.dumps(dict(scope="DIRECT_DONOR_REGISTRATION_BUILD_REVIEW_ONLY",original_sha256=PIN,generated_sha256=sha(result),donor=DONOR,startup=hex(HOOK),hook=hex(hook),resume="0x11ec9c",native={k:hex(v) for k,v in m.items()},native_guard_count=len(checked),code_size=len(code),original_loads_preserved=True,remote_accept=False,installable=False,vehicle_verified=False,runtime_verified=False,security_callback_source_integrated=True,inherited_endpoint_consumer=True,completion_ack_source=True,remaining=["actual supervisor FD publisher and owner-thread dispatch","callback lifetime and original shutdown/wired handoff"]),indent=2)+"\n")
     print("DIRECT_MU1005_DONOR_STARTUP_BUILD_ONLY_NO_INSTALL")
 if __name__=="__main__":
     if len(sys.argv)==4 and sys.argv[1]=="--source-build":

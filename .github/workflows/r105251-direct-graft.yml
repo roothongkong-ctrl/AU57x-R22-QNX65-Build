@@ -1,4 +1,4 @@
-name: R105.255 consolidated reuse and changed graft build (NO INSTALL)
+name: R105.256 reuse inherited endpoint and ACK (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -69,10 +69,10 @@ jobs:
           set -euxo pipefail
           mkdir prior-daemon
           gh run download 46109600160 --repo "$GITHUB_REPOSITORY" --name R105248-full-donor-auto-ie-arm-NO-INSTALL --dir prior-daemon
-          python3 lab/mu1005_direct_graft/pack_reuse.py prior-daemon evidence/direct-graft.json evidence/MU1005-R105255-consolidated-review-NO-INSTALL.zip
+          python3 lab/mu1005_direct_graft/pack_reuse.py prior-daemon evidence/direct-graft.json evidence/MU1005-R105256-consolidated-review-NO-INSTALL.zip
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105255-consolidated-review-NO-INSTALL
+          name: R105256-consolidated-review-NO-INSTALL
           path: evidence/
           retention-days: 7
