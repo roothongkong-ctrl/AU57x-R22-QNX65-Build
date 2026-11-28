@@ -1,0 +1,21 @@
+name: R105.238 paired owner start integration (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['lab/mu1005_paired_start/**','.github/workflows/r105238-paired-start.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  paired-start:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Link existing ACL latch and existing car-initiated controller
+        run: |
+          set -eux
+          s=project/source/src
+          b=project/source/legacy_mu1005/bluetooth
+          l=lab/mu1005_paired_start
+          cc -std=c99 -Wall -Wextra -Werror -g -fsanitize=address,undefined -fno-omit-frame-pointer -no-pie -I"$s" -I"$b" -I"$l" "$l"/paired_start.c "$l"/test.c "$s"/cp_wcp_autoconnect.c "$b"/bt_trace_latch.c -o /tmp/paired-start
+          /tmp/paired-start
