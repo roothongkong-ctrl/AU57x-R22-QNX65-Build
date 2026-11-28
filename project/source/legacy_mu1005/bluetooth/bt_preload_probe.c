@@ -29,6 +29,17 @@
 extern char *__progname;
 static volatile unsigned probe_enabled;
 static volatile unsigned thread_count;
+#if defined(__QNXNTO__) && defined(__arm__) && UINTPTR_MAX == UINT32_MAX
+static void log_one(const char*,uintptr_t,uintptr_t,int);
+static unsigned trace_requested;
+static volatile unsigned trace_ready;
+extern int mu_bt_trace_attach(void);
+static void try_startup_trace(void){
+ if(!trace_requested||__sync_val_compare_and_swap(&trace_ready,1u,1u)==1u)return;
+ if(mu_bt_trace_attach()&&__sync_bool_compare_and_swap(&trace_ready,0u,1u))
+  log_one("startup-trace-attached",0,0,1);
+}
+#endif
 static const uint32_t stock_callers[4]={0x236668u,0x2368c8u,0x236c2cu,0x236c48u};
 
 static int digest_hex(const char *path,char out[65]){
@@ -78,8 +89,9 @@ __attribute__((constructor)) static void au57x_probe_ctor(void){
  /* Optional first-link start witness; no OEM SDK registration in constructor. */
  if(getenv("AU57X_MU1005_TRACE_ATTACH") &&
     strcmp(getenv("AU57X_MU1005_TRACE_ATTACH"),"1")==0){
-  extern int mu_bt_trace_attach(void);
-  log_one(mu_bt_trace_attach()?"startup-trace-attached":"startup-trace-unavailable",0,0,0);
+  trace_requested=1;
+  try_startup_trace();
+  if(!trace_ready)log_one("startup-trace-deferred",0,0,0);
  }
 #endif
  /* Experimental original-HFP observer only; separate opt-in, never iAP2. */
@@ -112,7 +124,13 @@ int pthread_create(pthread_t *t,const pthread_attr_t *attr,
     if((site&~(uintptr_t)1u)==(uintptr_t)stock_callers[i]+4u)matched=1;
   (void)__sync_fetch_and_add(&thread_count,1u);
   log_one("pthread_create",site,(uintptr_t)start,matched);
-  if(matched) return au97_pthread_create(t,attr,start,arg,site,orig);
+  if(matched){
+#if defined(__QNXNTO__) && defined(__arm__) && UINTPTR_MAX == UINT32_MAX
+   /* Retry before original thread launch, not after the startup event. */
+   try_startup_trace();
+#endif
+   return au97_pthread_create(t,attr,start,arg,site,orig);
+  }
  }
  return orig(t,attr,start,arg);
 }

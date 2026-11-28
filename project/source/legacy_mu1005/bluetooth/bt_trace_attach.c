@@ -23,6 +23,9 @@
 #include <stdio.h>
 static MuBtTraceLatch latch;
 static Au97GotHook trace_hook;
+static volatile unsigned attach_busy;
+static volatile unsigned attach_done;
+static uintptr_t bound_original;
 extern void mu_bt_trace_tail(void*,int,const char*,...);
 __attribute__((visibility("hidden")))
 MuBtTraceOriginal mu_bt_trace_target(void *channel,uintptr_t lr,const char *fmt){
@@ -55,8 +58,8 @@ static int writable_slot(void){
  }
  return 0;
 }
-int mu_bt_trace_attach(void){
- if(!au57x_r92_stock_image_verified()||!writable_slot()||trace_hook.installed)return 0;
+static int attach_once(void){
+ if(!au57x_r92_stock_image_verified()||!writable_slot())return 0;
  void *symbol=dlsym(RTLD_NEXT,"_ZN7tracing7Channel5logCVEsPKcz");
  uintptr_t resolved=0;MuBtTraceOriginal original=NULL;
  if(!symbol)return 0;
@@ -71,13 +74,32 @@ int mu_bt_trace_attach(void){
  mu_bt_self_reader_close(r);
  /* Zero channel before C++ initialization is valid at attachment time.
   * The actual call must match the then-current nonzero stock slot. */
- if(!ok||!mu_bt_trace_latch_bind_deferred(&latch,original))return 0;
+ if(!ok)return 0;
+ if(!bound_original){
+  if(!mu_bt_trace_latch_bind_deferred(&latch,original))return 0;
+  bound_original=resolved;
+ }else if(bound_original!=resolved)return 0;
  /* Publish the tail only after original forwarding has been bound.
   * If lazy resolution or a competing slot change is present, do not attach. */
  return au97_got_replace(&trace_hook,(volatile uintptr_t*)0x2c12c8u,
                          resolved,(uintptr_t)&mu_bt_trace_tail)==0;
 }
-int mu_bt_trace_attached_take(void){return trace_hook.installed?mu_bt_trace_latch_take(&latch):0;}
+/* Constructor may run before the stock GOT has been relocated. Retry only
+ * at already identified stock thread creation sites; serialize publication.
+ * A failed compare/exchange leaves the original target bound for retry. */
+int mu_bt_trace_attach(void){
+ if(__sync_val_compare_and_swap(&attach_done,1u,1u)==1u)return 1;
+ if(!__sync_bool_compare_and_swap(&attach_busy,0u,1u))return 0;
+ int ok=__sync_val_compare_and_swap(&attach_done,1u,1u)==1u;
+ if(!ok && attach_once()){
+  __sync_synchronize();
+  (void)__sync_bool_compare_and_swap(&attach_done,0u,1u);
+  ok=1;
+ }
+ __sync_lock_release(&attach_busy);
+ return ok;
+}
+int mu_bt_trace_attached_take(void){return __sync_val_compare_and_swap(&attach_done,1u,1u)==1u?mu_bt_trace_latch_take(&latch):0;}
 #else
 int mu_bt_trace_attach(void){return 0;}
 int mu_bt_trace_attached_take(void){return 0;}

@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.226",
+    "version": "R105.227",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -270,7 +270,7 @@
         "evidence": "Actual full donor inherited EOF and malformed frame exit host regression and full ARM build, four SI host regressions success. No real RF."
       }
     ],
-    "discovery": "New plan milestone 3 original Bluetooth registration first. Congo startup trace strategy compared with pinned MU1005; old preload constructor required already initialized original Channel pointer, which may not exist until after constructors. R105.226 removes that circular requirement, verifies immutable trace site at attachment, compares exact original Channel slot at actual callback, always forwards original. No claim trace fires, GOT resolved at ctor, OEM lease or registration; existing host and ARM checks. No more donor peripheral fixes until core Bluetooth advances.",
+    "discovery": "R105.227: Congo isolated QNX dlopen succeeded run 46102169022 (no OEM or phone); outbound candidate run 46102256887 reports five exact-shift candidate entries and two uncertain, not callable ABI. Actual MU1005 preload now retries deferred trace GOT publication before known original thread creation; serialization and retained original pointer prevent failed CAS from permanently disabling retry. No owner/registration proof.",
     "expected_jobs": 13,
     "pending_prior": []
   },
@@ -307,7 +307,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.226 deferred original startup Channel binding in actual preload source. Still need original lifecycle lease/caller and real registration. Congo donor binary only 3638/5092, do not run on MU1005 without validated adaptation."
+      "evidence": "R105.227: Congo isolated QNX dlopen succeeded run 46102169022 (no OEM or phone); outbound candidate run 46102256887 reports five exact-shift candidate entries and two uncertain, not callable ABI. Actual MU1005 preload now retries deferred trace GOT publication before known original thread creation; serialization and retained original pointer prevent failed CAS from permanently disabling retry. No owner/registration proof."
     },
     {
       "priority": 2,
