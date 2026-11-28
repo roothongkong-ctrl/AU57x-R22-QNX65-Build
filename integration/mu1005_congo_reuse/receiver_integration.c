@@ -3,8 +3,9 @@
  * job adapter. Caller supplies independently verified real OEM providers.
  * Keep this object and the service/native storage alive until retired.
  */
-#include "native_iap2_bridge.h"
+#include <stddef.h>
 #include "dio_existing_receiver.h"
+#include "native_iap2_bridge.h"
 
 typedef struct {
     struct mu1005_dio_job job;
