@@ -109,6 +109,7 @@ public:
         if(!active_||!parser_||!codec_||!data||!len||!now||len>2*1024*1024){
             ++rejected_;return false;
         }
+        unsigned zero_packet_retries=0;
         while(len){
             uint8_t* packet=NULL;int packet_len=0;
             int unit=(int)(len>(size_t)INT_MAX?INT_MAX:len);
@@ -117,10 +118,15 @@ public:
             if(used<0||used>unit){++rejected_;return false;}
             if(packet_len && !decode_packet(packet,packet_len,now))return false;
             if(used==0){
-                if(!packet_len){++rejected_;return false;}
-                /* parser emitted a picture without consuming more bytes */
-                ++rejected_;return false; /* don't spin on malformed input */
+                /* Valid FFmpeg behavior: output a buffered picture before
+                 * consuming the next input chunk. Retry same bytes, but cap
+                 * zero-progress packets so bad H264 cannot spin forever. */
+                if(!packet_len || ++zero_packet_retries>16){
+                    ++rejected_;return false;
+                }
+                continue;
             }
+            zero_packet_retries=0;
             data+=used;len-=(size_t)used;
         }
         return true;
