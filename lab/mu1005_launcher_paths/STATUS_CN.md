@@ -1,0 +1,2 @@
+# R105.315 实际前置条件定位
+R105.314 run 46142583926 成功，11 来自 hash_file 或 main 两候选，尚无唯一证据。main 出现 snprintf 循环、rmdir，原报告遗漏 /var 路径。现解析 main/hash_file 完整 ARM 函数及实际公开文件路径，独立确定普通文件读取与可写临时目录要求；不修改任何校验、MFi 或授权，不重跑 QEMU。待确认后只补真实运行环境。NO INSTALL。

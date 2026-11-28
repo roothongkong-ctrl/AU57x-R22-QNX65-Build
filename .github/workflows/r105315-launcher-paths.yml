@@ -1,0 +1,31 @@
+name: R105.315 original launcher normal exit-11 diagnosis (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105315-launcher-paths.yml','lab/mu1005_launcher_paths/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-exit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit real upstream launcher return paths without modifying it
+        run: |
+          set -euxo pipefail
+          mkdir evidence
+          git init donor
+          git -C donor remote add origin https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps.git
+          git -C donor fetch --depth 1 origin aec37f5b1c87a0d961d16fe4328ac3638d0a833e
+          git -C donor checkout --detach FETCH_HEAD
+          test "$(git -C donor rev-parse HEAD)" = aec37f5b1c87a0d961d16fe4328ac3638d0a833e
+          python3 -m venv /tmp/launcher-exit
+          /tmp/launcher-exit/bin/pip install pyelftools==0.31 capstone==5.0.3
+          /tmp/launcher-exit/bin/python lab/mu1005_launcher_paths/path_audit.py donor evidence/prerequisites.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R105315-launcher-prerequisites-NO-INSTALL
+          path: evidence/
