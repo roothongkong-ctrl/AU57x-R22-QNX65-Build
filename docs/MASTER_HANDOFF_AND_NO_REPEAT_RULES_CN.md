@@ -298,3 +298,6 @@ R105.200三workflow46086291583、46086291605、46086291623共19/19 SUCCESS，保
 
 ## 68. R105.203 滚动补位：真实守护程序继承专用连接
 R105.201实际20/20 SUCCESS；R105.202本次12成功3运行1待汇总。用户要求有空位立即补位，不等待全部结束。此轮不重复先前C/Rust四代测试，复用LuKa 20c94f51c0f0ae88b154c12e4f604643ba23022c GPL原始守护程序及AP/SI/MFi/ACK适配，新增显式--mu1005-ack-fd：由supervisor独占已连接的TCP端点并传入FD，守护程序验证实际本地loopback:57342、对端loopback及SOCK_STREAM、CLOEXEC后接管，旧监听方式不变；错误FD不回退监听。主机真实子进程+实际继承连接测试ACK与拒绝无效/UDP FD，QNX ARM完整构建。仅解决守护程序接收入口候选，尚未完成真实QNX supervisor、程序身份和FD配对、OEM owner/生命周期；地址检查绝非身份认证。2项专项，原有自动回归可能触发但≤20预算；不宣称持续后台工作。第6/8/9仍未100%，35/66限定完成，NO INSTALL。
+
+## 69. R105.204 滚动补位：连接创建、子进程及回收
+R105.202 16/16 SUCCESS；R105.203 真实继承FD的Rust host 140798317067 SUCCESS，ARM 140798317261仍在构建。本轮新增独立C supervisor，复用此前QNX spawn映射和LuKa显式ACK FD模式，创建并核对同一loopback连接两端，关闭监听，指定FD3启动子进程，调用者须提供真实可执行文件/受保护目录校验；本进程仅核对精确FD、socket inode/地址对、child waitpid和连接状态，不以端口证明身份。真实Rust子进程host联调+ARM supervisor编译2路，旧ARM不重复。本候选尚无QNX原厂btstack内部交接、真实部署验证者、原厂生命周期互斥，不能安装。35/66限定完成，第6/8/9未100%。
