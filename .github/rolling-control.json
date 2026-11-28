@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.212",
+    "version": "R105.213",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 15
+      "dependent_not_yet_listed": 14
     },
     "runs": [],
     "verified_prior": [
@@ -136,10 +136,20 @@
           46089244406
         ],
         "evidence": "startup coordinator host fixture and ARM partial linking succeeded, OEM runtime not proven"
+      },
+      {
+        "version": "R105.212",
+        "passed": 15,
+        "runs": [
+          46089573774,
+          46089573705,
+          46089573694
+        ],
+        "evidence": "15/15 cloud jobs passed including full QNX native build; original DIO create output at observed context +0xc, original start/control call uses flag 1 and NULL qualifier/params; original iAP2 driver callback slots +0x28 send and +0x2c receive. Static evidence only."
       }
     ],
-    "discovery": "Full native library links all supervisor/startup objects; 2 OEM argument lanes; expected 13 existing regressions, actual API count authoritative.",
-    "expected_jobs": 15
+    "discovery": "Existing receiver singleton coordinator fixture plus required full native build/regressions; API count authoritative. Independent Congo branch 806b65ea43d80f91d6ce685a9308f9a564078360 run 46089902646 still running.",
+    "expected_jobs": 14
   },
   "read_strategy": {
     "first_parallel": [
@@ -159,7 +169,7 @@
         8,
         9
       ],
-      "task": "R105.212 put actual R105.210/211 startup and daemon binding into the native QNX Bluetooth DSO build, in parallel resolve exact DIO receiver and driver indirect-call argument setup from prior callsites. Do not treat static arguments as a live provider.",
+      "task": "Continue genuine OEM provider wiring; prioritize Congo direct compatibility in parallel, no install before live evidence.",
       "paths": [
         "lab/mu1005_route4_5/parallel_native.py",
         "lab/mu1005_route4_5/cleanup_callees.py",
@@ -174,7 +184,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.211 2/2 PASS. Genuine OEM startup authority/lease and actual receiver/driver runtime still not proven."
+      "evidence": "R105.212 complete. R105.213 connects verified existing DIO singleton to current native receiver and CPRX; no new receiver, no guessed object address. Real DIO manager/owner provider and Bluetooth startup lease still missing."
     },
     {
       "priority": 2,
