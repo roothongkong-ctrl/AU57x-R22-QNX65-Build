@@ -246,18 +246,6 @@ int au98_guard_published_daemon(Au98Handoff*s,const Au98DispatchPolicy*p,
  return 0;
 }
 
-/* R105.246: graft publication must not require the missing service
- * it is intended to create. Keep every independent route-gate witness
- * and live SDK owner/transport check. No MFi/auth result is fabricated. */
-int au98_graft_admission(const Au98OwnerProof*p,const MuBtOwner*o){
- if(!p||!o||!p->original_image_verified||!p->on_original_iap2_owner||
-    !o->owner_ready||!o->transport_ready||!o->read_live||
-    au100_route_select(p->route_evidence)!=AU100_GRAFT_RFCOMM_ROUTE)return 0;
- return p->original_image_verified(p->opaque)==1&&
-        p->on_original_iap2_owner(p->opaque)==1&&
-        o->owner_ready(o->opaque)==1&&o->transport_ready(o->opaque)==1;
-}
-
 /* Native execution path of the R98 -> R45 bridge. Coded as real calls to
  * native_binding.c, not a function-pointer-only host placeholder.
  * Strictly unavailable outside the pinned QNX ARM32 target. */

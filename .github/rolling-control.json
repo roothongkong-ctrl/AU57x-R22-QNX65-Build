@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.246",
+    "version": "R105.247",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 15
+      "dependent_not_yet_listed": 19
     },
     "runs": [],
     "verified_prior": [
@@ -448,10 +448,22 @@
           46108008150
         ],
         "evidence": "Four workflows completed successfully, read-only artifact 15248073443. User explicitly declines repeat collection; existing R106 archive reused."
+      },
+      {
+        "version": "R105.246",
+        "passed": 16,
+        "failed": 3,
+        "runs": [
+          46108905396,
+          46108905420,
+          46108905352,
+          46108905341
+        ],
+        "evidence": "New ARM/admission jobs pass. Existing host owner/discovery/transport fail linking au100_route_select from newly unconditional helper. Move helper into existing route-gate compilation unit; actual runtime remains unproven."
       }
     ],
-    "discovery": "Native graft no longer depends on preexisting factory iAP2 service callback. Actual original owner and independent route evidence retained. No repeat vehicle collection. Full donor route prioritized; runtime provider, endpoint and phone remain unproven.",
-    "expected_jobs": 15,
+    "discovery": "Fix common regression link dependency by implementing graft admission in existing route-gate module, preserving unchanged legacy host links and production QNX gate. No new vehicle probe or new auth implementation. Actual startup provider still missing.",
+    "expected_jobs": 19,
     "pending_prior": []
   },
   "read_strategy": {
@@ -488,7 +500,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "integration/mu1005_vehicle_stage/congo_port_table.json"
       ],
-      "evidence": "R105.246 admission fix; actual provider and vehicle link not yet implemented."
+      "evidence": "R105.247 common dependency fix; original runtime owner/launcher still missing. Use existing compiled daemon and original launcher config, not new isolated adapters."
     }
   ],
   "rules": [

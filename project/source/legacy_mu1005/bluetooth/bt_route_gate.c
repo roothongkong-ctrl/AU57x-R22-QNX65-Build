@@ -2,7 +2,7 @@
  * Safe factory -> graft fallback eligibility. This module does not install,
  * start, or patch any vehicle service. Runtime proofs must be independent.
  */
-#include "bt_route_gate.h"
+#include "bt_iap2_owner_handoff.h"
 Au100Route au100_route_select(const Au100Evidence *e) {
     if (!e || e->stock_image_pinned != 1u ||
         e->original_config_backed_up != 1u ||
@@ -32,3 +32,16 @@ const char *au100_route_name(Au100Route route) {
         default: return "NO_GO";
     }
 }
+
+/* R105.246: graft publication must not require the missing service
+ * it is intended to create. Keep every independent route-gate witness
+ * and live SDK owner/transport check. No MFi/auth result is fabricated. */
+int au98_graft_admission(const Au98OwnerProof*p,const MuBtOwner*o){
+ if(!p||!o||!p->original_image_verified||!p->on_original_iap2_owner||
+    !o->owner_ready||!o->transport_ready||!o->read_live||
+    au100_route_select(p->route_evidence)!=AU100_GRAFT_RFCOMM_ROUTE)return 0;
+ return p->original_image_verified(p->opaque)==1&&
+        p->on_original_iap2_owner(p->opaque)==1&&
+        o->owner_ready(o->opaque)==1&&o->transport_ready(o->opaque)==1;
+}
+
