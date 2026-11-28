@@ -34,8 +34,8 @@ int mu_bt_startup_watch_tick(MuBtStartupWatch *w,MuBtTraceLatch *l,unsigned tick
 }
 #if defined(__QNXNTO__) && defined(__arm__) && UINTPTR_MAX == UINT32_MAX
 #include "bt_queue_pulse.h"
-typedef struct {int(*take)(void);int observed;const MuBtQueuePulseBinding *queue;} BootStep;
-static int boot_take(void*p){BootStep*s=p;return s->take();}
+typedef struct {int(*take)(void);int observed;const MuBtQueuePulseBinding *queue;int event;} BootStep;
+static int boot_take(void*p){BootStep*s=p;s->event=s->take();return s->event;}
 static int boot_enter(void*p){BootStep*s=p;return s->queue->enter(s->queue->lease_context);}
 static void boot_leave(void*p){BootStep*s=p;s->queue->leave(s->queue->lease_context);}
 static int boot_read(void*p,uint32_t a,void*b,size_t n){BootStep*s=p;return s->queue->owner.read_live(s->queue->owner.opaque,a,b,n);}
@@ -48,10 +48,20 @@ static void boot_ready(void*p,uint32_t service){BootStep*s=p;(void)service;s->ob
 int mu_bt_startup_bootstrap_tick(MuBtStartupWatch*w,int(*trace_take)(void),unsigned ticks,
  const MuBtQueuePulseBinding*q,const MuBtNotifyBinding*n,int(*startup)(void*),void*ctx){
  if(!w||!trace_take||!q||!n||!startup||!q->enter||!q->leave||!q->owner.read_live)return -1;
- BootStep s={trace_take,0,q};
+ unsigned prior=w->remaining;
+ BootStep s={trace_take,0,q,0};
  int rc=mu_bt_startup_watch_tick_source(w,boot_take,&s,ticks,boot_enter,boot_leave,boot_read,boot_ready,&s);
  if(rc<=0)return rc;
- if(!s.observed||startup(ctx)!=1)return -1;
+ if(!s.observed)return -1;
+ int ready=startup(ctx);
+ if(ready==0){
+  /* Service visibility can precede the independent startup witness.
+   * Keep only the unspent observation budget; never retry partial attach. */
+  unsigned budget=prior?prior:(s.event==1?ticks:0u);
+  w->remaining=budget>0u?budget-1u:0u;
+  return w->remaining?0:-1;
+ }
+ if(ready!=1)return -1;
  return mu_bt_queue_bootstrap(q,n,startup,ctx)==0?1:-1;
 }
 #else
