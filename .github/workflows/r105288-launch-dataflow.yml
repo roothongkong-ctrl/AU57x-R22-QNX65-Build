@@ -1,0 +1,85 @@
+name: R105.288 targeted launch evidence and read-only runtime witness (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105288-launch-dataflow.yml','lab/mu1005_si_dio_owner/launch_dataflow.py','lab/mu1005_si_dio_owner/stock_script.py','lab/mu1005_si_dio_owner/observe_dio.sh']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  provider:
+    name: ${{ matrix.lane }}
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        lane: [launch-dataflow, stock-script]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover exact original MU1005 app70
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir firmware original-tools evidence
+          gh run download 45923122041 --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
+          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  $archive" | sha256sum -c -
+          git fetch --depth 1 origin 713fddea9bb11acfdb1df7eff02ca645011ad6d6
+          git archive FETCH_HEAD tools/mu1005_extract_app70.py | tar -x -C original-tools
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          git init qnxmount
+          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
+          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
+          git -C qnxmount checkout --detach FETCH_HEAD
+          python3 -m venv /tmp/extract-venv
+          /tmp/extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          python3 original-tools/tools/mu1005_extract_app70.py "$archive" "$RUNNER_TEMP/app70/app.img"
+          /tmp/extract-venv/bin/python extractor/tools/extract_firmware.py --source "$RUNNER_TEMP/app70/app.img" --output "$RUNNER_TEMP/original" --variant 70 --qnxmount-root "$PWD/qnxmount" > /tmp/app-summary.json
+      - name: Resolve targeted original launcher evidence
+        run: |
+          set -euxo pipefail
+          /tmp/extract-venv/bin/pip install pyelftools==0.31 capstone==5.0.6
+          case "${{ matrix.lane }}" in
+            launch-dataflow) script=launch_dataflow.py ;;
+            stock-script) script=stock_script.py ;;
+          esac
+          /tmp/extract-venv/bin/python "lab/mu1005_si_dio_owner/$script" "$RUNNER_TEMP/original" "evidence/${{ matrix.lane }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105288-${{ matrix.lane }}-NO-INSTALL
+          path: evidence/${{ matrix.lane }}.json
+  runtime-witness:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate read-only output filtering
+        run: |
+          set -euxo pipefail
+          sh -n lab/mu1005_si_dio_owner/observe_dio.sh
+          mkdir -p mock evidence
+          cat > mock/pidin <<'EOF'
+          #!/bin/sh
+          case "$3" in
+            ar) printf 'PID ARGS\n101 /mnt/app/eso/bin/apps/%s PRIVATE_EXAMPLE\n' "$2";;
+            family) printf 'PID PPID\n101 12\n';;
+            *) exit 2;;
+          esac
+          EOF
+          chmod +x mock/pidin
+          PATH="$PWD/mock:$PATH" sh lab/mu1005_si_dio_owner/observe_dio.sh > evidence/fixture.txt
+          grep -q 'PID 101 PATH_CLASS MNT_APP' evidence/fixture.txt
+          grep -q 'FAMILY PID 101 PPID 12' evidence/fixture.txt
+          ! grep -q PRIVATE_EXAMPLE evidence/fixture.txt
+          cp lab/mu1005_si_dio_owner/observe_dio.sh evidence/
+          echo 'READ ONLY OBSERVATION; NOT INSTALL; HOST FIXTURE ONLY' > evidence/README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105288-read-only-witness-NO-INSTALL
+          path: evidence/
