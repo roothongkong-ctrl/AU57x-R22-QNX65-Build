@@ -1,0 +1,70 @@
+name: 'R16: real 112 AVC over loopback TCP to FFmpeg plus R12 (SOURCE ONLY)'
+on:
+  workflow_dispatch:
+  push:
+    branches: [experiment/cluster-card-r16-112-tcp-to-decoder]
+    paths:
+      - 'experiments/cluster-compact-card/r13/**'
+      - 'experiments/cluster-compact-card/r16/**'
+      - '.github/workflows/cluster-card-r16-real-tcp.yml'
+permissions:
+  contents: read
+jobs:
+  end-to-end:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        compiler: [g++, clang++]
+        variant: [end-to-end, real-hook-lab, disabled-build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout official v1.2.14 source
+        run: git clone -q --depth 1 --branch v1.2.14 https://github.com/MacsInSpace/mib-cluster-map.git /tmp/mib-r16
+      - name: End-to-end real H264 or real patched AirPlay hook
+        shell: bash
+        env:
+          CXX: ${{ matrix.compiler }}
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          set -euo pipefail
+          REPO="$GITHUB_WORKSPACE"
+          SRC=/tmp/mib-r16/thirdparty/mhi2_altscreen_carplay
+          if [ "$VARIANT" = end-to-end ];then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq libavcodec-dev libavutil-dev pkg-config ffmpeg
+            ffmpeg -loglevel error -y -f lavfi -i 'color=c=white:s=800x298:r=10' \
+              -vf 'drawbox=x=182:y=18:w=40:h=40:color=black:t=fill' \
+              -frames:v 1 -pix_fmt yuv420p -c:v libx264 -preset ultrafast \
+              -x264-params keyint=1:scenecut=0:bframes=0 -f h264 /tmp/r16-real.h264
+            test -s /tmp/r16-real.h264
+            cc -std=c99 -O2 -Wall -Wextra -Werror -I"$SRC/include" \
+              -c "$SRC/src/alt111_video.c" -o /tmp/r16-alt111.o
+            "$CXX" -std=c++11 -pthread -O2 -Wall -Wextra -Werror -pedantic \
+              -I"$SRC/include" -I"$REPO/experiments/cluster-compact-card/r16" \
+              $(pkg-config --cflags libavcodec libavutil) \
+              "$REPO/experiments/cluster-compact-card/r16/test_tcp_to_r14.cpp" \
+              /tmp/r16-alt111.o \
+              $(pkg-config --libs libavcodec libavutil) -o /tmp/r16-test
+            /tmp/r16-test /tmp/r16-real.h264 19822
+            echo 'PASS: generated true H264 through original MIB AVCC engine, 112 loopback TCP, libavcodec, R12 exact-map compositor'
+          else
+            cp experiments/cluster-compact-card/r13/r13_112_probe.inc "$SRC/"
+            cp experiments/cluster-compact-card/r16/r16_card_tee.h "$SRC/"
+            python3 experiments/cluster-compact-card/r13/patch_real_v1214.py "$SRC/libaltscreen111_gen2.c"
+            git -C /tmp/mib-r16 diff --check
+            if [ "$CXX" = clang++ ]; then CC=clang; else CC=gcc;fi
+            FLAGS="-std=gnu99 -O1 -g -Wall -Wextra -Wno-unused-function -Werror=implicit-function-declaration -I$SRC/include"
+            if [ "$VARIANT" = real-hook-lab ];then
+              "$CC" $FLAGS -DCLUSTERMAP_R13_112_LAB -DCLUSTERMAP_R16_112_TEE_LAB \
+                -c "$SRC/libaltscreen111_gen2.c" -o /tmp/r16-lab.o
+              grep -aFq 'R16 experimental 112 Annex-B' /tmp/r16-lab.o
+              echo 'PASS: real AirPlay receiver compiled with bounded 112 loopback; run-time default OFF'
+            else
+              "$CC" $FLAGS -c "$SRC/libaltscreen111_gen2.c" -o /tmp/r16-stock.o
+              ! nm /tmp/r16-stock.o | grep -Fq 'r16_card_tee_pump'
+              echo 'PASS: normal original build has no experimental 112 TCP code'
+            fi
+          fi
