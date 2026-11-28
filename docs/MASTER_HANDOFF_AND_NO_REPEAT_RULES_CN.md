@@ -301,3 +301,6 @@ R105.201实际20/20 SUCCESS；R105.202本次12成功3运行1待汇总。用户�
 
 ## 69. R105.204 滚动补位：连接创建、子进程及回收
 R105.202 16/16 SUCCESS；R105.203 真实继承FD的Rust host 140798317067 SUCCESS，ARM 140798317261仍在构建。本轮新增独立C supervisor，复用此前QNX spawn映射和LuKa显式ACK FD模式，创建并核对同一loopback连接两端，关闭监听，指定FD3启动子进程，调用者须提供真实可执行文件/受保护目录校验；本进程仅核对精确FD、socket inode/地址对、child waitpid和连接状态，不以端口证明身份。真实Rust子进程host联调+ARM supervisor编译2路，旧ARM不重复。本候选尚无QNX原厂btstack内部交接、真实部署验证者、原厂生命周期互斥，不能安装。35/66限定完成，第6/8/9未100%。
+
+## 70. R105.205 滚动补位：实际发布后的守护程序见证及FD所有权
+R105.203 run46086850149 两路SUCCESS，R105.204 run46087012256 两路SUCCESS（原始host marker MU1005_SUPERVISOR_ACTUAL_DONOR_FD_PAIR_AND_REAP_PASS_NO_OEM，ARM编译）。本轮复用现有au98_drive及已验证supervisor，实际native legacy/ACK dispatch前后检查同一daemon FD证据；失效进入DRAINING，只允许既有原厂撤销，不假造释放或重复注册；错误线程不改变状态。supervisor新增一次性FD offer和可直接作为MuBtNotifyBinding witness的回调；转交后不得再关闭owner持有的FD，等待真实撤销关闭后回收child。新host真实donor所有权移交+guard负例、ARM supervisor编译及必要自动回归，预计≤19路。仍需真正原厂启动caller、受保护部署校验、生命周期lease及OEM owner，不是实车激活。35/66限定完成，6/8/9未100%，NO INSTALL。

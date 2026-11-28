@@ -1,4 +1,4 @@
-name: R105.204 supervised exact connected endpoint (NO INSTALL)
+name: R105.205 supervisor handoff and persistent daemon witness (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -32,6 +32,12 @@ jobs:
           cp donor/wireless/daemon/probes/dio_manager.fixture.json fixture/dio_manager.json
           cargo +nightly-2026-07-21 build --offline --locked --bin mhi2q-wireless-daemon --manifest-path donor/wireless/daemon/Cargo.toml 2>&1 | tee evidence/build.txt
           git -C donor diff -- wireless/daemon > evidence/combined.diff
+      - name: Test published exact daemon witness
+        run: |
+          set -euxo pipefail
+          s=project/source/legacy_mu1005/bluetooth
+          cc -std=gnu99 -Wall -Wextra -Werror -I"$s" "$s"/{bt_iap2_owner_handoff,rf_arg_experiment,bt_route_gate}.c lab/mu1005_route4_5/test_published_witness.c -o /tmp/witness
+          /tmp/witness
       - name: Run new C supervisor against actual adapted Rust daemon
         run: |
           set -euxo pipefail
@@ -42,7 +48,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105204-SUPERVISOR-REAL-DONOR-NO-INSTALL
+          name: R105205-SUPERVISOR-REAL-DONOR-NO-INSTALL
           path: evidence/
   qnx-arm-supervisor:
     runs-on: ubuntu-24.04
@@ -63,5 +69,5 @@ jobs:
           readelf -h evidence/supervisor.o | grep -E 'Machine:.*ARM'
       - uses: actions/upload-artifact@v4
         with:
-          name: R105204-SUPERVISOR-ARM-NO-INSTALL
+          name: R105205-SUPERVISOR-ARM-NO-INSTALL
           path: evidence/

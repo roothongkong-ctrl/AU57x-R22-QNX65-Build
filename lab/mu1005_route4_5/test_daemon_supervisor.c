@@ -26,12 +26,19 @@ int main(int argc,char**argv){
  MuDaemonSupervisor s={.fd=-1};
  assert(mu_daemon_supervisor_start(&s,argv[1],environ,proof,NULL)==0);
  assert(mu_daemon_supervisor_live(&s,s.fd)==1);
+ int offered=-1,second=-1;
+ assert(!mu_daemon_supervisor_witness(&s,s.fd));
+ assert(mu_daemon_supervisor_offer(&s,&offered)==0&&offered==s.fd);
+ assert(mu_daemon_supervisor_offer(&s,&second)==-1&&second==-1);
+ assert(mu_daemon_supervisor_witness(&s,offered)==1);
+ assert(mu_daemon_supervisor_close(&s)==1&&fcntl(offered,F_GETFD)>=0);
  int other=dup(s.fd);assert(other>=0&&!mu_daemon_supervisor_live(&s,other));close(other);
  unsigned char frames[]={1,0,6,0,1,0,0,0,2,1,2,3,4,5,2,0,6,0,1,0,0,0,255,85,2,0,238,16};
  unsigned char ack[]={4,0,0,0,1,0,0,0};
  transfer(s.fd,frames,sizeof frames,1);response(s.fd);assert(mu_daemon_supervisor_live(&s,s.fd)==1);
  transfer(s.fd,ack,sizeof ack,1);response(s.fd);
  assert(mu_daemon_supervisor_live(&s,s.fd)==1);
+ assert(close(offered)==0); /* owner-side close, not supervisor */
  int rc=mu_daemon_supervisor_close(&s);
  for(unsigned i=0;i<100&&rc==1;i++){struct timespec t={0,50000000};nanosleep(&t,NULL);rc=mu_daemon_supervisor_close(&s);}
  assert(rc==0&&s.reaped&&!mu_daemon_supervisor_live(&s,s.fd));

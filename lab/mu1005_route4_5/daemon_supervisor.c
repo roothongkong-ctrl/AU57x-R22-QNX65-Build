@@ -37,6 +37,15 @@ int mu_daemon_supervisor_live(MuDaemonSupervisor*s,int fd){
   if(k==0||(k<0&&errno!=EAGAIN&&errno!=EWOULDBLOCK)){s->active=0;return 0;}}
  return 1;
 }
+int mu_daemon_supervisor_witness(void*v,int fd){
+ MuDaemonSupervisor*s=v;
+ return s&&s->transferred&&mu_daemon_supervisor_live(s,fd)==1;
+}
+int mu_daemon_supervisor_offer(MuDaemonSupervisor*s,int*fd){
+ if(!s||!fd||*fd>=0||s->transferred||
+    mu_daemon_supervisor_live(s,s->fd)!=1)return -1;
+ s->transferred=1;*fd=s->fd;return 0;
+}
 static int env_ok(char*const env[]){
  unsigned count=0,found=0;
  if(!env)return 0;
@@ -92,7 +101,15 @@ bad:
 int mu_daemon_supervisor_close(MuDaemonSupervisor*s){
  if(!s||s->pid<=0)return -1;
  /* Never close a reused descriptor, and never kill a PID after reaping. */
- if(s->fd>=0){if(!exact(s,s->fd))return -1;close(s->fd);s->fd=-1;}
+ if(s->fd>=0){
+  if(s->transferred){
+   if(exact(s,s->fd))return 1; /* owner's FD: never close it ourselves */
+   s->fd=-1;
+  }else{
+   if(!exact(s,s->fd))return -1;
+   close(s->fd);s->fd=-1;
+  }
+ }
  s->active=0;
  if(s->reaped)return 0;
  return child_live(s)?1:(s->reaped?0:-1);

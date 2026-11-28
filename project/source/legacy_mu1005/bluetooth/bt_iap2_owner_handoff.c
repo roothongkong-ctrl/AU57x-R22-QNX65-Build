@@ -233,6 +233,19 @@ int au98_drive(Au98Handoff*s,int*fd,const Au98DispatchPolicy*p,Au98AdoptStep ado
  }
 }
 
+/* The witness is borrowed synchronously, never retained across calls.
+ * Revocation latches cleanup-only state; wrong-thread calls do not mutate. */
+int au98_guard_published_daemon(Au98Handoff*s,const Au98DispatchPolicy*p,
+ int(*verified)(void*,int),void*ctx){
+ if(!s||!p||!verified)return -1;
+ if(s->state!=AU98_PUBLISHED)return 0;
+ if(!p->safe_dispatch||p->safe_dispatch(p->opaque)!=1||
+    !s->hooks.on_original_iap2_owner||
+    s->hooks.on_original_iap2_owner(s->hooks.opaque)!=1)return -1;
+ if(s->fd<0||verified(ctx,s->fd)!=1){s->state=AU98_DRAINING;return -1;}
+ return 0;
+}
+
 /* Native execution path of the R98 -> R45 bridge. Coded as real calls to
  * native_binding.c, not a function-pointer-only host placeholder.
  * Strictly unavailable outside the pinned QNX ARM32 target. */
@@ -289,12 +302,18 @@ static int adopt_dispatch(void*ctx,Au98Handoff*s,int fd){
 int au98_drive_stock_native(Au98Handoff*s,int*fd,const Au98DispatchPolicy*p,const Au98OwnerProof*proof,const MuBtOwner*o,int(*verified)(void*,int),void*ctx){
  NativeDispatch d={proof,o,verified,ctx,0};
  if(!proof||!o||!verified)return -1;
- return au98_drive(s,fd,p,adopt_dispatch,&d,au98_rearm_stock_native);
+ if(au98_guard_published_daemon(s,p,verified,ctx)!=0)return -1;
+ int rc=au98_drive(s,fd,p,adopt_dispatch,&d,au98_rearm_stock_native);
+ if(rc==0&&au98_guard_published_daemon(s,p,verified,ctx)!=0)return -1;
+ return rc;
 }
 int au98_drive_stock_native_ack(Au98Handoff*s,int*fd,const Au98DispatchPolicy*p,const Au98OwnerProof*proof,const MuBtOwner*o,int(*verified)(void*,int),void*ctx){
  NativeDispatch d={proof,o,verified,ctx,1};
  if(!proof||!o||!verified)return -1;
- return au98_drive(s,fd,p,adopt_dispatch,&d,au98_rearm_stock_native);
+ if(au98_guard_published_daemon(s,p,verified,ctx)!=0)return -1;
+ int rc=au98_drive(s,fd,p,adopt_dispatch,&d,au98_rearm_stock_native);
+ if(rc==0&&au98_guard_published_daemon(s,p,verified,ctx)!=0)return -1;
+ return rc;
 }
 #else
 int au98_bind_stock_native(Au98Handoff*s,const Au98OwnerProof*p,const MuBtOwner*o){

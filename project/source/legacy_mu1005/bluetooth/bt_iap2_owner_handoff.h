@@ -80,6 +80,9 @@ typedef struct {
 typedef int (*Au98AdoptStep)(void*,Au98Handoff*,int);
 typedef int (*Au98ReclaimStep)(Au98Handoff*,int(*)(void*,const Inbound*),void*);
 int au98_drive(Au98Handoff*,int*,const Au98DispatchPolicy*,Au98AdoptStep,void*,Au98ReclaimStep);
+/* Nonblocking exact-FD proof before/after each native dispatch.
+ * Lost witness enters cleanup-only state, never releases SDK storage. */
+int au98_guard_published_daemon(Au98Handoff*,const Au98DispatchPolicy*,int(*)(void*,int),void*);
 int au98_drive_stock_native(Au98Handoff*,int*,const Au98DispatchPolicy*,const Au98OwnerProof*,const MuBtOwner*,int(*)(void*,int),void*);
 int au98_drive_stock_native_ack(Au98Handoff*,int*,const Au98DispatchPolicy*,const Au98OwnerProof*,const MuBtOwner*,int(*)(void*,int),void*);
 #endif

@@ -214,3 +214,5 @@ R105.202：用户要求20路滚动补位，实际修复第21/22/24接收器接�
 R105.203：R105.201 20/20 SUCCESS；滚动补位真实守护程序继承专用FD入口（LuKa+现有适配），主机实际子进程/ACK与ARM构建待验。QNX supervisor/真实原厂owner仍缺，35/66限定完成。
 
 R105.204：R105.203 host SUCCESS、ARM待；新增supervisor实际FD配对/子进程启动与回收候选，host真实donor与ARM编译待验；原厂接入仍缺，35/66限定完成。
+
+R105.205：R105.203/204共4路SUCCESS；新增真实native dispatch持续daemon witness及supervisor FD单次移交，接线仍需真实原厂caller、lease。35/66限定完成。
