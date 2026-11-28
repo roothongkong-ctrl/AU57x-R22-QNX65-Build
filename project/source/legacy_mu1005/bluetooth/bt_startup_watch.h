@@ -15,13 +15,15 @@ int mu_bt_startup_watch_tick(MuBtStartupWatch*,MuBtTraceLatch*,unsigned ticks,
  int(*read_live)(void*,uint32_t,void*,size_t),
  void(*ready)(void*,uint32_t),void*);
 /* Source callback permits the existing preload's real attached trace
- * provider to feed the watcher without exporting its private latch. */
+ * provider to feed the watcher without exporting its private latch.
+ * NULL source polls once per tick under the existing lease; caller must
+ * enforce a finite total deadline. No trace or ownership is fabricated. */
 int mu_bt_startup_watch_tick_source(MuBtStartupWatch*,int(*take)(void*),void*,unsigned,
  int(*enter)(void*),void(*leave)(void*),int(*read_live)(void*,uint32_t,void*,size_t),
  void(*ready)(void*,uint32_t),void*);
 #include "bt_queue_pulse.h"
-/* Worker-only, real preload trace_take and stock lifecycle providers must
- * be supplied by the caller. No automatic activation. 1 means bootstrap
+/* Worker-only, real stock lifecycle providers must be supplied by the
+ * caller. trace_take may be NULL for bounded supervisor polling. No automatic activation. 1 means bootstrap
  * queued, not a registered service. 0 pending; -1 failure. */
 int mu_bt_startup_bootstrap_tick(MuBtStartupWatch*,int(*trace_take)(void),unsigned,
  const MuBtQueuePulseBinding*,const MuBtNotifyBinding*,int(*startup)(void*),void*);

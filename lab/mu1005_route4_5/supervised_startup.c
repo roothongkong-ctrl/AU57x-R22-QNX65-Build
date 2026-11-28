@@ -6,7 +6,7 @@ int mu_supervised_startup_tick(MuSupervisedStartup*s,MuDaemonSupervisor*d,
  if(!s)return -1;
  if(s->phase==2)return 1; /* no reads of owner-side state after transfer */
  if(s->phase<0)return -1;
- if(!d||!n||!q||!trace_take||!startup||!total_ticks||total_ticks>10000u||
+ if(!d||!n||!q||!startup||!total_ticks||total_ticks>10000u||
     !trace_ticks||trace_ticks>100u||!n->handoff||
     n->handoff->state!=AU98_EMPTY||!n->prepared_fd||n->worker||
     n->daemon_context!=d||n->daemon_verified!=mu_daemon_supervisor_witness||

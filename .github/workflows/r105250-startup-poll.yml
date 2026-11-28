@@ -1,0 +1,42 @@
+name: R105.250 startup without optional DID trace (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105250-startup-poll.yml','project/source/legacy_mu1005/bluetooth/bt_startup_watch.*','lab/mu1005_route4_5/supervised_startup.c','lab/mu1005_route4_5/test_startup_source.c','lab/mu1005_route4_5/test_supervised_startup.c']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -euxo pipefail
+          b=project/source/legacy_mu1005/bluetooth
+          l=lab/mu1005_route4_5
+          cc -std=c99 -O2 -Wall -Wextra -Werror -DTRACE_LATCH_STANDALONE -DSTARTUP_WATCH_STANDALONE -I"$b" "$b"/{bt_startup_watch,bt_trace_latch,bt_startup_snapshot}.c "$l/test_startup_source.c" -o /tmp/startup-source
+          /tmp/startup-source
+          cc -std=c99 -O2 -Wall -Wextra -Werror -I"$b" -I"$l" "$l/supervised_startup.c" "$l/test_supervised_startup.c" -o /tmp/supervised-start
+          /tmp/supervised-start
+  arm-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - run: |
+          set -euxo pipefail
+          b=project/source/legacy_mu1005/bluetooth
+          l=lab/mu1005_route4_5
+          mkdir -p evidence
+          for f in "$b/bt_startup_watch.c" "$l/supervised_startup.c"; do
+            docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -I"$b" -I"$l" -c "$f" -o "evidence/$(basename "$f" .c).o"
+          done
+          readelf -h -sW evidence/*.o | tee evidence/arm.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105250-ARM-STARTUP-POLL-REVIEW-NO-INSTALL
+          path: evidence/

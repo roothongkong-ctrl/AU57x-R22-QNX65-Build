@@ -4,13 +4,18 @@
 int mu_bt_startup_watch_tick_source(MuBtStartupWatch *w,int(*take)(void*),void *source,unsigned ticks,
  int(*enter)(void*),void(*leave)(void*),
  int(*read_live)(void*,uint32_t,void*,size_t),void(*ready)(void*,uint32_t),void *ctx){
- if(!w||!take||!ticks||ticks>100u||!enter||!leave||!read_live||!ready)return -1;
- /* A new trace does not indefinitely extend a pending startup window. */
- int event=take(source);
- if(event!=0&&event!=1){w->remaining=0;return -1;}
- if(event==1&&!w->remaining)w->remaining=ticks;
- if(!w->remaining)return 0;
- --w->remaining;
+ if(!w||!ticks||ticks>100u||!enter||!leave||!read_live||!ready)return -1;
+ /* The donor DID trace is optional. With no source, inspect the real
+  * initialized service once per supervisor tick under the same lease.
+  * The supervisor owns the finite overall deadline. Never synthesize
+  * a trace or treat a snapshot as startup/owner authority. */
+ if(take){
+  int event=take(source);
+  if(event!=0&&event!=1){w->remaining=0;return -1;}
+  if(event==1&&!w->remaining)w->remaining=ticks;
+  if(!w->remaining)return 0;
+  --w->remaining;
+ }else w->remaining=0;
  int acquired=enter(ctx);
  if(acquired==0)return 0;
  if(acquired!=1){w->remaining=0;return -1;}
@@ -47,14 +52,15 @@ static void boot_ready(void*p,uint32_t service){BootStep*s=p;(void)service;s->ob
  * actual started object and live GOT addresses again. */
 int mu_bt_startup_bootstrap_tick(MuBtStartupWatch*w,int(*trace_take)(void),unsigned ticks,
  const MuBtQueuePulseBinding*q,const MuBtNotifyBinding*n,int(*startup)(void*),void*ctx){
- if(!w||!trace_take||!q||!n||!startup||!q->enter||!q->leave||!q->owner.read_live)return -1;
+ if(!w||!q||!n||!startup||!q->enter||!q->leave||!q->owner.read_live)return -1;
  unsigned prior=w->remaining;
  BootStep s={trace_take,0,q,0};
- int rc=mu_bt_startup_watch_tick_source(w,boot_take,&s,ticks,boot_enter,boot_leave,boot_read,boot_ready,&s);
+ int rc=mu_bt_startup_watch_tick_source(w,trace_take?boot_take:NULL,&s,ticks,boot_enter,boot_leave,boot_read,boot_ready,&s);
  if(rc<=0)return rc;
  if(!s.observed)return -1;
  int ready=startup(ctx);
  if(ready==0){
+  if(!trace_take)return 0; /* bounded by supervisor, not DID */
   /* Service visibility can precede the independent startup witness.
    * Keep only the unspent observation budget; never retry partial attach. */
   unsigned budget=prior?prior:(s.event==1?ticks:0u);

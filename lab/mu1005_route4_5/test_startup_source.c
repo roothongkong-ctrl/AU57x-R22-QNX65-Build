@@ -31,5 +31,15 @@ int main(void){
  f.bad=1;s.pending=1;assert(!tick(&w,&s,&f));s.pending=1;assert(!tick(&w,&s,&f));assert(!tick(&w,&s,&f)&&!w.remaining);
  assert(f.ready==1&&f.leaves+1==f.enters&&!f.held);
  assert(mu_bt_startup_bootstrap_tick(&w,NULL,3,NULL,NULL,NULL,NULL)==-1);
- puts("ROUTE6_ATTACHED_SOURCE_WATCH_PASS_FIXTURE_ONLY");return 0;
+ /* No DID event: original live snapshot still drives the watch. */
+ f.bad=0;f.started=0;f.allow=1;unsigned before=f.ready;
+ assert(mu_bt_startup_watch_tick_source(&w,NULL,NULL,3,enter,leave,read_live,ready,&f)==0);
+ f.started=1;
+ assert(mu_bt_startup_watch_tick_source(&w,NULL,NULL,3,enter,leave,read_live,ready,&f)==1);
+ assert(f.ready==before+1&&!f.held);
+ f.allow=0;
+ assert(mu_bt_startup_watch_tick_source(&w,NULL,NULL,3,enter,leave,read_live,ready,&f)==0);
+ assert(f.ready==before+1&&!f.held);
+ puts("ROUTE6_ATTACHED_SOURCE_WATCH_PASS_FIXTURE_ONLY");
+ puts("MU1005_NO_DID_SNAPSHOT_POLL_PASS_FIXTURE_ONLY");return 0;
 }

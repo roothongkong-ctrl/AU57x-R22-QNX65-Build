@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.249",
+    "version": "R105.250",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -482,11 +482,22 @@
         "passed": 4,
         "failed": 2,
         "evidence": "R105.247 unified completed success. R105.248 host and full ARM workflows fail Rust E0425 because insertion anchor spacing mismatch omitted helper. Also --check-config incorrectly requires manual slot. Fix both."
+      },
+      {
+        "version": "R105.249",
+        "runs": [
+          46109600131,
+          46109600108,
+          46109600130
+        ],
+        "evidence": "Host donor IE and SI/backup workflows success. Full ARM run 46109600160 in progress."
       }
     ],
-    "discovery": "Insert actual Rust slot-selection helper using exact verified anchor, add generation checks; remove mandatory IE index from daemon --check-config as well as runtime startup. Clarify exact original startup completion vs upstream early point. Congo/LuKa full donor integration remains priority; no repeat vehicle detection. No vehicle install.",
+    "discovery": "Optional DID trace is no longer mandatory in existing supervisor: bounded live initialized-service polling under independent lease, then existing startup authorization and queue bootstrap. No synthetic trace, actual runtime provider still missing, no installation.",
     "expected_jobs": 6,
-    "pending_prior": []
+    "pending_prior": [
+      46109600160
+    ]
   },
   "read_strategy": {
     "first_parallel": [
@@ -522,7 +533,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "integration/mu1005_vehicle_stage/congo_port_table.json"
       ],
-      "evidence": "R105.249 correct missing source function and stale manual configuration prerequisite. Original startup-complete site 0x11ec98, not old upstream early 0x11ec60; actual owner and startup wiring not implemented yet."
+      "evidence": "R105.250 eliminates optional DID log prerequisite; actual original lifecycle lease and runtime caller are still missing. Four grouped remaining stages: Bluetooth startup, Wi-Fi/session, install/recovery, vehicle acceptance."
     }
   ],
   "rules": [

@@ -7,7 +7,7 @@ static int live,rc,calls,checks;
 int mu_daemon_supervisor_witness(void*p,int fd){assert(p);checks++;return live&&fd==8;}
 int mu_bt_startup_bootstrap_tick(MuBtStartupWatch*w,int(*take)(void),unsigned ticks,
  const MuBtQueuePulseBinding*q,const MuBtNotifyBinding*n,int(*startup)(void*),void*ctx){
- assert(w&&take&&ticks==3&&q&&n&&startup&&ctx);calls++;return rc;
+ assert(w&&ticks==3&&q&&n&&startup&&ctx);(void)take;calls++;return rc;
 }
 static int trace(void){return 1;}
 static int enter(void*p){(void)p;return 1;}
@@ -30,6 +30,14 @@ int main(void){
  assert(T()==-1&&calls==6&&s.phase==-1);assert(T()==-1&&calls==6);
  s=(MuSupervisedStartup){0};rc=-1;assert(T()==-1&&calls==7);
  rc=1;assert(T()==-1&&calls==7&&fd==8);
+ s=(MuSupervisedStartup){0};rc=0;
+ #define POLL() mu_supervised_startup_tick(&s,&d,&n,&q,NULL,4,3,auth,&d)
+ assert(POLL()==0&&s.remaining==3);
+ rc=1;assert(POLL()==1&&s.phase==2);
+ s=(MuSupervisedStartup){0};rc=0;
+ for(int i=0;i<3;i++)assert(POLL()==0);
+ assert(POLL()==-1&&s.phase==-1);
  puts("MU1005_SUPERVISED_STARTUP_COORDINATOR_PASS_FIXTURE_ONLY");
+ puts("MU1005_NO_DID_SUPERVISOR_DEADLINE_PASS_FIXTURE_ONLY");
  return 0;
 }
