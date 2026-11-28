@@ -1,0 +1,2 @@
+# R105.313 原版配套启动试验
+R105.312 run 46142095717 成功，两个原版 libomonob-wireless-maps.so 均真实导出 v75gen，两个 receiver 具有对应 PLT relocation。原版 wireless-receiver-exec 启动 /dev/shmem/wcp_receiver 并使用 /mnt/app/carplaymaps 下配套库；不是 SDK 缺失符号。R105.309 裸 receiver SIGSEGV 的因果仍未确认。此次独立工作流复用已通过的 QNX 启动脚本、原版配套启动器/receiver/maps/transport，以隔离 IFS 路径和实际 /dev/shmem 文件复制执行原版启动入口，不伪造 OEM 数据、许可或 MFi，不修改原版字节、不连实车、手机或外网。没有原车文件和实际网络时，启动器可能正常拒绝或退出；仅记录结果，不将 PID 或符号匹配作为真实连接证据。两 profile 并行，不重复旧符号检查。NO INSTALL。
