@@ -1,4 +1,4 @@
-name: R105.201 batch C AP same-attempt snapshot and advertisement (NO INSTALL)
+name: R105.202 rolling D receiver owner revocation (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -7,21 +7,20 @@ on:
 permissions:
   contents: read
 jobs:
-  ap-snapshot-change:
+  receiver-owner-revocation:
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 3
       matrix:
-        case: [0, 1]
+        case: [0, 1, 2]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Test actual AP refresh with generation and credentials changes
+      - name: Exercise actual receiver wrapper with owner revocation
         env:
           CASE: ${{ matrix.case }}
         run: |
           set -euxo pipefail
-          s=project/source/src
-          a=integration/mu1005_si_native/ap_live
-          cc -std=gnu99 -Wall -Wextra -Werror -I"$s" -I"$a" -Iproject/source/legacy_mu1005/bluetooth -Iproject/source/legacy_mu1005/airplay "$a"/{ap_live,ap_refresh}.c "$s"/{cp_csm,cp_radio_policy}.c lab/mu1005_route4_5/test_batch_ap_epoch.c -o /tmp/ap-epoch
-          /tmp/ap-epoch "$CASE"
+          s=project/source/legacy_mu1005/airplay
+          cc -std=c99 -Wall -Wextra -Werror -I"$s" "$s/mu1005_r34_ap_server.c" lab/mu1005_route4_5/test_batch_receiver_owner.c -o /tmp/receiver
+          /tmp/receiver "$CASE"

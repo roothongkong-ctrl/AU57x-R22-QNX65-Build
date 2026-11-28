@@ -69,11 +69,20 @@ Mu34ApResult mu34_ap_server_set_interface(Mu34ApServer *s,
     if (length <= 0 || (size_t)length >= MU34_AP_INTERFACE_COPY_BYTES ||
         !safe_interface_name(name, (size_t)length))
         return MU34_AP_ERR_BAD_INTERFACE;
+    if (!oem_ready(s)) {
+        s->state = MU34_AP_FAILED;
+        return MU34_AP_ERR_NOT_OWNER;
+    }
     if (s->binding.set_property(s->binding.opaque, s->binding.server,
                                 s->binding.interface_key,
                                 cf_interface_value) != 0) {
         s->state = MU34_AP_FAILED;
         return MU34_AP_ERR_VENDOR;
+    }
+    if (!oem_ready(s)) {
+        s->interface_set = 0;
+        s->state = MU34_AP_FAILED;
+        return MU34_AP_ERR_NOT_OWNER;
     }
     memset(s->interface_name, 0, sizeof(s->interface_name));
     memcpy(s->interface_name, name, (size_t)length);
@@ -97,6 +106,10 @@ Mu34ApResult mu34_ap_server_start(Mu34ApServer *s,
     }
     if (s->binding.cf_string_ok(s->binding.opaque, s->binding.start_command) != 1)
         return MU34_AP_ERR_BAD_CF;
+    if (!oem_ready(s)) {
+        s->state = MU34_AP_FAILED;
+        return MU34_AP_ERR_NOT_OWNER;
+    }
     /* Accepted command only. No listener, Bonjour or port claim yet. */
     s->start_requested = 1; /* preserve stop obligation even on ambiguous vendor error */
     if (s->binding.server_control(s->binding.opaque, s->binding.server,
@@ -126,6 +139,13 @@ Mu34ApResult mu34_ap_server_poll(Mu34ApServer *s, uint32_t generation)
     }
     ready = s->binding.listening_verified(s->binding.opaque, s->binding.server,
                    s->binding.owner, s->expected_port);
+    /* Listener callback can observe a wired takeover or a lost owner.
+     * Never publish its positive result after the original owner changed. */
+    if (!oem_ready(s)) {
+        s->listening_verified = 0;
+        s->state = MU34_AP_FAILED;
+        return MU34_AP_ERR_NOT_OWNER;
+    }
     if (ready != 1) {
         s->listening_verified = 0;
         if (ready < 0 || ready > 1) {
@@ -152,11 +172,22 @@ Mu34ApResult mu34_ap_server_stop(Mu34ApServer *s, uint32_t generation)
     }
     if (s->binding.cf_string_ok(s->binding.opaque, s->binding.stop_command) != 1)
         return MU34_AP_ERR_BAD_CF;
+    if (!oem_ready(s)) {
+        s->state = MU34_AP_FAILED;
+        return MU34_AP_ERR_NOT_OWNER;
+    }
     if (s->binding.server_control(s->binding.opaque, s->binding.server,
                                   s->binding.stop_command,
                                   s->binding.owner) != 0) {
         s->state = MU34_AP_FAILED;
         return MU34_AP_ERR_VENDOR;
+    }
+    /* Keep the stop obligation on an unverified return; caller must
+     * recover with independent original-owner proof, not report restored. */
+    if (!oem_ready(s)) {
+        s->listening_verified = 0;
+        s->state = MU34_AP_FAILED;
+        return MU34_AP_ERR_NOT_OWNER;
     }
     s->start_requested = 0;
     s->expected_port = 0;
