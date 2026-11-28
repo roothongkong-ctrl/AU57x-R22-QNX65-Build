@@ -1,0 +1,38 @@
+name: R105.275 original USB DIO exit resume (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105275-usb-exit.yml','lab/mu1005_usb_exit/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qnx:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Link actual process exit observer to paired ACL resume
+        run: |
+          set -euxo pipefail
+          mkdir -p output
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 bash -ec '
+            C=arm-unknown-nto-qnx6.5.0eabi-gcc
+            s=project/source/src
+            b=project/source/legacy_mu1005/bluetooth
+            l=lab/mu1005_paired_start
+            u=lab/mu1005_usb_exit
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -I"$s" -I"$b" -I"$l" -I"$u" -c "$u/usb_exit_watch.c" -o output/watch.o
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -I"$s" -I"$b" -I"$l" -c "$l/paired_start.c" -o output/paired.o
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -I"$s" -c "$s/cp_wcp_autoconnect.c" -o output/auto.o
+            "$C" -nostdlib -r output/*.o -o output/usb-exit-resume-arm.o
+            arm-unknown-nto-qnx6.5.0eabi-nm output/usb-exit-resume-arm.o | grep -E " T (mu_usb_exit_arm|mu_usb_exit_tick|mu_paired_start_usb_ended)$"
+          '
+          printf '%s\n' 'Real process-exit observation integrated. Requires verified original USB DIO PID/cycle and same-phone owner callback; no automatic install.' > output/README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105275-usb-exit-resume-ARM-NO-INSTALL
+          path: output/
