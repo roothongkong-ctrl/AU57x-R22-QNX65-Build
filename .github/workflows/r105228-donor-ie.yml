@@ -1,0 +1,40 @@
+name: R105.228 actual donor AP ownership and session cleanup (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105228-donor-ie.yml, lab/mu1005_donor_ie/**]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+env:
+  DONOR: 20c94f51c0f0ae88b154c12e4f604643ba23022c
+  TOOLCHAIN: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+jobs:
+  actual-donor-ie-host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Actual Rust clean EOF and malformed frame exit status
+        run: |
+          set -euxo pipefail
+          git init donor
+          git -C donor remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C donor fetch --depth 1 origin "$DONOR"
+          git -C donor checkout --detach FETCH_HEAD
+          python3 integration/mu1005_donor_daemon/adapt_live_ap.py donor
+          python3 integration/mu1005_donor_daemon/adapt_receiver_unix.py donor
+          python3 integration/mu1005_donor_daemon/adapt_mfi_sequence.py donor
+          python3 lab/mu1005_route4_5/adapt_donor_ack.py donor
+          python3 lab/mu1005_route4_5/adapt_inherited_stream.py donor
+          python3 lab/mu1005_live_uap_ip/adapt.py donor
+          python3 lab/mu1005_donor_ready/adapt.py donor
+          python3 lab/mu1005_donor_exit/adapt.py donor
+          python3 lab/mu1005_donor_ie/adapt.py donor
+          rustup toolchain install nightly-2026-07-21 --profile minimal
+          cargo +nightly-2026-07-21 test --offline --locked --manifest-path donor/wireless/daemon/Cargo.toml mu1005_explicit_empty_owned_vs_borrowed
+          mkdir -p fixture
+          cp donor/wireless/daemon/probes/dio_manager.fixture.json fixture/dio_manager.json
+          cargo +nightly-2026-07-21 build --offline --locked --bin mhi2q-wireless-daemon --manifest-path donor/wireless/daemon/Cargo.toml
+          env -i PATH="$PATH" IPL_CONFIG_DIR_DIO_MANAGER="$PWD/fixture" MHI2Q_CP_MODEL=LAB-ONLY MHI2Q_CP_SERIAL=LAB-ONLY MHI2Q_CP_HARDWARE=LAB-ONLY MHI2Q_CP_BT_MAC=02:00:00:00:00:01 MHI2Q_CP_DEVICE_ID=02:00:00:00:00:02 MHI2Q_CP_SSID=LAB-ONLY MHI2Q_CP_PASSPHRASE=labfixturepassword MHI2Q_CP_CHANNEL=11 MHI2Q_CP_IP_ADDRESS=127.0.0.1 MHI2Q_CP_AIRPLAY_PORT=5000 MHI2Q_CP_RECEIVER=stock210 python3 lab/mu1005_donor_exit/test_exit.py "$PWD/donor/wireless/daemon/target/debug/mhi2q-wireless-daemon"

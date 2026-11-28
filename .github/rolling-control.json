@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.227",
+    "version": "R105.228",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 13
+      "dependent_not_yet_listed": 5
     },
     "runs": [],
     "verified_prior": [
@@ -268,10 +268,19 @@
           46094722406
         ],
         "evidence": "Actual full donor inherited EOF and malformed frame exit host regression and full ARM build, four SI host regressions success. No real RF."
+      },
+      {
+        "version": "R105.227",
+        "passed": 13,
+        "runs": [
+          46102648356,
+          46102648408
+        ],
+        "evidence": "All 13 jobs passed including full QNX native library and host Bluetooth trace; no OEM owner or phone."
       }
     ],
-    "discovery": "R105.227: Congo isolated QNX dlopen succeeded run 46102169022 (no OEM or phone); outbound candidate run 46102256887 reports five exact-shift candidate entries and two uncertain, not callable ABI. Actual MU1005 preload now retries deferred trace GOT publication before known original thread creation; serialization and retained original pointer prevent failed CAS from permanently disabling retry. No owner/registration proof.",
-    "expected_jobs": 13,
+    "discovery": "Actual LuKa full donor ninth adapter distinguishes borrowed stock AP advertisement from newly owned slot; only explicitly empty slot can be written; no periodic rewrite, no unowned removal; uncertain write retains owner marker. Host regression submitted; ARM rebuild not yet authorized by cache evidence; real OEM owner still unbound.",
+    "expected_jobs": 5,
     "pending_prior": []
   },
   "read_strategy": {
@@ -307,7 +316,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.227: Congo isolated QNX dlopen succeeded run 46102169022 (no OEM or phone); outbound candidate run 46102256887 reports five exact-shift candidate entries and two uncertain, not callable ABI. Actual MU1005 preload now retries deferred trace GOT publication before known original thread creation; serialization and retained original pointer prevent failed CAS from permanently disabling retry. No owner/registration proof."
+      "evidence": "R105.227 all 13 cloud jobs passed; actual stock Bluetooth owner remains unbound. User accepts hardware validation after complete reversible candidate; no claim of vehicle success."
     },
     {
       "priority": 2,
@@ -346,7 +355,7 @@
       "steps": [
         35
       ],
-      "task": "复用MIB现有备份恢复及事务引擎，首连后完成一键安装；当前NO INSTALL。"
+      "task": "Prepare reversible first-link candidate in parallel, not after first physical phone link. Keep installation disabled until actual modified components and recovery are integrated; defer nonessential optimizations."
     }
   ],
   "rules": [
