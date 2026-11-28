@@ -1,0 +1,84 @@
+name: Congo cross-release Bluetooth ABI evidence (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-congo-bluetooth-only-runtime]
+    paths: ['.github/workflows/mu1005-congo-cross-release.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        component: [libbthook.so, wcpd, wcppaird, startup-config]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read pinned donor release variants without executing donor binaries
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          set -euo pipefail
+          git init donor
+          git -C donor remote add origin https://github.com/congobg/MHI2Q_WiFi_CarPlay
+          git -C donor fetch --depth 1 origin 223b42f90bf7c15fbbbef23259da36caa9bd4994
+          git -C donor checkout --detach FETCH_HEAD
+          mkdir -p evidence
+          python3 - <<'PY'
+          import os, pathlib, tarfile, subprocess, tempfile, hashlib, json, re
+          name=os.environ["COMPONENT"]
+          archives=sorted(pathlib.Path("donor").rglob("wcp.tar.gz"))
+          assert archives, "No donor packages"
+          rows=[]
+          for archive in archives:
+              with tarfile.open(archive,"r:gz") as t:
+                  members=[m for m in t if m.isfile() and 0<m.size<10_000_000]
+                  if name=="startup-config":
+                      entries=[]
+                      for m in members:
+                          if m.size>262144: continue
+                          data=t.extractfile(m).read()
+                          if b'\0' in data: continue
+                          try: lines=data.decode("utf-8").splitlines()
+                          except UnicodeError: continue
+                          matched=[{"line":i,"text":s[:500]} for i,s in enumerate(lines,1) if re.search(r"libbthook|wcppaird|wcpd|btstack|iap2|LD_PRELOAD",s,re.I)]
+                          if matched: entries.append({"path":m.name,"matches":matched[:80]})
+                      rows.append({"variant":str(archive),"startup_references":entries})
+                      continue
+                  hits=[m for m in members if pathlib.PurePosixPath(m.name).name==name]
+                  if len(hits)!=1:
+                      rows.append({"variant":str(archive),"error":"expected exactly one component","count":len(hits)})
+                      continue
+                  data=t.extractfile(hits[0]).read()
+                  with tempfile.NamedTemporaryFile() as f:
+                      f.write(data);f.flush()
+                      output=subprocess.check_output(["readelf","-h","-d","--dyn-syms","--wide",f.name],text=True)
+                  imports=set();exports=set()
+                  for l in output.splitlines():
+                      a=l.split()
+                      if len(a)>=8 and re.fullmatch(r"[0-9]+:",a[0]) and a[4] in ("GLOBAL","WEAK"):
+                          (imports if a[6]=="UND" else exports).add(a[7])
+                  rows.append({"variant":str(archive),"sha256":hashlib.sha256(data).hexdigest(),"needed":sorted(re.findall(r"Shared library: \[([^\]]+)\]",output)),"imports":sorted(imports),"exports":sorted(exports),"elf_header":output.split("Dynamic section")[0].strip()})
+          comparisons=[]
+          good=[r for r in rows if "imports" in r]
+          for i,a in enumerate(good):
+              for b in good[i+1:]:
+                  differences={k:{"only_a":sorted(set(a[k])-set(b[k])),"only_b":sorted(set(b[k])-set(a[k]))} for k in ("imports","exports","needed")}
+                  comparisons.append({"a":a["variant"],"b":b["variant"],"identical_binary":a["sha256"]==b["sha256"],"differences":differences})
+          report={"component":name,"scope":"donor release comparison only; not OEM ABI or actual phone connection","installable":False,"variants":rows,"comparisons":comparisons}
+          pathlib.Path("evidence/report.json").write_text(json.dumps(report,indent=2))
+          print("variants",len(rows),"comparisons",len(comparisons))
+          if name!="startup-config": assert len(good)>=2, "Need two donor variants for comparison"
+          else: assert any(r["startup_references"] for r in rows), "No relevant startup references"
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: congo-cross-release-${{ matrix.component }}
+          path: evidence/
+          retention-days: 7
