@@ -1,0 +1,99 @@
+name: R105.260 Congo native decompilation (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-congo-direct-reuse]
+    paths: ['.github/workflows/r105260-congo-decompile.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  decompile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        binary: [libbthook.so, libwcpstart.so]
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Fetch exact donor and select one module
+        env:
+          BINARY: ${{ matrix.binary }}
+        run: |
+          set -euxo pipefail
+          git init donor
+          git -C donor remote add origin https://github.com/congobg/MHI2Q_WiFi_CarPlay.git
+          git -C donor fetch --depth 1 origin 223b42f90bf7c15fbbbef23259da36caa9bd4994
+          git -C donor checkout --detach FETCH_HEAD
+          mkdir -p input evidence scripts projects
+          cp donor/docs/LICENSE evidence/LICENSE-CONGO.txt
+          git -C donor rev-parse HEAD > evidence/upstream.txt
+          python3 - <<'PY'
+          import os, pathlib, tarfile
+          name=os.environ['BINARY']
+          with tarfile.open('donor/MHI2QC_3638/wcp.tar.gz','r:gz') as t:
+              entries=[m for m in t.getmembers() if m.isfile() and pathlib.PurePosixPath(m.name).name==name]
+              if len(entries)!=1: raise SystemExit(f'Expected one {name}, found {len(entries)}')
+              pathlib.Path('input',name).write_bytes(t.extractfile(entries[0]).read())
+          PY
+          sha256sum "input/$BINARY" > evidence/sha256.txt
+          readelf -h -d -Ws "input/$BINARY" > evidence/elf.txt
+      - name: Install pinned Ghidra
+        run: |
+          set -euxo pipefail
+          curl --fail --location --retry 3 -o ghidra.zip https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_11.4.2_build/ghidra_11.4.2_PUBLIC_20250826.zip
+          unzip -q ghidra.zip
+      - name: Decompile native functions without executing target
+        env:
+          BINARY: ${{ matrix.binary }}
+        run: |
+          set -euxo pipefail
+          cat > scripts/ExportNative.java <<'JAVA'
+          import ghidra.app.script.GhidraScript;
+          import ghidra.app.decompiler.*;
+          import ghidra.program.model.listing.*;
+          import java.io.*;
+          public class ExportNative extends GhidraScript {
+              public void run() throws Exception {
+                  DecompInterface d = new DecompInterface();
+                  int total=0, ok=0;
+                  try {
+                      if (!d.openProgram(currentProgram)) throw new IOException("Decompiler open failed");
+                      try (PrintWriter out = new PrintWriter(new File(getScriptArgs()[0]), "UTF-8");
+                           PrintWriter index = new PrintWriter(new File(getScriptArgs()[1]), "UTF-8")) {
+                          out.println("/* Congo noncommercial reference; see LICENSE-CONGO.txt. Not original source. */");
+                          FunctionIterator it=currentProgram.getFunctionManager().getFunctions(true);
+                          while (it.hasNext() && !monitor.isCancelled()) {
+                              Function f=it.next();
+                              if (f.isExternal() || f.isThunk()) continue;
+                              total++;
+                              DecompileResults r=d.decompileFunction(f, 15, monitor);
+                              boolean success=r.decompileCompleted() && r.getDecompiledFunction()!=null;
+                              index.println(f.getEntryPoint()+"\t"+f.getName()+"\t"+(success?"ok":"failed"));
+                              out.println("\n/* "+f.getEntryPoint()+" "+f.getName()+" */");
+                              if(success){out.println(r.getDecompiledFunction().getC());ok++;}
+                              else out.println("/* decompilation unavailable */");
+                          }
+                          index.println("TOTAL\t"+total+"\tSUCCESS\t"+ok);
+                          if(total==0 || ok==0) throw new IOException("No decompiled functions");
+                      }
+                  } finally { d.dispose(); }
+              }
+          }
+          JAVA
+          ghidra_11.4.2_PUBLIC/support/analyzeHeadless "$PWD/projects" native \
+            -import "$PWD/input/$BINARY" -analysisTimeoutPerFile 900 \
+            -scriptPath "$PWD/scripts" -postScript ExportNative.java "$PWD/evidence/decompiled.c" "$PWD/evidence/functions.tsv" \
+            -deleteProject
+          test -s evidence/decompiled.c
+          test -s evidence/functions.tsv
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R105260-${{ matrix.binary }}-decompilation
+          path: evidence/
+          retention-days: 7
