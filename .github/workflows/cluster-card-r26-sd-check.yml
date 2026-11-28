@@ -9,6 +9,7 @@ on:
     paths: ['.github/workflows/cluster-card-r26-sd-check.yml']
 permissions:
   contents: read
+  actions: read
 jobs:
   release-recovery:
     runs-on: ubuntu-24.04
@@ -73,6 +74,77 @@ jobs:
             cd dist/sdcard/ClusterMap
             sha256sum -c SHA256SUMS.txt
           ) 2>&1 | tee ../evidence/release-checks.log
+      - name: Retrieve completed R25 ARM build, pinned to original job
+        uses: actions/download-artifact@v4
+        with:
+          name: qnx-arm-player-review-NO-INSTALL
+          run-id: 46108814347
+          github-token: ${{ github.token }}
+          path: arm-review
+      - name: Rehearse player replacement and byte-exact recovery on host copy
+        run: |
+          set -euo pipefail
+          (cd arm-review && sha256sum -c SHA256SUMS.txt)
+          python3 - <<'PY' | tee evidence/player-recovery-rehearsal.log
+          from pathlib import Path
+          import hashlib, re, shutil, struct, tempfile, json
+          original=Path("upstream/dist/sdcard")
+          player=Path("arm-review/stream-player.experimental")
+          stock=Path("arm-review/stream-player.stock")
+          def digest(p):
+              return hashlib.file_digest(p.open("rb"),"sha256").hexdigest()
+          def check_elf(p):
+              b=p.read_bytes()
+              assert b[:6]==b"\x7fELF\x01\x01" and struct.unpack_from("<H",b,18)[0]==40
+              assert b"/usr/lib/ldqnx.so.2\x00" in b
+          check_elf(player)
+          check_elf(stock)
+          assert digest(player)!=digest(stock), "experimental and stock identical"
+          def snapshot(root):
+              return {str(p.relative_to(root)):digest(p) for p in root.rglob("*") if p.is_file()}
+          before=snapshot(original)
+          rel="ClusterMap/stream-player"
+          manifest="ClusterMap/SHA256SUMS.txt"
+          with tempfile.TemporaryDirectory() as d:
+              root=Path(d)/"host-only"
+              shutil.copytree(original,root)
+              backup=Path(d)/"release-player.original"
+              target=root/rel
+              shutil.copy2(target,backup)
+              assert digest(backup)==before[rel]
+              old_manifest=(root/manifest).read_bytes()
+              lines=old_manifest.decode("ascii").splitlines(keepends=True)
+              hits=[i for i,l in enumerate(lines) if re.fullmatch(r"[0-9a-f]{64} [ *]stream-player\r?\n?",l)]
+              assert len(hits)==1
+              i=hits[0]
+              assert lines[i][:64]==before[rel]
+              shutil.copy2(player,target)
+              lines[i]=digest(target)+lines[i][64:]
+              (root/manifest).write_bytes("".join(lines).encode("ascii"))
+              after=snapshot(root)
+              assert set(after)==set(before)
+              changed={p for p in before if before[p]!=after[p]}
+              assert changed=={rel,manifest}, changed
+              assert after[rel]==digest(player)
+              # Validate every original manifest member after updating only player hash.
+              for line in (root/manifest).read_text().splitlines():
+                  m=re.fullmatch(r"([0-9a-f]{64}) [ *](.+)",line)
+                  assert m, line
+                  h,n=m.groups()
+                  assert digest(root/"ClusterMap"/n)==h, n
+              print("PASS: only player and its SHA256 manifest changed; all installer/metadata files untouched")
+              shutil.copy2(backup,target)
+              (root/manifest).write_bytes(old_manifest)
+              assert snapshot(root)==before
+              print("PASS: host rehearsal restored every original file byte-for-byte")
+              # Export hashes, not a runnable SD tree; never copy host-only tree to artifact.
+              report={"scope":"host copy only; NOT a vehicle install or complete unit restore",
+                      "original_release_player":before[rel],"built_stock_player":digest(stock),
+                      "experimental_player":digest(player),"changed_files":sorted(changed),
+                      "restored_files":len(before),"source_run":46108814347}
+              Path("evidence/player-recovery-rehearsal.json").write_text(json.dumps(report,indent=2)+"\n")
+          assert snapshot(original)==before
+          PY
       - name: Execute original full recovery harness only with actual unit fixtures
         run: |
           set -euo pipefail
