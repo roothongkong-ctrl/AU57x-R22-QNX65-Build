@@ -121,9 +121,6 @@ static int once(const Input&in,int port){
  to.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
  assert(connect(fd,(struct sockaddr*)&to,sizeof(to))==0);
  r16_card_tee_pump(&tee);assert(tee.connected==1);
- const size_t expected=video.config_length+3u*(4u+in.au.size()-
-       (in.au.size()>4?(in.au.size()>=8?8u:4u):4u)); // overwritten below
- (void)expected;
  // Each complete AVCC AU is a separate keyframe. Need 3 for parser flush.
  for(int i=0;i<3;i++){
   int rc=alt111_video_submit(&video,stream,in.au.data(),in.au.size(),1);
@@ -157,7 +154,12 @@ static int once(const Input&in,int port){
  // Feed different network chunk sizes, no assumption of H264 packet boundary.
  for(size_t i=0;i<incoming.size();i+=137){
   size_t n=incoming.size()-i;if(n>137)n=137;
-  assert(decoder.feed_annexb(incoming.data()+i,n,NOW+4000));
+  if(!decoder.feed_annexb(incoming.data()+i,n,NOW+4000)){
+    std::cerr<<"R16 decode failed at TCP byte offset="<<i
+             <<" chunk="<<n<<" parser_rejects="<<decoder.rejects()
+             <<" total="<<incoming.size()<<"\n";
+    return 1;
+  }
  }
  assert(decoder.finish(NOW+5000));
  assert(decoder.frames()>=1);
