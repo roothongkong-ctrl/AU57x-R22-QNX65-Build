@@ -32,6 +32,9 @@ int main(int argc,char**argv){
  assert(mu_supervised_notify_prepare(&s,&binding,argv[1],environ,proof,NULL,ack_proof,NULL)==-1);
  assert(offered==-1&&!binding.daemon_verified&&s.pid<=0);
  ack_allowed=1;
+ assert(mu_supervised_notify_prepare(&s,&binding,argv[1],environ,proof,NULL,ack_proof,NULL)==-1);
+ assert(offered==-1&&s.pid<=0);
+ assert(setenv("MU1005_BRIDGE_READY","1",1)==0);
  assert(mu_supervised_notify_prepare(&s,&binding,argv[1],environ,proof,NULL,ack_proof,NULL)==0);
  assert(offered==s.fd&&binding.worker==NULL&&binding.daemon_context==&s);
  assert(binding.daemon_verified(binding.daemon_context,offered)==1);

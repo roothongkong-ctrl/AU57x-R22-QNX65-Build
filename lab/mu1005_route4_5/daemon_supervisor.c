@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <time.h>
 #define PORT 57342u
 static int cloexec(int f){int fl=fcntl(f,F_GETFD);return fl>=0&&fcntl(f,F_SETFD,fl|FD_CLOEXEC)==0;}
 static int addr(int f,int peer,struct sockaddr_in*a){
@@ -46,11 +47,46 @@ int mu_daemon_supervisor_offer(MuDaemonSupervisor*s,int*fd){
     mu_daemon_supervisor_live(s,s->fd)!=1)return -1;
  s->transferred=1;*fd=s->fd;return 0;
 }
+/* Optional protocol version flag. Production notify requires this mode;
+ * old standalone laboratory tests remain compatible. */
+static int ready_mode(char*const env[]){
+ unsigned count=0;
+ if(!env)return -1;
+ for(unsigned i=0;env[i];i++){
+  if(i>=127)return -1;
+  if(!strncmp(env[i],"MU1005_BRIDGE_READY=",20)){
+   if(strcmp(env[i],"MU1005_BRIDGE_READY=1")||++count!=1)return -1;
+  }
+ }
+ return (int)count;
+}
+static int await_ready(MuDaemonSupervisor*s){
+ static const unsigned char marker[]="MU1005-READY-v1\n";
+ unsigned char b[sizeof marker-1];size_t n=0;
+ struct timespec begin,now;
+ if(clock_gettime(CLOCK_MONOTONIC,&begin))return -1;
+ while(n<sizeof b){
+  if(clock_gettime(CLOCK_MONOTONIC,&now))return -1;
+  long ms=(long)(now.tv_sec-begin.tv_sec)*1000L+(now.tv_nsec-begin.tv_nsec)/1000000L;
+  if(ms<0||ms>=15000||!mu_daemon_supervisor_live(s,s->fd))return -1;
+  struct pollfd p={s->fd,POLLIN,0};
+  int rc=poll(&p,1,100);
+  if(rc<0&&errno==EINTR)continue;
+  if(rc<0||p.revents&(POLLERR|POLLHUP|POLLNVAL))return -1;
+  if(!rc)continue;
+  ssize_t got=recv(s->fd,b+n,sizeof b-n,MSG_DONTWAIT);
+  if(got<0&&(errno==EAGAIN||errno==EWOULDBLOCK||errno==EINTR))continue;
+  if(got<=0)return -1;
+  n+=(size_t)got;
+  if(memcmp(b,marker,n))return -1;
+ }
+ return mu_daemon_supervisor_live(s,s->fd)?0:-1;
+}
 static int env_ok(char*const env[]){
  unsigned count=0,found=0;
  if(!env)return 0;
  for(;env[count];count++){if(count>=127)return 0;if(!strncmp(env[count],"MU1005_BRIDGE_FD=",17)){if(strcmp(env[count],"MU1005_BRIDGE_FD=3"))return 0;found++;}}
- return found==1;
+ return found==1&&ready_mode(env)>=0;
 }
 static pid_t launch(const char*path,int accepted,char*const env[]){
  char *argv[]={(char*)path,"--mu1005-ack-fd",NULL};
@@ -94,6 +130,10 @@ int mu_daemon_supervisor_start(MuDaemonSupervisor*s,const char*path,char*const e
  if(fstat(c,&s->identity)||!S_ISSOCK(s->identity.st_mode)||verify(ctx,path)!=1)goto bad;
  pid=launch(path,a,env);if(pid<=0)goto bad;
  close(a);s->fd=c;s->pid=pid;s->local=local;s->peer=remote;s->active=1;
+ if(ready_mode(env)==1&&await_ready(s)!=0){
+  /* No ownership transfer on failure. Retain PID until certified reap. */
+  (void)mu_daemon_supervisor_close(s);return -1;
+ }
  return 0;
 bad:
  if(a>=0)close(a);

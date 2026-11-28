@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.223",
+    "version": "R105.224",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 6
+      "dependent_not_yet_listed": 15
     },
     "runs": [],
     "verified_prior": [
@@ -240,10 +240,19 @@
           46093662969
         ],
         "evidence": "Read-only package built; no need to request new collection from user. Uploaded 001(8).zip SHA identical to R105.196 001(7).zip: cdb2617784d871aa561938ca11e83e346abfa54c0fa18c7a8cf48b9a1f817b63. Historical OSAPI thread visible, live map includes libcomm/libutil, uap0 AP active channel 11, wired mm-ipod/DIO/carplay0 from wired sample 3; no actual wireless registration or owner lease."
+      },
+      {
+        "version": "R105.223",
+        "passed": 6,
+        "runs": [
+          46094220000,
+          46094220070
+        ],
+        "evidence": "Host live uap0 selection and actual StartSession IPv4 field test, full ARM donor compile, four SI host regressions all passed. Actual AP read on car not proven."
       }
     ],
-    "discovery": "User explicitly requires reuse of historical uploads and no repeated requests. Same R106 archive verified byte-identical. New production donor source change: live uap0 IPv4 read before/after AP sample via QNX getifaddrs, no static IP or wired/mmx address substitution; propagated to real Rust Config/StartSession. Host selection and wire tests, full ARM build. Existing logs do not prove lifecycle lease; no installation.",
-    "expected_jobs": 6,
+    "discovery": "R105.224 fixes C supervisor accepting live TCP before Rust configuration and AP initialization finished. Exact inherited ready marker consumed before owner FD transfer; explicit environment mode mandatory in supervised_notify, failure closes untransferred socket, retains child for reap. Host actual full donor and ARM build. Historical 001(8).zip verified identical via local file, no new upload request. No OEM owner lease or RF proof.",
+    "expected_jobs": 15,
     "pending_prior": []
   },
   "read_strategy": {
@@ -279,7 +288,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "Reuse R106 live process/OSAPI/map baseline; do not ask for repeated log. No lease or real iAP2 RFCOMM registration from historical capture."
+      "evidence": "R105.223 live IP code tested; R105.224 child actual ready handshake before Bluetooth FD transfer, pending CI. Real OEM owner and AP ownership still missing."
     },
     {
       "priority": 2,
