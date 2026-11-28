@@ -1,0 +1,37 @@
+name: R105.266 MU1005 receiver adapter ARM compile
+on:
+  push:
+    branches: [mu1005-congo-direct-reuse]
+    paths:
+      - 'integration/mu1005_congo_reuse/native_iap2_bridge.h'
+      - '.github/workflows/r105266-native-compile.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile receiver bridge for ARM EABI
+        run: |
+          set -euxo pipefail
+          mkdir -p output
+          cat > output/bridge.c <<'C'
+          #include "native_iap2_bridge.h"
+          int receiver_submit(struct mu1005_dio_job *j, const struct mu1005_dio_native *n, const struct mu1005_dio_request *r) {
+              return mu1005_dio_submit_once(j,n,r);
+          }
+          int receiver_release(struct mu1005_dio_job *j, const struct mu1005_dio_native *n) {
+              return mu1005_dio_release(j,n);
+          }
+          C
+          clang --target=armv7-none-eabi -marm -ffreestanding -fno-builtin -O2 -std=c99 -Wall -Wextra -Werror -Iintegration/mu1005_congo_reuse -c output/bridge.c -o output/bridge.o
+          readelf -h -A -sW output/bridge.o > output/elf.txt
+          readelf -rW output/bridge.o > output/relocations.txt
+          printf '%s\n' 'ARM object only. Not QNX-linked or installed. Native owner and authenticated session integration remain required.' > output/README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105266-receiver-arm-object-NO-INSTALL
+          path: output/
