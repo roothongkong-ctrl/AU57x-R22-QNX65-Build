@@ -21,9 +21,12 @@ int mu_stock_reconnect_step(MuPairedStart*s,int ready,uint64_t now){
 }
 static void dispatch(void*v,int ready){
  struct timespec t;
- if(clock_gettime(CLOCK_MONOTONIC,&t)!=0||t.tv_sec<0||
-    (uint64_t)t.tv_sec>UINT64_MAX/1000u-1u)return;
- (void)mu_stock_reconnect_step(v,ready,(uint64_t)t.tv_sec*1000u+(uint64_t)t.tv_nsec/1000000u);
+ if(clock_gettime(CLOCK_MONOTONIC,&t)!=0)return;
+ /* QNX6.5 time_t is unsigned 32-bit; convert before range checks.
+  * A negative signed host value also fails the unsigned bound. */
+ uint64_t sec=(uint64_t)t.tv_sec,nsec=(uint64_t)t.tv_nsec;
+ if(sec>UINT64_MAX/1000u-1u||nsec>=1000000000u)return;
+ (void)mu_stock_reconnect_step(v,ready,sec*1000u+nsec/1000000u);
 }
 int mu_stock_reconnect_bind(MuPairedStart*s){
  if(!s||!s->snapshot||!s->take||!s->released)return -1;

@@ -85,6 +85,7 @@ struct cp_cloud_pipeline {
  /* Opt-in live snapshot mode: never send the initial placeholder config.
   * Pointer borrows the caller-owned immutable session, reset per AP attempt. */
  int require_live_ap_refresh;
+ int prefer_stock_dual_band; /* 5 GHz when positively available, otherwise 2.4 */
  const struct cp_session *live_ap_config;
  int radio_failure_pending; /* explicit current attempt failure; await physical teardown */
  char iface[CP_CLOUD_IFACE_MAX+1];
@@ -162,6 +163,9 @@ int cp_cloud_bind_bootstrap(struct cp_cloud_pipeline *,
   const struct cp_identification *);
 int cp_cloud_confirm_bootstrap_auth(struct cp_cloud_pipeline *);
 int cp_cloud_require_live_ap_refresh(struct cp_cloud_pipeline *);
+/* AU57x user policy: choose 5 GHz if proven, otherwise 2.4 GHz;
+ * force live config refresh before sending credentials. No radio driver. */
+int cp_cloud_prefer_stock_dual_band(struct cp_cloud_pipeline *);
 int cp_cloud_radio_start(struct cp_cloud_pipeline *);
 /* Rebind a caller-owned immutable AP snapshot after a verified band
  * change, before association/start. No credential generation or radio I/O. */

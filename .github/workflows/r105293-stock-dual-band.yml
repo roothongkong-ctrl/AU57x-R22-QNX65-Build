@@ -1,0 +1,56 @@
+name: R105.293 QNX time fix and stock dual-band policy (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105293-stock-dual-band.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  wifi-policy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original pipeline and 5 GHz preference with 2.4 GHz fallback
+        run: bash ci/host_cloud_pipeline.sh
+  native-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Link existing runtime with original paired-record adapter
+        run: |
+          set -euxo pipefail
+          mkdir -p output
+          test "$(git hash-object third_party/luka-dev/mib2q-carplay-rgi/wireless/graft/eir.c)" = 99f42933e7c6b98af11fb387a1e68727ffe31997
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 bash -ec '
+            C=arm-unknown-nto-qnx6.5.0eabi-gcc
+            R=arm-unknown-nto-qnx6.5.0eabi-readelf
+            b=project/source/legacy_mu1005/bluetooth
+            s=project/source/src
+            l=lab/mu1005_route4_5
+            p=lab/mu1005_paired_start
+            u=lab/mu1005_usb_exit
+            a=lab/mu1005_stock_paired
+            k=lab/mu1005_stock_reconnect
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -Wl,--hash-style=sysv -I"$b" -I"$s" -I"$l" -I"$p" -I"$u" -I"$a" -I"$k" \
+              "$b"/{native_binding,native_event,inbound,inbound_r5,mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump,rf_arg_experiment,native_eir_bridge,au102_eir_advertisement,bt_iap2_owner_handoff,bt_route_gate,bt_startup_snapshot,bt_owner_identity,bt_notify_bridge,bt_socket_worker,bt_queue_pulse,bt_self_reader,bt_trace_latch,bt_startup_watch,bt_preload_probe,bt_thread_owner,bt_got_observer,bt_trace_attach}.c \
+              "$b/bt_trace_tail_arm.S" tools/review_txn/sha256.c third_party/luka-dev/mib2q-carplay-rgi/wireless/graft/eir.c \
+              "$l"/{daemon_supervisor,supervised_notify,supervised_startup,wcp_start}.c "$p/paired_start.c" "$a/stock_paired.c" "$k/stock_reconnect.c" "$u/usb_exit_watch.c" "$s/cp_wcp_autoconnect.c" \
+              -lsocket -lc -o output/libmu1005_bt_runtime_review.so
+            "$R" -h -l -dW -sW output/libmu1005_bt_runtime_review.so > output/elf.txt
+            grep -Eq "Machine:.*ARM" output/elf.txt
+            grep -Eq "Type:.*DYN" output/elf.txt
+            for sym in mu_stock_reconnect_bind mu_stock_reconnect_step mu_bt_notify_set_reconnect mu_stock_paired_snapshot mu_wcp_start_begin mu_wcp_start_poll mu_wcp_start_cancel_unpublished mu_supervised_notify_prepare mu_bt_queue_bootstrap mu_bt_notify_bind_queue_only mu_bt_notify_periodic_dispatch mu_bt_self_reader_open au57x_r92_stock_image_verified mu_bt_trace_attach mu_paired_start_tick mu_paired_start_usb_ended mu_usb_exit_arm mu_usb_exit_tick cp_wcp_bt_resume_wired au98_drive_stock_native_ack; do
+              awk -v name="$sym" '\''$7!="UND" && $8==name {found=1} END {exit !found}'\'' output/elf.txt
+            done
+          '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105293-stock-reconnect-runtime-NO-INSTALL
+          path: output/
+          if-no-files-found: error

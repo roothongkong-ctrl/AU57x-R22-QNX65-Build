@@ -377,7 +377,7 @@ int cp_cloud_confirm_bootstrap_auth(struct cp_cloud_pipeline *s){
  cap5=s->owner.radio_capability(s->owner.ctx,CP_RADIO_5)==1;
  /* A bound first-connect AP configuration chooses the preferred band.
   * Unbound legacy radio policy keeps its original 5 GHz default. */
- if(s->bootstrap->wireless_bound&&s->bootstrap->wireless.session){
+ if(!s->prefer_stock_dual_band&&s->bootstrap->wireless_bound&&s->bootstrap->wireless.session){
   preferred=cp_radio_channel_band(s->bootstrap->wireless.session->wifi.channel);
   if(preferred==CP_RADIO_NONE)return CP_CLOUD_PROOF;
  }
@@ -393,6 +393,11 @@ int cp_cloud_require_live_ap_refresh(struct cp_cloud_pipeline *s){
  if(!s||s->started||s->stopped)return CP_CLOUD_ORDER;
  s->require_live_ap_refresh=1;s->live_ap_config=NULL;return CP_CLOUD_OK;
 }
+int cp_cloud_prefer_stock_dual_band(struct cp_cloud_pipeline *s){
+ int r=cp_cloud_require_live_ap_refresh(s);
+ if(r==CP_CLOUD_OK)s->prefer_stock_dual_band=1;
+ return r;
+}
 int cp_cloud_radio_start(struct cp_cloud_pipeline *s){
  enum cp_radio_band band=CP_RADIO_NONE;
  if(!eligible(s,1))return stop(s);
@@ -402,10 +407,13 @@ int cp_cloud_radio_start(struct cp_cloud_pipeline *s){
  if(cp_radio_select(&s->radio,s->epoch,1,&band)!=CP_RADIO_OK)
   return CP_CLOUD_ORDER;
  s->live_ap_config=NULL;
- if(s->owner.ap_prepare(s->owner.ctx,s->epoch,band)!=1)return stop(s);
+ int prepared=s->owner.ap_prepare(s->owner.ctx,s->epoch,band);
+ if(prepared!=1&&(!s->prefer_stock_dual_band||prepared!=0))return stop(s);
  if(cp_radio_connect_requested(&s->radio,s->epoch,1)!=CP_RADIO_OK)return stop(s);
- s->band=band;s->radio_failure_pending=0;
- return CP_CLOUD_OK;
+ s->band=band;s->radio_failure_pending=prepared==0;
+ /* An explicit stock prepare rejection must wait for original physical
+  * release before fallback; no guessed channel, no stale credentials. */
+ return prepared==1?CP_CLOUD_OK:CP_CLOUD_RETRY;
 }
 /* Called only by original owner with current AP config after band switch.
  * Caller owns the immutable snapshot for the remaining session lifetime.

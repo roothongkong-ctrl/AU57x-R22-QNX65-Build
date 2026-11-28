@@ -273,7 +273,7 @@ static int ap_config_fixture(void *ctx,uint32_t epoch,enum cp_radio_band band,co
   ((band==CP_RADIO_5&&cfg->wifi.channel==36)||
    (band==CP_RADIO_24&&cfg->wifi.channel==6));
 }
-static void radio_to_airplay_direction(enum cp_radio_band first){
+static void radio_to_airplay_direction(enum cp_radio_band first,int stock_policy){
  enum cp_radio_band next=first==CP_RADIO_5?CP_RADIO_24:CP_RADIO_5;
  struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
  struct cp_oem_assertions proof={0};Mu34ApServer real_ap;
@@ -293,8 +293,9 @@ static void radio_to_airplay_direction(enum cp_radio_band first){
   .bluetooth_mac6=mac,.accessory_messages=sent,.phone_messages=recv,
   .accessory_message_count=4,.phone_message_count=5
  };
- config.wifi.channel=first==CP_RADIO_5?36:6;
+ config.wifi.channel=stock_policy?6:(first==CP_RADIO_5?36:6);
  reset_fixture();mocked_oem(&b,&stock,1);cp_cloud_init(&p);
+ if(stock_policy)assert(cp_cloud_prefer_stock_dual_band(&p)==CP_CLOUD_OK);
 #ifdef MU_QNX_LIVE_AP_FALLBACK
  assert(cp_cloud_require_live_ap_refresh(&p)==CP_CLOUD_OK);
 #endif
@@ -306,7 +307,25 @@ static void radio_to_airplay_direction(enum cp_radio_band first){
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
  assert(!proof.live_hotspot&&!proof.network_airplay_ready);
  assert(cp_cloud_confirm_bootstrap_auth(&p)==CP_CLOUD_OK);
- assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK&&p.band==first);
+ if(stock_policy==2)ap=0;
+ int first_result=cp_cloud_radio_start(&p);
+ assert(first_result==(stock_policy==2?CP_CLOUD_RETRY:CP_CLOUD_OK)&&p.band==first);
+ if(stock_policy==2){
+  assert(p.radio_failure_pending);
+  assert(cp_cloud_radio_result(&p,0,0)==CP_CLOUD_RETRY);
+  assert(cp_cloud_radio_result(&p,0,1)==CP_CLOUD_RETRY);
+  ap=1;assert(cp_cloud_radio_start(&p)==CP_CLOUD_OK&&p.band==CP_RADIO_24);
+  assert(!p.radio_failure_pending&&!p.live_ap_config);
+  int ok=1;assert(cp_cloud_refresh_ap_config(&p,&config,ap_config_fixture,&ok)==CP_CLOUD_OK);
+  assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_OK);
+  return;
+ }
+ if(stock_policy==1){
+  assert(!p.live_ap_config);
+  assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_PROOF);
+  config.wifi.channel=36;
+  int ok=1;assert(cp_cloud_refresh_ap_config(&p,&config,ap_config_fixture,&ok)==CP_CLOUD_OK);
+ }
  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
 #ifdef MU_QNX_LIVE_AP_FALLBACK
  assert(proof.verified_mfi&&!proof.live_hotspot&&!proof.network_airplay_ready);
@@ -402,8 +421,10 @@ static void radio_to_airplay_direction(enum cp_radio_band first){
 #endif
 }
 static void radio_to_airplay_proof(void){
- radio_to_airplay_direction(CP_RADIO_5);
- radio_to_airplay_direction(CP_RADIO_24);
+ radio_to_airplay_direction(CP_RADIO_5,0);
+ radio_to_airplay_direction(CP_RADIO_24,0);
+ radio_to_airplay_direction(CP_RADIO_5,1);
+ radio_to_airplay_direction(CP_RADIO_5,2);
 }
 static void automatic_native_carplay_start(void){
  struct cp_cloud_pipeline p;struct cp_step04_session b;struct cp_stock_mfi stock;
