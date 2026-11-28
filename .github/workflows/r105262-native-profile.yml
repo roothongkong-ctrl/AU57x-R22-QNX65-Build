@@ -1,0 +1,145 @@
+name: R105.262 Resolve native Congo profile guard fields (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-congo-direct-reuse]
+    paths: ['.github/workflows/r105262-native-profile.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover pinned original binaries once
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir firmware original-tools evidence
+          gh run download 45923122041 --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
+          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  $archive" | sha256sum -c -
+          git fetch --depth 1 origin 713fddea9bb11acfdb1df7eff02ca645011ad6d6
+          git archive FETCH_HEAD tools/mu1005_extract_app70.py | tar -x -C original-tools
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          git init qnxmount
+          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
+          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
+          git -C qnxmount checkout --detach FETCH_HEAD
+          python3 -m venv /tmp/extract-venv
+          /tmp/extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          python3 original-tools/tools/mu1005_extract_app70.py "$archive" "$RUNNER_TEMP/app70/app.img"
+          /tmp/extract-venv/bin/python extractor/tools/extract_firmware.py --source "$RUNNER_TEMP/app70/app.img" --output "$RUNNER_TEMP/original" --variant 70 --qnxmount-root "$PWD/qnxmount" > /tmp/app-summary.json
+      - name: Obtain exact donor and generate candidate rows from target code
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir donor
+          git -C donor init
+          git -C donor fetch --depth 1 https://github.com/congobg/MHI2Q_WiFi_CarPlay.git 223b42f90bf7c15fbbbef23259da36caa9bd4994
+          git -C donor checkout --detach FETCH_HEAD
+          python3 - <<'PY'
+          import pathlib,hashlib,struct,tarfile,os,json
+          from concurrent.futures import ThreadPoolExecutor
+          P=pathlib.Path
+          root=P(os.environ['RUNNER_TEMP'])/'original'
+          def original(name,sha):
+              found=[p for p in root.rglob(name) if p.is_file() and hashlib.sha256(p.read_bytes()).hexdigest()==sha]
+              if not found: raise ValueError('Original missing '+name)
+              return found[0].read_bytes()
+          def unpack(b,o): return struct.unpack_from('<I',b,o)[0]
+          def segments(b):
+              n=unpack(b,28);s,c=struct.unpack_from('<HH',b,42)
+              return [(v,v+f,o,flags) for typ,o,v,_,f,_,flags,_ in (struct.unpack_from('<8I',b,n+i*s) for i in range(c)) if typ==1]
+          def read(b,va,n):
+              for l,h,o,flags in segments(b):
+                  if l<=va and va+n<=h: return b[o+va-l:o+va-l+n]
+              raise ValueError('unmapped '+hex(va))
+          with tarfile.open('donor/MHI2QC_3638/wcp.tar.gz') as t:
+              def donor(name):
+                  m=[x for x in t.getmembers() if x.isfile() and P(x.name).name==name]
+                  if len(m)!=1: raise ValueError('donor '+name)
+                  return t.extractfile(m[0]).read()
+              bt=donor('libbthook.so');dio=donor('libwcpstart.so')
+          m=json.loads(P('integration/mu1005_vehicle_stage/congo_port_table.json').read_text())
+          assert hashlib.sha256(bt).hexdigest()==m['donor_libbthook_sha256']
+          def btrow():
+              stock=original('btstack',m['stock_btstack_sha256'])
+              # The first word is the firmware label. Documented 5092 guard starts at +4.
+              off=int(m['donor_table_5092_file_offset'],16)-4
+              w=list(struct.unpack_from('<63I',bt,off))
+              assert w[1]==0x11ecd0 and w[4]==0x12a710 and w[10]==0x277b98
+              mapping={int(r['donor_file_offset'],16):r for r in m['entries']}
+              fields={}
+              for i,v in enumerate(w):
+                  row=mapping.get(off+4*i)
+                  if row is None:continue
+                  va=int(row['stock_va'],16)
+                  fields[str(i)]={'name':row['name'],'old':hex(v),'candidate':hex(va),'evidence':row['status']}
+                  if 10<=i<26:
+                      actual=struct.unpack('<2I',read(stock,va,8))
+                      fields[str(i)]['target_prologue']=[hex(x) for x in actual]
+                      fields[str(i)]['old_prologue']=[hex(x) for x in w[26+(i-10)*2:28+(i-10)*2]]
+                      fields[str(i)]['same_prologue']=list(actual)==w[26+(i-10)*2:28+(i-10)*2]
+              # This output deliberately does not rewrite a guard to force acceptance.
+              return {'row_file_offset':hex(off),'word_count':len(w),'fields':fields,
+                 'unmapped_words':[{'index':i,'donor':hex(v)} for i,v in enumerate(w) if str(i) not in fields],
+                 'activation_ready':False}
+          def diorow():
+              stock=original('dio_manager','e40b5bf9df3f96221ac01bc0484e06493e6c58e60cca32d2547939ff1d56f63c')
+              # Locate actual donor profile by its documented 5092 vtable and slot.
+              hits=[]
+              for o in range(0,len(dio)-72,4):
+                  row=list(struct.unpack_from('<18I',dio,o))
+                  if row[6]==0x15af40 and row[7]==0x158b10 and row[8]==0x176b9c and row[9]==0x1a485c:
+                      hits.append((o,row))
+              if len(hits)!=1: raise ValueError('receiver row matches '+str(len(hits)))
+              off,w=hits[0]
+              # The target vtables are exported; enumerate actual entries and
+              # compare old prologue words without assuming a matching object layout.
+              vtable=0x1a58d0
+              slots=[]
+              for i in range(2,126):
+                  va=unpack(read(stock,vtable+4*i,4),0)
+                  try: ins=unpack(read(stock,va,4),0)
+                  except ValueError: continue
+                  if ins==w[6]: pass
+                  if ins==0xe92d47f0:
+                      slots.append({'slot':i-2,'address':hex(vtable+4*i),'function':hex(va),'prologue':hex(ins)})
+              expected={6:0xe92d47f0,7:0xe92d4060,8:0xe5903004}
+              # Compute exact constants from the decompiled selector, not donor addresses.
+              expected={6:(-0x16d2b810)&0xffffffff,7:(-0x16d2bf90)&0xffffffff,8:(-0x1a6fcffc)&0xffffffff}
+              code_matches={}
+              for i,sig in expected.items():
+                  matches=[]
+                  for l,h,o,flags in segments(stock):
+                      if not flags&1:continue
+                      for pos in range(o,o+h-l-3,4):
+                          if unpack(stock,pos)==sig: matches.append(hex(l+pos-o))
+                  code_matches[str(i)]=matches
+              return {'row_file_offset':hex(off),'donor_words':[hex(x) for x in w],
+                'target_vtable':hex(vtable),'target_vtable_slots':slots,
+                'target_exact_signature_matches':code_matches,
+                'target_exported_anchors':{'timer_got':'0x1a7594','timer_handler':'0x155bc4','thread_vtable':'0x1a5890','airplay_create_plt':'0x11243c','nothrow_new_plt':'0x1123d0','nothrow_got':'0x1a7634'},
+                'activation_ready':False}
+          with ThreadPoolExecutor(max_workers=2) as pool:
+              a=pool.submit(btrow);b=pool.submit(diorow)
+              results={}
+              for name,f in [('bluetooth',a),('receiver',b)]:
+                  try: results[name]=f.result()
+                  except Exception as e: results[name]={'error':str(e),'activation_ready':False}
+              P('evidence/native-profile-fields.json').write_text(json.dumps(results,indent=2)+'\n')
+              if any('error' in v for v in results.values()): raise SystemExit('One or more profile layouts unresolved; see artifact')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R105262-native-profile-fields-NO-INSTALL
+          path: evidence/
