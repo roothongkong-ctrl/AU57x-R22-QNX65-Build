@@ -1,0 +1,2 @@
+# R105.322 精确原厂配置与设备提供方
+R105.321 run 46145878710 确认 key10 -> accessor 0x130bac -> 原厂 UnicodeString8 -> job producer 0x124990；实际队列调用关系已确认。旧扫描只接受常见扩展名，漏掉无扩展名原厂 dio_manager 配置；现定位 accessor 默认值的 ARM PC-relative literal，追踪 key lookup 0x130884 并从完整 app70、stage2/EFS 扫描无扩展名的真实配置与设备路径。只输出已知公开配置标识，不复制配置/凭据，不修改原厂。若仅发现 /dev/ipod0，则不能把现有有线 resource manager 冒充无线。保留现有 Congo 原厂 DIO 复用方案；实际无线端点/同会话 owner 仍待证明。NO INSTALL。
