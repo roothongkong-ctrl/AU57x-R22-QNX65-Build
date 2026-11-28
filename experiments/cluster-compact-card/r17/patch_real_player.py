@@ -4,7 +4,8 @@
 Only player/opengl_gpu.cc text gets patched; copy four headers into player/r17.
 - Default build: no R17 compiled.
 - Experimental: define CLUSTERMAP_R17_CARD70_LAB AND set
-  CLUSTERMAP_R17_CARD70=1 AND original CarPlay --no-ack
+  CLUSTERMAP_R17_CARD70=1 AND explicit lab-only CLEAN_MAP_111/CARD112_VERIFIED
+  AND original CarPlay --no-ack
   AND source tcp://127.0.0.1:19820 AND 800x298 window.
 - If 112 absent/invalid/stale: existing 111 map sent to GLES unchanged.
 - Real instrument/phone still NOT validated; this is a source-only build.
@@ -43,11 +44,18 @@ patch_once(
 #ifdef CLUSTERMAP_R17_CARD70_LAB
     {
         const char *opt=getenv("CLUSTERMAP_R17_CARD70");
+        const char *mapOnly=getenv("CLUSTERMAP_R17_CLEAN_MAP_111");
+        const char *verified=getenv("CLUSTERMAP_R17_CARD112_VERIFIED");
+        /* A normal full 111 frame already includes the card. Never assume
+         * it is clean from the socket address or window dimensions alone.
+         * This explicit lab contract is not an on-car capability probe. */
         /* Not a general overlay feature! Explicitly require the original
          * card-free MIB CarPlay video path and 800x298 real window.
          * No change at all to Android Auto, file playback or any other size.
          */
         if(opt && strcmp(opt,"1")==0 &&
+           mapOnly && strcmp(mapOnly,"1")==0 &&
+           verified && strcmp(verified,"1")==0 &&
            g_noAck && windowWidth==800 && windowHeight==298 &&
            strcmp(g_videoSource,"tcp://127.0.0.1:19820")==0) {
             if(g_r17_card.start(now_us()))
@@ -55,7 +63,7 @@ patch_once(
             else
                 LOGE("R17 LAB: sidecar startup failed; stock 111 preserved");
         } else if(opt && strcmp(opt,"1")==0) {
-            LOG("R17 LAB refused: needs 800x298 original --no-ack CarPlay 19820");
+            LOG("R17 LAB refused: requires explicitly verified independent map/card sources; stock 111 unchanged");
         }
     }
 #endif
