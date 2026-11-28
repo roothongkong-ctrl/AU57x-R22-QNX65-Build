@@ -1,0 +1,146 @@
+name: R105.261 MU1005 Congo parallel profile integration (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-congo-direct-reuse]
+    paths: ['.github/workflows/r105261-congo-profile.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  bluetooth-profile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Integrate existing exact MU1005 Bluetooth map with decompiled profile layout
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir evidence decompiled donor
+          gh run download 46112674227 --repo "$GITHUB_REPOSITORY" --name R105260-libbthook.so-decompilation --dir decompiled
+          git -C donor init
+          git -C donor fetch --depth 1 https://github.com/congobg/MHI2Q_WiFi_CarPlay.git 223b42f90bf7c15fbbbef23259da36caa9bd4994
+          git -C donor checkout --detach FETCH_HEAD
+          python3 - <<'PY'
+          import hashlib,json,pathlib,re,struct,tarfile
+          p=pathlib.Path
+          m=json.loads(p('integration/mu1005_vehicle_stage/congo_port_table.json').read_text())
+          with tarfile.open('donor/MHI2QC_3638/wcp.tar.gz') as t:
+              a=[x for x in t.getmembers() if x.isfile() and p(x.name).name=='libbthook.so']
+              if len(a)!=1: raise ValueError('ambiguous donor')
+              b=t.extractfile(a[0]).read()
+          assert hashlib.sha256(b).hexdigest()==m['donor_libbthook_sha256']
+          # Reuse original mapping, not the other firmware's instruction guards.
+          # The two existing rows are 252 bytes; extract only the documented known fields.
+          rows=[]
+          for item in m['entries']:
+              off=int(item['donor_file_offset'],16)
+              rows.append(dict(item,donor_original_word=hex(struct.unpack_from('<I',b,off)[0])))
+          report={'target':m['firmware'],'original_sha256':m['stock_btstack_sha256'],
+            'donor_sha256':m['donor_libbthook_sha256'],'table_row_bytes':252,
+            'decompiled_selector':'bthook_load','entries':rows,
+            'startup_completion':m['startup_completion'],
+            'unresolved':['full original guard signatures and unmapped data/object fields','runtime native callback ABI and owner'],
+            'installable':False}
+          p('evidence/bluetooth-profile.json').write_text(json.dumps(report,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105261-bluetooth-profile-NO-INSTALL
+          path: evidence/
+  receiver-profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover exact MU1005 receiver from pinned original
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir firmware original-tools evidence
+          gh run download 45923122041 --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
+          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  $archive" | sha256sum -c -
+          git fetch --depth 1 origin 713fddea9bb11acfdb1df7eff02ca645011ad6d6
+          git archive FETCH_HEAD tools/mu1005_extract_app70.py | tar -x -C original-tools
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          git init qnxmount
+          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
+          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
+          git -C qnxmount checkout --detach FETCH_HEAD
+          python3 -m venv /tmp/extract-venv
+          /tmp/extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          python3 original-tools/tools/mu1005_extract_app70.py "$archive" "$RUNNER_TEMP/app70/app.img"
+          /tmp/extract-venv/bin/python extractor/tools/extract_firmware.py --source "$RUNNER_TEMP/app70/app.img" --output "$RUNNER_TEMP/original" --variant 70 --qnxmount-root "$PWD/qnxmount" > /tmp/app-summary.json
+          python3 - <<'PY'
+          import os,pathlib,hashlib,shutil
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])
+          pin='e40b5bf9df3f96221ac01bc0484e06493e6c58e60cca32d2547939ff1d56f63c'
+          found=[p for p in (root/'original').rglob('dio_manager') if p.is_file() and hashlib.sha256(p.read_bytes()).hexdigest()==pin]
+          if not found: raise SystemExit('exact original DIO missing')
+          shutil.copyfile(found[0],root/'dio_manager')
+          PY
+      - name: Create MU1005 receiver profile from actual original symbols and existing job mapping
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir decompiled
+          gh run download 46112674227 --repo "$GITHUB_REPOSITORY" --name R105260-libwcpstart.so-decompilation --dir decompiled
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,re,struct,subprocess
+          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'dio_manager'
+          b=p.read_bytes()
+          def readva(va,n):
+              ph=struct.unpack_from('<I',b,28)[0]
+              size,count=struct.unpack_from('<HH',b,42)
+              for i in range(count):
+                  typ,off,v,_,f,_,flags,_=struct.unpack_from('<8I',b,ph+i*size)
+                  if typ==1 and v<=va and va+n<=v+f:
+                      return b[off+va-v:off+va-v+n]
+              raise ValueError(hex(va))
+          proc=subprocess.run(['readelf','-Ws','-rW','--demangle',str(p)],capture_output=True,text=True)
+          patterns=['CDIOManager','CAirPlayMainThread','AirPlayReceiverServerCreate','CIpodAP2Service','iap2_connect','restartMdnsd','std::nothrow']
+          matches={s:[l.strip() for l in proc.stdout.splitlines() if s in l][:120] for s in patterns}
+          # Preserve exact earlier MU1005 mapping; do not treat the donor's different
+          # high-level connect function as ABI-equivalent to this lower-level job.
+          known={'iap2_connect_plt':0x1127f0,'ipod_service_connect':0x17a054,
+                 'ipod_service_job':0x17a55c,'job_callsite':0x17a614}
+          observed={k:{'va':hex(v),'first_word':hex(struct.unpack('<I',readva(v,4))[0])} for k,v in known.items()}
+          result={'target':'MHI2_CN_AU57x_K1006_2 / MU1005','stock_sha256':hashlib.sha256(b).hexdigest(),
+            'donor_profile_selector':'right_binary','donor_profile_row_bytes':72,
+            'known_native_entries':observed,'symbol_and_relocation_candidates':matches,
+            'unresolved':['receiver class object layout and virtual slots','native startup timer and callback lifetime',
+                          'wireless start job ABI and HMI handoff','libairplay profile'],
+            'installable':False,'runtime_verified':False}
+          pathlib.Path('evidence/receiver-profile.json').write_text(json.dumps(result,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105261-receiver-profile-NO-INSTALL
+          path: evidence/
+  merge-profiles:
+    runs-on: ubuntu-latest
+    needs: [bluetooth-profile,receiver-profile]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: R105261-*-profile-NO-INSTALL
+          path: profiles
+      - run: |
+          python3 - <<'PY'
+          import json,pathlib
+          p=pathlib.Path('profiles')
+          reports={f.stem:json.loads(f.read_text()) for f in p.rglob('*.json')}
+          assert set(reports)=={'bluetooth-profile','receiver-profile'}
+          pathlib.Path('MU1005-Congo-profile.json').write_text(json.dumps({'installable':False,'profiles':reports},indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105261-MU1005-Congo-profile-NO-INSTALL
+          path: MU1005-Congo-profile.json
