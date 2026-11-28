@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: f04e909b1aef41ce07877a2dccc8f7d9822cd5af
+          ref: 844d31c18a7d6144b9765bd51bf19ef5b18bbf11
       - uses: ./.github/actions/mu1005-qnx-image
         with:
           require-cache: 'true'
