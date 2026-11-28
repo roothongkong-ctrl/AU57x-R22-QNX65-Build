@@ -1,0 +1,43 @@
+name: R105.289 wired-first remembered phone integration (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105289-wired-first.yml','lab/mu1005_wired_first/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-new-scenario:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test new remembered-phone lifecycle only
+        run: |
+          set -euxo pipefail
+          mkdir output
+          cc -std=c99 -Wall -Wextra -Werror -O2 -Iproject/source/src -Iproject/source/legacy_mu1005/bluetooth -Ilab/mu1005_paired_start lab/mu1005_wired_first/{wired_first,phone_pref,test}.c lab/mu1005_paired_start/paired_start.c project/source/src/cp_wcp_autoconnect.c -o output/test
+          output/test
+  native-qnx:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Compile original paired controller with new preference adapter
+        run: |
+          set -euxo pipefail
+          mkdir output
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 bash -ec '
+            C=arm-unknown-nto-qnx6.5.0eabi-gcc
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -Iproject/source/src -Iproject/source/legacy_mu1005/bluetooth -Ilab/mu1005_paired_start lab/mu1005_wired_first/{wired_first,phone_pref}.c lab/mu1005_paired_start/paired_start.c project/source/src/cp_wcp_autoconnect.c -lc -o output/libmu1005_wired_first_review.so
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW -sW output/libmu1005_wired_first_review.so > output/elf.txt
+            for sym in mu_wired_first_learn mu_wired_first_tick mu_phone_pref_load mu_phone_pref_save; do
+              awk -v name="$sym" '\''$7!="UND" && $8==name {found=1} END {exit !found}'\'' output/elf.txt
+            done
+          '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105289-wired-first-native-NO-INSTALL
+          path: output/
