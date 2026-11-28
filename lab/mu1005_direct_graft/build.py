@@ -15,10 +15,17 @@ from mu1005_lifecycle_observer import PIN,CODE,ENTRY,STATE,headers,branch,align
 DONOR="20c94f51c0f0ae88b154c12e4f604643ba23022c"
 HOOK=0x11ec98
 STOCK_WORD=0xe5c531b0
-MAP={"RF_REGISTER":0x277a18,"RF_DEREGISTER":0x2779b4,"SDP_ADD":0x207244,
-     "SDP_REMOVE":0x2071c4,"EIR_REQUEST":0x1db4c8,"RF_ACCEPT":0x27733c,
-     "RF_DISCONNECT":0x2773f8,"RF_SEND":0x2771f8,"RF_MAX_PAYLOAD":0x277074,
-     "RF_CREDIT":0x27715c}
+# Single retained MU1005 mapping for non-exported original functions.
+# Standard imported calls are resolved from the original ELF by imports().
+_PORT=json.loads((ROOT/"integration/mu1005_vehicle_stage/congo_port_table.json").read_text())
+if _PORT["stock_btstack_sha256"]!=PIN:raise ValueError("port table firmware mismatch")
+_ROW={e["name"]:e for e in _PORT["entries"]}
+_NAMES={"RF_REGISTER":"RF_RegisterServerChannel","RF_DEREGISTER":"RF_DeregisterServerChannel",
+        "SDP_ADD":"SDP_AddRecord","SDP_REMOVE":"SDP_RemoveRecord",
+        "EIR_REQUEST":"EIR_refresh","RF_ACCEPT":"RF_RespondChannel",
+        "RF_DISCONNECT":"RF_CloseChannel","RF_SEND":"RF_SendData",
+        "RF_MAX_PAYLOAD":"RF_FrameSize","RF_CREDIT":"RF_AdvanceCredit"}
+MAP={k:int(_ROW[v]["stock_va"],16) for k,v in _NAMES.items()}
 IMPORTS={"PTHREAD_CREATE":"pthread_create","SOCKET":"socket","CONNECT":"connect",
          "POLL":"poll","SEND":"send","RECV":"recv","CLOSE":"close","USLEEP":"usleep"}
 def sha(b):return hashlib.sha256(b).hexdigest()
@@ -95,9 +102,9 @@ static int mu_graft_peer(struct GraftState*s,const struct RfEvent*e,u8 mac[6]) {
     u32 a=(u32)e->data;
     if(!a || (a&3u) || a>0xffffffffu-18u ||
        !mu38_registry_association((u32)&s->channel,a,mu_graft_read,s))return 0;
-    /* The original synchronous SDK callback owns the associated object.
-     * Restrict this disposable graft to the exact registered peer pointer. */
-    bytes_copy(mac,(const u8*)a+13u,6);
+    /* Do not dereference an arbitrary heap address. The existing approved
+     * reader and native lifetime provider must be connected before activation. */
+    if(!mu_graft_read(s,a+13u,mac,6))return 0;
     return mu38_stock_bond_present(mac,mu_graft_read,s) &&
         mu38_registry_association((u32)&s->channel,a,mu_graft_read,s);
 }
@@ -112,7 +119,7 @@ def adapt(s,m):
         need(n==1,"upstream macro "+macro)
     s=rep(s,"RF_REGISTER(&s->channel, &s->granted_channel, 0)","RF_REGISTER(&s->channel, &s->granted_channel, 4)")
     # Preserve donor state layout by appending the new fields.
-    s=rep(s,"    u8 peer_address[6], peer_valid;","    u8 peer_address[6], peer_valid;\\n    volatile u32 transport_owner_verified;\\n    u32 pending_association;")
+    s=rep(s,"    u8 peer_address[6], peer_valid;","    u8 peer_address[6], peer_valid;\n    volatile u32 transport_owner_verified;\n    u32 pending_association;")
     # Reuse the real MU1005 original security callback and paired-record check.
     # No writer exists for transport_owner_verified yet: actual remote acceptance
     # remains disabled until the independently supervised endpoint is wired.
@@ -149,7 +156,7 @@ static void graft_rf_dispatch(void *channel,const struct RfEvent *event,u32 lr,u
            !mu_graft_peer(s,event,mac)) {s->pending_association=0;return;}
         s->pending_association=0;
 ''')
-    s=rep(s,"        s->peer_valid = event->data != 0;\\n        if (s->peer_valid) bytes_copy(s->peer_address,(const u8 *)event->data+13,6);","        s->peer_valid = 1;\\n        bytes_copy(s->peer_address,mac,6);")
+    s=rep(s,"        s->peer_valid = event->data != 0;\n        if (s->peer_valid) bytes_copy(s->peer_address,(const u8 *)event->data+13,6);","        s->peer_valid = 1;\n        bytes_copy(s->peer_address,mac,6);")
     s=rep(s,"    if (event->code == 4u) {","    if (event->code == 4u) { s->pending_association=0;")
     # The old EIR trampoline is firmware-specific; do not install it.
     # The registered SDP records and original refresh are reused.

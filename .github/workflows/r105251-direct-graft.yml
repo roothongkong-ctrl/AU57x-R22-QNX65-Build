@@ -1,4 +1,4 @@
-name: R105.254 direct graft with original security callback (NO INSTALL)
+name: R105.255 consolidated reuse and changed graft build (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -62,9 +62,17 @@ jobs:
           /tmp/graft-venv/bin/python lab/mu1005_direct_graft/build.py "$RUNNER_TEMP/btstack" donor evidence/direct-graft.json "$RUNNER_TEMP/btstack-graft-private"
           readelf -h -lW "$RUNNER_TEMP/btstack-graft-private" > evidence/elf.txt
           rm -f "$RUNNER_TEMP/btstack-graft-private"
+      - name: Assemble previously compiled donor and existing recovery components
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir prior-daemon
+          gh run download 46109600160 --repo "$GITHUB_REPOSITORY" --name R105248-full-donor-auto-ie-arm-NO-INSTALL --dir prior-daemon
+          python3 lab/mu1005_direct_graft/pack_reuse.py prior-daemon evidence/direct-graft.json evidence/MU1005-R105255-consolidated-review-NO-INSTALL.zip
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105254-direct-graft-security-NO-INSTALL
+          name: R105255-consolidated-review-NO-INSTALL
           path: evidence/
           retention-days: 7

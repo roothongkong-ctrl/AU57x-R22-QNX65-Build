@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.254",
+    "version": "R105.255",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -538,9 +538,18 @@
         "passed": 6,
         "failed": 0,
         "evidence": "Generated ARM startup test five fixture scenarios passed, source-link and four host regression jobs passed. Real SDK/phone unverified."
+      },
+      {
+        "version": "R105.254",
+        "runs": [
+          46110867198
+        ],
+        "passed": 0,
+        "failed": 1,
+        "evidence": "Donor source transformation failed due to two escaped newline literals. No new binary. R105.253 remains last verified startup run."
       }
     ],
-    "discovery": "Direct graft now incorporates existing actual MU1005 RfSecCallback provenance, stock registry and pairing metadata checks, matching event 1/2 association, no additional MFi logic. Remote accept remains disabled until actual supervised transport owner; original callback lifetime and shutdown still unproven. Only exact changed ARM build, remove redundant source-link and broad automatic regression.",
+    "discovery": "Fix literal newline anchors, resolve native address table from existing exact MU1005 metadata, standard imports from original ELF, avoid raw unbounded peer pointer read. Reuse full compiled R105.249 daemon and existing backup/recovery source; assemble one review archive without rebuilding donor or re-running host regressions. Actual activation and installation still incomplete.",
     "expected_jobs": 1,
     "pending_prior": []
   },
@@ -578,7 +587,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "integration/mu1005_vehicle_stage/congo_port_table.json"
       ],
-      "evidence": "R105.254 reuse original security callback source in direct LuKa graft; real supervisor transport owner and shutdown/wired lifecycle remain. No duplicate or unrelated tests."
+      "evidence": "R105.255 consolidate previous compiled daemon and changed direct graft review with existing source and recovery components. Do not repeat tests. Actual transport and OEM lifecycle are not connected; no install."
     }
   ],
   "rules": [
