@@ -1,0 +1,2 @@
+# R105.316 精确定位退出11
+R105.315 run 46142736130 成功。main 0x101030 verify 后 clock_gettime(2) / snprintf / mkdir 三类失败汇合至正常 return 11；hash_file 内部返回11尚不是 main 直接退出证据。读取实际格式字符串地址 0x101468，生成真实 parent，再在已有 QNX 隔离环境测试 clock_gettime(2) 与该 parent 下普通临时目录创建/删除，保留 errno；不运行 donor、不改任何校验、授权、认证或固件、不重建 SDK。若 parent 不是静态普通路径则明确停止。NO INSTALL。

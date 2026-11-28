@@ -1,0 +1,49 @@
+name: R105.316 exact launcher temporary-directory and clock prerequisite (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105316-launcher-prereq.yml','lab/mu1005_launcher_prereq/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prerequisites:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve exact original mkdir format and prepare existing QNX harness
+        run: |
+          set -euxo pipefail
+          mkdir stage evidence
+          git init donor
+          git -C donor remote add origin https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps.git
+          git -C donor fetch --depth 1 origin aec37f5b1c87a0d961d16fe4328ac3638d0a833e
+          git -C donor checkout --detach FETCH_HEAD
+          python3 -m venv /tmp/donor-path
+          /tmp/donor-path/bin/pip install pyelftools==0.31
+          /tmp/donor-path/bin/python lab/mu1005_launcher_prereq/exact.py donor/standalone/SD_ROOT/carplay/payload/wireless/profiles/AID10.5-17PM/wireless-receiver-exec evidence/prerequisites.json stage/parent.h
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          if ! command -v qemu-system-arm >/dev/null; then
+            sudo apt-get -o Acquire::Retries=3 update -qq
+            sudo apt-get -o Acquire::Retries=3 install -y -qq qemu-system-arm
+          fi
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Check actual QNX clock and mkdir without re-executing receiver
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -Istage lab/mu1005_launcher_prereq/probe.c -o stage/dir_probe
+          python3 lab/mu1005_launcher_prereq/boot.py toolchain/tests/qemu-run.sh
+          QEMU_KEEP_LOG="$PWD/evidence/serial.log" QEMU_TIMEOUT=90 QEMU_RUN_SECS=20 sh toolchain/tests/qemu-run.sh "$PWD/stage/dir_probe" 8.5 | tee evidence/runtime.log
+          grep -F DONOR_CLOCK2 evidence/runtime.log
+          grep -F DONOR_MKDIR evidence/runtime.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R105316-launcher-prerequisites-NO-INSTALL
+          path: evidence/
