@@ -4,15 +4,16 @@ on:
   pull_request:
     branches: [experiment/cluster-card-r22-modern-sdk-fix]
     types: [opened, synchronize, reopened]
-  push:
-    branches: [experiment/cluster-card-r22-build-first]
-    paths: ['.github/workflows/cluster-card-r22-build-first.yml']
+# Draft PR synchronization is the sole automatic trigger: no duplicate push runs.
+concurrency:
+  group: cluster-card-r22-build-first
+  cancel-in-progress: false
 permissions:
   contents: read
 jobs:
   amap:
     runs-on: macos-15-intel
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -46,7 +47,8 @@ jobs:
           python3 "$GITHUB_WORKSPACE/experiments/cluster-compact-card/r20/patch_card70.py" "$RUNNER_TEMP/amap"
           python3 "$GITHUB_WORKSPACE/experiments/cluster-compact-card/r21/patch_evidence.py" "$RUNNER_TEMP/amap"
           if [ "${{ matrix.dependencies }}" = refreshed ]; then python3 "$GITHUB_WORKSPACE/experiments/cluster-compact-card/r22/patch_modern_sdk.py" "$RUNNER_TEMP/amap"; fi
-      - name: Compile real SDK sample for iOS Simulator
+      - name: Resolve and verify SDK dependencies
+        timeout-minutes: 10
         shell: bash
         env:
           DEPS: ${{ matrix.dependencies }}
@@ -64,6 +66,13 @@ jobs:
             if test -f "$bin"; then echo "$bin"; file "$bin"; lipo -archs "$bin" || true; fi
           done | tee "$RUNNER_TEMP/r19/sdk-architectures.txt"
           xcodebuild -list -workspace HelloCarPlay.xcworkspace | tee "$RUNNER_TEMP/r19/schemes.txt"
+      - name: Compile and link SDK app (Intel simulator)
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/amap"
+          echo "Starting x86_64 compile at $(date -u)"
           xcodebuild -workspace HelloCarPlay.xcworkspace -scheme HelloCarPlay -configuration Debug -sdk iphonesimulator -destination "generic/platform=iOS Simulator" -derivedDataPath "$RUNNER_TEMP/derived" CODE_SIGNING_ALLOWED=NO IPHONEOS_DEPLOYMENT_TARGET=13.0 ARCHS=x86_64 ONLY_ACTIVE_ARCH=NO build 2>&1 | tee "$RUNNER_TEMP/r19/build.log"
           APP=$(find "$RUNNER_TEMP/derived/Build/Products" -maxdepth 2 -name HelloCarPlay.app -print -quit)
           test -n "$APP"
