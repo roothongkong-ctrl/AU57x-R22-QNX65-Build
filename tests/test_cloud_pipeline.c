@@ -320,21 +320,20 @@ static void radio_to_airplay_direction(enum cp_radio_band first,int stock_policy
   assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_OK);
   return;
  }
- if(stock_policy==1){
+ /* Both opt-in policy and QNX live-AP fixture require one fresh snapshot.
+  * Keep the initially bound configuration immutable across the refresh. */
+ struct cp_session first_config=config;
+ first_config.wifi.channel=first==CP_RADIO_5?36:6;
+ assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
+ if(p.require_live_ap_refresh){
   assert(!p.live_ap_config);
+  assert(proof.verified_mfi&&!proof.live_hotspot&&!proof.network_airplay_ready);
   assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_PROOF);
-  config.wifi.channel=36;
-  int ok=1;assert(cp_cloud_refresh_ap_config(&p,&config,ap_config_fixture,&ok)==CP_CLOUD_OK);
+  int first_verify=1;
+  assert(cp_cloud_refresh_ap_config(&p,&first_config,ap_config_fixture,&first_verify)==CP_CLOUD_OK);
+  assert(p.live_ap_config==&first_config);
+  assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
  }
- assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
-#ifdef MU_QNX_LIVE_AP_FALLBACK
- assert(proof.verified_mfi&&!proof.live_hotspot&&!proof.network_airplay_ready);
- assert(cp_cloud_radio_result(&p,1,0)==CP_CLOUD_PROOF);
- int first_verify=1;
- assert(cp_cloud_refresh_ap_config(&p,&config,ap_config_fixture,&first_verify)==CP_CLOUD_OK);
- assert(p.live_ap_config==&config);
- assert(b.wireless_proof(b.wireless_ctx,8,4,&proof)==1);
-#endif
  assert(proof.verified_mfi&&proof.live_hotspot&&!proof.network_airplay_ready);
  /* First attempt failed; verify actual disconnect before switching bands. */
  assert(cp_cloud_radio_report_failure(&p,9,4,first)==CP_CLOUD_STALE);
