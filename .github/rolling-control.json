@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.208",
+    "version": "R105.209",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 18
+      "dependent_not_yet_listed": 14
     },
     "runs": [],
     "verified_prior": [
@@ -100,10 +100,20 @@
           46087766901
         ],
         "evidence": "cleanup_first tail B 0x27a610->0x278418; cleanup_second acquires via 0x27a12c, calls 0x1e51e8/0x1d5f5c/0x1d17c8 and tail B to 0x27a0a0; singleton 0x279f80 mutex lock/unlock is initialization not lease; no file-backed pointers."
+      },
+      {
+        "version": "R105.208",
+        "passed": 18,
+        "runs": [
+          46088017986,
+          46088017809,
+          46088017799
+        ],
+        "evidence": "5 targeted jobs and 13 automatic regressions successful; real OEM lease and actual connection remain unverified."
       }
     ],
-    "discovery": "Use current HEAD; 5 new lanes + expected 9+4 automatic regressions; actual API count authoritative.",
-    "expected_jobs": 18
+    "discovery": "1 focused activation record replacement test plus expected 13 automatic regressions; actual API count authoritative.",
+    "expected_jobs": 14
   },
   "read_strategy": {
     "first_parallel": [
@@ -123,7 +133,7 @@
         8,
         9
       ],
-      "task": "R105.208沿实际cleanup锁和tail继续；并行原厂driver producer、DIO/SI真实导入调用边界和SI激活观察失效修复。4个独立原厂专项+1个代码修复专项；真实接线和原厂lease未证。",
+      "task": "Use R105.208 native-provider artifacts for next actual provider wiring; do not rerun the four extraction lanes unchanged. R105.209 focused SI record continuity regression.",
       "paths": [
         "lab/mu1005_route4_5/parallel_native.py",
         "lab/mu1005_route4_5/cleanup_callees.py",
@@ -134,7 +144,7 @@
         "lab/mu1005_route4_5/daemon_supervisor.c",
         "project/source/legacy_mu1005/bluetooth/bt_notify_bridge.c"
       ],
-      "evidence": "R105.207通过。已明确cleanup第二段同步调用，仍需真实lease。新21修复observe后owner撤销，测试待验。"
+      "evidence": "R105.208 18/18 passed; R105.209 rejects replacement of the original device record during observation, before activation or connected publication; test pending; real owner lease and original wiring remain open."
     },
     {
       "priority": 2,
