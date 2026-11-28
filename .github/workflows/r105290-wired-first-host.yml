@@ -1,0 +1,19 @@
+name: R105.290 wired-first host test correction (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105290-wired-first-host.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-new-scenario:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify remembered phone lifecycle after fixture name correction
+        run: |
+          set -euxo pipefail
+          mkdir output
+          cc -std=c99 -Wall -Wextra -Werror -O2 -Iproject/source/src -Iproject/source/legacy_mu1005/bluetooth -Ilab/mu1005_paired_start lab/mu1005_wired_first/{wired_first,phone_pref,test}.c lab/mu1005_paired_start/paired_start.c project/source/src/cp_wcp_autoconnect.c -o output/test
+          output/test

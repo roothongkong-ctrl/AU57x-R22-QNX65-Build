@@ -11,7 +11,7 @@ static int snap(void*v,uint32_t*g){*g=((F*)v)->gen;return *g!=0;}
 static unsigned take(void*v){(void)v;return 0;}
 static int owner(void*v,uint32_t g){return ((F*)v)->gen==g;}
 static int idle(void*v){return ((F*)v)->idle;}
-static int link(void*v,uint32_t g){(void)v;(void)g;return 0;}
+static int fixture_link(void*v,uint32_t g){(void)v;(void)g;return 0;}
 static int op(void*v,uint32_t g){F*f=v;assert(owner(v,g));f->opens++;return CP_WCP_OPEN_PENDING;}
 static int cancel(void*v,uint32_t g){(void)g;((F*)v)->cancels++;return 1;}
 static int released(void*v,uint32_t g){(void)v;(void)g;return 1;}
@@ -23,7 +23,7 @@ int main(void){
  char dir[]="/tmp/mu-wired-first-XXXXXX";assert(mkdtemp(dir));
  F f={0};f.gen=7;f.usb.bytes[0]=1;f.acl=f.usb;
  assert(snprintf(f.path,sizeof f.path,"%s/phone",dir)>0);
- struct cp_wcp_bt_ops b={&f,owner,owner,idle,link,owner,op,cancel};
+ struct cp_wcp_bt_ops b={&f,owner,owner,idle,fixture_link,owner,op,cancel};
  MuWiredFirstOps o={&f,usb,acl,load,save};
  MuPairedStart p;MuWiredFirst s;
  assert(mu_paired_start_init(&p,&b,snap,take,released)==0);
