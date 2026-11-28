@@ -3,7 +3,7 @@
   "project": "AU57x MU1005 纯软件无线CarPlay",
   "branch": "mu1005-si-cprx-real-review",
   "command": "1 = 查状态、验收、修失败、立即补位；无需重复读取全部历史",
-  "goal": "首次真实不插USB无线CarPlay会话，先2.4GHz，保留原厂认证与有线；双频后置",
+  "goal": "首次真实不插USB无线CarPlay：iPhone原厂认证完成、2.4GHz无线会话建立、MMI出现CarPlay画面；保留有线与恢复。双频、自动重连和体验优化后置。",
   "budget": {
     "max_jobs": 20,
     "count": [
@@ -49,15 +49,19 @@
     "vehicle_evidence_required": true
   },
   "baseline": {
-    "commit": null,
+    "commit": "146a01ff2403f26dd5fd99e2c643b7c44dcfb46f",
     "version": "R105.209",
     "observed_jobs": {
-      "success": 0,
+      "success": 14,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 14
+      "dependent_not_yet_listed": 0
     },
-    "runs": [],
+    "runs": [
+      46088562910,
+      46088562984,
+      46088562992
+    ],
     "verified_prior": [
       {
         "version": "R105.201",
@@ -110,6 +114,16 @@
           46088017799
         ],
         "evidence": "5 targeted jobs and 13 automatic regressions successful; real OEM lease and actual connection remain unverified."
+      },
+      {
+        "version": "R105.209",
+        "passed": 14,
+        "runs": [
+          46088562910,
+          46088562984,
+          46088562992
+        ],
+        "evidence": "all 14 cloud jobs succeeded; no actual iPhone wireless session or native lease established"
       }
     ],
     "discovery": "1 focused activation record replacement test plus expected 13 automatic regressions; actual API count authoritative.",
@@ -133,7 +147,7 @@
         8,
         9
       ],
-      "task": "Use R105.208 native-provider artifacts for next actual provider wiring; do not rerun the four extraction lanes unchanged. R105.209 focused SI record continuity regression.",
+      "task": "首连优先：消费 R105.208 四路现存证据，选取有确切ABI的实际owner/driver接线；若缺真实lease，优先并行推进原厂隐藏入口和上游graft/hybrid替代路径，不重复生命周期静态扫描。",
       "paths": [
         "lab/mu1005_route4_5/parallel_native.py",
         "lab/mu1005_route4_5/cleanup_callees.py",
@@ -144,7 +158,7 @@
         "lab/mu1005_route4_5/daemon_supervisor.c",
         "project/source/legacy_mu1005/bluetooth/bt_notify_bridge.c"
       ],
-      "evidence": "R105.208 18/18 passed; R105.209 rejects replacement of the original device record during observation, before activation or connected publication; test pending; real owner lease and original wiring remain open."
+      "evidence": "R105.209 14/14 completed success. Remaining first-link blockers: OEM lifecycle lease, original driver producer, actual receiver wiring. No physical connection proof."
     },
     {
       "priority": 2,
@@ -190,7 +204,8 @@
     "四路线及安全回滚不变",
     "GitHub成熟代码优先，记录commit/license；不可绕过MFi",
     "下一轮不等待全批完成，有独立可执行任务即补位；无独立任务不凑数",
-    "GitHub测试可自行运行；聊天结束后不会自主写新代码；控制文件非后台AI调度器"
+    "GitHub测试可自行运行；聊天结束后不会自主写新代码；控制文件非后台AI调度器",
+    "用户授权为首连目标自主改变研发路线，不为每项技术选型请求确认；安全与原厂认证不变。"
   ],
   "history": [
     "docs/WIRELESS_FIRST_LINK_TASK_REGISTER_CN.md",
@@ -199,5 +214,36 @@
   "upstream": {
     "daemon": "luka-dev/mib2q-carplay-rgi@20c94f51c0f0ae88b154c12e4f604643ba23022c",
     "toolchain": "luka-dev/qnx65-armv7-toolchain@baa45224f18ae6b13c2e9c77c6663bb8181eb6a1"
+  },
+  "first_link_strategy": {
+    "priority": "first real wireless connection, not cosmetic polish or test counts",
+    "routes": [
+      {
+        "name": "factory",
+        "action": "原厂隐藏功能与原厂认证/传输入口优先；有真实接线证据才继续"
+      },
+      {
+        "name": "upstream-graft",
+        "action": "原厂路径遇到不可证明或不兼容的关键接口，切换已复用LuKa graft/daemon适配，仍使用原厂MFi"
+      },
+      {
+        "name": "hybrid",
+        "action": "独立复用已验证的原厂认证、上游iAP2桥及原厂AirPlay/SI接收器；按接口实际证据选择"
+      }
+    ],
+    "switch_rule": "每次研发优先一个能改变首连结论的实质动作；若某路线无可用原厂证据、不能兼容或重复无新证据，记录阻塞并推进替代路线；不强制把一条路线全部做完，不重复无效实验。独立工作并行，切换前清理原有资源，不并发占用原厂服务。",
+    "defer": [
+      "5GHz",
+      "自动重连体验优化",
+      "非首连所需功能优化"
+    ],
+    "retain": [
+      "原厂MFi",
+      "有线优先",
+      "备份与可恢复",
+      "真实接线及首次实车证据",
+      "NO INSTALL直到受控候选门槛通过"
+    ],
+    "scope": "研发决策自动选择，不表示已实现车机自动切换，也不是聊天结束后自主开发。"
   }
 }
