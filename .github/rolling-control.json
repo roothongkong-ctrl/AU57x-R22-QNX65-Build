@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.256",
+    "version": "R105.257",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -556,9 +556,18 @@
         "passed": 0,
         "failed": 1,
         "evidence": "Exact native address table and donor transformations resolved; compile failed undeclared le16 because native_event source slice began at le32."
+      },
+      {
+        "version": "R105.256",
+        "runs": [
+          46111505882
+        ],
+        "passed": 0,
+        "failed": 1,
+        "evidence": "Pinned donor sockaddr literal mismatched. No compiled output."
       }
     ],
-    "discovery": "Include existing le16 helper; direct worker consumes inherited supervised FD instead of a second TCP connection; type4 ACK after actual event6 completion of all chunks. No publisher/actual owner dispatch yet, remote accept disabled. Reuse prior compiled daemon, no repeated tests.",
+    "discovery": "Correct sockaddr anchor directly from actual pinned upstream; check all literal anchors against upstream before firmware extraction; no direct registration until genuine owner/FD. Actual supervisor publisher, lifecycle and install remain incomplete.",
     "expected_jobs": 1,
     "pending_prior": []
   },
@@ -596,7 +605,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "integration/mu1005_vehicle_stage/congo_port_table.json"
       ],
-      "evidence": "R105.256 fix le16, inherited endpoint consumer and wire completion ACK adapted. Actual supervisor publisher, OEM owner/lifetime, shutdown and wired handoff remain. No install."
+      "evidence": "R105.257 fix pinned donor anchor; keep stock startup unchanged without genuine owner; actual supervisor publisher, owner-thread dispatch and shutdown remain."
     }
   ],
   "rules": [

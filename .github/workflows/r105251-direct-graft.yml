@@ -1,4 +1,4 @@
-name: R105.256 reuse inherited endpoint and ACK (NO INSTALL)
+name: R105.257 correct pinned donor transformation (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -20,6 +20,22 @@ jobs:
           sudo apt-get install -y -qq lld
           clang --version
           ld.lld --version
+      - name: Prepare pinned donor transformation
+        run: |
+          set -euxo pipefail
+          git init donor
+          git -C donor remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
+          git -C donor fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C donor checkout --detach FETCH_HEAD
+          python3 -m venv /tmp/graft-venv
+          /tmp/graft-venv/bin/pip install pyelftools==0.32
+          /tmp/graft-venv/bin/python - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0,"lab/mu1005_direct_graft")
+          from build import adapt,MAP,IMPORTS
+          adapt(Path("donor/wireless/graft/graft.c").read_text(),MAP|{n:0x100000+i*4 for i,n in enumerate(IMPORTS)})
+          PY
       - name: Recover exact original btstack only
         env:
           GH_TOKEN: ${{ github.token }}
@@ -53,12 +69,6 @@ jobs:
       - name: Build actual upstream startup graft on disposable original
         run: |
           set -euxo pipefail
-          git init donor
-          git -C donor remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
-          git -C donor fetch --depth 1 origin 20c94f51c0f0ae88b154c12e4f604643ba23022c
-          git -C donor checkout --detach FETCH_HEAD
-          python3 -m venv /tmp/graft-venv
-          /tmp/graft-venv/bin/pip install pyelftools==0.32
           /tmp/graft-venv/bin/python lab/mu1005_direct_graft/build.py "$RUNNER_TEMP/btstack" donor evidence/direct-graft.json "$RUNNER_TEMP/btstack-graft-private"
           readelf -h -lW "$RUNNER_TEMP/btstack-graft-private" > evidence/elf.txt
           rm -f "$RUNNER_TEMP/btstack-graft-private"
@@ -69,10 +79,10 @@ jobs:
           set -euxo pipefail
           mkdir prior-daemon
           gh run download 46109600160 --repo "$GITHUB_REPOSITORY" --name R105248-full-donor-auto-ie-arm-NO-INSTALL --dir prior-daemon
-          python3 lab/mu1005_direct_graft/pack_reuse.py prior-daemon evidence/direct-graft.json evidence/MU1005-R105256-consolidated-review-NO-INSTALL.zip
+          python3 lab/mu1005_direct_graft/pack_reuse.py prior-daemon evidence/direct-graft.json evidence/MU1005-R105257-consolidated-review-NO-INSTALL.zip
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105256-consolidated-review-NO-INSTALL
+          name: R105257-consolidated-review-NO-INSTALL
           path: evidence/
           retention-days: 7

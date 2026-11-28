@@ -176,11 +176,15 @@ __attribute__((naked,used)) void graft_hook(void) {
     );
 }
 '''
+    s=rep(s,"    if (__atomic_exchange_n(&s->once, 1u, __ATOMIC_ACQ_REL)) return;",r'''    /* Preserve original startup when no genuine wireless owner is available. */
+    if (__atomic_load_n(&s->transport_owner_verified,__ATOMIC_ACQUIRE)!=1u ||
+        !__atomic_load_n(&s->supervised_fd_token,__ATOMIC_ACQUIRE))return;
+    if (__atomic_exchange_n(&s->once, 1u, __ATOMIC_ACQ_REL)) return;''')
     return inherited_transport(s)
 def inherited_transport(s):
     s=rep(s,"#define FRAME_DISCONNECTED 3u","#define FRAME_DISCONNECTED 3u\n#define FRAME_TX_COMPLETE 4u")
     s=rep(s,"    u32 pending_association;","    u32 pending_association;\n    volatile u32 supervised_fd_token;")
-    s=rep(s,"    const struct SockAddrIn endpoint = {\n        16, 2, (u8)(BRIDGE_PORT >> 8), (u8)BRIDGE_PORT,\n        {127,0,0,1}, {0,0,0,0}\n    };\n","")
+    s=rep(s,"    const struct SockAddrIn endpoint = {\n        16, 2, (u8)(BRIDGE_PORT >> 8), (u8)BRIDGE_PORT,\n        {127,0,0,1}, {0,0,0,0,0,0,0,0}\n    };\n","")
     s=rep(s,"    u32 tx_length = 0, tx_offset = 0, tx_generation = 0;","    u32 tx_length = 0, tx_offset = 0, tx_generation = 0, ack_generation = 0;")
     s=rep(s,"            fd = SOCKET(2, 1, 0);\n            if (fd < 0 || CONNECT(fd, &endpoint, 16) != 0) {\n                if (fd >= 0) (void)CLOSE(fd);\n                fd = -1;\n                (void)USLEEP(200000);\n                continue;\n            }",r'''            /* Consume an already connected endpoint exclusively, once.
              * The existing supervisor owns startup/READY and descriptor proof.
@@ -276,7 +280,7 @@ def main(stock,donor,out,private):
     result.extend(bytes(off-len(result)));result.extend(payload);result.extend(bytes(stateoff-len(result)))
     need(headers(result)==new and stock.read_bytes()==b,"postbuild validation")
     private.write_bytes(result)
-    out.write_text(json.dumps(dict(scope="DIRECT_DONOR_REGISTRATION_BUILD_REVIEW_ONLY",original_sha256=PIN,generated_sha256=sha(result),donor=DONOR,startup=hex(HOOK),hook=hex(hook),resume="0x11ec9c",native={k:hex(v) for k,v in m.items()},native_guard_count=len(checked),code_size=len(code),original_loads_preserved=True,remote_accept=False,installable=False,vehicle_verified=False,runtime_verified=False,security_callback_source_integrated=True,inherited_endpoint_consumer=True,completion_ack_source=True,remaining=["actual supervisor FD publisher and owner-thread dispatch","callback lifetime and original shutdown/wired handoff"]),indent=2)+"\n")
+    out.write_text(json.dumps(dict(scope="DIRECT_DONOR_REGISTRATION_BUILD_REVIEW_ONLY",original_sha256=PIN,generated_sha256=sha(result),donor=DONOR,startup=hex(HOOK),hook=hex(hook),resume="0x11ec9c",native={k:hex(v) for k,v in m.items()},native_guard_count=len(checked),code_size=len(code),original_loads_preserved=True,remote_accept=False,installable=False,vehicle_verified=False,runtime_verified=False,security_callback_source_integrated=True,inherited_endpoint_consumer=True,completion_ack_source=True,registration_disabled_without_owner=True,remaining=["actual supervisor FD publisher and owner-thread dispatch","callback lifetime and original shutdown/wired handoff"]),indent=2)+"\n")
     print("DIRECT_MU1005_DONOR_STARTUP_BUILD_ONLY_NO_INSTALL")
 if __name__=="__main__":
     if len(sys.argv)==4 and sys.argv[1]=="--source-build":
