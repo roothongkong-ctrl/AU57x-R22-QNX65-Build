@@ -56,6 +56,21 @@ int main(void){
  assert(same.bt.generation==11&&same.bt.state==CP_WCP_DELAY);
  assert(mu_paired_start_usb_ended(&same,1,4005,usb_cycle)==CP_WCP_STALE);
  assert(mu_paired_start_tick(&same,8004)==CP_WCP_WAIT&&u.opens==2);
+ /* Automatic reacquisition does not need a USB identity/explicit callback.
+  * Same ACL, independent released proof, fresh native open. */
+ u.wired=0;u.cancel=0;
+ assert(mu_paired_start_tick(&same,8005)==CP_WCP_WAIT);
+ assert(same.bt.state==CP_WCP_RESTORE_PENDING);
+ u.wired=1;u.release=0;
+ assert(mu_paired_start_tick(&same,8006)==CP_WCP_WAIT&&u.opens==2);
+ u.cancel=1;
+ assert(mu_paired_start_tick(&same,8007)==CP_WCP_OK);
+ assert(mu_paired_start_tick(&same,8008)==CP_WCP_DENIED&&u.opens==2);
+ u.release=1;
+ assert(mu_paired_start_tick(&same,8009)==CP_WCP_OK);
+ assert(same.bt.generation==11&&same.resume_generation==0);
+ assert(mu_paired_start_tick(&same,12009)==CP_WCP_WAIT&&u.opens==3);
+ puts("AUTOMATIC_IDLE_REACQUISITION_SAME_ACL_PASS_FIXTURE_ONLY");
  puts("SAME_PAIRED_ACL_AFTER_USB_END_PASS_FIXTURE_ONLY");
  puts("PAIRED_START_EXISTING_LATCH_AND_AUTOCONNECT_PASS_FIXTURE_ONLY");
 }

@@ -19,8 +19,16 @@ int mu_paired_start_tick(MuPairedStart*s,uint64_t now){
  /* A trace is only a wakeup: never use it as evidence, nor infer a
   * disconnect when the authoritative snapshot reports the same peer. */
  if(hint&~(MU_BT_ACL_UP|MU_BT_ACL_DOWN))r=-1;
+ /* A lost wired-idle admission may mean USB use or an unknown state.
+  * Do not infer a USB identity or transfer its authentication. Reacquire
+  * only a fresh wireless session for the uniquely selected paired ACL.
+  * An independently verified idle and old job release remain mandatory.
+  * This removes the need to correlate a USB record ID with a BT MAC. */
+ int idle=b->ops.wired_idle_verified(s->ctx);
+ if(r!=1||!gen||gen!=b->generation)s->resume_generation=0;
+ else if(idle!=1&&b->state!=CP_WCP_IDLE)s->resume_generation=gen;
  if(b->state==CP_WCP_RESTORE_PENDING)return cp_wcp_bt_restore_tick(b,b->generation);
- if(r!=1||!gen||b->ops.wired_idle_verified(s->ctx)!=1){
+ if(r!=1||!gen||idle!=1){
   if(b->state!=CP_WCP_IDLE&&b->state!=CP_WCP_BLOCKED)
    return cp_wcp_bt_abort(b,b->generation,1);
   return CP_WCP_WAIT;
@@ -28,6 +36,11 @@ int mu_paired_start_tick(MuPairedStart*s,uint64_t now){
  if(b->state!=CP_WCP_IDLE&&b->state!=CP_WCP_BLOCKED){
   if(gen!=b->generation)return cp_wcp_bt_abort(b,b->generation,1);
   return cp_wcp_bt_tick(b,gen,now);
+ }
+ if(gen==b->generation&&b->state==CP_WCP_BLOCKED&&s->resume_generation==gen){
+  int rc=cp_wcp_bt_resume_wired(b,gen,now,s->released);
+  if(rc==CP_WCP_OK)s->resume_generation=0;
+  return rc;
  }
  if(gen<=b->generation)return CP_WCP_WAIT;
  if(b->state==CP_WCP_BLOCKED)return cp_wcp_bt_rearm(b,gen,now,s->released);
@@ -53,6 +66,6 @@ int mu_paired_start_usb_ended(MuPairedStart*s,uint64_t cycle,uint64_t now,
  else if(b->state==CP_WCP_IDLE)
   rc=cp_wcp_bt_acl_up(b,gen,now);
  else return CP_WCP_WAIT;
- if(rc==CP_WCP_OK)s->last_usb_cycle=cycle;
+ if(rc==CP_WCP_OK){s->last_usb_cycle=cycle;s->resume_generation=0;}
  return rc;
 }

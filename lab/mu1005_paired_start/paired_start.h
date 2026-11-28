@@ -13,6 +13,7 @@ typedef struct {
  unsigned (*take)(void*);
  int (*released)(void*,uint32_t);
  uint64_t last_usb_cycle;
+ uint32_t resume_generation; /* same ACL, after loss of verified wired idle */
 } MuPairedStart;
 int mu_paired_start_init(MuPairedStart*,const struct cp_wcp_bt_ops*,
  int(*)(void*,uint32_t*),unsigned(*)(void*),int(*)(void*,uint32_t));

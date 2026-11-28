@@ -1,4 +1,4 @@
-name: R105.274 reuse paired ACL after USB CarPlay (NO INSTALL)
+name: R105.279 automatic paired ACL resume after verified wired idle (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -41,8 +41,8 @@ jobs:
             "$C" -nostdlib -r output/*.o -o output/usb-resume-arm.o
             arm-unknown-nto-qnx6.5.0eabi-nm output/usb-resume-arm.o | grep -E " T (mu_paired_start_usb_ended|cp_wcp_bt_resume_wired)$"
           '
-          printf '%s\n' 'Requires genuine USB lifecycle and same-phone proof, fresh wireless authentication. NO INSTALL.' > output/README.txt
+          printf '%s\n' 'Requires genuine current paired ACL, original owner, wired idle and prior callback drain; fresh wireless authentication. NO INSTALL.' > output/README.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: R105274-usb-resume-arm-NO-INSTALL
+          name: R105279-auto-resume-arm-NO-INSTALL
           path: output/
