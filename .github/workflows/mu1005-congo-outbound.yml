@@ -65,10 +65,19 @@ jobs:
           def md():
               m=Cs(CS_ARCH_ARM,CS_MODE_ARM);m.detail=True;return m
           calls={}
+          # ARM code and embedded literal pools coexist. Scan aligned words
+          # rather than stopping the whole segment at an undecodable word.
           for lo,hi,o in seg:
-              for i in md().disasm(b[o:o+hi-lo],lo):
-                  if i.mnemonic=="bl" and i.operands and i.operands[0].type==ARM_OP_IMM:
-                      calls.setdefault(i.operands[0].imm,[]).append(i.address)
+              for offset in range(0,hi-lo-3,4):
+                  w=struct.unpack_from("<I",b,o+offset)[0]
+                  if w>>28==15 or (w&0x0f000000)!=0x0b000000:continue
+                  disp=w&0xffffff
+                  if disp&0x800000:disp-=0x1000000
+                  site=lo+offset
+                  target=site+8+4*disp
+                  if read(target,4):calls.setdefault(target,[]).append(site)
+          assert 0x2464b0 in calls.get(0x277a18,[])
+          assert 0x24dcac in calls.get(0x277a18,[])
           known=[("register",0x277b98,0x277a18),("sdp_add",0x2073c4,0x207244),("rf_send",0x277378,0x2771f8),("eir",0x1db648,0x1db4c8)]
           assert all(read(target,4) for _,_,target in known)
           assert struct.unpack("<I",read(0x277a18,4))[0]==0xe92d4070
@@ -82,11 +91,11 @@ jobs:
                   first=ins[0]
                   if first.mnemonic!="push" or "lr" not in first.op_str:continue
                   sites=calls.get(addr,[])
-                  candidates.append({"address":hex(addr),"distance_from_prediction":addr-predicted,"caller_count":len(sites),"caller_addresses":[hex(x) for x in sites[:20]],"entry":[i.mnemonic+" "+i.op_str for i in ins[:6]]})
+                  candidates.append({"address":hex(addr),"distance_from_prediction":addr-predicted,"caller_count":len(sites),"caller_addresses":[hex(x) for x in sites[:20]],"entry_words":[hex(x) for x in struct.unpack("<10I",raw)],"entry":[i.mnemonic+" "+i.op_str for i in ins[:6]]})
               candidates.sort(key=lambda c:(abs(c["distance_from_prediction"]),-c["caller_count"]))
               return {"name":name,"donor5092":hex(donor),"unverified_prediction":hex(predicted),"candidates":candidates[:12],"verified":False}
           with concurrent.futures.ThreadPoolExecutor(max_workers=7) as e: rows=list(e.map(probe,tasks))
-          report={"scope":"candidate-only exact OEM disassembly; constant shift is a hypothesis, not callable ABI","installable":False,"known_control_deltas":[{"name":n,"delta":a-c} for n,a,c in known],"rows":rows}
+          report={"scope":"candidate-only exact OEM disassembly; constant shift is a hypothesis, not callable ABI","call_scan_control":"both original RFCOMM callers found","acl_trace_window":[{"address":hex(i.address),"instruction":i.mnemonic+" "+i.op_str} for i in md().disasm(read(0x13f690,0x38),0x13f690)],"installable":False,"known_control_deltas":[{"name":n,"delta":a-c} for n,a,c in known],"rows":rows}
           pathlib.Path("evidence/outbound.json").write_text(json.dumps(report,indent=2))
           print(json.dumps(report,indent=2))
           PY
