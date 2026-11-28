@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.230",
+    "version": "R105.231",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 5
+      "dependent_not_yet_listed": 15
     },
     "runs": [],
     "verified_prior": [
@@ -296,10 +296,20 @@
           46104138486
         ],
         "evidence": "Five exact config staging cases, package assembly, six backup cases and four native host regressions passed; no live installation."
+      },
+      {
+        "version": "R105.230",
+        "passed": 4,
+        "failed": 1,
+        "runs": [
+          46104381226,
+          46104381236
+        ],
+        "evidence": "SI host success; QNX cached image restored successfully, Rust seed failed due to nested Cargo workspace, not daemon compilation."
       }
     ],
-    "discovery": "Compile actual full nine-adapter donor ARM via verified complete existing C/SDK image, no Docker SDK build. Restore/install only pinned Rust language runtime and upstream std port; target binary must include IE ownership fix. Previous package success; original Bluetooth and SI provider still missing.",
-    "expected_jobs": 5,
+    "discovery": "Stock-first existing pairing and iAP2 transport reuse; implement actual reversible config replacement primitive on host fixture, preserve iap2.cfg bytewise. ARM seed isolated from root Cargo workspace. No activation or actual native registration proof.",
+    "expected_jobs": 15,
     "pending_prior": []
   },
   "read_strategy": {
@@ -320,7 +330,7 @@
         8,
         9
       ],
-      "task": "Continue genuine OEM provider wiring; prioritize Congo direct compatibility in parallel, no install before live evidence.",
+      "task": "Stock first: reuse existing pairing and original bluetooth.enableIap; preserve iap2.cfg (status reporting, not transport switch). Use pinned Congo/LuKa only for missing RFCOMM wireless startup and receiver adaptation. Do not redevelop pairing; no install until reversible complete candidate.",
       "paths": [
         "lab/mu1005_route4_5/parallel_native.py",
         "lab/mu1005_route4_5/cleanup_callees.py",
@@ -375,7 +385,7 @@
         35
       ],
       "task": "Prepare reversible first-link candidate in parallel, not after first physical phone link. Keep installation disabled until actual modified components and recovery are integrated; defer nonessential optimizations.",
-      "evidence": "R105.229 review package assembled successfully; R105.230 targets current ARM payload, not live installer."
+      "evidence": "Actual config replace/restore primitive implemented on fixture; vehicle mode intentionally disabled. Need live configuration path and connected receiver/transport before complete installer."
     }
   ],
   "rules": [

@@ -1,0 +1,58 @@
+name: R105.231 stock-first iAP2 configuration transaction (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105231-stock-first.yml','integration/mu1005_vehicle_stage/stock_config_apply.sh']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stock-route:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [apply-restore, wrong-iap2, drift, tampered]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify actual replacement and original iAP2 preservation on fixture
+        env:
+          CASE: ${{ matrix.scenario }}
+        run: |
+          set -euo pipefail
+          root=$(mktemp -d)
+          trap 'rm -rf "$root"' EXIT
+          touch "$root/LAB_ONLY"
+          mkdir "$root/original"
+          src="$root/original/connectivity.json"
+          iap="$root/original/iap2.cfg"
+          python3 - "$src" <<'PY'
+          import pathlib,sys
+          pathlib.Path(sys.argv[1]).write_bytes(b'{\r\n'+b'# kept\r\n'*214+b' "enableIap": false,\r\n "other": 12\r\n}\r\n')
+          PY
+          printf '#[bluetooth]\n#enable = 0\n' > "$iap"
+          chmod 640 "$src"
+          pin=$(sha256sum "$src" | awk '{print $1}')
+          iap_pin=$(sha256sum "$iap" | awk '{print $1}')
+          stage="$root/stage-one"
+          sh integration/mu1005_vehicle_stage/config_transaction.sh host-fixture "$src" "$stage" "$root" "$pin"
+          s=integration/mu1005_vehicle_stage/stock_config_apply.sh
+          sh -n "$s"
+          case "$CASE" in
+            wrong-iap2) iap_pin=wrong ;;
+            drift) printf '\n# changed\n' >> "$src" ;;
+            tampered) printf '\n' >> "$stage/candidate.json" ;;
+          esac
+          before=$(sha256sum "$src")
+          if [ "$CASE" = apply-restore ]; then
+            sh "$s" apply "$root" "$stage" "$iap_pin"
+            cmp "$src" "$stage/candidate.json"
+            test "$(stat -c %a "$src")" = 640
+            sh "$s" restore "$root" "$stage" "$iap_pin"
+            cmp "$src" "$stage/original.json"
+            test "$(stat -c %a "$src")" = 640
+          else
+            if sh "$s" apply "$root" "$stage" "$iap_pin"; then exit 1; fi
+          fi
+          test "$before" = "$(sha256sum "$src")"
+          printf '#[bluetooth]\n#enable = 0\n' | cmp - "$iap"

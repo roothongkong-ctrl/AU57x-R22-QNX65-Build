@@ -1,4 +1,4 @@
-name: R105.230 latest full donor ARM on restored QNX environment (NO INSTALL)
+name: R105.231 latest full donor ARM on restored QNX environment (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -60,9 +60,12 @@ jobs:
               arm-unknown-nto-qnx6.5.0eabi-gcc -c shim/unwind_shim.c -o shim/unwind_shim.o
               arm-unknown-nto-qnx6.5.0eabi-ar rcs shim/libqnxunwind.a shim/unwind_shim.o
               if ! find /opt/cargo/registry/src -maxdepth 2 -name libc-0.2.185 2>/dev/null | grep -q .; then
-                cd /src/toolchain/rust/tests/stdhello
-                RUSTFLAGS="-C linker=/src/toolchain/rust/qnx-cc" cargo build -Z build-std=std,panic_abort -Z build-std-features= -Z json-target-spec --target /src/toolchain/rust/armv7-unknown-nto-qnx650.json --release >/tmp/std-seed.log 2>&1 || tail -n 15 /tmp/std-seed.log
+                seed=$(mktemp -d /tmp/qnx-std-seed.XXXXXX)
+                cp -R /src/toolchain/rust/tests/stdhello/. "$seed/"
+                cd "$seed"
+                RUSTFLAGS="-C linker=/src/toolchain/rust/qnx-cc" cargo build -Z build-std=std,panic_abort -Z build-std-features= -Z json-target-spec --target /src/toolchain/rust/armv7-unknown-nto-qnx650.json --release >/tmp/std-seed.log 2>&1 || tail -n 25 /tmp/std-seed.log
                 cd /src/toolchain/rust
+                find /opt/cargo/registry/src -maxdepth 2 -name libc-0.2.185 | grep -q libc-0.2.185
               fi
               bash port/apply_std_port.sh
               rustc --version
@@ -123,6 +126,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105230-full-donor-ie-arm-NO-INSTALL
+          name: R105231-full-donor-ie-arm-NO-INSTALL
           path: donor-arm-evidence/
           retention-days: 7
