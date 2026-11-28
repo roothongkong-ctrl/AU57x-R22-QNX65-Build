@@ -1,4 +1,4 @@
-name: R105.207 original cleanup synchronization callees (NO INSTALL)
+name: R105.208 parallel native integration (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -8,12 +8,18 @@ permissions:
   contents: read
   actions: read
 jobs:
-  first-link:
+  native-provider:
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        lane: [stop-sync, driver-producer, receiver-provider, si-provider]
     runs-on: ubuntu-24.04
     timeout-minutes: 100
     env:
       GH_TOKEN: ${{ github.token }}
       SOURCE_RUN: "45923122041"
+      LANE: ${{ matrix.lane }}
     steps:
       - uses: actions/checkout@v4
       - name: Obtain retained archive from existing NAS task (no second NAS request)
@@ -68,9 +74,19 @@ jobs:
           set -euo pipefail
           /tmp/mu1005-extract-venv/bin/pip install capstone==5.0.3 pyelftools==0.31
           /tmp/mu1005-extract-venv/bin/python lab/mu1005_route4_5/lifecycle_cfg.py --selftest
-          /tmp/mu1005-extract-venv/bin/python lab/mu1005_route4_5/cleanup_callees.py "${RUNNER_TEMP}/combined" evidence/cleanup-callees.json
+          /tmp/mu1005-extract-venv/bin/python lab/mu1005_route4_5/parallel_native.py "$LANE" "${RUNNER_TEMP}/combined" evidence/native-provider.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105207-CLEANUP-CALLEES-NO-INSTALL
-          path: evidence/cleanup-callees.json
+          name: R105208-${{ matrix.lane }}-NO-INSTALL
+          path: evidence/native-provider.json
+  activation-revoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test actual SI activation observation revocation
+        run: |
+          set -euxo pipefail
+          s=integration/mu1005_si_native
+          cc -std=c99 -Wall -Wextra -Werror -I"$s" "$s"/{si_mu1005_activation,si_mu1005_layout}.c lab/mu1005_route4_5/test_activation_revoke.c -o /tmp/activation
+          /tmp/activation

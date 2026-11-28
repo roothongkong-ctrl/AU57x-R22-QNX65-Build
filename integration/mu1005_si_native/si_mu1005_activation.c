@@ -18,6 +18,9 @@ int mu_si_activate_once(struct mu_act_state*s,const struct mu_act_ops*o,const st
   if(o->admit(o->ctx,k)!=1){s->phase=MU_ACT_UNCERTAIN;return s->phase;}
   v=o->observe(o->ctx,k);
  }
+ /* The observation can revoke the owner while it runs. Never publish a
+  * connected state for a revoked session, including repeat observations. */
+ if(o->admit(o->ctx,k)!=1){if(s->phase)s->phase=MU_ACT_UNCERTAIN;return s->phase?s->phase:MU_ACT_DENIED;}
  if(v==2){s->phase=MU_ACT_CONNECTED;return s->phase;}
  if(s->phase==MU_ACT_PENDING&&(v==0||v==1))return MU_ACT_PENDING;
  s->phase=MU_ACT_UNCERTAIN;return s->phase;
