@@ -46,7 +46,32 @@ for i,item in enumerate(members):
             decoded=work/f"{i}.imagefs"
             decompress_container(raw,decoded,decompress=decompress,max_output_bytes=512*1024*1024)
         elif magic!=b"imagefs":
-            row["result"]="unrecognized container, not searched";continue
+            # Stage1 may contain a boot header before the ImageFS payload.
+            # Search bounded raw bytes, validate header and directory before
+            # accepting any embedded candidate; never treat strings as files.
+            import struct
+            payload=raw.read_bytes()
+            candidates=[]; hits=[]; pos=0
+            while True:
+                pos=payload.find(b"imagefs",pos)
+                if pos<0:break
+                off=pos;pos+=7
+                if len(hits)>=256:raise ValueError("too many ImageFS signature candidates")
+                hits.append(off)
+                if off+88>len(payload):continue
+                order=">" if payload[off+7]&1 else "<"
+                size,end,start=struct.unpack_from(order+"III",payload,off+8)
+                if not 88<=start<=end<=size-4 or size>len(payload)-off:continue
+                candidate=work/f"{i}-embedded-{off}.imagefs"
+                candidate.write_bytes(payload[off:off+size])
+                try:inventory_imagefs(candidate)
+                except (ValueError,OSError):candidate.unlink();continue
+                candidates.append((off,candidate))
+            row["imagefs_signature_offsets"]=hits
+            row["validated_embedded_offsets"]=[off for off,_ in candidates]
+            if len(candidates)!=1:
+                row["result"]="no unique validated embedded ImageFS";continue
+            row["embedded_imagefs_offset"],decoded=candidates[0]
         info=inventory_imagefs(decoded);row["result"]="validated ImageFS directory";row["matches"]=[]
         with decoded.open("rb") as f:
             for e in info["entries"]:
