@@ -1,8 +1,8 @@
-name: R105.231 latest full donor ARM on restored QNX environment (NO INSTALL)
+name: R105.248 full donor ARM with automatic original AP slot (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/r105230-donor-ie-arm.yml]
+    paths: [.github/workflows/r105230-donor-ie-arm.yml, lab/mu1005_donor_ie/adapt.py]
   workflow_dispatch:
 permissions:
   contents: read
@@ -87,6 +87,10 @@ jobs:
           python3 lab/mu1005_donor_exit/adapt.py donor | tee donor-arm-evidence/exit-port.log
           python3 lab/mu1005_donor_ie/adapt.py donor | tee donor-arm-evidence/ie-port.log
           git -C donor diff -- wireless/daemon > donor-arm-evidence/combined-port.diff
+      - name: Test live slot selection in the actual donor source
+        run: |
+          set -euxo pipefail
+          cargo test --locked --manifest-path donor/wireless/daemon/Cargo.toml --lib mu1005_ie_tests -- --nocapture | tee donor-arm-evidence/ie-host.log
       - name: Build adapted full QNX daemon (default feature set)
         run: |
           set -euxo pipefail
@@ -122,10 +126,11 @@ jobs:
           grep -F 'MU1005 requires original SI control endpoint' /tmp/donor-strings
           grep -F 'MU1005 IE slot not explicitly present exactly once' /tmp/donor-strings
           grep -F 'MU1005 refuses unowned IE removal' /tmp/donor-strings
+          grep -F 'MU1005 no explicitly free IE slot' /tmp/donor-strings
           printf '%s\n' 'FULL_ADAPTED_DONOR_ARM_BUILD_ONLY_NO_OEM_NO_RF' | tee donor-arm-evidence/result.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105231-full-donor-ie-arm-NO-INSTALL
+          name: R105248-full-donor-auto-ie-arm-NO-INSTALL
           path: donor-arm-evidence/
           retention-days: 7

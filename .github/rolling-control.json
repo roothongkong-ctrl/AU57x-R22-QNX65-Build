@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.247",
+    "version": "R105.248",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 19
+      "dependent_not_yet_listed": 6
     },
     "runs": [],
     "verified_prior": [
@@ -460,11 +460,24 @@
           46108905341
         ],
         "evidence": "New ARM/admission jobs pass. Existing host owner/discovery/transport fail linking au100_route_select from newly unconditional helper. Move helper into existing route-gate compilation unit; actual runtime remains unproven."
+      },
+      {
+        "version": "R105.247",
+        "passed": 17,
+        "runs": [
+          46109195569,
+          46109195554,
+          46109195575,
+          46109195611
+        ],
+        "evidence": "All three prior linking failures now pass, native-library and collection still pending on last check."
       }
     ],
-    "discovery": "Fix common regression link dependency by implementing graft admission in existing route-gate module, preserving unchanged legacy host links and production QNX gate. No new vehicle probe or new auth implementation. Actual startup provider still missing.",
-    "expected_jobs": 19,
-    "pending_prior": []
+    "discovery": "Remove manual IE slot prerequisite in actual full donor executable. Query original uaputl, borrow matching slot or choose explicitly empty 0..3, reject absent/ambiguous/malformed slots, recheck before write and preserve existing rollback. No repeat vehicle collection; no claim of concurrent OEM exclusion or native runtime owner.",
+    "expected_jobs": 6,
+    "pending_prior": [
+      46109195611
+    ]
   },
   "read_strategy": {
     "first_parallel": [
@@ -500,7 +513,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "integration/mu1005_vehicle_stage/congo_port_table.json"
       ],
-      "evidence": "R105.247 common dependency fix; original runtime owner/launcher still missing. Use existing compiled daemon and original launcher config, not new isolated adapters."
+      "evidence": "R105.247 three link failures fixed. R105.248 actual donor AP slot automatic selection removes manual environment dependency, full ARM build pending; native startup provider still missing."
     }
   ],
   "rules": [

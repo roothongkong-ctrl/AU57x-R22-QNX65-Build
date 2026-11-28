@@ -31,18 +31,32 @@ pub struct Mu1005OwnedIe {
 impl Mu1005OwnedIe {
     // An absent token means a pre-existing matching IE, which is never removed.
     pub fn install(bt:[u8;6],id:[u8;6])->Result<Option<Self>,String>{
-        let index=std::env::var("MHI2Q_CP_IE_INDEX").map_err(|_|"missing verified IE index")?
-            .parse::<u8>().map_err(|_|"invalid IE index")?;
+        let requested=match std::env::var("MHI2Q_CP_IE_INDEX"){
+            Ok(s)=>Some(s.parse::<u8>().map_err(|_|"invalid IE index")?),
+            Err(std::env::VarError::NotPresent)=>None,
+            Err(_)=>return Err("invalid IE index environment".into()),
+        };
         let expected=device_ie(bt,id);
-        let args=uaputl_args(index,&expected)?;
         let binary=std::env::var("MHI2Q_CP_UAPUTL").unwrap_or_else(|_|"/mnt/app/armle/sbin/uaputl".into());
         let lease=ControlLease::begin(std::path::Path::new("/tmp/mu1005_wifi_ie_owner.pending"))?;
         let query=run_uaputl_command(&binary,&["-i","uap0","sys_cfg_custom_ie"])
-            .and_then(|q|mu1005_slot_state(&q,index,&expected));
-        match query {
+            .and_then(|q|mu1005_choose_slot(&q,&expected,requested));
+        let (index,owned)=match query{
             Err(e)=>{lease.complete()?;return Err(e);}
-            Ok(false)=>{lease.complete()?;return Ok(None);}
-            Ok(true)=>{}
+            Ok(v)=>v,
+        };
+        if !owned{lease.complete()?;return Ok(None);}
+        let args=match uaputl_args(index,&expected){
+            Ok(v)=>v,Err(e)=>{lease.complete()?;return Err(e);}
+        };
+        // Recheck immediately before the driver write. The local lease
+        // serializes our own writers, not arbitrary OEM processes.
+        let current=run_uaputl_command(&binary,&["-i","uap0","sys_cfg_custom_ie"])
+            .and_then(|q|mu1005_choose_slot(&q,&expected,Some(index)));
+        match current {
+            Ok((i,true)) if i==index=>{}
+            Ok((i,false)) if i==index=>{lease.complete()?;return Ok(None);}
+            _=>{lease.complete()?;return Err("MU1005 IE selection changed before write".into());}
         }
         // From this point a failed write/readback leaves the owner marker:
         // no automatic deletion or subsequent attempt on uncertain hardware.
@@ -71,6 +85,24 @@ mod mu1005_ie_tests {
     fn query(mask:u16,bytes:&[u8])->String{
         let hex=bytes.iter().map(|v|format!("{v:02x}")).collect::<Vec<_>>().join(" ");
         format!("Querying custom IE successful\nIndex [1]\nManagement Subtype Mask = 0x{mask:x}\nIE Buffer: len={}\n{hex}\n",bytes.len())
+    }
+    #[test]
+    fn mu1005_select_live_explicit_slot(){
+        let ie=device_ie([0;6],[2;6]);
+        let empty=query(0,&[]);
+        let occupied=query(1,&[1,2]).replace("Index [1]","Index [0]");
+        let matched=query(IE_MASK_REQUIRED_FRAMES,&ie).replace("Index [1]","Index [2]");
+        let mixed=format!("{occupied}{empty}");
+        assert_eq!(mu1005_choose_slot(&mixed,&ie,None),Ok((1,true)));
+        assert_eq!(mu1005_choose_slot(&format!("{mixed}{matched}"),&ie,None),Ok((2,false)));
+        assert_eq!(mu1005_choose_slot(&empty,&ie,Some(1)),Ok((1,true)));
+        assert!(mu1005_choose_slot(&empty,&ie,Some(3)).is_err());
+        assert!(mu1005_choose_slot(&empty,&ie,Some(4)).is_err());
+        assert!(mu1005_choose_slot(&occupied,&ie,None).is_err());
+        assert!(mu1005_choose_slot("Querying custom IE successful",&ie,None).is_err());
+        assert!(mu1005_choose_slot(&format!("{empty}{empty}"),&ie,None).is_err());
+        assert!(mu1005_choose_slot(&format!("{matched}{}",matched.replace("Index [2]","Index [3]")),&ie,None).is_err());
+        assert!(mu1005_choose_slot(&format!("{empty}{matched}"),&ie,Some(1)).is_err());
     }
     #[test]
     fn mu1005_explicit_empty_owned_vs_borrowed(){
