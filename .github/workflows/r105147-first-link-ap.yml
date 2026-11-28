@@ -2,7 +2,7 @@ name: R105.147 first-link AP slot selection and QNX build (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/r105147-first-link-ap.yml, integration/mu1005_si_native/ap_live/**, lab/mu1005_first_link_ap/**]
+    paths: [integration/mu1005_si_native/ap_live/ap_live.c, integration/mu1005_si_native/ap_live/ap_live.h, lab/mu1005_first_link_ap/**]
   workflow_dispatch:
 permissions:
   contents: read

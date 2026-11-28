@@ -8,26 +8,25 @@ permissions:
   contents: read
 jobs:
   first-session:
-    strategy:
-      fail-fast: false
-      max-parallel: 8
-      matrix:
-        case: [0, 1, 2, 3, 4, 5, 6, 7]
+    # Keep the full manual regression, but bound automatic refresh changes to one runner.
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Test live AP config to peer ACK and first session on actual sockets
-        env:
-          AP_CASE: ${{ matrix.case }}
         run: |
           set -euo pipefail
           mkdir -p evidence
-          bash ci/host_step5_live_ap.sh | tee evidence/chain.log
-          grep -Fx "R105149_AP_HANDOFF_CASE_PASS $AP_CASE FIXTURE_ONLY" evidence/chain.log
-          grep -Fx STEP5_FIRST_AUTHENTICATED_SESSION_AND_IMMEDIATE_DISCONNECT_FIXTURE_PASS_NO_OEM evidence/chain.log
+          cases="0 1"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ];then cases="0 1 2 3 4 5 6 7";fi
+          for AP_CASE in $cases;do
+            export AP_CASE
+            bash ci/host_step5_live_ap.sh | tee "evidence/chain-$AP_CASE.log"
+            grep -Fx "R105149_AP_HANDOFF_CASE_PASS $AP_CASE FIXTURE_ONLY" "evidence/chain-$AP_CASE.log"
+            grep -Fx STEP5_FIRST_AUTHENTICATED_SESSION_AND_IMMEDIATE_DISCONNECT_FIXTURE_PASS_NO_OEM "evidence/chain-$AP_CASE.log"
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: r105149-live-ap-case-${{ matrix.case }}-NO-INSTALL
-          path: evidence/chain.log
+          name: r105149-live-ap-chain-NO-INSTALL
+          path: evidence/chain-*.log

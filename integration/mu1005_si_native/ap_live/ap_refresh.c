@@ -17,11 +17,19 @@ int mu_ap_refresh_prepare(struct mu_ap_refresh_slot*s,const struct cp_cloud_pipe
  if(!s||!p||!q||referenced(s,p))return CP_CLOUD_BAD;
  mu_ap_live_clear(s,sizeof *s);
  if(!current(p))return CP_CLOUD_ORDER;
+ uint32_t epoch=p->epoch,generation=p->bt_generation;
+ enum cp_radio_band band=p->band;
+ const struct cp_step04_session*bootstrap=p->bootstrap;
  if(mu_ap_live_read(&s->ap,q,ctx)!=0||
-    cp_radio_channel_band(s->ap.channel)!=p->band){
+    cp_radio_channel_band(s->ap.channel)!=band){
   mu_ap_live_clear(s,sizeof *s);return CP_CLOUD_PROOF;
  }
- s->epoch=p->epoch;s->generation=p->bt_generation;s->band=p->band;s->prepared=1;
+ /* A new attempt must never inherit credentials collected for its predecessor. */
+ if(!current(p)||p->bootstrap!=bootstrap||p->epoch!=epoch||
+    p->bt_generation!=generation||p->band!=band){
+  mu_ap_live_clear(s,sizeof *s);return CP_CLOUD_STALE;
+ }
+ s->epoch=epoch;s->generation=generation;s->band=band;s->prepared=1;
  return CP_CLOUD_OK;
 }
 struct verify_ctx {struct mu_ap_refresh_slot*s;mu_ap_verify_current fn;void*ctx;};
@@ -63,7 +71,8 @@ static int guard_live(struct first_link_guard*g){
 static int guard_query(void*v,unsigned n,char*out,size_t cap){
  struct first_link_guard*g=v;
  if(!guard_live(g))return -1;
- return g->ops->query(g->ops->ctx,n,out,cap);
+ int rc=g->ops->query(g->ops->ctx,n,out,cap);
+ return rc==0&&guard_live(g)?0:-1;
 }
 static int guard_exclusive(void*v,const uint8_t b[6],unsigned slot){
  struct first_link_guard*g=v;
@@ -93,5 +102,13 @@ int mu_ap_refresh_prepare_first_link(struct mu_ap_refresh_slot*s,
     !guard_live(&g)){
   mu_ap_live_clear(s,sizeof *s);return CP_CLOUD_PROOF;
  }
+ /* The original AP may change between its first snapshot and IE readback.
+  * Re-read under the same owner proof, including SSID/key/band/BSSID.
+  * Keep any acquired IE lease for explicit restoration on failure. */
+ struct mu_ap_live after={0};
+ int same=mu_ap_live_read(&after,guard_query,&g)==0&&
+  !memcmp(&after,&s->ap,sizeof after)&&guard_live(&g);
+ mu_ap_live_clear(&after,sizeof after);
+ if(!same){mu_ap_live_clear(s,sizeof *s);return CP_CLOUD_PROOF;}
  return CP_CLOUD_OK;
 }
