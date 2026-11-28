@@ -1,0 +1,78 @@
+name: R105.304 independent route selection and original reuse (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105304-multiroute.yml','lab/mu1005_multiroute/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  selector:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -euxo pipefail
+          d=lab/mu1005_multiroute
+          cc -std=c99 -O2 -Wall -Wextra -Werror "$d/route_select.c" "$d/test.c" -o /tmp/route
+          /tmp/route
+  existing-route-evidence:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        include:
+          - route: A-congo-direct
+            run_id: 46132478079
+            artifact: R105284-DIO-launch-NO-INSTALL
+          - route: B-luka-SI
+            run_id: 46132705687
+            artifact: R105303-stock-unified-DIO-ARM-NO-INSTALL
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ matrix.run_id }}
+          ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          set -euxo pipefail
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$ARTIFACT" --dir evidence
+          find evidence -type f -name '*.so' -print -exec readelf -h {} \;
+          grep -E 'Machine:.*ARM' evidence/elf.txt
+          grep -F mu_dio_launch_wireless evidence/elf.txt
+          if [ "$RUN_ID" = 46132705687 ]; then grep -F mu_si_dio_cloud_tick evidence/elf.txt; fi
+          echo REUSED_ARM_ARTIFACT_NOT_RUNTIME_ADMISSION
+  C-type3:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Verify current original ingress route compatibility contract
+        run: |
+          set -euxo pipefail
+          git diff --exit-code 5341746ee8aacd16dd9d188b5d4506bc2c080be0 HEAD -- project/source/legacy_mu1005/bluetooth/bt_route_gate.c project/source/legacy_mu1005/bluetooth/bt_route_gate.h || exit 1
+          test -f integration/mu1005_si_native/R105_010_CLASSIC_MHI2_DONOR_COMPARISON_CN.md
+          echo TYPE3_NO_VERIFIED_OEM_ENDPOINT_KEEP_DISABLED
+  native-selector:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - run: |
+          set -euxo pipefail
+          mkdir output
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 bash -ec '
+            C=arm-unknown-nto-qnx6.5.0eabi-gcc
+            "$C" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined lab/mu1005_multiroute/route_select.c -lc -o output/libmu1005_route_select_review.so
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h -sW output/libmu1005_route_select_review.so > output/elf.txt
+            grep -F mu_route_begin output/elf.txt
+          '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105304-route-select-ARM-NO-INSTALL
+          path: output/

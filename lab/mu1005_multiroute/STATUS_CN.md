@@ -1,0 +1,3 @@
+# R105.304 三路线并行，唯一运行 owner
+A Congo 思路：复用 R105.302 原厂 DIO spawn、R105.284 接收器适配与 R105.303 会话协调器。B LuKa 思路：复用 R103 iAP2 LinkEngine/R45、原厂 SI activation + CPRX。A/B 是启动路线，均仍缺真实 OEM 运行时 owner。C joeyQuery 思路：原厂 Type-3/RFCOMM 字节入口，MH2p 的 /dev/iapDevice-* 不是本车已验证接口；C 不是独立无线接收器，必须与 A 或 B 共用原厂接收器；没有实际端点时保持禁用。不能直接装三份不同固件的二进制。
+新增 route_select 策略源码：同一时刻只选择一个 route，A→B→C，已验证成功的优先；实际失败后必须完成原厂恢复、换新 epoch 才可尝试下一条，插线不启无线。enabled mask 可淘汰不合格方案，不删除有价值的历史代码。preferred 仅本次运行内存，持久化、实际 provider 与启动/停止 dispatcher 尚未接通。A/B 复用历史 ARM 产物并核实符号，不重复编译；C 保留已有证据，不假造成功；新增 selector 独立 host/ARM 验收。NO INSTALL / vehicle_verified=false。
