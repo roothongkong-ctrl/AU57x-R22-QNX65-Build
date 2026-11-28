@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.215",
+    "version": "R105.216",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 11
+      "dependent_not_yet_listed": 15
     },
     "runs": [],
     "verified_prior": [
@@ -164,10 +164,20 @@
           46091721708
         ],
         "evidence": "Host singleton coordinator admission/rollback fixture passed; native build did not trigger because lab source paths were omitted. R105.215 fixes trigger coverage and verifies ARM compilation."
+      },
+      {
+        "version": "R105.215",
+        "passed": 15,
+        "runs": [
+          46091835639,
+          46091835587,
+          46091835544
+        ],
+        "evidence": "15/15 passed, full ARM build. DIO direct callsites only known 0x15df68/88/bc; new StopController vtable relocation 0x1a7710. Driver 47 paired stores, only four non-SP, all unrelated packet/medialib functions; no descriptor producer proved. R105.212 dispatch loads object table at +0x40 before slot +0x28/+0x2c."
       }
     ],
-    "discovery": "Two focused pinned OEM lanes: DIO lifecycle/dispatch callers and candidate paired transport callback slot writers (+0x28/+0x2c), plus 9 native build/regression jobs triggered by corrected path filter. Congo 46091673646 recursive resolver fixture passed, actual extraction/runtime not yet complete. No real provider or RF proven.",
-    "expected_jobs": 11
+    "discovery": "R105.216 follows concrete StopController vtable and actual +0x40 transport table pointer, not paired stack stores. QNX supervisor sockaddr_in length field set consistently with existing native CPRX QNX code; full native compile/regressions. Congo 46091673646 still building toolchain at check, resolver fixture success; no new firmware results.",
+    "expected_jobs": 15
   },
   "read_strategy": {
     "first_parallel": [
@@ -202,7 +212,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.214 host PASS. R105.215 locates actual DIO lifecycle callers and transport descriptor producer candidates; corrects native review ARM trigger for coordinator/supervisor code. No claim of actual provider lease. Congo runtime still running."
+      "evidence": "R105.215 all 15 passed; original owner remains unbound. R105.216 follows new StopController vtable candidate, driver table pointer producer and QNX supervisor sockaddr length portability. Do not count static candidates as runtime success."
     },
     {
       "priority": 2,

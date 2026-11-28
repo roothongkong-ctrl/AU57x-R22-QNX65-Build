@@ -73,6 +73,9 @@ int mu_daemon_supervisor_start(MuDaemonSupervisor*s,const char*path,char*const e
  if(!s||s->active||s->pid>0||!path||path[0]!='/'||!verify||!env_ok(env)||verify(ctx,path)!=1)return -1;
  memset(s,0,sizeof *s);s->fd=-1;
  l=socket(AF_INET,SOCK_STREAM,0);if(l<0||!cloexec(l)||setsockopt(l,SOL_SOCKET,SO_REUSEADDR,&one,sizeof one))goto bad;
+ #if defined(__QNXNTO__)
+ bindaddr.sin_len=sizeof bindaddr;
+#endif
  bindaddr.sin_family=AF_INET;bindaddr.sin_addr.s_addr=htonl(INADDR_LOOPBACK);bindaddr.sin_port=htons(PORT);
  if(bind(l,(struct sockaddr*)&bindaddr,sizeof bindaddr)||listen(l,1))goto bad;
  c=socket(AF_INET,SOCK_STREAM,0);if(c<0||!cloexec(c)||(fl=fcntl(c,F_GETFL,0))<0||fcntl(c,F_SETFL,fl|O_NONBLOCK))goto bad;
