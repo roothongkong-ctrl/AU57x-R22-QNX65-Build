@@ -1,0 +1,72 @@
+name: R105.308 unmodified classic receiver QNX loader trial (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105308-classic-runtime.yml','lab/mu1005_classic_receiver/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  receiver:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        profile: ['790','791']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch exact public donor and existing QNX boot harness
+        env:
+          PROFILE: ${{ matrix.profile }}
+        run: |
+          set -euxo pipefail
+          mkdir evidence stage
+          git init donor
+          git -C donor remote add origin https://github.com/omonob/VW-MHI2-Wireless-Carplay-Maps.git
+          git -C donor fetch --depth 1 origin aec37f5b1c87a0d961d16fe4328ac3638d0a833e
+          git -C donor checkout --detach FETCH_HEAD
+          case "$PROFILE" in
+            790) dir=AID10.5-17PM ;;
+            791) dir=AID12.3 ;;
+            *) exit 1 ;;
+          esac
+          cp "donor/standalone/SD_ROOT/carplay/payload/wireless/profiles/$dir/wcp_receiver" stage/wcp_receiver
+          sha256sum stage/wcp_receiver | tee evidence/donor.sha256
+          readelf -h -dW stage/wcp_receiver | tee evidence/donor-elf.txt
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          if ! command -v qemu-system-arm >/dev/null; then
+            sudo apt-get -o Acquire::Retries=3 update -qq
+            sudo apt-get -o Acquire::Retries=3 install -y -qq qemu-system-arm
+          fi
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Compile isolated launch probe and inspect genuine SDK dependencies
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 sh -ec '
+            C=arm-unknown-nto-qnx6.5.0eabi
+            "$C-gcc" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror lab/mu1005_classic_receiver/probe.c -o stage/receiver_probe
+            T=/opt/qnx650/target/qnx6/armle-v7
+            for n in libc.so.3 libsocket.so.3 libm.so.2; do
+              p="$T/lib/$n"; [ -f "$p" ] || p="$T/usr/lib/$n"
+              test -f "$p"
+              "$C-readelf" -WsV "$p" > "evidence/$n.txt"
+            done
+          '
+      - name: Execute untouched receiver in isolated QNX without vehicle or phone
+        run: |
+          set -euo pipefail
+          python3 lab/mu1005_classic_receiver/prepare.py toolchain/tests/qemu-run.sh
+          QNX_DONOR_RECEIVER="$PWD/stage/wcp_receiver" QEMU_KEEP_LOG="$PWD/evidence/serial.log" QEMU_TIMEOUT=90 QEMU_RUN_SECS=35 sh toolchain/tests/qemu-run.sh "$PWD/stage/receiver_probe" 8.5 | tee evidence/runtime.log
+          grep -E 'DONOR_(EXIT|SIGNAL|ALIVE|SPAWN_FAILED)' evidence/runtime.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R105308-receiver-${{ matrix.profile }}-NO-INSTALL
+          path: evidence/
