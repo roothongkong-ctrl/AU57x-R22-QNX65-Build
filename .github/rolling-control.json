@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.211",
+    "version": "R105.212",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 2
+      "dependent_not_yet_listed": 15
     },
     "runs": [],
     "verified_prior": [
@@ -128,10 +128,18 @@
           46089034911
         ],
         "evidence": "actual adapted Rust daemon connected to C supervisor/binding in host lab; QNX ARM adapter compilation passed. No real RF/OEM runtime. Other predicted auto regressions did not appear for this SHA."
+      },
+      {
+        "version": "R105.211",
+        "passed": 2,
+        "runs": [
+          46089244406
+        ],
+        "evidence": "startup coordinator host fixture and ARM partial linking succeeded, OEM runtime not proven"
       }
     ],
-    "discovery": "New startup coordinator host fixture and QNX ARM compilation; API is authoritative.",
-    "expected_jobs": 2
+    "discovery": "Full native library links all supervisor/startup objects; 2 OEM argument lanes; expected 13 existing regressions, actual API count authoritative.",
+    "expected_jobs": 15
   },
   "read_strategy": {
     "first_parallel": [
@@ -151,7 +159,7 @@
         8,
         9
       ],
-      "task": "R105.211 connects the prepared donor FD to existing native startup trace/queue bootstrap, with bounded retry and no repeated bootstrap. Next actual OEM start caller and lease; pursue alternate factory/driver entry in parallel when native lease is not proven.",
+      "task": "R105.212 put actual R105.210/211 startup and daemon binding into the native QNX Bluetooth DSO build, in parallel resolve exact DIO receiver and driver indirect-call argument setup from prior callsites. Do not treat static arguments as a live provider.",
       "paths": [
         "lab/mu1005_route4_5/parallel_native.py",
         "lab/mu1005_route4_5/cleanup_callees.py",
@@ -166,7 +174,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.210 two confirmed successful jobs. R105.211 coordinator pending cloud; no actual OEM startup authority, RF or MFi claimed."
+      "evidence": "R105.211 2/2 PASS. Genuine OEM startup authority/lease and actual receiver/driver runtime still not proven."
     },
     {
       "priority": 2,

@@ -29,6 +29,7 @@ jobs:
           (cd review/source/airplay && sha256sum *.c *.h) > review/evidence/receiver-source.sha256
           cp -R integration/mu1005_si_native review/source/si
           cp -R project/source/legacy_mu1005/bluetooth review/source/bluetooth
+          cp lab/mu1005_route4_5/{daemon_supervisor,supervised_notify,supervised_startup}.{c,h} review/source/bluetooth/
           cp -R tools/review_txn review/source/recovery
           mkdir -p review/source/connection
           cp project/source/src/cp_*.{c,h} review/source/connection/
@@ -146,7 +147,7 @@ jobs:
             b=review/source/bluetooth
             # Isolate QNX public header ABI errors before the larger link.
             printf "%s\n" "#include \"bt_startup_watch.h\"" | "$C" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -I"$b" -x c -fsyntax-only -
-            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$b" "$b"/{native_binding,native_event,inbound,inbound_r5,mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump,rf_arg_experiment,native_eir_bridge,au102_eir_advertisement,upstream_eir,bt_iap2_owner_handoff,bt_route_gate,bt_startup_snapshot,bt_owner_identity,bt_notify_bridge,bt_socket_worker,bt_queue_pulse,bt_self_reader,bt_trace_latch,bt_startup_watch}.c -lsocket -lc -o review/payload/libmu1005_bt_native_review.so
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$b" "$b"/{native_binding,native_event,inbound,inbound_r5,mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump,rf_arg_experiment,native_eir_bridge,au102_eir_advertisement,upstream_eir,bt_iap2_owner_handoff,bt_route_gate,bt_startup_snapshot,bt_owner_identity,bt_notify_bridge,bt_socket_worker,bt_queue_pulse,bt_self_reader,bt_trace_latch,bt_startup_watch,daemon_supervisor,supervised_notify,supervised_startup}.c -lsocket -lc -o review/payload/libmu1005_bt_native_review.so
             "$R" -h -dW -sW review/payload/libmu1005_bt_native_review.so > review/evidence/native-bt-elf.log
             # Existing preload constructor and original pthread forwarding.
             # Compile from checkout to retain the relative SHA256 header.
@@ -179,7 +180,7 @@ jobs:
             "$C" -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -fPIC -shared -Wl,--no-undefined -I"$b" -I"$r" -I"$tcp" "$b"/{mu1005_rf_ingress,mu1005_ipc_stream,mu1005_socket_pump}.c "$r"/{wcp_oem_graft_io,wcp_graft_frames,wcp_stream_bridge}.c "$tcp/tcp_adopt.c" -lsocket -lc -o review/payload/libmu1005_rf_r29_tcp_review.so
             "$R" -h -dW -sW review/payload/libmu1005_rf_r29_tcp_review.so > review/evidence/r29-tcp-elf.log
           ' 2>&1 | tee review/evidence/native-build.log
-          for sym in mu_bt_self_reader_open mu_bt_self_reader_read mu_bt_self_reader_close mu_bt_osapi_target mu_bt_queue_bootstrap mu_bt_queue_pulse_start mu_bt_queue_pulse_stop mu_bt_queue_pulse_retire mu_bt_notify_bind_queue_only mu_bt_notify_periodic_dispatch mu_bt_worker_start mu_bt_worker_poll mu_bt_worker_stop au98_prepare_daemon_socket mu_bt_notify_bind mu_bt_notify_unbind mu_notify_call mu_bt_osapi_thread_matches mu_bt_osapi_identity mu_bt_osapi_identity_matches mu_bt_comm_words_match mu_bt_sdk_started mu_bt_native_eir_builder_review au102_eir_build_original_first mu_bt_native_append_eir mu_bt_native_refresh_eir mu_bt_native_discovery_ready ir5_discovery_ready ir5_drain mu_bt_native_reclaim au98_bind_stock_native au98_adopt_stock_native au98_adopt au98_drive au98_drive_stock_native au98_rearm_stock_native au98_tick au98_withdraw; do
+          for sym in mu_supervised_startup_tick mu_supervised_notify_prepare mu_daemon_supervisor_start mu_bt_self_reader_open mu_bt_self_reader_read mu_bt_self_reader_close mu_bt_osapi_target mu_bt_queue_bootstrap mu_bt_queue_pulse_start mu_bt_queue_pulse_stop mu_bt_queue_pulse_retire mu_bt_notify_bind_queue_only mu_bt_notify_periodic_dispatch mu_bt_worker_start mu_bt_worker_poll mu_bt_worker_stop au98_prepare_daemon_socket mu_bt_notify_bind mu_bt_notify_unbind mu_notify_call mu_bt_osapi_thread_matches mu_bt_osapi_identity mu_bt_osapi_identity_matches mu_bt_comm_words_match mu_bt_sdk_started mu_bt_native_eir_builder_review au102_eir_build_original_first mu_bt_native_append_eir mu_bt_native_refresh_eir mu_bt_native_discovery_ready ir5_discovery_ready ir5_drain mu_bt_native_reclaim au98_bind_stock_native au98_adopt_stock_native au98_adopt au98_drive au98_drive_stock_native au98_rearm_stock_native au98_tick au98_withdraw; do
             awk -v name="$sym" '$7!="UND" && $8==name {found=1} END {exit !found}' review/evidence/native-bt-elf.log
           done
           grep -Eq 'Machine:.*ARM' review/evidence/preload-elf.log
