@@ -1,0 +1,135 @@
+name: Congo component ABI comparison against exact MU1005 (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-congo-pairing-native]
+    paths: ['.github/workflows/mu1005-congo-component-abi.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  oem-index:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract exact retained OEM firmware once
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir firmware original-tools
+          gh run download 45923122041 --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
+          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  $archive" | sha256sum -c -
+          git fetch --depth 1 origin 713fddea9bb11acfdb1df7eff02ca645011ad6d6
+          git archive FETCH_HEAD tools/mu1005_extract_app70.py tools/mu1005_extract_stage2.py | tar -x -C original-tools
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          git init qnxmount
+          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
+          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
+          git -C qnxmount checkout --detach FETCH_HEAD
+          command -v 7z || sudo apt-get install -y p7zip-full
+          python3 -m venv /tmp/extract-venv
+          /tmp/extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          mkdir -p "$RUNNER_TEMP/original"
+          python3 original-tools/tools/mu1005_extract_app70.py "$archive" "$RUNNER_TEMP/app70/app.img"
+          /tmp/extract-venv/bin/python extractor/tools/extract_firmware.py --source "$RUNNER_TEMP/app70/app.img" --output "$RUNNER_TEMP/original/app70" --variant 70 --qnxmount-root "$PWD/qnxmount" > /tmp/app-summary.json
+          /tmp/extract-venv/bin/python original-tools/tools/mu1005_extract_stage2.py "$archive" "$RUNNER_TEMP/original/stage2" --toolkit extractor --qnxmount qnxmount --report /tmp/stage2-summary.json
+      - name: Index exported dynamic symbols without publishing binaries
+        run: |
+          python3 - <<'PY'
+          import concurrent.futures,hashlib,json,os,pathlib,subprocess
+          root=pathlib.Path(os.environ["RUNNER_TEMP"])/"original"
+          def inspect(p):
+              if not p.is_file() or p.is_symlink():return
+              with p.open("rb") as f:
+                  h=f.read(20)
+              if len(h)<20 or h[:6]!=b"\x7fELF\x01\x01" or int.from_bytes(h[18:20],"little")!=40:return
+              r=subprocess.run(["readelf","--dyn-syms","--wide",str(p)],capture_output=True,text=True,errors="replace",timeout=30)
+              if r.returncode:return
+              names=set()
+              for line in r.stdout.splitlines():
+                  a=line.split()
+                  if len(a)>=8 and a[0].endswith(":") and a[4] in ("GLOBAL","WEAK") and a[6]!="UND" and a[5] in ("DEFAULT","PROTECTED"):
+                      names.add(a[7])
+              return {"path":str(p.relative_to(root)),"name":p.name,"sha256":hashlib.sha256(p.read_bytes()).hexdigest(),"exports":sorted(names)}
+          paths=sorted(root.rglob("*"))
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+              rows=[x for x in ex.map(inspect,paths) if x is not None]
+          assert any(x["name"]=="btstack" for x in rows), "stock btstack not indexed"
+          pathlib.Path("evidence").mkdir()
+          pathlib.Path("evidence/oem-symbol-index.json").write_text(json.dumps(rows))
+          print("OEM ARM ELF count",len(rows))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mu1005-private-abi-index
+          path: evidence/oem-symbol-index.json
+          retention-days: 3
+  compare:
+    needs: oem-index
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        component: [bluetooth, connection, receiver]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: mu1005-private-abi-index
+          path: evidence
+      - name: Fetch pinned donor without executing it
+        run: |
+          set -euxo pipefail
+          git init donor
+          git -C donor remote add origin https://github.com/congobg/MHI2Q_WiFi_CarPlay
+          git -C donor fetch --depth 1 origin 223b42f90bf7c15fbbbef23259da36caa9bd4994
+          git -C donor checkout --detach FETCH_HEAD
+      - name: Compare component dependencies and imported symbols
+        env:
+          COMPONENT: ${{ matrix.component }}
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib,re,subprocess,tarfile,tempfile
+          group=os.environ["COMPONENT"]
+          groups={"bluetooth":{"libbthook.so"},"connection":{"wcpd","wcppaird","libwcpshim.so"},"receiver":{"libwcpstart.so","libairplay.so"}}
+          rows=json.loads(pathlib.Path("evidence/oem-symbol-index.json").read_text())
+          exports={}
+          for row in rows:
+              for sym in row["exports"]:
+                  exports.setdefault(sym,set()).add(row["name"])
+          names={x["name"] for x in rows}
+          out=[]
+          with tarfile.open("donor/MHI2QC_3638/wcp.tar.gz","r:gz") as t:
+              for m in t:
+                  name=pathlib.PurePosixPath(m.name).name
+                  if not m.isfile() or name not in groups[group] or m.size>30_000_000:continue
+                  with tempfile.TemporaryDirectory() as d:
+                      p=pathlib.Path(d)/"elf";p.write_bytes(t.extractfile(m).read())
+                      dyn=subprocess.check_output(["readelf","-dW",str(p)],text=True)
+                      syms=subprocess.check_output(["readelf","--dyn-syms","--wide",str(p)],text=True)
+                  deps=re.findall(r"Shared library: \[([^\]]+)\]",dyn)
+                  unresolved=[];matched={}
+                  for line in syms.splitlines():
+                      a=line.split()
+                      if len(a)<8 or not a[0].endswith(":") or a[6]!="UND" or a[4]!="GLOBAL":continue
+                      sym=a[7]
+                      providers=exports.get(sym,set())
+                      if providers:matched[sym]=sorted(providers)
+                      else:unresolved.append(sym)
+                  out.append({"component":name,"direct_needed":deps,"not_in_extracted_oem":[d for d in deps if d not in names],"matching_oem_export_names":matched,"not_in_oem_export_index":sorted(set(unresolved))})
+          assert {x["component"] for x in out}==groups[group]
+          report={"group":group,"scope":"static candidate names only; SDK and donor providers not indexed; no ABI, runtime or authentication proof","installable":False,"components":out}
+          pathlib.Path("result.json").write_text(json.dumps(report,indent=2))
+          print(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: congo-abi-${{ matrix.component }}
+          path: result.json
+          retention-days: 7
