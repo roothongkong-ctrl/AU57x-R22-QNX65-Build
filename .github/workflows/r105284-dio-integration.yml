@@ -1,0 +1,68 @@
+name: R105.284 parallel original DIO startup and receiver integration (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105284-dio-integration.yml','lab/mu1005_dio_launch/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  launch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Build original DIO launch adapter with actual QNX spawn
+        run: |
+          set -euxo pipefail
+          mkdir -p output
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 bash -ec '
+            C=arm-unknown-nto-qnx6.5.0eabi-gcc
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined lab/mu1005_dio_launch/dio_launch.c -lc -o output/libmu1005_dio_launch_review.so
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW -sW output/libmu1005_dio_launch_review.so > output/elf.txt
+            grep -F mu_dio_launch_wireless output/elf.txt
+          '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105284-DIO-launch-NO-INSTALL
+          path: output/
+  receiver:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Reuse exact previously built receiver guards
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir -p previous output
+          gh run download 46125996321 --repo "$GITHUB_REPOSITORY" --name R105283-original-DIO-start-adapter-NO-INSTALL --dir previous
+          test -f previous/dio_property_sites.inc
+          grep -F '{0x0015df88u,0xebfed104u},' previous/dio_property_sites.inc
+          grep -F '{0x0015dfbcu,0xebfed0f7u},' previous/dio_property_sites.inc
+      - name: Combine original DIO control interposer with existing inner iAP2 and native receiver
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 bash -ec '
+            C=arm-unknown-nto-qnx6.5.0eabi-gcc
+            a=project/source/legacy_mu1005/airplay
+            l=lab/mu1005_route4_5
+            i=integration/mu1005_si_native/inner_iap2
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$a" -I"$l" -Itools/review_txn -Iprevious lab/mu1005_dio_direct/interface.c tools/review_txn/sha256.c "$a"/{cprx_service,native_exports,semantic,mu1005_r34_ap_server}.c "$l/dio_existing_receiver.c" "$i"/{inner_iap2,inner_airplay,inner_socket,inner_session,mm_peer,mm_notify}.c -lsocket -lc -o output/libmu1005_dio_runtime_review.so
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW -sW output/libmu1005_dio_runtime_review.so > output/elf.txt
+            for sym in AirPlayReceiverServerControl mu_dio_existing_receiver_open mu_inner_ap_bind; do
+              awk -v name="$sym" '\''$7!="UND" && $8==name {found=1} END {exit !found}'\'' output/elf.txt
+            done
+          '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105284-DIO-runtime-NO-INSTALL
+          path: output/

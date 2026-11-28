@@ -1,0 +1,53 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+#define _POSIX_C_SOURCE 200809L
+#include "dio_launch.h"
+#include <string.h>
+#include <stdio.h>
+#include <errno.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#define STOCK "/mnt/app/eso/bin/apps/dio_manager"
+static int reserved(const char*s){
+ return !strncmp(s,"LD_PRELOAD=",11)||!strncmp(s,"WCP_DIO_WIRELESS=",17)||
+ !strncmp(s,"MU1005_DIO_INTERFACE_REVIEW=",28);
+}
+static int path_ok(const char*p){
+ if(!p||p[0]!='/'||strlen(p)>240)return 0;
+ for(;*p;p++)if(!((*p>='a'&&*p<='z')||(*p>='A'&&*p<='Z')||(*p>='0'&&*p<='9')||
+ *p=='/'||*p=='_'||*p=='-'||*p=='.'))return 0;
+ return 1;
+}
+int mu_dio_launch_wireless(MuDioLaunch*s,uint64_t epoch,char*const argv[],char*const env[],
+ const char*lib,int(*admit)(void*,uint64_t,const char*),void*ctx){
+ char preload[280];char *child[128];unsigned n=0,a=0;
+ if(!s||s->attempted||s->pid>0||!epoch||!argv||!argv[0]||!env||!path_ok(lib)||!admit)return -1;
+ /* Only original process name; do not substitute a donor DIO binary. */
+ const char*name=strrchr(argv[0],'/');name=name?name+1:argv[0];
+ if(strcmp(name,"dio_manager"))return -1;
+ for(;argv[a];++a)if(a>=63)return -1;
+ /* The stock launch environment must be unambiguous. Ordinary USB is
+  * never passed to this function; preexisting preload is not overwritten. */
+ for(;env[n];++n){if(n>=124||reserved(env[n]))return -1;child[n]=env[n];}
+ int k=snprintf(preload,sizeof preload,"LD_PRELOAD=%s",lib);
+ if(k<0||(unsigned)k>=sizeof preload)return -1;
+ child[n++]=preload;child[n++]="WCP_DIO_WIRELESS=1";child[n++]="MU1005_DIO_INTERFACE_REVIEW=1";child[n]=0;
+ if(admit(ctx,epoch,lib)!=1)return -1;
+ s->attempted=1;s->epoch=epoch;
+#if defined(__QNXNTO__)
+ int map[]={0,1,2};
+ s->pid=spawn(STOCK,3,map,NULL,argv,child);
+#else
+ /* No host path execution; this is a QNX-only original process adapter. */
+ s->pid=-1;
+#endif
+ if(s->pid<=0)return -1;
+ /* A PID is not receiver readiness. Retain PID even if SI revokes admission. */
+ return admit(ctx,epoch,lib)==1?0:-2;
+}
+int mu_dio_launch_reap(MuDioLaunch*s){
+ if(!s||s->pid<=0)return -1;
+ int status;pid_t r=waitpid(s->pid,&status,WNOHANG);
+ if(r==0)return 1;
+ if(r==s->pid){s->pid=0;return 0;}
+ return -1;
+}
