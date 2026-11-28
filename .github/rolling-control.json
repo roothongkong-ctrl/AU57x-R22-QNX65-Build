@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.222",
+    "version": "R105.223",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 5
+      "dependent_not_yet_listed": 6
     },
     "runs": [],
     "verified_prior": [
@@ -231,10 +231,19 @@
           46093474748
         ],
         "evidence": "Native ARM observer compiled and readelf confirmed ARM. Packaging failed solely because Docker output inode is root-owned, chmod failed. No actual vehicle observation."
+      },
+      {
+        "version": "R105.222",
+        "passed": 5,
+        "runs": [
+          46093662999,
+          46093662969
+        ],
+        "evidence": "Read-only package built; no need to request new collection from user. Uploaded 001(8).zip SHA identical to R105.196 001(7).zip: cdb2617784d871aa561938ca11e83e346abfa54c0fa18c7a8cf48b9a1f817b63. Historical OSAPI thread visible, live map includes libcomm/libutil, uap0 AP active channel 11, wired mm-ipod/DIO/carplay0 from wired sample 3; no actual wireless registration or owner lease."
       }
     ],
-    "discovery": "R105.222 repairs root-owned package file via runner-owned copy, preserves executable modes in tar.gz, combines already tested stock fixed-path/FD observation with new live btstack snapshot into one SD result even if btstack unavailable. Congo 46092734687 failed on same four original libraries; do not repeat extraction or invent substitutes. Main blocker real stock owner/lifetime, report observational only.",
-    "expected_jobs": 5,
+    "discovery": "User explicitly requires reuse of historical uploads and no repeated requests. Same R106 archive verified byte-identical. New production donor source change: live uap0 IPv4 read before/after AP sample via QNX getifaddrs, no static IP or wired/mmx address substitution; propagated to real Rust Config/StartSession. Host selection and wire tests, full ARM build. Existing logs do not prove lifecycle lease; no installation.",
+    "expected_jobs": 6,
     "pending_prior": []
   },
   "read_strategy": {
@@ -270,7 +279,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.221 observer ARM compiled, packaging failed on chmod; R105.222 fixes delivery and combines stock provider report. Actual owner lease remains unproved, no installation."
+      "evidence": "Reuse R106 live process/OSAPI/map baseline; do not ask for repeated log. No lease or real iAP2 RFCOMM registration from historical capture."
     },
     {
       "priority": 2,
@@ -301,7 +310,8 @@
         "integration/mu1005_si_native/ap_live/ap_refresh.c",
         "project/source/legacy_mu1005/airplay/mu1005_r34_ap_server.c",
         "lab/mu1005_stock_reuse/dns_provider.py"
-      ]
+      ],
+      "evidence": "R105.223 original uap0 actual IPv4 added to live AP config and real StartSession; tests pending. No actual receiver binding or association."
     },
     {
       "priority": 4,
