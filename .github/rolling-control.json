@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.238",
+    "version": "R105.239",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -366,9 +366,18 @@
           46106309492
         ],
         "evidence": "Raw FD adapter QNX ARM actual child-process data exchange success and 4 SI regression jobs. No physical phone."
+      },
+      {
+        "version": "R105.238",
+        "passed": 5,
+        "runs": [
+          46106618374,
+          46106618323
+        ],
+        "evidence": "Existing paired ACL coordinator and four SI host tests passed. Snapshot provider and RF client native calls not integrated."
       }
     ],
-    "discovery": "Wire existing ACL trace latch and existing auto-connect controller via an independent OEM paired-peer snapshot. Initial connected phone supported, no re-pair, wired priority and old release maintained; fixture only, actual native snapshot and client-open/cancel still missing.",
+    "discovery": "Focused actual original peer / SDP / RFCOMM client caller argument and return audit, using exact retained firmware and pinned extraction. No more controller rewrites. Native ABI not assumed.",
     "expected_jobs": 1,
     "pending_prior": [
       46106440500
@@ -406,9 +415,10 @@
         "lab/mu1005_route4_5/supervised_notify.h",
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h",
-        "lab/mu1005_paired_start/paired_start.c"
+        "lab/mu1005_paired_start/paired_start.c",
+        "lab/mu1005_paired_start/client_contract.py"
       ],
-      "evidence": "R105.237 19 jobs passed, QNX joint pending; R105.238 coordinator connects existing latch and car-initiated controller, supports already-connected initial snapshot; real OEM provider missing."
+      "evidence": "R105.238 coordinator cloud success. R105.239 focuses on exact original current peer / SDP / RFCOMM client call arguments instead of new state machine. No native call or actual phone yet."
     },
     {
       "priority": 2,
