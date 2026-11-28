@@ -16,3 +16,22 @@ jobs:
           python3 -m venv /tmp/card70
           /tmp/card70/bin/pip install 'Pillow>=10.4,<13'
           /tmp/card70/bin/python experiments/cluster-compact-card/r24/rgd_card70_fallback.py
+  native-i420:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        cxx: [g++, clang++]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and verify native YUV overlay
+        env:
+          CXX: ${{ matrix.cxx }}
+        run: |
+          set -euo pipefail
+          cd experiments/cluster-compact-card/r24
+          "$CXX" -std=c++11 -O2 -Wall -Wextra -Werror -pedantic test_rgd_card70_i420.cpp -o /tmp/rgd-card70
+          /tmp/rgd-card70
+          "$CXX" -std=c++11 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer test_rgd_card70_i420.cpp -o /tmp/rgd-card70-sanitized
+          /tmp/rgd-card70-sanitized
