@@ -1,0 +1,2 @@
+# R105.323 原厂 native EA 端点分类
+R105.322 run 46146096294 确认真正 EFS 配置 etc/eso/production/dio_manager.json 使用 /dev/ipod0；另发现 CarLife 的 carlife 和 iap_nativeea 含 /dev/iap2native，属于新候选，不预设能承载 CarPlay。此轮核对两原厂模块的依赖、资源管理器/IPC/蓝牙/USB/网络符号、端点引用，判断 provider 与 consumer，若只为 EA 应用层则排除，不再误用。不运行或修改原厂程序，不更改有线路径，不伪造 MFi。NO INSTALL。
