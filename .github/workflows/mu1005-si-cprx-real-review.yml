@@ -21,6 +21,7 @@ on:
       - '.github/workflows/mu1005-si-cprx-real-review.yml'
       - 'docs/MASTER_HANDOFF_AND_NO_REPEAT_RULES_CN.md'
       - 'docs/WIRELESS_FIRST_LINK_TASK_REGISTER_CN.md'
+      - '.github/rolling-control.json'
   workflow_dispatch:
 permissions:
   contents: read

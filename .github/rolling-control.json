@@ -1,0 +1,181 @@
+{
+  "schema": 1,
+  "project": "AU57x MU1005 纯软件无线CarPlay",
+  "branch": "mu1005-si-cprx-real-review",
+  "command": "1 = 查状态、验收、修失败、立即补位；无需重复读取全部历史",
+  "goal": "首次真实不插USB无线CarPlay会话，先2.4GHz，保留原厂认证与有线；双频后置",
+  "budget": {
+    "max_jobs": 20,
+    "count": [
+      "running",
+      "queued",
+      "pending dependent jobs",
+      "new automatic regressions"
+    ],
+    "no_padding": true,
+    "refill_on_each_interaction": true,
+    "never_wait_for_whole_batch": true
+  },
+  "acceptance": {
+    "total": 66,
+    "limited_software_completed": 35,
+    "remaining": 31,
+    "new_order_closed": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "software_remaining": [
+      6,
+      8,
+      9,
+      11,
+      12,
+      14,
+      17,
+      18,
+      21,
+      22,
+      23,
+      24,
+      35
+    ],
+    "note": "此前12项统计未计入部分MFi等的交叉依赖；按实际任务登记为准。上述13个编号含第12项跨实车的联合接线，不代表13个独立开发工程。实际完成必须按证据更新，不凭测试数推算。",
+    "install_allowed": false,
+    "vehicle_evidence_required": true
+  },
+  "baseline": {
+    "commit": "41523a1a87b62b2576684d8eb91867e46b0b8b87",
+    "version": "R105.205",
+    "observed_jobs": {
+      "success": 17,
+      "running": 1,
+      "failed": 0,
+      "dependent_not_yet_listed": 1
+    },
+    "runs": [
+      {
+        "id": 46087191846,
+        "expected": 9,
+        "state": "in_progress"
+      },
+      {
+        "id": 46087191865,
+        "expected": 4,
+        "state": "success"
+      },
+      {
+        "id": 46087191869,
+        "expected": 4,
+        "state": "success"
+      },
+      {
+        "id": 46087191902,
+        "expected": 2,
+        "state": "success"
+      }
+    ],
+    "verified_prior": [
+      {
+        "version": "R105.201",
+        "passed": 20
+      },
+      {
+        "version": "R105.202",
+        "passed": 16
+      },
+      {
+        "version": "R105.203",
+        "passed": 2
+      },
+      {
+        "version": "R105.204",
+        "passed": 2
+      }
+    ]
+  },
+  "read_strategy": {
+    "first_parallel": [
+      "read this file from active branch",
+      "GET /actions/runs?branch=<branch>&per_page=12",
+      "GET /branches/<branch> only if writing"
+    ],
+    "second_parallel": "fetch jobs only for current HEAD, unfinished runs from baseline, or newly failed runs; skip historical successful runs. If recent list omits active run, fetch its recorded ID explicitly. Reserve dependent jobs not yet returned. Fetch failed job logs only. Status from API, never assume snapshot current.",
+    "write_strategy": "Update baseline/run IDs and next queue in this file with each real code commit. Do not reread giant master docs unless an exact relevant section is needed. Single atomic tree/commit/ref with expected old SHA. Do not create a commit only to say test passed unless it changes next action or acceptance. Preserve historical evidence in original docs.",
+    "no_repeat": "Reuse exact donor sources and caches; test changed code with focused negative/positive regression; no unrelated full scan; keep required auto regression and genuine failures visible."
+  },
+  "next": [
+    {
+      "priority": 1,
+      "steps": [
+        6,
+        8,
+        9
+      ],
+      "task": "原厂真实启动调用及生命周期接入；不是再添加普通保护层。R105.198无统一stop导入；从两条已确认真实OSAPI stop调用及启动完成边界确定可证明的同一owner机制，不能推测锁或绕过原厂。",
+      "paths": [
+        "project/source/legacy_mu1005/bluetooth/bt_queue_pulse.c",
+        "project/source/legacy_mu1005/bluetooth/bt_startup_watch.c",
+        "integration/mu1005_si_native/BT_QUEUE_BOOTSTRAP_CN.md",
+        "lab/mu1005_route4_5/daemon_supervisor.c",
+        "project/source/legacy_mu1005/bluetooth/bt_notify_bridge.c"
+      ],
+      "evidence": "R105.203/204真实host donor通过、ARM编译通过；R105.205持续FD见证与移交专项通过；还缺真实原厂caller及lease。"
+    },
+    {
+      "priority": 2,
+      "steps": [
+        11,
+        12
+      ],
+      "task": "复用已有driver/transport ABI与IPC字节确认，完成实际producer接线；依赖原厂owner，不重复已通过的字节模型。",
+      "paths": [
+        "lab/mu1005_route3_dispatch/ipc_finish.c",
+        "project/source/src/cp_step2_ipc_link.c"
+      ]
+    },
+    {
+      "priority": 3,
+      "steps": [
+        14,
+        17,
+        18,
+        21,
+        22,
+        23,
+        24
+      ],
+      "task": "优先独立真实原厂provider与接收器/Bonjour入口绑定，复用已通过适配；只有新增实际接线或新证据才开启专项。",
+      "paths": [
+        "project/source/src/cp_step04_stock_mfi.c",
+        "integration/mu1005_si_native/ap_live/ap_refresh.c",
+        "project/source/legacy_mu1005/airplay/mu1005_r34_ap_server.c",
+        "lab/mu1005_stock_reuse/dns_provider.py"
+      ]
+    },
+    {
+      "priority": 4,
+      "steps": [
+        35
+      ],
+      "task": "复用MIB现有备份恢复及事务引擎，首连后完成一键安装；当前NO INSTALL。"
+    }
+  ],
+  "rules": [
+    "15项批准决定不再询问，见docs/R105197_USER_DECISIONS_CN.md",
+    "四路线及安全回滚不变",
+    "GitHub成熟代码优先，记录commit/license；不可绕过MFi",
+    "下一轮不等待全批完成，有独立可执行任务即补位；无独立任务不凑数",
+    "GitHub测试可自行运行；聊天结束后不会自主写新代码；控制文件非后台AI调度器"
+  ],
+  "history": [
+    "docs/WIRELESS_FIRST_LINK_TASK_REGISTER_CN.md",
+    "docs/MASTER_HANDOFF_AND_NO_REPEAT_RULES_CN.md"
+  ],
+  "upstream": {
+    "daemon": "luka-dev/mib2q-carplay-rgi@20c94f51c0f0ae88b154c12e4f604643ba23022c",
+    "toolchain": "luka-dev/qnx65-armv7-toolchain@baa45224f18ae6b13c2e9c77c6663bb8181eb6a1"
+  }
+}
