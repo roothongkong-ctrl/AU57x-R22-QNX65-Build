@@ -1,0 +1,63 @@
+name: MU1005 recovery staging regression (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['integration/mu1005_vehicle_stage/recover.sh', '.github/workflows/mu1005-vehicle-stage-recovery.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recovery:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        scenario: [normal, corrupt, incomplete, duplicate, existing, symlink, lock, interrupted]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise real backup and recovery staging scripts
+        env:
+          CASE: ${{ matrix.scenario }}
+        run: |
+          set -euo pipefail
+          root=$(mktemp -d)
+          trap 'rm -rf "$root"' EXIT
+          touch "$root/LAB_ONLY"
+          mkdir -p "$root/eso/bin/apps"
+          for n in btstack bluetooth smartphone_integrator dio_manager; do
+            printf '%s\n' "original-$n" > "$root/eso/bin/apps/$n"
+          done
+          expected=$(sha256sum "$root/eso/bin/apps/btstack" | awk '{print $1}')
+          backup="$root/backup-test"
+          sh integration/mu1005_vehicle_stage/backup.sh host-fixture "$backup" "$root" "$expected"
+          s=integration/mu1005_vehicle_stage/recover.sh
+          sh -n "$s"
+          final="$root/MU1005-recovery-ready"
+          (cd "$root/eso/bin/apps"; sha256sum *) > "$root/originals.before"
+          case "$CASE" in
+            normal) ;;
+            corrupt) echo bad >> "$backup/dio_manager" ;;
+            incomplete) rm "$backup/COMPLETE" ;;
+            duplicate) head -n1 "$backup/SHA256.tsv" >> "$backup/SHA256.tsv" ;;
+            existing) mkdir "$final"; echo sentinel > "$final/sentinel" ;;
+            symlink) rm "$backup/dio_manager"; ln -s "$root/eso/bin/apps/dio_manager" "$backup/dio_manager" ;;
+            lock) mkdir "$root/.MU1005-recovery-lock" ;;
+            interrupted) mkdir "$root/.MU1005-recovery-abandoned"; echo partial > "$root/.MU1005-recovery-abandoned/btstack" ;;
+          esac
+          case "$CASE" in
+            normal|interrupted)
+              sh "$s" verify "$backup" "$root"
+              sh "$s" stage "$backup" "$root"
+              test "$(cat "$final/COMPLETE")" = RECOVERY_STAGED_CORE_ONLY
+              for n in btstack bluetooth smartphone_integrator dio_manager; do cmp "$root/eso/bin/apps/$n" "$final/$n"; done
+              ;;
+            *)
+              if sh "$s" stage "$backup" "$root"; then echo "unexpected success"; exit 1; fi
+              test ! -f "$final/COMPLETE"
+              if [ "$CASE" = existing ]; then test "$(cat "$final/sentinel")" = sentinel; fi
+              ;;
+          esac
+          (cd "$root/eso/bin/apps"; sha256sum *) > "$root/originals.after"
+          cmp "$root/originals.before" "$root/originals.after"
+          echo "RECOVERY_CASE_PASS $CASE; staging only"
