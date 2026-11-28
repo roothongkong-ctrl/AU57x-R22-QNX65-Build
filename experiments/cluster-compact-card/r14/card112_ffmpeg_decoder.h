@@ -28,6 +28,7 @@ class Card112Decoder {
     uint64_t session_;
     uint64_t completed_;
     uint64_t rejected_;
+    uint64_t last_submit_us_;
     bool active_;
     bool decode_packet(const uint8_t *bytes,int len,uint64_t now) {
         if(len<=0||!bytes||len>2*1024*1024){++rejected_;return false;}
@@ -57,9 +58,19 @@ class Card112Decoder {
                                frame_->data[plane]+(size_t)y*frame_->linesize[plane],w);
                     off+=(size_t)w*h;
                 }
-                if(good && out_.submit(r12::ORIGINAL_CARD_112,session_,now,
-                                     packed.data(),800,298))++completed_;
-                else {good=false;++rejected_;}
+                /* One network read may yield multiple decoded pictures.
+                 * R12 requires strictly increasing per-source timestamps.
+                 * Preserve real receive time as baseline; advance by 1us only
+                 * for frames from the SAME read. Reset for every session. */
+                uint64_t ordered=now;
+                if(ordered<=last_submit_us_ && last_submit_us_!=UINT64_MAX)
+                    ordered=last_submit_us_+1;
+                if(good && ordered>=now &&
+                   out_.submit(r12::ORIGINAL_CARD_112,session_,ordered,
+                               packed.data(),800,298)){
+                    last_submit_us_=ordered;
+                    ++completed_;
+                }else {good=false;++rejected_;}
             }else ++rejected_;
             av_frame_unref(frame_);
             if(!good)return false;
@@ -70,7 +81,7 @@ class Card112Decoder {
 public:
     explicit Card112Decoder(r12::Joiner &dst):
         parser_(NULL),codec_(NULL),frame_(NULL),pkt_(NULL),
-        out_(dst),session_(0),completed_(0),rejected_(0),active_(false) {
+        out_(dst),session_(0),completed_(0),rejected_(0),last_submit_us_(0),active_(false) {
         const AVCodec *dec=avcodec_find_decoder(AV_CODEC_ID_H264);
         if(dec){
             codec_=avcodec_alloc_context3(dec);
@@ -98,12 +109,12 @@ public:
         parser_=av_parser_init(AV_CODEC_ID_H264);
         if(!parser_)return false;
         av_packet_unref(pkt_);av_frame_unref(frame_);
-        session_=session;active_=true;completed_=rejected_=0;
+        session_=session;active_=true;completed_=rejected_=last_submit_us_=0;
         return true;
     }
     void drop(){
         if(active_)out_.drop(r12::ORIGINAL_CARD_112,session_);
-        active_=false;session_=0;
+        active_=false;session_=0;last_submit_us_=0;
     }
     bool feed_annexb(const uint8_t* data,size_t len,uint64_t now){
         if(!active_||!parser_||!codec_||!data||!len||!now||len>2*1024*1024){
