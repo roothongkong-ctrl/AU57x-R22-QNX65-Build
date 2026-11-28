@@ -1,0 +1,60 @@
+name: R23 single preload compatibility ARM build (REVIEW ONLY)
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [experiment/cluster-card-r24-r26-integrated]
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'experiments/cluster-compact-card/r24/build_single_carplay_hook.sh'
+      - '.github/workflows/cluster-card-r23-single-hook.yml'
+permissions:
+  contents: read
+jobs:
+  merged-hook:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare pinned upstream sources
+        id: deps
+        run: |
+          set -euo pipefail
+          git clone -q --depth 1 --branch v1.2.14 https://github.com/MacsInSpace/mib-cluster-map.git upstream
+          git init -q luka
+          git -C luka fetch -q --depth 1 https://github.com/luka-dev/mib2q-carplay-rgi.git 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C luka checkout -q FETCH_HEAD
+          python3 experiments/cluster-compact-card/r24/prepare_rgi_bridge.py upstream luka
+          git clone -q --depth 1 https://github.com/luka-dev/qnx65-armv7-toolchain.git qnx-toolchain
+          echo "toolchain=$(git -C qnx-toolchain rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Reuse QNX ARM image
+        id: qnx-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: docker-images/qnx65-armv7-toolchain_8.5.tar.gz
+          key: qnx65-armv7-amd64-8.5-v1-${{ steps.deps.outputs.toolchain }}
+      - name: Load toolchain; build only if cache missing
+        run: |
+          set -euo pipefail
+          if ! sh upstream/tools/docker_image.sh qnx65-armv7-toolchain:8.5; then
+            (cd qnx-toolchain && ./host-scripts/qnx-run.sh build 8.5)
+          fi
+          sh upstream/tools/docker_image.sh qnx65-armv7-toolchain:8.5
+      - name: Save toolchain for future changes
+        if: steps.qnx-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: docker-images/qnx65-armv7-toolchain_8.5.tar.gz
+          key: ${{ steps.qnx-cache.outputs.cache-primary-key }}
+      - name: Compile just the single merged hook and compare exports
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash experiments/cluster-compact-card/r24/build_single_carplay_hook.sh 2>&1 | tee evidence/merged-build.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: merged-carplay-hook-review-NO-INSTALL
+          path: |
+            evidence/*.review
+            evidence/*.txt
+            evidence/*.log

@@ -1,0 +1,104 @@
+name: R23 native bridge ARM build (REVIEW ONLY)
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [experiment/cluster-card-r24-r26-integrated]
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'experiments/cluster-compact-card/r24/prepare_rgi_bridge.py'
+      - 'experiments/cluster-compact-card/r24/prepare_player.py'
+      - 'experiments/cluster-compact-card/r24/rgd_card70_bridge.h'
+      - 'experiments/cluster-compact-card/r24/rgd_card70_i420.h'
+      - 'experiments/cluster-compact-card/r17/**'
+permissions:
+  contents: read
+concurrency:
+  group: r23-native-bridge
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply bridge to pinned upstream source trees
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          git clone -q --depth 1 --branch v1.2.14 https://github.com/MacsInSpace/mib-cluster-map.git upstream
+          git init -q luka
+          git -C luka fetch -q --depth 1 https://github.com/luka-dev/mib2q-carplay-rgi.git 20c94f51c0f0ae88b154c12e4f604643ba23022c
+          git -C luka checkout -q FETCH_HEAD
+          python3 experiments/cluster-compact-card/r24/prepare_rgi_bridge.py upstream luka
+          git -C upstream diff > evidence/player.patch
+          git -C luka diff > evidence/rgd-hook.patch
+      - name: Identify reusable build dependencies
+        id: deps
+        run: |
+          set -euo pipefail
+          git clone -q --depth 1 https://github.com/luka-dev/qnx65-armv7-toolchain.git qnx-toolchain
+          echo "toolchain=$(git -C qnx-toolchain rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "ffmpeg=$(sha256sum upstream/build_local.sh upstream/tools/qnx_cc.sh upstream/tools/ffmpeg_qnx_aligned.sh | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Restore QNX 6.5 GCC 8.5 Docker image
+        id: qnx-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: docker-images/qnx65-armv7-toolchain_8.5.tar.gz
+          key: qnx65-armv7-amd64-8.5-v1-${{ steps.deps.outputs.toolchain }}
+      - name: Load existing toolchain or build on cache miss
+        run: |
+          set -euo pipefail
+          if ! sh upstream/tools/docker_image.sh qnx65-armv7-toolchain:8.5; then
+            (cd qnx-toolchain && ./host-scripts/qnx-run.sh build 8.5)
+          fi
+          sh upstream/tools/docker_image.sh qnx65-armv7-toolchain:8.5
+          docker run --rm qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-g++ --version
+          test -s docker-images/qnx65-armv7-toolchain_8.5.tar.gz
+      - name: Save QNX image immediately for later builds
+        if: steps.qnx-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: docker-images/qnx65-armv7-toolchain_8.5.tar.gz
+          key: ${{ steps.qnx-cache.outputs.cache-primary-key }}
+      - name: Restore existing FFmpeg ARM static libraries
+        id: ffmpeg-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: upstream/build/ffmpeg-mini
+          key: qnx-ffmpeg-6.1.5-neon-v1-${{ steps.deps.outputs.toolchain }}-${{ steps.deps.outputs.ffmpeg }}
+      - name: Build modified player only
+        run: |
+          set -euo pipefail
+          cd upstream
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("build_local.sh")
+          s=p.read_text()
+          a=" -DNDEBUG -I$FF -I. opengl_gpu.cc"
+          assert s.count(a)==1
+          p.write_text(s.replace(a," -DNDEBUG -DCLUSTERMAP_RGD_CARD70_LAB -std=c++11 -I$FF -I. opengl_gpu.cc"))
+          PY
+          ./build_local.sh player 2>&1 | tee ../evidence/player-build.log
+          cp build/stream-player ../evidence/stream-player.rgd70.review
+          readelf -h -d ../evidence/stream-player.rgd70.review > ../evidence/player-elf.txt
+      - name: Save compiled FFmpeg once
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: upstream/build/ffmpeg-mini
+          key: ${{ steps.ffmpeg-cache.outputs.cache-primary-key }}
+      - name: Build modified RGI hook separately (do not preload together)
+        run: |
+          set -euo pipefail
+          cd luka
+          QNX_TOOLCHAIN_VARIANT=8.5 HOOK_AUDIO=0 HOOK_WIRELESS=0 bash scripts/build_hook.sh 2>&1 | tee ../evidence/rgd-hook-build.log
+          cp build/unprotected/libcarplay_hook.so ../evidence/libcarplay_hook.rgd70.review
+          readelf -h -d ../evidence/libcarplay_hook.rgd70.review > ../evidence/hook-elf.txt
+          cd ../evidence
+          sha256sum *.review > SHA256SUMS.txt
+          echo 'Separate review binaries only; not a verified K1006_2 integration. Never preload both hooks. Live source, original map geometry and RGI compatibility remain unverified.' > README.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-bridge-review-NO-INSTALL
+          path: evidence/

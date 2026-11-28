@@ -1,0 +1,168 @@
+name: R26 upstream SD input fix and recovery checks (NO INSTALL)
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [experiment/cluster-card-r24-r26-integrated]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [experiment/cluster-card-r26-sd-input-fix]
+    paths: ['.github/workflows/cluster-card-r26-sd-check.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  release-recovery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch original released SD card and source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence downloads
+          git clone -q --depth 1 --branch v1.2.14 https://github.com/MacsInSpace/mib-cluster-map.git upstream
+          gh api repos/MacsInSpace/mib-cluster-map/releases/tags/v1.2.14 > evidence/release.json
+          gh release download v1.2.14 -R MacsInSpace/mib-cluster-map -p '*.zip' -D downloads
+          cd downloads
+          test "$(find . -maxdepth 1 -name '*.zip' | wc -l)" -eq 1
+          python3 - <<'PY'
+          import hashlib, json, pathlib, re
+          z=next(pathlib.Path(".").glob("*.zip"))
+          release=json.loads(pathlib.Path("../evidence/release.json").read_text())
+          assets=[a for a in release["assets"] if a["name"]==z.name]
+          assert len(assets)==1
+          a=assets[0]
+          digest=hashlib.file_digest(z.open("rb"),"sha256").hexdigest()
+          assert z.stat().st_size==a["size"], "release asset size mismatch"
+          expected=a.get("digest")
+          if expected:
+              assert re.fullmatch(r"sha256:[a-f0-9]{64}",expected)
+              assert expected=="sha256:"+digest, "release asset digest mismatch"
+              status="PASS: GitHub release asset SHA256 matches"
+          else:
+              status="UNVERIFIED: no publisher archive digest; internal manifest checked separately"
+          pathlib.Path("../evidence/archive-integrity.txt").write_text(status+"\n"+digest+"  "+z.name+"\n")
+          print(status)
+          PY
+          mkdir -p ../upstream/dist/sdcard
+          python3 - <<'PY'
+          import pathlib, zipfile, stat
+          archive=next(pathlib.Path(".").glob("*.zip"))
+          target=pathlib.Path("../upstream/dist/sdcard").resolve()
+          with zipfile.ZipFile(archive) as z:
+              for m in z.infolist():
+                  p=target/m.filename
+                  assert p.resolve().is_relative_to(target)
+                  assert not stat.S_ISLNK(m.external_attr>>16)
+              z.extractall(target)
+          PY
+          test -f ../upstream/dist/sdcard/ClusterMap/enable_hook.sh
+          test -f ../upstream/dist/sdcard/ClusterMap/disable_hook.sh
+      - name: Run upstream source and actual released script checks
+        run: |
+          set -euo pipefail
+          cd upstream
+          (
+            sh tests/regression_guards.sh
+            sh tests/unit_shell_lint_test.sh
+            sh tests/profile_check_test.sh
+            sh tests/cluster_frame_test.sh
+            python3 tools/check_scripts.py dist/sdcard/ClusterMap
+            python3 tools/unit_shell_lint.py dist/sdcard/ClusterMap
+            cd dist/sdcard/ClusterMap
+            sha256sum -c SHA256SUMS.txt
+          ) 2>&1 | tee ../evidence/release-checks.log
+      - name: Retrieve completed R25 ARM build, pinned to original job
+        uses: actions/download-artifact@v4
+        with:
+          name: qnx-arm-player-review-NO-INSTALL
+          run-id: 46108814347
+          github-token: ${{ github.token }}
+          path: arm-review
+      - name: Rehearse player replacement and byte-exact recovery on host copy
+        run: |
+          set -euo pipefail
+          (cd arm-review && sha256sum -c SHA256SUMS.txt)
+          python3 - <<'PY' | tee evidence/player-recovery-rehearsal.log
+          from pathlib import Path
+          import hashlib, re, shutil, struct, tempfile, json
+          original=Path("upstream/dist/sdcard")
+          player=Path("arm-review/stream-player.experimental")
+          stock=Path("arm-review/stream-player.stock")
+          def digest(p):
+              return hashlib.file_digest(p.open("rb"),"sha256").hexdigest()
+          def check_elf(p):
+              b=p.read_bytes()
+              assert b[:6]==b"\x7fELF\x01\x01" and struct.unpack_from("<H",b,18)[0]==40
+              assert b"/usr/lib/ldqnx.so.2\x00" in b
+          check_elf(player)
+          check_elf(stock)
+          assert digest(player)!=digest(stock), "experimental and stock identical"
+          def snapshot(root):
+              return {str(p.relative_to(root)):digest(p) for p in root.rglob("*") if p.is_file()}
+          before=snapshot(original)
+          rel="ClusterMap/stream-player"
+          manifest="ClusterMap/SHA256SUMS.txt"
+          with tempfile.TemporaryDirectory() as d:
+              root=Path(d)/"host-only"
+              shutil.copytree(original,root)
+              backup=Path(d)/"release-player.original"
+              target=root/rel
+              shutil.copy2(target,backup)
+              assert digest(backup)==before[rel]
+              old_manifest=(root/manifest).read_bytes()
+              lines=old_manifest.decode("ascii").splitlines(keepends=True)
+              hits=[i for i,l in enumerate(lines) if re.fullmatch(r"[0-9a-f]{64} [ *]stream-player\r?\n?",l)]
+              assert len(hits)==1
+              i=hits[0]
+              assert lines[i][:64]==before[rel]
+              shutil.copy2(player,target)
+              lines[i]=digest(target)+lines[i][64:]
+              (root/manifest).write_bytes("".join(lines).encode("ascii"))
+              after=snapshot(root)
+              assert set(after)==set(before)
+              changed={p for p in before if before[p]!=after[p]}
+              assert changed=={rel,manifest}, changed
+              assert after[rel]==digest(player)
+              # Validate every original manifest member after updating only player hash.
+              for line in (root/manifest).read_text().splitlines():
+                  m=re.fullmatch(r"([0-9a-f]{64}) [ *](.+)",line)
+                  assert m, line
+                  h,n=m.groups()
+                  assert digest(root/"ClusterMap"/n)==h, n
+              print("PASS: only player and its SHA256 manifest changed; all installer/metadata files untouched")
+              shutil.copy2(backup,target)
+              (root/manifest).write_bytes(old_manifest)
+              assert snapshot(root)==before
+              print("PASS: host rehearsal restored every original file byte-for-byte")
+              # Export hashes, not a runnable SD tree; never copy host-only tree to artifact.
+              report={"scope":"host copy only; NOT a vehicle install or complete unit restore",
+                      "original_release_player":before[rel],"built_stock_player":digest(stock),
+                      "experimental_player":digest(player),"changed_files":sorted(changed),
+                      "restored_files":len(before),"source_run":46108814347}
+              Path("evidence/player-recovery-rehearsal.json").write_text(json.dumps(report,indent=2)+"\n")
+          assert snapshot(original)==before
+          PY
+      - name: Execute original full recovery harness only with actual unit fixtures
+        run: |
+          set -euo pipefail
+          cd upstream
+          set +e
+          ./build_local.sh simtest 2>&1 | tee ../evidence/unit-simulation.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          if [ "$rc" -eq 77 ]; then
+            echo 'FULL UNIT RECOVERY: SKIPPED (missing original unit fixture or Docker), NOT PASSED' | tee ../evidence/recovery-status.txt
+          elif [ "$rc" -eq 0 ]; then
+            echo 'FULL UNIT RECOVERY: PASS' | tee ../evidence/recovery-status.txt
+          else
+            echo "FULL UNIT RECOVERY: FAIL ($rc)" | tee ../evidence/recovery-status.txt
+            exit "$rc"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r26-original-sd-review-NO-INSTALL
+          path: evidence/
