@@ -16,46 +16,11 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - name: Reuse pinned QNX toolchain
-        run: |
-          set -euxo pipefail
-          mkdir -p output
-          git init toolchain
-          git -C toolchain fetch --depth 1 https://github.com/luka-dev/qnx65-armv7-toolchain.git baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
-          git -C toolchain checkout --detach FETCH_HEAD
-          test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
-      - name: Restore checksum-pinned GNU source cache
-        id: gnu-cache
-        uses: actions/cache/restore@v4
+      - uses: ./.github/actions/mu1005-qnx-image
         with:
-          path: ~/.cache/au57x-gnu
-          key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
-      - name: Fetch and verify GNU archives from independent mirrors
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee output/gnu-sources.log
-      - name: Save verified archives before building
-        if: steps.gnu-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.cache/au57x-gnu
-          key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
-      - name: Configure reusable QNX compiler build cache
-        uses: docker/setup-buildx-action@v3
-      - name: Build locked ARM toolchain with reusable compiler layers
-        uses: docker/build-push-action@v6
-        with:
-          context: toolchain
-          platforms: linux/amd64
-          target: base-env
-          build-args: BASE=base-8.5
-          tags: qnx65-armv7-toolchain:8.5
-          load: true
-          push: false
-          cache-from: type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1
-          cache-to: type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1,mode=min,ignore-error=true
-
+          require-cache: 'true'
+      - name: Prepare output
+        run: mkdir -p output
       - name: Link original CPRX receiver with integrated native job adapter
         run: |
           set -euxo pipefail
