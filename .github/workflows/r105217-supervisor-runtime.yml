@@ -1,0 +1,52 @@
+name: R105.217 actual QNX supervisor process and socket (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105217-supervisor-runtime.yml, lab/mu1005_supervisor_runtime/**]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  host-process:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -euxo pipefail
+          l=lab/mu1005_route4_5
+          cc -std=c99 -Wall -Wextra -Werror -I"$l" "$l/daemon_supervisor.c" lab/mu1005_supervisor_runtime/test_process.c -o /tmp/mu-supervisor-test
+          timeout 20 /tmp/mu-supervisor-test
+  qnx-process:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Fetch pinned boot harness
+        run: |
+          set -euxo pipefail
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain.git
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          test "$(git -C toolchain rev-parse HEAD)" = baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+      - name: Run real QNX spawn and loopback connection
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -Ilab/mu1005_route4_5 lab/mu1005_route4_5/daemon_supervisor.c lab/mu1005_supervisor_runtime/test_process.c -lsocket -lc -o evidence/mu-supervisor-test
+          python3 lab/mu1005_supervisor_runtime/prepare_net.py toolchain/tests/qemu-run.sh
+          QEMU_KEEP_LOG="$PWD/evidence/serial.log" QEMU_TIMEOUT=100 QEMU_RUN_SECS=45 sh toolchain/tests/qemu-run.sh "$PWD/evidence/mu-supervisor-test" 8.5 | tee evidence/runtime.log
+          grep -F SUPERVISOR_CHILD_REAL_FD3_EOF_PASS evidence/runtime.log
+          grep -F SUPERVISOR_REAL_SPAWN_FD3_REAP_PASS_NO_OEM evidence/runtime.log
+          grep -E 'Process [0-9]+ \(mu-supervisor-test\) exited status=0' evidence/serial.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R105217-QNX-process-NO-INSTALL
+          path: evidence/*.log
