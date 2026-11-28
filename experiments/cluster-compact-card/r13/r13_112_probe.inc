@@ -11,6 +11,9 @@
 #ifndef CLUSTERMAP_CARD_R13_112_PROBE_INC
 #define CLUSTERMAP_CARD_R13_112_PROBE_INC
 
+#ifdef CLUSTERMAP_R16_112_TEE_LAB
+#include "r16_card_tee.h"
+#endif
 #define R13_STREAM_CARD 112
 #define R13_CARD_UUID "b7e6c5a0-2222-4000-8000-000000000003"
 #define R13_CARD_URL ALT_URL_INSTRUCTIONCARD
@@ -100,6 +103,11 @@ static void *r13_card_worker(void *arg)
     unsigned configs=0,frames=0,decrypted=0,rejects=0;
     uint64_t bytes=0,probe_stream=0;
     struct alt111_video parsed112;
+#ifdef CLUSTERMAP_R16_112_TEE_LAB
+    struct r16_card_tee r16tee;
+    int r16tee_on=0;
+    r16_card_tee_reset(&r16tee);
+#endif
     alt111_video_init(&parsed112);
     probe_stream=alt111_video_begin(&parsed112,r13_session_connection);
     fd=accept(listener,NULL,NULL);
@@ -111,12 +119,25 @@ static void *r13_card_worker(void *arg)
     pthread_mutex_lock(&r13_lock);
     r13_client_fd=fd;
     pthread_mutex_unlock(&r13_lock);
+#ifdef CLUSTERMAP_R16_112_TEE_LAB
+    {
+        const char*enable=getenv("CLUSTERMAP_R16_112_TEE");
+        if(enable && strcmp(enable,"1")==0 &&
+           r16_card_tee_open(&r16tee,&parsed112,R16_CARD_PORT)==0){
+            r16tee_on=1;
+            logf_u2("R16 experimental 112 Annex-B at 127.0.0.1:%d (lab only)",R16_CARD_PORT);
+        }
+    }
+#endif
     logf_u2("R13 type112 iPhone socket connected, validating encrypted packet flow");
     for(;;){
         AirPlayScreenHeaderCompat h;
         uint8_t *body=NULL;
         int rr;
         if(r13_stop_flag)break;
+#ifdef CLUSTERMAP_R16_112_TEE_LAB
+        if(r16tee_on)r16_card_tee_pump(&r16tee);
+#endif
         rr=read_exact(fd,&h,sizeof(h));
         if(rr<=0)break;
         if(h.bodySize>MAX_SCREEN_BODY){++rejects;break;}
@@ -162,13 +183,27 @@ static void *r13_card_worker(void *arg)
                  h.opcode!=K_SCREEN_FORCE_KEYFRAME){
             ++rejects;
         }
+#ifdef CLUSTERMAP_R16_112_TEE_LAB
+        if(r16tee_on)r16_card_tee_pump(&r16tee);
+#endif
         free(body);
-        /* Bounded observational run: don't keep private stream alive indefinitely. */
+        /* R13 probe bounded at 120; opt-in R16 lab capped at 30000 AUs. */
+#ifdef CLUSTERMAP_R16_112_TEE_LAB
+        if((!r16tee_on && frames>=120u)||(r16tee_on&&frames>=30000u)||rejects>=10u)break;
+#else
         if(frames>=120u || rejects>=10u)break;
+#endif
     }
     logf_u2("R13 type112 SUMMARY connection=%llu avcC=%u ctrCalls=%u validatedH264=%u bytes=%llu rejects=%u (GaoDe content NOT verified)",
             (unsigned long long)r13_session_connection,configs,decrypted,frames,
             (unsigned long long)bytes,rejects);
+#ifdef CLUSTERMAP_R16_112_TEE_LAB
+    if(r16tee_on){
+        logf_u2("R16 loopback summary connects=%u bytes=%llu disconnects=%u errors=%u",
+          r16tee.connected,(unsigned long long)r16tee.sent_bytes,r16tee.detached,r16tee.errors);
+        r16_card_tee_close(&r16tee);
+    }
+#endif
     alt111_video_destroy(&parsed112);
     pthread_mutex_lock(&r13_lock);
     if(r13_client_fd==fd)r13_client_fd=-1;
