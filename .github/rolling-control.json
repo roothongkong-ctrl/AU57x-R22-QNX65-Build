@@ -48,7 +48,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.206",
+    "version": "R105.207",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -82,9 +82,17 @@
           46087191869,
           46087191902
         ]
+      },
+      {
+        "version": "R105.206",
+        "passed": 1,
+        "runs": [
+          46087555830
+        ],
+        "evidence": "OSAPI stop 0x27b180 calls 0x279f80 then tail B 0x27b18c -> 0x27a614; cleanup calls 0x27a604,0x1e4fa8 on initialized branch; indirect BLX at 0x27a63c via timer vtable; clears +0x16,+0x10,+0x18. Start 0x27b190 separate."
       }
     ],
-    "discovery": "Use latest HEAD SHA for the pending R105.206 push workflow; avoid self-referential commit SHA.",
+    "discovery": "Use current HEAD for R105.207",
     "expected_jobs": 1
   },
   "read_strategy": {
@@ -105,8 +113,9 @@
         8,
         9
       ],
-      "task": "R105.206先纠正R105.198的固定384字节扫描：实际OSAPI stop 0x27b180和start 0x27b190相邻，不能把后者的分配/入队误判为stop。按ARM分支/返回实际可达范围确认stop及cleanup调用；结果出来后直接选择可证明的原厂同步入口，不做额外外围保护层。",
+      "task": "R105.206通过，直接确认stop尾跳统一cleanup。R105.207只沿真实cleanup三个被调用函数、B/BL引用与文件内指针引用继续核实同步/释放顺序；不重复旧384字节扫描，不把未知间接调用当作已覆盖。根据结果接真实生命周期，不额外开发普通保护层。",
       "paths": [
+        "lab/mu1005_route4_5/cleanup_callees.py",
         "lab/mu1005_route4_5/lifecycle_cfg.py",
         "project/source/legacy_mu1005/bluetooth/bt_queue_pulse.c",
         "project/source/legacy_mu1005/bluetooth/bt_startup_watch.c",
@@ -114,7 +123,7 @@
         "lab/mu1005_route4_5/daemon_supervisor.c",
         "project/source/legacy_mu1005/bluetooth/bt_notify_bridge.c"
       ],
-      "evidence": "R105.205 19/19成功，R105.198日志显示相邻函数污染，R105.206新专项使用已保留固件归档和上游提取工具，不重新请求NAS。真实原厂caller/lease仍缺。"
+      "evidence": "R105.206 run46087555830通过；上游LuKa固定commit的graft_init直接启动位置0x11ecd0属于另一固件，不能直接套用。未证原厂生命周期lease，禁止安装。"
     },
     {
       "priority": 2,

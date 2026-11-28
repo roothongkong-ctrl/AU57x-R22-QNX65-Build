@@ -1,4 +1,4 @@
-name: R105.206 exact original lifecycle control-flow (NO INSTALL)
+name: R105.207 original cleanup synchronization callees (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -63,14 +63,14 @@ jobs:
           mkdir -p "${RUNNER_TEMP}/combined"
           python3 tools/mu1005_extract_app70.py "$archive" "${RUNNER_TEMP}/app70/app.img"
           /tmp/mu1005-extract-venv/bin/python extractor/tools/extract_firmware.py --source "${RUNNER_TEMP}/app70/app.img" --output "${RUNNER_TEMP}/combined/app70" --variant 70 --qnxmount-root "$PWD/qnxmount" > evidence/app-summary.json
-      - name: Trace exact original lifecycle function boundaries
+      - name: Trace exact cleanup callees and direct/pointer references
         run: |
           set -euo pipefail
           /tmp/mu1005-extract-venv/bin/pip install capstone==5.0.3 pyelftools==0.31
           /tmp/mu1005-extract-venv/bin/python lab/mu1005_route4_5/lifecycle_cfg.py --selftest
-          /tmp/mu1005-extract-venv/bin/python lab/mu1005_route4_5/lifecycle_cfg.py "${RUNNER_TEMP}/combined" evidence/lifecycle-cfg.json
+          /tmp/mu1005-extract-venv/bin/python lab/mu1005_route4_5/cleanup_callees.py "${RUNNER_TEMP}/combined" evidence/cleanup-callees.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105206-LIFECYCLE-CFG-NO-INSTALL
-          path: evidence/lifecycle-cfg.json
+          name: R105207-CLEANUP-CALLEES-NO-INSTALL
+          path: evidence/cleanup-callees.json

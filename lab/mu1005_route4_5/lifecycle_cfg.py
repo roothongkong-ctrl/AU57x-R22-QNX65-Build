@@ -60,20 +60,21 @@ def selftest():
     assert [x["site"] for x in r["calls"]]==["0x1004"]
     assert r["returns"]==["0x1008"] and not r["unresolved"]
     print("LIFECYCLE_CFG_ADJACENT_FUNCTION_EXCLUSION_PASS")
-if sys.argv[1:]==["--selftest"]:selftest();raise SystemExit(0)
-selftest()
-b=Binary(load(Path(sys.argv[1]).resolve(strict=True),"btstack"))
-assert b.word(0x11eab0)==0xeb0571b6 and b.word(0x125968)==0xeb055604 and b.word(0x11de34)==0xeb0574d1
-# Stop entry 0x27b180 and adjacent start entry 0x27b190 are different
-# direct targets. First bound explicitly excludes the start entry.
-ranges={"osapi_stop":(0x27b180,0x27b180,0x27b190),"osapi_start":(0x27b190,0x27b190,0x27b380),"cleanup":(0x27a614,0x27a614,0x27a660),"service_stop":(0x125908,0x125908,0x125a90),"service_start":(0x11e9b0,0x11e9b0,0x11ed3c)}
-res={k:walk(b.word,*v,b.labels) for k,v in ranges.items()}
-# Examine direct callees from stop/cleanup, not arbitrary neighboring code.
-# Tailcall or unresolved exits stay unresolved, not marked complete.
-report={"scope":"ACTUAL_CONTROL_FLOW_WITH_EXPLICIT_BOUNDS_ONLY","routines":res,"original_sha256":"51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566","all_stop_paths_proven":False,"live_lease_proven":False,"installable":False}
-Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+"\n")
-for k,v in res.items():
- print("LIFECYCLE_CFG",k,json.dumps({x:v[x] for x in ("entry","calls","returns","unresolved")}))
- if k in ("osapi_stop","cleanup"):
-  for i in v["instructions"]:print("LIFECYCLE_INSTRUCTION",k,i["va"],i["mnemonic"],i["op_str"])
-print("R105206_ORIGINAL_LIFECYCLE_CFG_READONLY_COMPLETE")
+if __name__=="__main__":
+    if sys.argv[1:]==["--selftest"]:selftest();raise SystemExit(0)
+    selftest()
+    b=Binary(load(Path(sys.argv[1]).resolve(strict=True),"btstack"))
+    assert b.word(0x11eab0)==0xeb0571b6 and b.word(0x125968)==0xeb055604 and b.word(0x11de34)==0xeb0574d1
+    # Stop entry 0x27b180 and adjacent start entry 0x27b190 are different
+    # direct targets. First bound explicitly excludes the start entry.
+    ranges={"osapi_stop":(0x27b180,0x27b180,0x27b190),"osapi_start":(0x27b190,0x27b190,0x27b380),"cleanup":(0x27a614,0x27a614,0x27a660),"service_stop":(0x125908,0x125908,0x125a90),"service_start":(0x11e9b0,0x11e9b0,0x11ed3c)}
+    res={k:walk(b.word,*v,b.labels) for k,v in ranges.items()}
+    # Examine direct callees from stop/cleanup, not arbitrary neighboring code.
+    # Tailcall or unresolved exits stay unresolved, not marked complete.
+    report={"scope":"ACTUAL_CONTROL_FLOW_WITH_EXPLICIT_BOUNDS_ONLY","routines":res,"original_sha256":"51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566","all_stop_paths_proven":False,"live_lease_proven":False,"installable":False}
+    Path(sys.argv[2]).write_text(json.dumps(report,indent=2)+"\n")
+    for k,v in res.items():
+     print("LIFECYCLE_CFG",k,json.dumps({x:v[x] for x in ("entry","calls","returns","unresolved")}))
+     if k in ("osapi_stop","cleanup"):
+      for i in v["instructions"]:print("LIFECYCLE_INSTRUCTION",k,i["va"],i["mnemonic"],i["op_str"])
+    print("R105206_ORIGINAL_LIFECYCLE_CFG_READONLY_COMPLETE")
