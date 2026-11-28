@@ -1,0 +1,98 @@
+name: MU1005 missing Congo outbound interfaces (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-congo-bluetooth-only-runtime]
+    paths: ['.github/workflows/mu1005-congo-outbound.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  targeted:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover exact original btstack only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir firmware original-tools evidence
+          gh run download 45923122041 --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
+          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  $archive" | sha256sum -c -
+          git fetch --depth 1 origin 713fddea9bb11acfdb1df7eff02ca645011ad6d6
+          git archive FETCH_HEAD tools/mu1005_extract_app70.py | tar -x -C original-tools
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          git init qnxmount
+          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
+          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
+          git -C qnxmount checkout --detach FETCH_HEAD
+          python3 -m venv /tmp/extract-venv
+          /tmp/extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          python3 original-tools/tools/mu1005_extract_app70.py "$archive" "$RUNNER_TEMP/app70/app.img"
+          /tmp/extract-venv/bin/python extractor/tools/extract_firmware.py --source "$RUNNER_TEMP/app70/app.img" --output "$RUNNER_TEMP/original" --variant 70 --qnxmount-root "$PWD/qnxmount" > /tmp/app-summary.json
+          python3 - <<'PY'
+          import os,pathlib,hashlib,shutil
+          root=pathlib.Path(os.environ["RUNNER_TEMP"])
+          matches=[p for p in (root/"original").rglob("btstack") if p.is_file() and hashlib.sha256(p.read_bytes()).hexdigest()=="51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566"]
+          assert matches,"Exact original btstack missing from app70"
+          shutil.copyfile(matches[0],root/"btstack")
+          PY
+      - name: Identify candidate entry points and callers without modifying OEM
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/disasm
+          /tmp/disasm/bin/pip install capstone==5.0.6
+          /tmp/disasm/bin/python - <<'PY'
+          import os,pathlib,struct,json,concurrent.futures
+          from capstone import Cs,CS_ARCH_ARM,CS_MODE_ARM
+          from capstone.arm import ARM_OP_IMM
+          b=(pathlib.Path(os.environ["RUNNER_TEMP"])/"btstack").read_bytes()
+          ph=struct.unpack_from("<I",b,28)[0]; sz,n=struct.unpack_from("<HH",b,42)
+          seg=[]
+          for i in range(n):
+              kind,off,va,_,filesz,_,flags,_=struct.unpack_from("<8I",b,ph+i*sz)
+              if kind==1 and flags&1:seg.append((va,va+filesz,off))
+          def read(va,n):
+              for lo,hi,o in seg:
+                  if lo<=va and va+n<=hi:return b[o+va-lo:o+va-lo+n]
+              return b""
+          def md():
+              m=Cs(CS_ARCH_ARM,CS_MODE_ARM);m.detail=True;return m
+          calls={}
+          for lo,hi,o in seg:
+              for i in md().disasm(b[o:o+hi-lo],lo):
+                  if i.mnemonic=="bl" and i.operands and i.operands[0].type==ARM_OP_IMM:
+                      calls.setdefault(i.operands[0].imm,[]).append(i.address)
+          known=[("register",0x277b98,0x277a18),("sdp_add",0x2073c4,0x207244),("rf_send",0x277378,0x2771f8),("eir",0x1db648,0x1db4c8)]
+          assert all(read(target,4) for _,_,target in known)
+          assert struct.unpack("<I",read(0x277a18,4))[0]==0xe92d4070
+          tasks=[("CMGR_RegisterHandler",0x2436f4),("CMGR_CreateDataLink",0x2436ac),("CMGR_GetRemoteDevice",0x2427f0),("SDP_Query",0x1d0d88),("SDP_ParseAttributes",0x1d0390),("RF_OpenClientChannel",0x277644),("ME_SendHciCommandAsync",0x1dbcc0)]
+          def probe(item):
+              name,donor=item; predicted=donor-0x180; candidates=[]
+              for addr in range(predicted-0x100,predicted+0x104,4):
+                  raw=read(addr,40)
+                  ins=list(md().disasm(raw,addr))
+                  if not ins:continue
+                  first=ins[0]
+                  if first.mnemonic!="push" or "lr" not in first.op_str:continue
+                  sites=calls.get(addr,[])
+                  candidates.append({"address":hex(addr),"distance_from_prediction":addr-predicted,"caller_count":len(sites),"caller_addresses":[hex(x) for x in sites[:20]],"entry":[i.mnemonic+" "+i.op_str for i in ins[:6]]})
+              candidates.sort(key=lambda c:(abs(c["distance_from_prediction"]),-c["caller_count"]))
+              return {"name":name,"donor5092":hex(donor),"unverified_prediction":hex(predicted),"candidates":candidates[:12],"verified":False}
+          with concurrent.futures.ThreadPoolExecutor(max_workers=7) as e: rows=list(e.map(probe,tasks))
+          report={"scope":"candidate-only exact OEM disassembly; constant shift is a hypothesis, not callable ABI","installable":False,"known_control_deltas":[{"name":n,"delta":a-c} for n,a,c in known],"rows":rows}
+          pathlib.Path("evidence/outbound.json").write_text(json.dumps(report,indent=2))
+          print(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: congo-mu1005-outbound-candidates
+          path: evidence/
+          retention-days: 7
