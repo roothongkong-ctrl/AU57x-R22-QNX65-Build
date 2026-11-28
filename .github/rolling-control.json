@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.224",
+    "version": "R105.225",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 15
+      "dependent_not_yet_listed": 6
     },
     "runs": [],
     "verified_prior": [
@@ -249,10 +249,20 @@
           46094220070
         ],
         "evidence": "Host live uap0 selection and actual StartSession IPv4 field test, full ARM donor compile, four SI host regressions all passed. Actual AP read on car not proven."
+      },
+      {
+        "version": "R105.224",
+        "passed": 15,
+        "runs": [
+          46094482918,
+          46094482912,
+          46094482921
+        ],
+        "evidence": "Actual full host donor READY before C supervisor handoff and ARM build; 15/15 success including native build and regressions. OEM owner still unbound."
       }
     ],
-    "discovery": "R105.224 fixes C supervisor accepting live TCP before Rust configuration and AP initialization finished. Exact inherited ready marker consumed before owner FD transfer; explicit environment mode mandatory in supervised_notify, failure closes untransferred socket, retains child for reap. Host actual full donor and ARM build. Historical 001(8).zip verified identical via local file, no new upload request. No OEM owner lease or RF proof.",
-    "expected_jobs": 15,
+    "discovery": "R105.225 actual donor main fixes ready write bypassing cleanup and inherited session errors reported as exit success. Independent reset/peer/IE cleanup, monitor stopped first, no speculative removal after failed installation, mandatory QNX inherited ready mode. Actual host EOF and invalid frame exit test + full ARM compile. Does not establish radio lease, OEM Bluetooth registration or real first link.",
+    "expected_jobs": 6,
     "pending_prior": []
   },
   "read_strategy": {
@@ -288,7 +298,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.223 live IP code tested; R105.224 child actual ready handshake before Bluetooth FD transfer, pending CI. Real OEM owner and AP ownership still missing."
+      "evidence": "R105.224 15/15 passed; R105.225 fixes real donor failure exit and cleanup. No repeated request for historical car data. OEM lifecycle provider remains missing."
     },
     {
       "priority": 2,
