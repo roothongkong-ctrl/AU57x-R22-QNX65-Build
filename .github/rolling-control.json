@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.236",
+    "version": "R105.237",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 1
+      "dependent_not_yet_listed": 4
     },
     "runs": [],
     "verified_prior": [
@@ -359,9 +359,12 @@
         "evidence": "Actual nonblocking FD child process exchange, existing IPC completion and four SI host jobs successful. No real original Bluetooth provider."
       }
     ],
-    "discovery": "Reuse cached QNX image and known boot harness for ARM build/runtime of existing raw FD adapter. Host success already accepted. Do not repeat other modules.",
-    "expected_jobs": 1,
-    "pending_prior": []
+    "discovery": "Reuse exact original ACL trace channel mapped to pinned Congo technical reference; extend existing forwarding latch with coalesced ACL up/down hint, no threshold modification and no peer identity or SDK call. Original owner worker remains required.",
+    "expected_jobs": 4,
+    "pending_prior": [
+      46106309579,
+      46106309492
+    ]
   },
   "read_strategy": {
     "first_parallel": [
@@ -396,7 +399,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.232 static CMGR candidate supported by 12 calls; HCI candidate distinguished, ACL trace slot still not proved; actual native registration remains missing."
+      "evidence": "R105.237 closes static ACL trace slot candidate via exact matching JOBS_STARTSERVICE relocation and donor reference; existing trace forwarder emits ACL event hints if exact live site/slot checks pass. Worker still needs actual paired peer/owner and registration."
     },
     {
       "priority": 2,

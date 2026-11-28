@@ -137,10 +137,10 @@
     {
       "name": "acl_trace_slot",
       "donor_file_offset": "0xbf28",
-      "stock_va": null,
-      "status": "unresolved",
+      "stock_va": "0x2c2258",
+      "status": "candidate",
       "witness": "0x13f6c4",
-      "note": "R105.232 original ELF JOBS_STARTSERVICE relocation 0x2c2258, object 0x2c3f64; not proven same ACL trace slot. Keep unresolved."
+      "note": "Pinned Congo technical reference section 14 labels donor 5092 GOT 0x2c1a88 JOBS_STARTSERVICE; original R105.232 relocation 0x2c2258 names identical channel and R105.232 trace sites plus BT_TRACE_ORIGINAL show established/lost/already. Static candidate only; observed hints do not authorize SDK calls."
     },
     {
       "name": "ME_SendHciCommandAsync",

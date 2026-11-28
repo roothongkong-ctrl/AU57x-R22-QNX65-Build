@@ -37,3 +37,18 @@ int mu_bt_trace_latch_take(MuBtTraceLatch *s){
     if(!s||__sync_val_compare_and_swap(&s->bound,2u,2u)!=2u)return 0;
     return __sync_bool_compare_and_swap(&s->pending,1u,0u);
 }
+
+/* Exact stock callsite and live original channel, no vararg access.
+ * Both flags can occur before consumption; worker must re-query live state. */
+void mu_bt_trace_acl_observe(MuBtTraceLatch*s,uintptr_t lr,uintptr_t channel,uintptr_t format,uintptr_t current){
+ if(!s||__sync_val_compare_and_swap(&s->bound,2u,2u)!=2u||
+    s->channel||!current||(current&3u)||channel!=current)return;
+ unsigned hint=0;
+ if((lr==0x13f6c8u&&format==0x285d44u)||(lr==0x13f1dcu&&format==0x285bb0u))hint=MU_BT_ACL_UP;
+ else if(lr==0x13f560u&&format==0x285d88u)hint=MU_BT_ACL_DOWN;
+ if(hint)(void)__sync_fetch_and_or(&s->acl_pending,hint);
+}
+unsigned mu_bt_trace_acl_take(MuBtTraceLatch*s){
+ if(!s||__sync_val_compare_and_swap(&s->bound,2u,2u)!=2u)return 0;
+ return __sync_lock_test_and_set(&s->acl_pending,0u);
+}

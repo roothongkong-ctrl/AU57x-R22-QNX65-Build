@@ -25,6 +25,7 @@ static MuBtTraceLatch latch;
 static Au97GotHook trace_hook;
 static volatile unsigned attach_busy;
 static volatile unsigned attach_done;
+static volatile unsigned acl_observer_ready;
 static uintptr_t bound_original;
 extern void mu_bt_trace_tail(void*,int,const char*,...);
 __attribute__((visibility("hidden")))
@@ -35,11 +36,21 @@ MuBtTraceOriginal mu_bt_trace_target(void *channel,uintptr_t lr,const char *fmt)
  uintptr_t current=0;
  if(lr==0x11ed14u&&(uintptr_t)fmt==0x27cf94u)
   current=__atomic_load_n((const uint32_t*)(uintptr_t)0x2c18fcu,__ATOMIC_ACQUIRE);
+ /* Same original trace forwarder; never change threshold or decode the
+  * private variadic peer address. The worker must query the paired owner. */
+ if(__sync_val_compare_and_swap(&acl_observer_ready,1u,1u)==1u&&
+    ((lr==0x13f6c8u&&(uintptr_t)fmt==0x285d44u)||
+     (lr==0x13f1dcu&&(uintptr_t)fmt==0x285bb0u)||
+     (lr==0x13f560u&&(uintptr_t)fmt==0x285d88u))){
+  uintptr_t acl=__atomic_load_n((const uint32_t*)(uintptr_t)0x2c2258u,__ATOMIC_ACQUIRE);
+  mu_bt_trace_acl_observe(&latch,lr,(uintptr_t)channel,(uintptr_t)fmt,acl);
+ }
  return mu_bt_trace_latch_observe_live(&latch,lr,(uintptr_t)channel,(uintptr_t)fmt,current);
 }
 static int allow(void *unused,uint32_t address,size_t n){
  (void)unused;
- return (address==0x2c12c8u&&n==4)||(address==0x2c18fcu&&n==4)||
+ return ((address==0x2c2258u||address==0x13f6c4u||address==0x13f55cu||address==0x13f1d8u)&&n==4)||
+        (address==0x2c12c8u&&n==4)||(address==0x2c18fcu&&n==4)||
         (address==0x11ed10u&&n==4)||(address==0x27cf94u&&n==sizeof("%s(%d): Primary DID registered"));
 }
 static int writable_slot(void){
@@ -71,6 +82,14 @@ static int attach_once(void){
  int ok=mu_bt_self_reader_read(r,0x2c18fcu,&channel,4)&&
     mu_bt_self_reader_read(r,0x2c12c8u,&slot,4)&&slot==resolved&&
     mu_bt_sdk_trace_site(mu_bt_self_reader_read,r);
+ /* Validate all three exact ARM BL words and readable live GOT slot.
+  * R105.232 relocation identifies JOBS_STARTSERVICE, matching Congo
+  * pinned reference table. If anything differs, keep only startup. */
+ uint32_t acl=0,est=0,lost=0,already=0;
+ int acl_ok=mu_bt_self_reader_read(r,0x2c2258u,&acl,4)&&
+    mu_bt_self_reader_read(r,0x13f6c4u,&est,4)&&est==0xebff5ddeu;
+ acl_ok=acl_ok&&mu_bt_self_reader_read(r,0x13f55cu,&lost,4)&&lost==0xebff5e38u&&
+    mu_bt_self_reader_read(r,0x13f1d8u,&already,4)&&already==0xebff5f19u;
  mu_bt_self_reader_close(r);
  /* Zero channel before C++ initialization is valid at attachment time.
   * The actual call must match the then-current nonzero stock slot. */
@@ -81,6 +100,7 @@ static int attach_once(void){
  }else if(bound_original!=resolved)return 0;
  /* Publish the tail only after original forwarding has been bound.
   * If lazy resolution or a competing slot change is present, do not attach. */
+ if(acl_ok)(void)__sync_lock_test_and_set(&acl_observer_ready,1u);
  return au97_got_replace(&trace_hook,(volatile uintptr_t*)0x2c12c8u,
                          resolved,(uintptr_t)&mu_bt_trace_tail)==0;
 }
@@ -100,7 +120,11 @@ int mu_bt_trace_attach(void){
  return ok;
 }
 int mu_bt_trace_attached_take(void){return __sync_val_compare_and_swap(&attach_done,1u,1u)==1u?mu_bt_trace_latch_take(&latch):0;}
+unsigned mu_bt_trace_attached_acl_take(void){
+ return __sync_val_compare_and_swap(&attach_done,1u,1u)==1u?mu_bt_trace_acl_take(&latch):0u;
+}
 #else
+unsigned mu_bt_trace_attached_acl_take(void){return 0u;}
 int mu_bt_trace_attach(void){return 0;}
 int mu_bt_trace_attached_take(void){return 0;}
 #endif

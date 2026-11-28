@@ -1,0 +1,2 @@
+# R105.237 已配对蓝牙的原厂 ACL 提示
+原厂配对不重做。Congo 固定 223b42f90bf7c15fbbbef23259da36caa9bd4994 技术文档第14节确认 donor 5092 的 0x2c1a88 为 JOBS_STARTSERVICE GOT；R105.232 原厂 relocation 0x2c2258 为相同名称，历史原厂三个 ACL callsite 已识别。复用既有 logCV tail，不新增 hook、不改日志级别、不读 varargs、不修改配对、认证、原厂线程。仅在原始映像、GOT 可读、三个 BL 指令匹配且实时 channel 指针匹配时锁存 up/down 提示；两种提示可同时出现，消费者必须重新查询实际配对设备状态。此为事件候选，不是全局 ACL 监听、不是实际 owner 或连接证明；已配对但无新 trace 时不能推断状态。尚缺原厂 worker/真实 peer 数据源及实际无线注册。NO INSTALL。

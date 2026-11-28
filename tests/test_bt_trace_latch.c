@@ -35,6 +35,17 @@ void mu_bt_trace_latch_test(void){
     assert(mu_bt_trace_latch_take(&d));
     assert(mu_bt_trace_latch_observe(&d,0x11ed14,0,0x27cf94)==original);
     assert(!mu_bt_trace_latch_take(&d));
+    assert(!mu_bt_trace_acl_take(&d));
+    mu_bt_trace_acl_observe(&d,0x13f6c8,0x1234,0x285d44,0x4324);
+    mu_bt_trace_acl_observe(&d,0x13f6c8,0x1234,0x285bb0,0x1234);
+    assert(!mu_bt_trace_acl_take(&d));
+    mu_bt_trace_acl_observe(&d,0x13f6c8,0x1234,0x285d44,0x1234);
+    mu_bt_trace_acl_observe(&d,0x13f1dc,0x1234,0x285bb0,0x1234);
+    mu_bt_trace_acl_observe(&d,0x13f560,0x1234,0x285d88,0x1234);
+    assert(mu_bt_trace_acl_take(&d)==(MU_BT_ACL_UP|MU_BT_ACL_DOWN));
+    assert(!mu_bt_trace_acl_take(&d));
+    assert(!mu_bt_trace_latch_take(&d));
+    puts("MU1005_ACL_TRACE_HINT_PASS_FIXTURE_ONLY");
     puts("MU1005_TRACE_DEFERRED_CHANNEL_PASS_FIXTURE_ONLY");
     puts("MU1005_TRACE_LATCH_COALESCING_PASS_FIXTURE_ONLY");
 }
