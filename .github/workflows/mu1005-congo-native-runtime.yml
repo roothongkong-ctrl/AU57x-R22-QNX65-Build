@@ -1,4 +1,4 @@
-name: Congo isolated QNX pairing runtime (NO INSTALL)
+name: Congo direct donor runtime dependency fix (NO INSTALL)
 on:
   push:
     branches: [mu1005-congo-pairing-native]
@@ -11,9 +11,11 @@ env:
 jobs:
   pairing-runtime:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - name: Test sectionless ARM ELF dependency reader
+        run: python3 integration/mu1005_congo_native/elf_needed.py
       - name: Fetch pinned release and QNX runtime
         run: |
           set -euxo pipefail
@@ -64,7 +66,9 @@ jobs:
             done
           '
           python3 - <<'PY'
-          import pathlib,re,subprocess,shutil,json
+          import pathlib,shutil,json,sys
+          sys.path.insert(0,"integration/mu1005_congo_native")
+          from elf_needed import needed
           stage=pathlib.Path("stage"); sdk=pathlib.Path("sdk-libs")
           base={"libc.so.3","libm.so.2","libsocket.so.3"}
           pending=list(stage.iterdir()); visited=set(); missing=set()
@@ -72,8 +76,7 @@ jobs:
               p=pending.pop()
               if p.name in visited:continue
               visited.add(p.name)
-              s=subprocess.check_output(["readelf","-dW",str(p)],text=True)
-              for dep in re.findall(r"Shared library: \[([^\]]+)\]",s):
+              for dep in needed(p):
                   if dep in base:continue
                   dest=stage/dep
                   if dest.is_file():pending.append(dest);continue
