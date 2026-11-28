@@ -1,0 +1,79 @@
+name: Congo MU1005 port table localization (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-congo-bluetooth-only-runtime]
+    paths: ['.github/workflows/mu1005-congo-port-table.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  mapping:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        lane: [registration, rfcomm, startup, outbound]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: mu1005-private-abi-index
+          run-id: 46098309814
+          github-token: ${{ github.token }}
+          path: evidence-input
+      - name: Localize donor table and reconcile existing MU1005 proof
+        env:
+          LANE: ${{ matrix.lane }}
+        run: |
+          set -euo pipefail
+          git init donor
+          git -C donor remote add origin https://github.com/congobg/MHI2Q_WiFi_CarPlay
+          git -C donor fetch --depth 1 origin 223b42f90bf7c15fbbbef23259da36caa9bd4994
+          git -C donor checkout --detach FETCH_HEAD
+          git fetch --depth 1 origin 235f971a53ce99e9e32db7c48062647dcb4fdb8d
+          git show FETCH_HEAD:project/source/legacy_mu1005/bluetooth/native_binding.c > native.c
+          git show FETCH_HEAD:project/source/legacy_mu1005/bluetooth/native_binding_words.h > words.h
+          git show FETCH_HEAD:project/source/legacy_mu1005/bluetooth/bt_trace_attach.c > trace.c
+          git show FETCH_HEAD:docs/R45_MU1005_BTSTACK_STATIC_RECHECK.json > prior.json
+          mkdir evidence
+          python3 - <<'PY'
+          import json,os,pathlib,struct,tarfile,re
+          lanes={
+            "registration":[("RF_RegisterServerChannel",0x27c0bc,0x277b98,0x277a18),("RF_DeregisterServerChannel",0x27c058,0x277b34,0x2779b4),("SDP_AddRecord",0x20ae24,0x2073c4,0x207244),("SDP_RemoveRecord",0x20ada4,0x207344,0x2071c4),("EIR refresh",0x1df0a8,0x1db648,0x1db4c8)],
+            "rfcomm":[("RF_RespondChannel",0x27b9e0,0x2774bc,0x27733c),("RF_CloseChannel",0x27ba9c,0x277578,0x2773f8),("RF_SendData",0x27b89c,0x277378,0x2771f8),("RF_FrameSize",0x27b718,0x2771f4,0x277074),("RF_AdvanceCredit",0x27b800,0x2772dc,0x27715c)],
+            "startup":[("startBtStack trace GOT",0x2c6134,0x2c112c,0x2c18fc),("BtJobStartService trace GOT",0x2c6a94,0x2c1a88,None)],
+            "outbound":[("CMGR_RegisterHandler",0x247c2c,0x2436f4,None),("CMGR_CreateDataLink",0x247be4,0x2436ac,None),("CMGR_GetRemoteDevice",0x246d28,0x2427f0,None),("SDP_Query",0x1d4800,0x1d0d88,None),("SDP_ParseAttributes",0x1d3e08,0x1d0390,None),("RF_OpenClientChannel",0x27bb68,0x277644,None),("ME_SendHciCommandAsync",0x1df720,0x1dbcc0,None)]
+          }
+          prior=json.loads(pathlib.Path("prior.json").read_text())
+          assert prior["sha256"]=="51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566"
+          assert prior["matching"]==prior["word_count"]==40
+          oem=json.loads(pathlib.Path("evidence-input/oem-symbol-index.json").read_text())
+          assert any(r["name"]=="btstack" and r["sha256"]==prior["sha256"] for r in oem)
+          stock=next(r for r in oem if r["name"]=="btstack" and r["sha256"]==prior["sha256"])
+          with tarfile.open("donor/MHI2QC_3638/wcp.tar.gz","r:gz") as t:
+              m=[m for m in t if m.isfile() and pathlib.PurePosixPath(m.name).name=="libbthook.so"]
+              assert len(m)==1 and m[0].size<10000000
+              blob=t.extractfile(m[0]).read()
+          native=pathlib.Path("native.c").read_text().lower()
+          trace=pathlib.Path("trace.c").read_text().lower()
+          def offsets(addr):
+              pattern=struct.pack("<I",addr)
+              return [hex(m.start()) for m in re.finditer(re.escape(pattern),blob)]
+          result=[]
+          for name,a,b,c in lanes[os.environ["LANE"]]:
+              prior_source=(c is not None and (hex(c) in native or hex(c) in trace))
+              exported=[s for s in stock["exports"] if name.lower().replace(" ","") in s.lower().replace(" ","")]
+              result.append({"function":name,"donor3638":hex(a),"donor5092":hex(b),"donor3638_literal_file_offsets":offsets(a),"donor5092_literal_file_offsets":offsets(b),"mu1005_prior_candidate":hex(c) if c is not None else None,"candidate_in_prior_source":prior_source,"mu1005_name_candidates":exported,"runtime_compatible":False})
+          report={"lane":os.environ["LANE"],"scope":"read-only candidate locations, not validated donor binary patch sites or callable ABI","installable":False,"rows":result}
+          pathlib.Path("evidence/port-table.json").write_text(json.dumps(report,indent=2))
+          print(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: congo-port-table-${{ matrix.lane }}
+          path: evidence/
+          retention-days: 7
