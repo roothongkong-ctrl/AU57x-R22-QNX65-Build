@@ -1,0 +1,57 @@
+name: 'R15: map-only 111 + optional card-only 112 contract (source-only)'
+on:
+  push:
+    branches: [experiment/cluster-card-r15-map-only-gate]
+    paths:
+      - 'experiments/cluster-compact-card/r13/**'
+      - '.github/workflows/cluster-card-r15-map-only.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hook-compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        mode: [default-off, experimental]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch official MIB v1.2.14
+        run: git clone -q --depth 1 --branch v1.2.14 https://github.com/MacsInSpace/mib-cluster-map.git /tmp/r15-upstream
+      - name: Apply guarded 112 source experiment
+        run: |
+          set -euo pipefail
+          cp experiments/cluster-compact-card/r13/r13_112_probe.inc /tmp/r15-upstream/thirdparty/mhi2_altscreen_carplay/
+          python3 experiments/cluster-compact-card/r13/patch_real_v1214.py /tmp/r15-upstream/thirdparty/mhi2_altscreen_carplay/libaltscreen111_gen2.c
+          git -C /tmp/r15-upstream diff --check
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('experiments/cluster-compact-card/r13/r13_112_probe.inc').read_text()
+          fn=s.split('static void r13_advertise(',1)[1].split('static void r13_setup(',1)[0]
+          assert fn.index('if(!r13_enabled()') < fn.index('set_str((CFMutableDictionaryRef)alt111,"initialURL",ALT_URL_MAP)') < fn.index('card=dict_clone(alt111)')
+          assert fn.index('remove_key((CFMutableDictionaryRef)alt111,"altScreenSuggestUIURLs")') < fn.index('card=dict_clone(alt111)')
+          assert fn.index('set_str(card,"initialURL",R13_CARD_URL)') > fn.index('card=dict_clone(alt111)')
+          print('PASS: only opt-in branch requests 111 map and 112 card before advertisement')
+          PY
+      - name: Compile real v1.2.14 AirPlay C hook
+        env:
+          CC: ${{ matrix.compiler }}
+          MODE: ${{ matrix.mode }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          INC=/tmp/r15-upstream/thirdparty/mhi2_altscreen_carplay
+          SRC=$INC/libaltscreen111_gen2.c
+          FLAGS="-std=gnu99 -O1 -g -Wall -Wextra -Wno-unused-function -Werror=implicit-function-declaration -I$INC/include"
+          if [ "$MODE" = default-off ]; then
+            "$CC" $FLAGS -c "$SRC" -o /tmp/r15-stock.o
+            ! nm /tmp/r15-stock.o | grep -Fq 'r13_advertise'
+            echo 'PASS: original 111 compiled with no experimental 112 code'
+          else
+            "$CC" $FLAGS -DCLUSTERMAP_R13_112_LAB -c "$SRC" -o /tmp/r15-lab.o
+            grep -aFq 'R15 EXPERIMENTAL /info requested 111 map-only + 112 card-only' /tmp/r15-lab.o
+            echo 'PASS: experimental double screen contract compiled; NOT phone verified'
+          fi
