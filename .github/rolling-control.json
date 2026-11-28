@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.213",
+    "version": "R105.214",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -146,9 +146,19 @@
           46089573694
         ],
         "evidence": "15/15 cloud jobs passed including full QNX native build; original DIO create output at observed context +0xc, original start/control call uses flag 1 and NULL qualifier/params; original iAP2 driver callback slots +0x28 send and +0x2c receive. Static evidence only."
+      },
+      {
+        "version": "R105.213",
+        "passed": 14,
+        "runs": [
+          46090291166,
+          46090291153,
+          46090291105
+        ],
+        "evidence": "14/14 jobs success; existing DIO singleton coordinator fixture and full native build; no actual DIO provider or RF."
       }
     ],
-    "discovery": "Existing receiver singleton coordinator fixture plus required full native build/regressions; API count authoritative. Independent Congo branch 806b65ea43d80f91d6ce685a9308f9a564078360 run 46089902646 still running.",
+    "discovery": "R105.214 pre/post-bind and published CPRX admission revalidation, targeted coordinator fixture and required regressions. Congo failure run 46090592144: seven transitive NVIDIA libraries absent from stage; independent fix 7ec8bff1e9ecbfee125298b5895ed11770db0506 now resolves all recursively from pinned MU1005 archive, rejecting ambiguous matches. Await results; no real OEM provider or RF yet.",
     "expected_jobs": 14
   },
   "read_strategy": {
@@ -184,7 +194,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.212 complete. R105.213 connects verified existing DIO singleton to current native receiver and CPRX; no new receiver, no guessed object address. Real DIO manager/owner provider and Bluetooth startup lease still missing."
+      "evidence": "R105.213 all 14 jobs succeeded; R105.214 revalidates DIO/SI admission around existing singleton binding and publication, preserves CPRX rollback ownership on revocation. Actual provider and startup lease still missing. Congo recursive closure fix separate branch."
     },
     {
       "priority": 2,

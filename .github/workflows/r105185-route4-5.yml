@@ -1,4 +1,4 @@
-name: R105.213 existing original receiver coordinator (NO INSTALL)
+name: R105.214 existing receiver admission continuity (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
