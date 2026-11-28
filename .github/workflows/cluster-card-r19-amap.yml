@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [experiment/cluster-card-r19-amap-xcode]
-    paths: ['.github/workflows/cluster-card-r19-amap.yml']
+    paths: ['.github/workflows/cluster-card-r19-amap.yml', 'experiments/cluster-compact-card/r19/**']
 permissions:
   contents: read
 jobs:
@@ -23,7 +23,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/r19"
           xcodebuild -version | tee "$RUNNER_TEMP/r19/xcode.txt"
           xcrun simctl list devices available -j > "$RUNNER_TEMP/r19/devices.json"
-          UDID=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))["devices"]; print(next(x["udid"] for k,v in d.items() if "iOS" in k for x in v if x.get("isAvailable") and x["name"].startswith("iPad")))' "$RUNNER_TEMP/r19/devices.json")
+          UDID=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))["devices"]; print(next(x["udid"] for k,v in d.items() if "iOS" in k for x in v if x.get("isAvailable") and x["name"].startswith("iPad") and ("13-inch" in x["name"] or "12.9-inch" in x["name"])))' "$RUNNER_TEMP/r19/devices.json")
           echo "R19_UDID=$UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
