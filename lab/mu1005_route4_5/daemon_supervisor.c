@@ -141,6 +141,13 @@ bad:
  if(l>=0)close(l);
  return -1;
 }
+int mu_daemon_supervisor_retract_unpublished(MuDaemonSupervisor*s,int fd){
+ /* Caller alone can prove that no AO received the mailbox. Never revoke
+  * an already published endpoint. Exact socket identity, not liveness. */
+ if(!s||!s->transferred||!exact(s,fd))return -1;
+ s->transferred=0;
+ return mu_daemon_supervisor_close(s);
+}
 int mu_daemon_supervisor_close(MuDaemonSupervisor*s){
  if(!s||s->pid<=0)return -1;
  /* Never close a reused descriptor, and never kill a PID after reaping. */

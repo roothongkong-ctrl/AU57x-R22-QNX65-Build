@@ -19,5 +19,7 @@ int mu_daemon_supervisor_live(MuDaemonSupervisor*,int);
  * adoption or via certified handoff withdrawal; no concurrent access. */
 int mu_daemon_supervisor_offer(MuDaemonSupervisor*,int*);
 int mu_daemon_supervisor_witness(void*,int);
+/* Only the original serialized supervisor, before AO publication. */
+int mu_daemon_supervisor_retract_unpublished(MuDaemonSupervisor*,int);
 int mu_daemon_supervisor_close(MuDaemonSupervisor*);
 #endif

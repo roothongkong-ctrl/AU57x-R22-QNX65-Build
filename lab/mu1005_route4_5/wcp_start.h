@@ -16,8 +16,13 @@ typedef struct {
 /* Start the actual donor daemon in inherited ACK mode, using existing
  * supervisor/READY protocol, then keep the descriptor for the stock AO.
  * The caller supplies verified binary identity and ACK capability. */
+#define MU_WCP_START_WAIT 1
+/* 0 prepared, 1 original startup not ready (no child spawned), <0 failure.
+ * Authorization and genuine lifetime lease are checked before and after
+ * the blocking donor READY handshake; caller remains the supervisor. */
 int mu_wcp_start_begin(MuWcpStart*,const MuBtNotifyBinding*,const MuBtQueuePulseBinding*,
- const char*,char*const[],int(*)(void*,const char*),void*,int(*)(void*,const char*),void*);
+ const char*,char*const[],int(*)(void*,const char*),void*,int(*)(void*,const char*),void*,
+ int(*)(void*),void*);
 /* Drive from original startup supervisor. 1=queued, not connected.
  * 0=waiting; -1=terminal/retain resources for certified withdrawal. */
 int mu_wcp_start_poll(MuWcpStart*,int(*)(void*),void*);
