@@ -1,4 +1,4 @@
-name: R105.205 supervisor handoff and persistent daemon witness (NO INSTALL)
+name: R105.206 exact original lifecycle control-flow (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -6,68 +6,71 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-env:
-  DONOR: 20c94f51c0f0ae88b154c12e4f604643ba23022c
-  TOOLCHAIN: baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+  actions: read
 jobs:
-  combined-real-c-rust:
+  first-link:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 100
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: "45923122041"
     steps:
       - uses: actions/checkout@v4
-      - name: Combine existing AP receiver MFi and ACK source adaptations
+      - name: Obtain retained archive from existing NAS task (no second NAS request)
         run: |
-          set -euxo pipefail
-          git init donor
-          git -C donor remote add origin https://github.com/luka-dev/mib2q-carplay-rgi.git
-          git -C donor fetch --depth 1 origin "$DONOR"
-          git -C donor checkout --detach FETCH_HEAD
-          for n in adapt_live_ap adapt_receiver_unix adapt_mfi_sequence; do
-            python3 "integration/mu1005_donor_daemon/$n.py" donor
+          set -euo pipefail
+          mkdir -p firmware evidence
+          # A push that updates both workflows uses its own acquisition run.
+          # Never consume the known failed 20-minute run or duplicate a NAS request.
+          if [ -z "$SOURCE_RUN" ]; then
+            for i in $(seq 1 40); do
+              SOURCE_RUN=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow mu1005-oem-nas.yml --branch mu1005-si-cprx-real-review --commit "$GITHUB_SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+              if [ -n "$SOURCE_RUN" ]; then break; fi
+              sleep 15
+            done
+          fi
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
+          echo "NAS_SOURCE_RUN:$SOURCE_RUN"
+          for i in $(seq 1 380); do
+            result=$(gh run view "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --json status,conclusion --jq '.status + ":" + .conclusion')
+            if [ "$result" = "completed:success" ]; then break; fi
+            if [[ "$result" == completed:* ]]; then echo "NAS_SOURCE_NOT_SUCCESS:$result"; exit 2; fi
+            sleep 15
           done
-          python3 lab/mu1005_route4_5/adapt_donor_ack.py donor
-          python3 lab/mu1005_route4_5/adapt_inherited_stream.py donor
-          rustup toolchain install nightly-2026-07-21 --profile minimal
-          mkdir -p evidence fixture
-          cp donor/wireless/daemon/probes/dio_manager.fixture.json fixture/dio_manager.json
-          cargo +nightly-2026-07-21 build --offline --locked --bin mhi2q-wireless-daemon --manifest-path donor/wireless/daemon/Cargo.toml 2>&1 | tee evidence/build.txt
-          git -C donor diff -- wireless/daemon > evidence/combined.diff
-      - name: Test published exact daemon witness
+          test "$result" = "completed:success"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z" | sha256sum -c -
+      - name: Fetch exact upstream MHI2 extractor and QNX6 reader
         run: |
           set -euxo pipefail
-          s=project/source/legacy_mu1005/bluetooth
-          cc -std=gnu99 -Wall -Wextra -Werror -I"$s" "$s"/{bt_iap2_owner_handoff,rf_arg_experiment,bt_route_gate}.c lab/mu1005_route4_5/test_published_witness.c -o /tmp/witness
-          /tmp/witness
-      - name: Run new C supervisor against actual adapted Rust daemon
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          test "$(git -C extractor rev-parse HEAD)" = 64a44fe23dbaa08771440d69642d2874d7028295
+          git init qnxmount
+          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
+          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
+          git -C qnxmount checkout --detach FETCH_HEAD
+          test "$(git -C qnxmount rev-parse HEAD)" = 0379c064975d5bbe3595ac7e3d149ea789406794
+          python3 -m venv /tmp/mu1005-extract-venv
+          /tmp/mu1005-extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          command -v 7z || { sudo apt-get update -qq && sudo apt-get install -y p7zip-full; }
+      - name: Extract pinned app70 for original lifecycle
         run: |
-          set -euxo pipefail
-          l=lab/mu1005_route4_5
-          cc -std=c99 -Wall -Wextra -Werror "$l/daemon_supervisor.c" "$l/test_daemon_supervisor.c" -o /tmp/supervisor
-          env -i PATH="$PATH" IPL_CONFIG_DIR_DIO_MANAGER="$PWD/fixture" MHI2Q_CP_MODEL=LAB-ONLY MHI2Q_CP_SERIAL=LAB-ONLY MHI2Q_CP_HARDWARE=LAB-ONLY MHI2Q_CP_BT_MAC=02:00:00:00:00:01 MHI2Q_CP_DEVICE_ID=02:00:00:00:00:02 MHI2Q_CP_SSID=LAB-ONLY MHI2Q_CP_PASSPHRASE=labfixturepassword MHI2Q_CP_CHANNEL=11 MHI2Q_CP_IP_ADDRESS=127.0.0.1 MHI2Q_CP_AIRPLAY_PORT=5000 MHI2Q_CP_RECEIVER=stock210 timeout 25 /tmp/supervisor "$PWD/donor/wireless/daemon/target/debug/mhi2q-wireless-daemon" | tee evidence/supervisor.log
-          grep -F MU1005_SUPERVISOR_ACTUAL_DONOR_FD_PAIR_AND_REAP_PASS_NO_OEM evidence/supervisor.log
+          set -euo pipefail
+          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
+          mkdir -p "${RUNNER_TEMP}/combined"
+          python3 tools/mu1005_extract_app70.py "$archive" "${RUNNER_TEMP}/app70/app.img"
+          /tmp/mu1005-extract-venv/bin/python extractor/tools/extract_firmware.py --source "${RUNNER_TEMP}/app70/app.img" --output "${RUNNER_TEMP}/combined/app70" --variant 70 --qnxmount-root "$PWD/qnxmount" > evidence/app-summary.json
+      - name: Trace exact original lifecycle function boundaries
+        run: |
+          set -euo pipefail
+          /tmp/mu1005-extract-venv/bin/pip install capstone==5.0.3 pyelftools==0.31
+          /tmp/mu1005-extract-venv/bin/python lab/mu1005_route4_5/lifecycle_cfg.py --selftest
+          /tmp/mu1005-extract-venv/bin/python lab/mu1005_route4_5/lifecycle_cfg.py "${RUNNER_TEMP}/combined" evidence/lifecycle-cfg.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: R105205-SUPERVISOR-REAL-DONOR-NO-INSTALL
-          path: evidence/
-  qnx-arm-supervisor:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/mu1005-qnx-image
-        with:
-          require-cache: 'true'
-      - name: Compile new native spawn supervisor only
-        run: |
-          set -euxo pipefail
-          mkdir -p evidence
-          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -c lab/mu1005_route4_5/daemon_supervisor.c -o /src/evidence/supervisor.o
-          readelf -h evidence/supervisor.o | grep -E 'Machine:.*ARM'
-      - uses: actions/upload-artifact@v4
-        with:
-          name: R105205-SUPERVISOR-ARM-NO-INSTALL
-          path: evidence/
+          name: R105206-LIFECYCLE-CFG-NO-INSTALL
+          path: evidence/lifecycle-cfg.json
