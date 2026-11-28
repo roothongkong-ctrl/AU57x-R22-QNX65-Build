@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test sectionless ARM ELF dependency reader
         run: python3 integration/mu1005_congo_native/elf_needed.py
+      - name: Test recursive OEM dependency closure
+        run: python3 integration/mu1005_congo_native/resolve_dependencies.py --self-test
       - name: Fetch pinned release and QNX runtime
         run: |
           set -euxo pipefail
@@ -31,7 +33,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq qemu-system-arm
           docker build --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee evidence/toolchain.log
-      - name: Recover exact missing libraries from retained MU1005 archive
+      - name: Extract pinned MU1005 archive for recursive dependency lookup
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -57,28 +59,6 @@ jobs:
           python3 original-tools/tools/mu1005_extract_app70.py "$archive" "$RUNNER_TEMP/app70/app.img"
           /tmp/extract-venv/bin/python extractor/tools/extract_firmware.py --source "$RUNNER_TEMP/app70/app.img" --output "$RUNNER_TEMP/original/app70" --variant 70 --qnxmount-root "$PWD/qnxmount" > /tmp/app-summary.json
           /tmp/extract-venv/bin/python original-tools/tools/mu1005_extract_stage2.py "$archive" "$RUNNER_TEMP/original/stage2" --toolkit extractor --qnxmount qnxmount --report /tmp/stage2-summary.json
-          python3 - <<'PY'
-          import hashlib,json,os,pathlib,shutil,sys
-          sys.path.insert(0,"integration/mu1005_congo_native")
-          from elf_needed import needed
-          root=pathlib.Path(os.environ["RUNNER_TEMP"])/"original"
-          out=pathlib.Path("oem-libs");out.mkdir()
-          report={}
-          for name in ("libdisplayinit.so","libdns_sd.so.1"):
-              found={}
-              for p in root.rglob(name):
-                  if not p.is_file() or not p.resolve().is_relative_to(root):continue
-                  try: deps=needed(p)
-                  except ValueError:continue
-                  digest=hashlib.sha256(p.read_bytes()).hexdigest()
-                  found[digest]=(p,deps)
-              report[name]=[{"sha256":h,"path":str(p.relative_to(root)),"needed":d} for h,(p,d) in found.items()]
-              if len(found)==1:
-                  p,_=next(iter(found.values()));shutil.copy2(p,out/name)
-          pathlib.Path("evidence/oem-missing-library-candidates.json").write_text(json.dumps(report,indent=2)+"\n")
-          print("OEM_LIBRARY_CANDIDATE_COUNTS", {n:len(v) for n,v in report.items()})
-          if any(len(v)!=1 for v in report.values()):raise SystemExit("No unique authentic candidate for each missing library")
-          PY
       - name: Stage only donor pairing helper and private dependencies
         run: |
           set -euxo pipefail
@@ -113,31 +93,7 @@ jobs:
               done
             done
           '
-          python3 - <<'PY'
-          import pathlib,shutil,json,sys
-          sys.path.insert(0,"integration/mu1005_congo_native")
-          from elf_needed import needed
-          stage=pathlib.Path("stage"); sdk=pathlib.Path("sdk-libs"); oem=pathlib.Path("oem-libs")
-          base={"libc.so.3","libm.so.2","libsocket.so.3"}
-          pending=list(stage.iterdir()); visited=set(); missing=set()
-          while pending:
-              p=pending.pop()
-              if p.name in visited:continue
-              visited.add(p.name)
-              for dep in needed(p):
-                  if dep in base:continue
-                  dest=stage/dep
-                  if dest.is_file():pending.append(dest);continue
-                  if (oem/dep).is_file():
-                      shutil.copy2(oem/dep,dest);pending.append(dest)
-                  elif (sdk/dep).is_file():
-                      shutil.copy2(sdk/dep,dest);pending.append(dest)
-                  else:missing.add(dep)
-          report={"staged":sorted(visited),"unresolved":sorted(missing),"authentication_stubs":False,"vehicle_access":False}
-          pathlib.Path("evidence/native-dependency-closure.json").write_text(json.dumps(report,indent=2)+"\n")
-          print(json.dumps(report,indent=2))
-          if missing: raise SystemExit("Unresolved genuine dependencies: "+", ".join(sorted(missing)))
-          PY
+          python3 integration/mu1005_congo_native/resolve_dependencies.py --stage stage --sdk sdk-libs --oem "$RUNNER_TEMP/original" --report evidence/native-dependency-closure.json
       - name: Run isolated QNX library and helper startup
         run: |
           set -euxo pipefail
