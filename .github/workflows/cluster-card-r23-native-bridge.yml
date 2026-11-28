@@ -4,6 +4,12 @@ on:
   pull_request:
     branches: [experiment/cluster-card-r24-r26-integrated]
     types: [opened, synchronize, reopened]
+    paths:
+      - 'experiments/cluster-compact-card/r24/prepare_rgi_bridge.py'
+      - 'experiments/cluster-compact-card/r24/prepare_player.py'
+      - 'experiments/cluster-compact-card/r24/rgd_card70_bridge.h'
+      - 'experiments/cluster-compact-card/r24/rgd_card70_i420.h'
+      - 'experiments/cluster-compact-card/r17/**'
 permissions:
   contents: read
 concurrency:
