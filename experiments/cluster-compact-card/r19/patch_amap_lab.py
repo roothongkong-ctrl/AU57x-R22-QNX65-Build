@@ -37,10 +37,6 @@ edit("AppDelegate.m", [
 }""")
 ])
 edit("MainViewController.m", [
-    ("    [self updateMapViewScreenAnchor:NO];  //", "    [self updateMapViewScreenAnchor:NO];  //"), 
-    ("    [self updateMapViewScreenAnchor:NO];  //", "    [self updateMapViewScreenAnchor:NO];  //"),
-] if False else [
-    ("    [self updateMapViewScreenAnchor:NO];  //", "    [self updateMapViewScreenAnchor:NO];  //"),
     ("#pragma mark - Interface", """#if TARGET_OS_SIMULATOR
 - (void)driveManagerOnCalculateRouteSuccess:(AMapNaviDriveManager *)driveManager {
     if (![[NSProcessInfo processInfo].arguments containsObject:@"-R19Lab"]) return;
