@@ -1,0 +1,61 @@
+name: R105.232 current ARM first-link payload and config tools (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105232-current-payload.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reuse latest successful native and last actual ARM donor build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p stage/components/native stage/components/luka-arm stage/tools stage/source
+          gh run download 46102648356 --repo "$GITHUB_REPOSITORY" --name mu1005-si-cprx-arm-NO-INSTALL --dir stage/components/native
+          gh run download 46105174013 --repo "$GITHUB_REPOSITORY" --name R105231-full-donor-ie-arm-NO-INSTALL --dir /tmp/donor
+          cp /tmp/donor/donor-daemon-MU1005-INHERITED-ACK-NO-INSTALL.bin stage/components/luka-arm/
+          cp /tmp/donor/STATUS.txt /tmp/donor/daemon.sha256 stage/components/luka-arm/
+          for f in LICENSE LICENSE.md COPYING; do if [ -f "/tmp/donor/$f" ]; then cp "/tmp/donor/$f" stage/components/luka-arm/; fi; done
+          cp integration/mu1005_vehicle_stage/{backup.sh,recover.sh,config_transaction.sh,stock_config_apply.sh,congo_port_table.json} stage/tools/
+          cp -R lab/mu1005_donor_ie lab/mu1005_donor_exit lab/mu1005_donor_ready lab/mu1005_live_uap_ip stage/source/
+          cp -R integration/mu1005_donor_daemon stage/source/
+          mkdir -p stage/source/route4_5
+          cp lab/mu1005_route4_5/{adapt_donor_ack.py,adapt_inherited_stream.py} stage/source/route4_5/
+          strings stage/components/luka-arm/*.bin > /tmp/daemon-strings
+          grep -F 'MU1005 IE slot not explicitly present exactly once' /tmp/daemon-strings
+          grep -F 'MU1005 refuses unowned IE removal' /tmp/daemon-strings
+          readelf -h stage/components/luka-arm/*.bin | grep -E 'Machine:.*ARM'
+          python3 - <<'PY'
+          import hashlib,json,pathlib,zipfile
+          root=pathlib.Path("stage")
+          bin=next((root/"components/luka-arm").glob("*.bin"))
+          assert hashlib.sha256(bin.read_bytes()).hexdigest()==(bin.parent/"daemon.sha256").read_text().split()[0]
+          rows=[]
+          for p in sorted(root.rglob("*")):
+              if p.is_symlink():raise ValueError("unexpected link")
+              if p.is_file(): rows.append({"path":str(p.relative_to(root)),"sha256":hashlib.sha256(p.read_bytes()).hexdigest(),"bytes":p.stat().st_size})
+          manifest={"target":"MHI2_CN_AU57x_K1006_2 / MU1005","installable":False,"vehicle_verified":False,"native_run":46102648356,"luka_arm_run":46105174013,"luka_arm_version":"R105.231 (nine adapters, including original AP IE ownership fix)","missing":["actual OEM Bluetooth registration","production SI/DIO and original MFi owner binding","live installation and rollback integration"],"files":rows}
+          (root/"manifest.json").write_text(json.dumps(manifest,indent=2))
+          (root/"DO_NOT_INSTALL.txt").write_text("Review payload only. Do not execute or flash. Current ARM daemon includes IE ownership fix; native providers are not wired.\n")
+          out="MU1005-R105232-first-link-payload-NO-INSTALL.zip"
+          with zipfile.ZipFile(out,"w",zipfile.ZIP_DEFLATED) as z:
+              for p in sorted(root.rglob("*")):
+                  if p.is_file():z.write(p,p.relative_to(root))
+          with zipfile.ZipFile(out) as z:
+              assert z.testzip() is None
+              assert all(hashlib.sha256(z.read(row["path"])).hexdigest()==row["sha256"] for row in rows)
+          print("PACKAGED_COMPONENTS",len(rows),"NO_INSTALL")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MU1005-R105232-first-link-payload-NO-INSTALL
+          path: MU1005-R105232-first-link-payload-NO-INSTALL.zip
+          retention-days: 14

@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.231",
+    "version": "R105.232",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 15
+      "dependent_not_yet_listed": 6
     },
     "runs": [],
     "verified_prior": [
@@ -306,10 +306,21 @@
           46104381236
         ],
         "evidence": "SI host success; QNX cached image restored successfully, Rust seed failed due to nested Cargo workspace, not daemon compilation."
+      },
+      {
+        "version": "R105.231",
+        "passed": 15,
+        "runs": [
+          46105174128,
+          46105174110,
+          46105174047,
+          46105174013
+        ],
+        "evidence": "Original stock config apply/restore host cases, backup, SI host and full current nine-adapter QNX ARM Rust build all passed; artifact 15247486645. Actual owner and phone not established."
       }
     ],
-    "discovery": "Stock-first existing pairing and iAP2 transport reuse; implement actual reversible config replacement primitive on host fixture, preserve iap2.cfg bytewise. ARM seed isolated from root Cargo workspace. No activation or actual native registration proof.",
-    "expected_jobs": 15,
+    "discovery": "Use newest actual ARM donor binary from successful run 46105174013 in payload instead of old R105.225 binary; include config transaction and apply/restore source. Target only ambiguous Congo CMGR_CreateDataLink, ME_SendHciCommandAsync and ACL trace relocations, with actual OEM and donor fingerprints; no unknown ABI activation.",
+    "expected_jobs": 6,
     "pending_prior": []
   },
   "read_strategy": {
@@ -345,7 +356,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.227 all 13 cloud jobs passed; actual stock Bluetooth owner remains unbound. User accepts hardware validation after complete reversible candidate; no claim of vehicle success."
+      "evidence": "R105.231 actual full ARM daemon built; targeted remaining Congo entry/trace evidence pending. Stock config route remains preferred; no genuine native registration yet."
     },
     {
       "priority": 2,
@@ -385,7 +396,7 @@
         35
       ],
       "task": "Prepare reversible first-link candidate in parallel, not after first physical phone link. Keep installation disabled until actual modified components and recovery are integrated; defer nonessential optimizations.",
-      "evidence": "Actual config replace/restore primitive implemented on fixture; vehicle mode intentionally disabled. Need live configuration path and connected receiver/transport before complete installer."
+      "evidence": "R105.232 current binary and stock configuration replacement/restore packaged in review payload; no vehicle activation."
     }
   ],
   "rules": [
