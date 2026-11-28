@@ -1,0 +1,39 @@
+name: R105.245 consolidated first-link review session (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105245-first-link-session.yml','integration/mu1005_vehicle_stage/first_link_session.sh']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  review-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reuse already compiled read-only observer and reviewed transaction
+        run: |
+          set -euxo pipefail
+          mkdir -p package/observer package/lab/mu1005_first_link_trial package/lab/mu1005_first_link_config delivery old
+          gh run download 46093662999 --repo "$GITHUB_REPOSITORY" --name R105222-MU1005-ONE-SHOT-READ-ONLY --dir old
+          tar -xzf old/MU1005-one-shot-readonly.tar.gz -C package/observer
+          (cd package/observer && sha256sum -c SHA256SUMS)
+          cp lab/mu1005_first_link_trial/trial.sh package/lab/mu1005_first_link_trial/
+          cp lab/mu1005_first_link_config/first_link_config.sh package/lab/mu1005_first_link_config/
+          cp integration/mu1005_vehicle_stage/{backup.sh,recover.sh,first_link_session.sh} package/
+          cp docs/R105245_FIRST_LINK_SESSION_CN.md package/README_CN.md
+          find package -name '*.sh' -exec sh -n {} \;
+          grep -F 'collect > "$report"' package/first_link_session.sh
+          grep -F 'observe_paths' package/first_link_session.sh
+          test "$(grep -c REVIEW_ONLY_APPLY_DISABLED package/first_link_session.sh)" = 1
+          (cd package && find . -type f ! -name PACKAGE_SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > PACKAGE_SHA256SUMS && sha256sum -c PACKAGE_SHA256SUMS)
+          tar -czf delivery/MU1005-R105245-first-link-review.tar.gz -C package .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105245-FIRST-LINK-REVIEW-NO-INSTALL
+          path: delivery/
+          retention-days: 30

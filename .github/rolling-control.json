@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.244",
+    "version": "R105.245",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -428,9 +428,19 @@
           46107619843
         ],
         "evidence": "Both original adapters ARM compile and exact original guards passed. Old separate R105.237 joint run 46106440500 failed QEMU tmp mkdtemp, Bluetooth fixture markers passed; not actual vehicle."
+      },
+      {
+        "version": "R105.244",
+        "passed": 11,
+        "runs": [
+          46107915832,
+          46107915361,
+          46107915409
+        ],
+        "evidence": "Consolidated review package artifact 15248561365 and host regressions success; no actual config activation."
       }
     ],
-    "discovery": "Stop incremental mock/adapter churn. Package one original-route review session using existing exact config transaction, existing compiled observer and original backup. Apply disabled until vehicle path/rollback review. If stock cannot supply service, switch to full mature donor integration instead of additional isolated wrappers.",
+    "discovery": "Fix early-exit path observation and invoke existing compiled native observer in same session; preserve diagnostic report even if aliases missing. Prior vehicle R105.196 lacks connectivity.json path; no offline proof of live alias or independent rollback. Apply remains disabled.",
     "expected_jobs": 5,
     "pending_prior": []
   },
@@ -468,7 +478,7 @@
         "lab/mu1005_first_link_config/first_link_config.sh",
         "lab/mu1005_bt_live_observe/probe.sh"
       ],
-      "evidence": "R105.244 package CI pending. No physical trial, no install authorization."
+      "evidence": "R105.244 package pass. R105.245 corrects premature exit and captures missing live config path plus original observer in a single SD read-only session. Actual path/consumer and rollback remain vehicle evidence, not cloud tests."
     },
     {
       "priority": 2,
