@@ -37,6 +37,7 @@ int cp_stock_mfi_bind(struct cp_stock_mfi *s,void *lib,
            sizeof s->create_signature)!=0){
   cp_stock_mfi_invalidate(s);return CP_STOCK_VENDOR;
  }
+ if(!cp_stock_mfi_live(s)){cp_stock_mfi_invalidate(s);return CP_STOCK_OWNER;}
  return CP_STOCK_OK;
 }
 static void release(struct cp_stock_mfi *s,uint8_t *ptr){

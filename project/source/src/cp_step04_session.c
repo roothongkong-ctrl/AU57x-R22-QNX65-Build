@@ -259,6 +259,10 @@ int cp_s4_wireless_send(void *ctx,const uint8_t *frame,size_t len){
 }
 void cp_s4_revoke(struct cp_step04_session *s){
  if(!s)return;
+ /* Retire this wireless generation's borrowed OEM signer, not the
+  * original library or chip. A new session must bind and authenticate anew. */
+ if(s->stock&&s->stock->bound&&s->stock->epoch==s->epoch&&
+    s->stock->bt_generation==s->link.generation)cp_stock_mfi_invalidate(s->stock);
  cp_lk_revoke(&s->link);
  if(s->auth_ready)cp_auth_revoke(&s->auth);
  s->pending_stock_library=NULL;

@@ -253,6 +253,8 @@ int main(void){
  o.paired=0;
  assert(cp_wcp_r45_bootstrap_tick(&r,&w,&t,&ops,&ac,124)==CP_WCP_DENIED);
  assert(!w.attached&&t.closed&&ac.state==CP_WCP_BLOCKED);
+ assert(!stock.bound&&!stock.existing_library&&!stock.create_signature&&!stock.copy_certificate);
+ assert(!cp_s4_authenticated(&s));
  puts("PASS established RFCOMM owner revoked before subsequent iAP2 socket pump");
  assert(out.stock_iap2_connected(out.ctx,7)==0);
  assert(cp_wcp_r45_remote_ops(&r,&out)==-1);
