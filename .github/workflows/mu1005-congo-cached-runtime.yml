@@ -1,0 +1,141 @@
+name: Congo Bluetooth runtime on existing QNX cache (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/mu1005-congo-cached-runtime.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  independent:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        check: [hook-load, hook-sdk-symbols, daemon-sdk-symbols]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned donor and QNX SDK
+        run: |
+          set -euxo pipefail
+          mkdir stage evidence
+          git init donor
+          git -C donor remote add origin https://github.com/congobg/MHI2Q_WiFi_CarPlay
+          git -C donor fetch --depth 1 origin 223b42f90bf7c15fbbbef23259da36caa9bd4994
+          git -C donor checkout --detach FETCH_HEAD
+          git init toolchain
+          git -C toolchain remote add origin https://github.com/luka-dev/qnx65-armv7-toolchain
+          git -C toolchain fetch --depth 1 origin baa45224f18ae6b13c2e9c77c6663bb8181eb6a1
+          git -C toolchain checkout --detach FETCH_HEAD
+          python3 - <<'PY'
+          import tarfile,pathlib
+          with tarfile.open("donor/MHI2QC_3638/wcp.tar.gz","r:gz") as t:
+              for m in t:
+                  p=pathlib.PurePosixPath(m.name)
+                  if not m.isfile() or p.name not in {"libbthook.so","wcpd","wcppaird"}:continue
+                  assert 0<m.size<10_000_000
+                  dest=pathlib.Path("stage")/p.name
+                  assert not dest.exists()
+                  dest.write_bytes(t.extractfile(m).read())
+          assert all((pathlib.Path("stage")/n).exists() for n in ("libbthook.so","wcpd","wcppaird"))
+          PY
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Prepare QEMU only for isolated load
+        if: matrix.check == 'hook-load'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-arm
+      - name: Compare versioned imports with genuine QNX SDK libraries
+        if: matrix.check != 'hook-load'
+        env:
+          CHECK: ${{ matrix.check }}
+        run: |
+          set -euxo pipefail
+          docker run --rm -v "$PWD":/src qnx65-armv7-toolchain:8.5 sh -c '
+            T=/opt/qnx650/target/qnx6/armle-v7
+            for n in libc.so.3 libsocket.so.3; do
+              p="$T/lib/$n"; [ -f "$p" ] || p="$T/usr/lib/$n"
+              test -f "$p" || exit 1
+              arm-unknown-nto-qnx6.5.0eabi-readelf -WsV "$p" > "/src/evidence/$n.txt"
+            done'
+          python3 - <<'PY'
+          import os,re,pathlib,subprocess,json
+          ev=pathlib.Path("evidence")
+          def syms(text,imports):
+              result=set()
+              for l in text.splitlines():
+                  a=l.split()
+                  if len(a)<8 or not re.fullmatch(r"[0-9]+:",a[0]) or a[4]!="GLOBAL":continue
+                  if (a[6]=="UND")==imports:result.add(a[7].replace("@@","@"))
+              return result
+          providers=set()
+          for p in ev.glob("*.txt"):providers|=syms(p.read_text(),False)
+          # An unversioned import may bind a default-versioned export.
+          # Treat that as a candidate only, never as confirmed ABI.
+          base={x.split("@")[0] for x in providers}
+          names=["libbthook.so"] if os.environ["CHECK"]=="hook-sdk-symbols" else ["wcpd","wcppaird"]
+          rows=[]
+          for n in names:
+              s=subprocess.check_output(["readelf","--dyn-syms","--wide","stage/"+n],text=True)
+              i=syms(s,True)
+              rows.append({"component":n,"exact_candidates":sorted(i&providers),"base_name_only":sorted(x for x in i-providers if x.split("@")[0] in base),"no_sdk_candidate":sorted(x for x in i if x.split("@")[0] not in base)})
+          report={"scope":"SDK static symbols only; not OEM runtime or phone proof","installable":False,"rows":rows}
+          (ev/"report.json").write_text(json.dumps(report,indent=2))
+          print(json.dumps(report,indent=2))
+          PY
+      - name: Load Bluetooth hook in isolated QNX process without hardware
+        if: matrix.check == 'hook-load'
+        run: |
+          set -euxo pipefail
+          command -v qemu-system-arm >/dev/null || { echo 'Existing runner lacks QEMU'; exit 3; }
+          cat > probe.c <<'EOF'
+          #include <stdio.h>
+          #include <dlfcn.h>
+          #include <unistd.h>
+          int main(void){
+            setvbuf(stdout,0,_IONBF,0);
+            if(access("/dev/sdio0",F_OK)==0 || access("/dev/i2c8",F_OK)==0)return 9;
+            puts("ISOLATED_HOOK_LOAD_ATTEMPT");
+            void *h=dlopen("/proc/boot/libbthook.so",RTLD_NOW|RTLD_LOCAL);
+            if(!h){printf("HOOK_LOAD_FAILED: %s\n",dlerror());return 2;}
+            puts("HOOK_LOAD_OK_NO_STOCK_BTSTACK_NO_PHONE");
+            return 0;
+          }
+          EOF
+          docker run --rm -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -Wall -Wextra -Werror probe.c -o probe
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("toolchain/tests/qemu-run.sh")
+          s=p.read_text()
+          a='cp "$BIN" "$WORK/$NAME"\n'
+          assert s.count(a)==1
+          s=s.replace(a,a+'cp "$HOOK_FILE" "$WORK/libbthook.so"\n')
+          a='$NAME\nEOF\n'
+          assert s.count(a)==1
+          s=s.replace(a,'$NAME\nlibbthook.so\nEOF\n')
+          # U-Boot can consume the first input before the autoboot prompt.
+          # Send bounded repeated ENTERs and wait before issuing disk commands.
+          a="( printf '\\n'; sleep 4"
+          assert s.count(a)==1
+          s=s.replace(a,"( for i in 1 2 3 4 5 6 7 8 9 10; do printf '\\r'; sleep 1; done; sleep 2")
+          # Retain serial log even when U-Boot never reaches the program.
+          a='if ! grep -q \'@@QNXRUN-START@@\' "$LOG"; then'
+          assert s.count(a)==1
+          s=s.replace(a,'[ -z "${QEMU_KEEP_LOG:-}" ] || cp "$LOG" "$QEMU_KEEP_LOG"\n'+a)
+          a='qemu-system-arm -M virt'
+          assert s.count(a)==1
+          s=s.replace(a,'qemu-system-arm -nic none -M virt')
+          p.with_name("qemu-hook.sh").write_text(s)
+          PY
+          HOOK_FILE="$PWD/stage/libbthook.so" QEMU_KEEP_LOG="$PWD/evidence/qemu.log" QEMU_RUN_SECS=20 QEMU_TIMEOUT=95 bash toolchain/tests/qemu-hook.sh "$PWD/probe" 8.5 | tee evidence/probe.log
+          grep -Fq HOOK_LOAD_OK_NO_STOCK_BTSTACK_NO_PHONE evidence/probe.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bluetooth-only-${{ matrix.check }}
+          path: evidence/
+          retention-days: 7
