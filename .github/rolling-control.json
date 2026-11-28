@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.210",
+    "version": "R105.211",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 15
+      "dependent_not_yet_listed": 2
     },
     "runs": [],
     "verified_prior": [
@@ -120,10 +120,18 @@
           46088562992
         ],
         "evidence": "all 14 cloud jobs succeeded; no actual iPhone wireless session or native lease established"
+      },
+      {
+        "version": "R105.210",
+        "passed": 2,
+        "runs": [
+          46089034911
+        ],
+        "evidence": "actual adapted Rust daemon connected to C supervisor/binding in host lab; QNX ARM adapter compilation passed. No real RF/OEM runtime. Other predicted auto regressions did not appear for this SHA."
       }
     ],
-    "discovery": "2 focused new supervisor-to-native-notify adapter tests plus expected 13 auto regressions; actual count authoritative.",
-    "expected_jobs": 15
+    "discovery": "New startup coordinator host fixture and QNX ARM compilation; API is authoritative.",
+    "expected_jobs": 2
   },
   "read_strategy": {
     "first_parallel": [
@@ -143,7 +151,7 @@
         8,
         9
       ],
-      "task": "Use R105.210 supervised_notify_prepare before queue bootstrap; no second legacy worker connection. Next actual OEM owner/lease and driver/receiver provider wiring, not redoing old static scans.",
+      "task": "R105.211 connects the prepared donor FD to existing native startup trace/queue bootstrap, with bounded retry and no repeated bootstrap. Next actual OEM start caller and lease; pursue alternate factory/driver entry in parallel when native lease is not proven.",
       "paths": [
         "lab/mu1005_route4_5/parallel_native.py",
         "lab/mu1005_route4_5/cleanup_callees.py",
@@ -154,9 +162,11 @@
         "lab/mu1005_route4_5/daemon_supervisor.c",
         "project/source/legacy_mu1005/bluetooth/bt_notify_bridge.c",
         "lab/mu1005_route4_5/supervised_notify.c",
-        "lab/mu1005_route4_5/supervised_notify.h"
+        "lab/mu1005_route4_5/supervised_notify.h",
+        "lab/mu1005_route4_5/supervised_startup.c",
+        "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.208 logs show OSAPI timer stop and mutex pair, original driver resource mount and DIO AirPlay Create/SetDelegate/Control callsites; not live owner evidence. R105.210 connects existing donor supervisor endpoint directly to native notify binding with separate ACK/identity proof; cloud tests pending. Genuine OEM startup caller and lease remain open."
+      "evidence": "R105.210 two confirmed successful jobs. R105.211 coordinator pending cloud; no actual OEM startup authority, RF or MFi claimed."
     },
     {
       "priority": 2,
