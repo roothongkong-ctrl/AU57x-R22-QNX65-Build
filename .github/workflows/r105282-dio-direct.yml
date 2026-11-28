@@ -1,4 +1,4 @@
-name: R105.282 original DIO wireless interface direct port (NO INSTALL)
+name: R105.283 original DIO startServer direct wireless port (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
@@ -52,10 +52,10 @@ jobs:
             "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -Itools/review_txn -Ievidence lab/mu1005_dio_direct/interface.c tools/review_txn/sha256.c -lsocket -lc -o evidence/libmu1005_dio_interface_review.so
             arm-unknown-nto-qnx6.5.0eabi-readelf -h -dW -sW evidence/libmu1005_dio_interface_review.so > evidence/elf.txt
             grep -E "Machine:.*ARM" evidence/elf.txt
-            grep -F AirPlayReceiverServerSetProperty evidence/elf.txt
+            grep -F AirPlayReceiverServerControl evidence/elf.txt
           '
           cp lab/mu1005_dio_direct/STATUS_CN.md evidence/README.md
       - uses: actions/upload-artifact@v4
         with:
-          name: R105282-original-DIO-interface-adapter-NO-INSTALL
+          name: R105283-original-DIO-start-adapter-NO-INSTALL
           path: evidence/

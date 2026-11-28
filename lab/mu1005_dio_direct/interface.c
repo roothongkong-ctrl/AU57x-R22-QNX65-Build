@@ -20,7 +20,10 @@ extern char *__progname;
 #define STOCK_PIN "e40b5bf9df3f96221ac01bc0484e06493e6c58e60cca32d2547939ff1d56f63c"
 #define UTF8 0x08000100u
 typedef int (*Set)(void*,unsigned,const void*,const void*,const void*);
-static Set original;
+typedef int (*Control)(void*,unsigned,const void*,const void*,const void*,void**);
+static Control original;
+static Set set_property;
+static void **server_slot;
 static unsigned long (*type)(const void*);
 static unsigned long (*string_type)(void);
 static void *(*make)(const void*,const char*,unsigned);
@@ -45,12 +48,14 @@ static int resolve(const char*n,void*out,size_t size){
  (void)dlerror();void*p=dlsym(RTLD_NEXT,n);if(!p||dlerror())return 0;memcpy(out,&p,size);return 1;
 }
 static void init(void){
- if(!resolve("AirPlayReceiverServerSetProperty",&original,sizeof original))return;
+ if(!resolve("AirPlayReceiverServerControl",&original,sizeof original))return;
  const char*m=getenv("WCP_DIO_WIRELESS");
  const char*review=getenv("MU1005_DIO_INTERFACE_REVIEW");
  /* No opt-in from an ordinary OEM USB invocation. */
  if(!m||strcmp(m,"1")||!review||strcmp(review,"1")||!__progname||strcmp(__progname,"dio_manager")||!pin())return;
- if(!resolve("CFGetTypeID",&type,sizeof type)||!resolve("CFStringGetTypeID",&string_type,sizeof string_type)||
+ if(!resolve("AirPlayReceiverServerSetProperty",&set_property,sizeof set_property)||
+    !resolve("gAirPlayReceiverServer",&server_slot,sizeof server_slot)||
+    !resolve("CFGetTypeID",&type,sizeof type)||!resolve("CFStringGetTypeID",&string_type,sizeof string_type)||
     !resolve("CFStringCreateWithCString",&make,sizeof make)||!resolve("CFStringGetCString",&get,sizeof get)||
     !resolve("CFRelease",&release,sizeof release))return;
  allowed=1;
@@ -74,16 +79,25 @@ static int ap_up(void){
  ok=ok&&ioctl(fd,SIOCGIFADDR,&r)==0&&r.ifr_addr.sa_family==AF_INET;
  close(fd);return ok;
 }
-int AirPlayReceiverServerSetProperty(void*s,unsigned flags,const void*k,const void*q,const void*v){
+int AirPlayReceiverServerControl(void*s,unsigned flags,const void*k,const void*q,const void*v,void**out){
  uintptr_t lr=(uintptr_t)__builtin_return_address(0);
  (void)pthread_once(&once,init);
  if(!original)return -1;
- /* Only redirect an actual stock request to bind carplay0. No call to
-  * startServer, no replacement of other settings, no authentication changes.
-  * A dedicated launch supervisor must still exclude concurrent wired DIO. */
- if(!allowed||!caller(lr)||!s||q||!equal(k,"interfaceName")||!equal(v,"carplay0")||!ap_up())
-  return original(s,flags,k,q,v);
- void*ap=make(NULL,"uap0",UTF8);if(!ap)return original(s,flags,k,q,v);
- int rc=original(s,flags,k,q,ap);release(ap);
- return rc;
+ /* Native DIO startServer is the real receiver startup boundary, as
+  * already used by native_exports.c. Execute on the original calling
+  * thread, use its server and preserve the exact original Control ABI.
+  * No fabricated success and no additional receiver. */
+ if(!allowed||!caller(lr)||!s||!server_slot||*server_slot!=s||
+    flags!=1u||q||v||out||!equal(k,"startServer"))
+  return original(s,flags,k,q,v,out);
+ /* Only an explicitly wireless launch reaches here. If the AP is down,
+  * refuse this wireless start rather than start an unintended listener. */
+ if(!ap_up())return -1;
+ void*key=make(NULL,"interfaceName",UTF8);
+ void*ap=make(NULL,"uap0",UTF8);
+ if(!key||!ap){if(key)release(key);if(ap)release(ap);return -1;}
+ int rc=set_property(s,0,key,NULL,ap);
+ release(ap);release(key);
+ if(rc!=0||*server_slot!=s)return rc?rc:-1;
+ return original(s,flags,k,q,v,out);
 }

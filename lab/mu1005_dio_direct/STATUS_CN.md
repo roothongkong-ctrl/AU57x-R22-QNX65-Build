@@ -1,2 +1,2 @@
-# R105.282 原厂 DIO 接收器直接复用
-按 congobg/MHI2Q_WiFi_CarPlay 223b42f9 技术说明 section 6 的 carplay0→uap0 做最小适配，使用真实原厂 DIO 调用 AirPlayReceiverServerSetProperty 的入口，不另建接收器。严格固定 MU1005 原厂 SHA；生成真实 PLT 调用点保护；仅专门的 wireless 进程且 AP 可用时转换 interfaceName，普通 USB 原样转发。无需新增外围模拟测试，仅目标编译。此模块没有启动 DIO、设置无线 Bonjour 特征、实现无线加密或 inner iAP2；原厂 QNX 运行未验证。上游 QC 包不能直接移植，仍需安全的无线启动路径、USB 互斥、恢复。NO INSTALL。
+# R105.283 原厂 DIO 启动入口适配（NO INSTALL）
+R105.282 run 46125603360 在生成直接 SetProperty 调用点时失败；不删除版本锁定或放宽到任意地址。改为复用既有 native_exports.c 的原厂六参数 AirPlayReceiverServerControl(startServer) 入口、五参数 SetProperty ABI。仅无线专用 DIO 进程，真实原厂直接调用点、原厂 singleton 和 flags=1、三空参数、原厂 CFString startServer 才在启动前将 interfaceName 设置为当前已启用的 uap0；失败不返回成功。普通有线仍直接转发。原厂动态链接/真实调用尚未运行验证；没有无线 DIO 启动器或认证/session bridge 接入，不得安装。只做原厂目标编译，不新增模拟测试。
