@@ -2,7 +2,7 @@ name: MU1005 unified parallel development (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/mu1005-si-cprx-native.yml, integration/mu1005_si_native/**, integration/mu1005_swdl_review/**, tools/review_txn/**, project/source/legacy_mu1005/**, project/source/src/**, tools/ci/mu1005_gnu_mirrors.sh, tools/mu1005_oem_inventory.py, tools/mu1005_qnx_dependency_probe.py, tests/**, ci/**]
+    paths: [.github/workflows/mu1005-si-cprx-native.yml, lab/mu1005_route4_5/dio_existing_receiver.*, lab/mu1005_route4_5/daemon_supervisor.*, lab/mu1005_route4_5/supervised_notify.*, lab/mu1005_route4_5/supervised_startup.*, integration/mu1005_si_native/**, integration/mu1005_swdl_review/**, tools/review_txn/**, project/source/legacy_mu1005/**, project/source/src/**, tools/ci/mu1005_gnu_mirrors.sh, tools/mu1005_oem_inventory.py, tools/mu1005_qnx_dependency_probe.py, tests/**, ci/**]
   workflow_dispatch:
 permissions:
   contents: read

@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.214",
+    "version": "R105.215",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 14
+      "dependent_not_yet_listed": 11
     },
     "runs": [],
     "verified_prior": [
@@ -156,10 +156,18 @@
           46090291105
         ],
         "evidence": "14/14 jobs success; existing DIO singleton coordinator fixture and full native build; no actual DIO provider or RF."
+      },
+      {
+        "version": "R105.214",
+        "passed": 1,
+        "runs": [
+          46091721708
+        ],
+        "evidence": "Host singleton coordinator admission/rollback fixture passed; native build did not trigger because lab source paths were omitted. R105.215 fixes trigger coverage and verifies ARM compilation."
       }
     ],
-    "discovery": "R105.214 pre/post-bind and published CPRX admission revalidation, targeted coordinator fixture and required regressions. Congo failure run 46090592144: seven transitive NVIDIA libraries absent from stage; independent fix 7ec8bff1e9ecbfee125298b5895ed11770db0506 now resolves all recursively from pinned MU1005 archive, rejecting ambiguous matches. Await results; no real OEM provider or RF yet.",
-    "expected_jobs": 14
+    "discovery": "Two focused pinned OEM lanes: DIO lifecycle/dispatch callers and candidate paired transport callback slot writers (+0x28/+0x2c), plus 9 native build/regression jobs triggered by corrected path filter. Congo 46091673646 recursive resolver fixture passed, actual extraction/runtime not yet complete. No real provider or RF proven.",
+    "expected_jobs": 11
   },
   "read_strategy": {
     "first_parallel": [
@@ -194,7 +202,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.213 all 14 jobs succeeded; R105.214 revalidates DIO/SI admission around existing singleton binding and publication, preserves CPRX rollback ownership on revocation. Actual provider and startup lease still missing. Congo recursive closure fix separate branch."
+      "evidence": "R105.214 host PASS. R105.215 locates actual DIO lifecycle callers and transport descriptor producer candidates; corrects native review ARM trigger for coordinator/supervisor code. No claim of actual provider lease. Congo runtime still running."
     },
     {
       "priority": 2,
