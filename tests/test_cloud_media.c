@@ -35,6 +35,26 @@ int main(void){
  assert(cp_cloud_media_forward(&r,CP_CLOUD_VIDEO,sample,sizeof sample,1,8)==CP_FWD_OWNER);
  assert(cp_cloud_media_bind(&r,&cp,&ops)==CP_FWD_OWNER);
  cp.native_dio=NULL;
+ /* Real original SI/DIO receiver ownership also covers remote process
+  * mode; no fallback raw router may claim video, audio or either control. */
+ for(unsigned phase=1;phase<=4;phase++){
+  cp.remote_phase=phase;
+  assert(cp_cloud_media_bind(&r,&cp,&ops)==CP_FWD_OWNER);
+  cp.remote_phase=0;
+  assert(cp_cloud_media_bind(&r,&cp,&ops)==CP_FWD_OK);
+  cp.remote_phase=phase;
+  for(int kind=CP_CLOUD_VIDEO;kind<=CP_CLOUD_STEERING;kind++){
+   int result=cp_cloud_media_forward(&r,(enum cp_cloud_media)kind,sample,sizeof sample,1,8);
+   assert(result==(kind==CP_CLOUD_VIDEO?CP_FWD_OWNER:CP_FWD_ORDER));
+  }
+  cp.remote_phase=0;
+ }
+ MuCprxService receiver={0};
+ cp.rx_service=&receiver;
+ assert(cp_cloud_media_bind(&r,&cp,&ops)==CP_FWD_OWNER);
+ cp.rx_service=NULL;cp.rx_client_enabled=1;
+ assert(cp_cloud_media_bind(&r,&cp,&ops)==CP_FWD_OWNER);
+ cp.rx_client_enabled=0;
  assert(cp_cloud_media_bind(&r,&cp,&ops)==CP_FWD_OK);
  assert(cp_cloud_media_forward(&r,CP_CLOUD_VIDEO,sample,sizeof sample,1,8)==CP_FWD_OK);
  assert(cp_cloud_media_forward(&r,CP_CLOUD_VIDEO,sample,sizeof sample,1,8)==CP_FWD_ORDER);

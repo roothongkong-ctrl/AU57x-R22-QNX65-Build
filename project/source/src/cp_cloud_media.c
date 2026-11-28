@@ -1,13 +1,18 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include "cp_cloud_media.h"
 #include <string.h>
+/* Original DIO owns all native channels, including the separate-process
+ * receiver. Do not create a competing media/control data path. */
+static int original_receiver(const struct cp_cloud_pipeline *p){
+ return p->native_dio||p->rx_service||p->rx_client_enabled||p->remote_phase;
+}
 int cp_cloud_media_bind(struct cp_cloud_media_router *r,
                         struct cp_cloud_pipeline *session,const struct cp_cloud_media_ops *o){
  if(!r||!session||!o||!o->on_owner_thread||!o->source_verified||!o->native_deliver||
     !session->started||session->stopped||!session->epoch)return CP_FWD_INVALID;
  /* Stock AirPlay owns video/audio decoding; this raw byte router is only
   * a standalone test adapter and may NEVER inject into native DIO. */
- if(session->native_dio)return CP_FWD_OWNER;
+ if(original_receiver(session))return CP_FWD_OWNER;
  memset(r,0,sizeof *r);r->pipeline=session;r->ops=*o;r->epoch=session->epoch;
  return CP_FWD_OK;
 }
@@ -21,7 +26,7 @@ int cp_cloud_media_forward(struct cp_cloud_media_router *r,enum cp_cloud_media t
   return CP_FWD_INVALID;
  if(r->closed||!r->pipeline)return CP_FWD_ORDER;
  p=r->pipeline;
- if(p->native_dio){cp_cloud_media_close(r);return CP_FWD_OWNER;}
+ if(original_receiver(p)){cp_cloud_media_close(r);return CP_FWD_OWNER;}
  if(!epoch||epoch!=r->epoch||p->epoch!=epoch)return CP_FWD_STALE;
  if(n>CP_CLOUD_MEDIA_MAX||((type==CP_CLOUD_HMI||type==CP_CLOUD_STEERING)&&n>256u))
   return CP_FWD_INVALID;

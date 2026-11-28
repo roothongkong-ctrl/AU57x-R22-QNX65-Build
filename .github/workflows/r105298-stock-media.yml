@@ -1,0 +1,76 @@
+name: R105.298 original CarPlay media and control reuse (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105298-stock-media.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-media-provider:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover exact original MU1005 app70
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir firmware original-tools evidence
+          gh run download 45923122041 --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
+          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  $archive" | sha256sum -c -
+          git fetch --depth 1 origin 713fddea9bb11acfdb1df7eff02ca645011ad6d6
+          git archive FETCH_HEAD tools/mu1005_extract_app70.py | tar -x -C original-tools
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          git init qnxmount
+          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
+          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
+          git -C qnxmount checkout --detach FETCH_HEAD
+          python3 -m venv /tmp/extract-venv
+          /tmp/extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          python3 original-tools/tools/mu1005_extract_app70.py "$archive" "$RUNNER_TEMP/app70/app.img"
+          /tmp/extract-venv/bin/python extractor/tools/extract_firmware.py --source "$RUNNER_TEMP/app70/app.img" --output "$RUNNER_TEMP/original" --variant 70 --qnxmount-root "$PWD/qnxmount" > /tmp/app-summary.json
+      - name: Confirm original DIO media and control dependencies
+        run: |
+          /tmp/extract-venv/bin/pip install pyelftools==0.31
+          /tmp/extract-venv/bin/python lab/mu1005_stock_media/provider.py "$RUNNER_TEMP/original" evidence/media-provider.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105298-original-media-provider-NO-INSTALL
+          path: evidence/*.json
+  media-owner-regression:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash ci/host_cloud_media.sh
+  native-media:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Compile original receiver exclusion for QNX ARM
+        run: |
+          set -euxo pipefail
+          mkdir output
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 bash -ec '
+            C=arm-unknown-nto-qnx6.5.0eabi-gcc
+            s=project/source/src
+            a=project/source/legacy_mu1005/airplay
+            b=project/source/legacy_mu1005/bluetooth
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -c -I"$s" -I"$a" -I"$b" "$s/cp_cloud_media.c" -o output/cp_cloud_media.o
+            arm-unknown-nto-qnx6.5.0eabi-readelf -h output/cp_cloud_media.o | tee output/elf.txt
+            grep -E "Machine:.*ARM" output/elf.txt
+          '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105298-original-media-ARM-object-NO-INSTALL
+          path: output/
