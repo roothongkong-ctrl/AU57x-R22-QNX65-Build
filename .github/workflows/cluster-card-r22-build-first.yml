@@ -1,0 +1,147 @@
+name: R22 compile first with bounded simulator recovery
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [experiment/cluster-card-r22-modern-sdk-fix]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [experiment/cluster-card-r22-build-first]
+    paths: ['.github/workflows/cluster-card-r22-build-first.yml']
+permissions:
+  contents: read
+jobs:
+  amap:
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        dependencies: [locked, refreshed]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inventory Xcode and simulator runtimes (no boot required)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/r19"
+          uname -m | tee "$RUNNER_TEMP/r19/architecture.txt"
+          xcodebuild -version | tee "$RUNNER_TEMP/r19/xcode.txt"
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/r19/devices.json"
+          test "$(uname -m)" = x86_64
+          xcrun simctl list runtimes | tee "$RUNNER_TEMP/r19/runtimes.txt"
+      - name: Fetch actual official AMap source and inventory CarPlay interfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/amap-demo/iOS-HelloCarPlay.git "$RUNNER_TEMP/amap"
+          cd "$RUNNER_TEMP/amap"
+          git rev-parse HEAD > "$RUNNER_TEMP/r19/amap-source-sha.txt"
+          git grep -inE 'startEmulatorNavi|didConnectCarInterfaceController|CPTemplateApplicationInstrumentClusterScene|CPTemplateApplicationDashboardScene|CPMapTemplate|AMapNaviDriveView' -- '*.m' '*.h' '*.plist' > "$RUNNER_TEMP/r19/api-inventory.txt" || true
+          cat "$RUNNER_TEMP/r19/api-inventory.txt"
+          cp Podfile.lock "$RUNNER_TEMP/r19/original-pod-lock.txt"
+      - name: Patch native SDK lab viewport
+        run: |
+          set -euo pipefail
+          python3 "$GITHUB_WORKSPACE/experiments/cluster-compact-card/r19/patch_amap_lab.py" "$RUNNER_TEMP/amap"
+          python3 "$GITHUB_WORKSPACE/experiments/cluster-compact-card/r20/patch_card70.py" "$RUNNER_TEMP/amap"
+          python3 "$GITHUB_WORKSPACE/experiments/cluster-compact-card/r21/patch_evidence.py" "$RUNNER_TEMP/amap"
+          if [ "${{ matrix.dependencies }}" = refreshed ]; then python3 "$GITHUB_WORKSPACE/experiments/cluster-compact-card/r22/patch_modern_sdk.py" "$RUNNER_TEMP/amap"; fi
+      - name: Compile real SDK sample for iOS Simulator
+        shell: bash
+        env:
+          DEPS: ${{ matrix.dependencies }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/amap"
+          if [ "$DEPS" = refreshed ]; then
+            python3 -c 'from pathlib import Path; p=Path("Podfile"); s=p.read_text(); import re; s,n=re.subn(r"pod\s+[\x27\x22]AMapNavi[\x27\x22](?:[^\n]*)", "pod \"AMapNavi\", \"11.3.300\"",s); assert n==1; p.write_text(s)'
+            rm -f Podfile.lock
+          fi
+          (pod install || pod install --repo-update) 2>&1 | tee "$RUNNER_TEMP/r19/pods.log"
+          cp Podfile.lock "$RUNNER_TEMP/r19/resolved-pod-lock.txt"
+          find Pods -type d -name '*.framework' | while IFS= read -r fw; do
+            bin="$fw/$(basename "$fw" .framework)"
+            if test -f "$bin"; then echo "$bin"; file "$bin"; lipo -archs "$bin" || true; fi
+          done | tee "$RUNNER_TEMP/r19/sdk-architectures.txt"
+          xcodebuild -list -workspace HelloCarPlay.xcworkspace | tee "$RUNNER_TEMP/r19/schemes.txt"
+          xcodebuild -workspace HelloCarPlay.xcworkspace -scheme HelloCarPlay -configuration Debug -sdk iphonesimulator -destination "generic/platform=iOS Simulator" -derivedDataPath "$RUNNER_TEMP/derived" CODE_SIGNING_ALLOWED=NO IPHONEOS_DEPLOYMENT_TARGET=13.0 ARCHS=x86_64 ONLY_ACTIVE_ARCH=NO build 2>&1 | tee "$RUNNER_TEMP/r19/build.log"
+          APP=$(find "$RUNNER_TEMP/derived/Build/Products" -maxdepth 2 -name HelloCarPlay.app -print -quit)
+          test -n "$APP"
+          echo "R19_APP=$APP" >> "$GITHUB_ENV"
+          BUNDLE=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Info.plist")
+          echo "R19_BUNDLE=$BUNDLE" >> "$GITHUB_ENV"
+          echo 'SDK demo compiled; NOT proof of live navigation, instrument cluster or type112.' | tee "$RUNNER_TEMP/r19/scope.txt"
+      - name: Boot simulator with bounded recovery (after successful compile)
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, subprocess, pathlib
+          out = pathlib.Path(os.environ["RUNNER_TEMP"]) / "r19"
+          devices = json.loads((out / "devices.json").read_text())["devices"]
+          candidates = [d for k,v in reversed(list(devices.items())) if "iOS" in k
+                        for d in v if d.get("isAvailable") and d["name"].startswith("iPad")]
+          candidates.sort(key=lambda d: ("11-inch" not in d["name"], d.get("state") != "Booted"))
+          if not candidates:
+              raise SystemExit("No available iPad simulator runtime")
+          with (out / "boot.log").open("w") as log:
+              for d in candidates[:2]:
+                  udid = d["udid"]
+                  print("Trying", d["name"], udid, flush=True)
+                  def run(args, timeout):
+                      return subprocess.run(["xcrun","simctl"]+args, timeout=timeout,
+                                            stdout=log, stderr=subprocess.STDOUT)
+                  try:
+                      if d.get("state") != "Booted":
+                          run(["boot",udid],30).check_returncode()
+                      run(["bootstatus",udid,"-b"],150).check_returncode()
+                      with open(os.environ["GITHUB_ENV"],"a") as env:
+                          env.write("R19_UDID="+udid+"\n")
+                      break
+                  except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as exc:
+                      print("Boot attempt failed:", exc, flush=True)
+                      log.write(str(exc)+"\n")
+                      log.flush()
+                      try:
+                          run(["shutdown",udid],20)
+                      except subprocess.TimeoutExpired:
+                          pass
+              else:
+                  raise SystemExit("Both simulator boots failed; inspect boot.log; SDK build independent")
+          PY
+      - name: Install successfully compiled SDK demo
+        run: xcrun simctl install "$R19_UDID" "$R19_APP"
+      - name: Launch native SDK and verify real emulator callbacks
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun simctl privacy "$R19_UDID" grant location "$R19_BUNDLE" || true
+          xcrun simctl launch "$R19_UDID" "$R19_BUNDLE" -R19Lab | tee "$RUNNER_TEMP/r19/launch.txt"
+          for t in 1 2 3 4 5 6; do
+            sleep 10
+            xcrun simctl io "$R19_UDID" screenshot "$RUNNER_TEMP/r19/sdk-frame-$t.png"
+            xcrun simctl spawn "$R19_UDID" log show --last 5m --style compact --predicate 'eventMessage CONTAINS "R19_" OR eventMessage CONTAINS "R20_" OR eventMessage CONTAINS "R21_"' > "$RUNNER_TEMP/r19/navigation.log"
+            if grep -q R19_ROUTE_SUCCESS "$RUNNER_TEMP/r19/navigation.log" && grep -q R19_NAV_SAMPLE "$RUNNER_TEMP/r19/navigation.log" && grep -q R21_NATIVE_PAIR_CAPTURED "$RUNNER_TEMP/r19/navigation.log"; then break; fi
+          done
+          cat "$RUNNER_TEMP/r19/navigation.log"
+          grep -q 'R19_LAB_VIEWPORT 800x298' "$RUNNER_TEMP/r19/navigation.log"
+          grep -q R19_ROUTE_SUCCESS "$RUNNER_TEMP/r19/navigation.log"
+          grep -q R19_NAV_SAMPLE "$RUNNER_TEMP/r19/navigation.log"
+          echo 'Native SDK emulator callback observed, not a production AMap CarPlay type112 stream.'
+      - name: Collect actual SDK native card and 800x298 base; verify pixels
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q R20_NATIVE_CARD70_CAPTURED "$RUNNER_TEMP/r19/navigation.log"
+          DATA=$(xcrun simctl get_app_container "$R19_UDID" "$R19_BUNDLE" data)
+          cp "$DATA/Documents/r20-base.png" "$DATA/Documents/r20-card.png" "$DATA/Documents/r20-meta.json" "$DATA/Documents/r21-before.png" "$DATA/Documents/r21-after.png" "$RUNNER_TEMP/r19/"
+          python3 -m venv "$RUNNER_TEMP/r20-venv"
+          "$RUNNER_TEMP/r20-venv/bin/pip" install 'Pillow>=10,<13'
+          "$RUNNER_TEMP/r20-venv/bin/python" "$GITHUB_WORKSPACE/experiments/cluster-compact-card/r20/verify_pixels.py" "$RUNNER_TEMP/r19"
+          "$RUNNER_TEMP/r20-venv/bin/python" "$GITHUB_WORKSPACE/experiments/cluster-compact-card/r21/verify_native_pair.py" "$RUNNER_TEMP/r19"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: amap-r22-build-first-${{ matrix.dependencies }}
+          path: ${{ runner.temp }}/r19/
