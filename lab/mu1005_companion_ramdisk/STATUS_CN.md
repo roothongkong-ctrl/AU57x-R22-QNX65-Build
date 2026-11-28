@@ -1,0 +1,2 @@
+# R105.317 补齐真正 /ramdisk
+R105.316 run 46142869621 实际 QNX clock2 rc0，mkdir /ramdisk rc-1 errno89；原 launcher 确认要求 /ramdisk/.v75-native-...。不修改程序和校验。此次复用历史 devf-ram、devb-ram 命令与已有 SDK，分别在隔离 VM 提供实际 RAM 文件系统、mkdir/rmdir 先验后执行同一 790 原版启动器。两种后端并行验证，避免重复两个相同故障的 profile；后端是否能在 QEMU 正常启动仍待验证。没有车机硬件、真实 MFi、手机或网络会话，不宣称接收器可装车。
