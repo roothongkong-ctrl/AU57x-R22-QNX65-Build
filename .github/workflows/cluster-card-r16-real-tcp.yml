@@ -5,6 +5,7 @@ on:
     branches: [experiment/cluster-card-r16-112-tcp-to-decoder]
     paths:
       - 'experiments/cluster-compact-card/r13/**'
+      - 'experiments/cluster-compact-card/r14/**'
       - 'experiments/cluster-compact-card/r16/**'
       - '.github/workflows/cluster-card-r16-real-tcp.yml'
 permissions:
