@@ -14,6 +14,8 @@
 #include <thread>
 #include <vector>
 #include <time.h>
+#include <poll.h>
+#include <signal.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -72,45 +74,54 @@ int main(int argc,char**argv){
  bindto.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
  assert(bind(fd,(struct sockaddr*)&bindto,sizeof(bindto))==0);
  assert(listen(fd,1)==0);
- std::atomic<bool> finished(false),failed(false);
+ signal(SIGPIPE,SIG_IGN);
+ std::atomic<int> released(0),closed(0),allowed(1);
+ std::atomic<bool> failed(false);
  std::thread server([&](){
-  const int client=accept(fd,NULL,NULL);
-  if(client<0){failed.store(true);return;}
-  for(size_t i=0;i<annexb.size();i+=193){
-   size_t n=annexb.size()-i;if(n>193)n=193;
-   if(!sendall(client,annexb.data()+i,n)){failed.store(true);break;}
-   usleep(120);
+  for(int round=1;round<=2;round++){
+   struct pollfd p={fd,POLLIN,0};
+   if(poll(&p,1,8000)<=0){failed.store(true);return;}
+   int client=accept(fd,NULL,NULL);
+   if(client<0){failed.store(true);return;}
+   for(int k=0;k<800&&allowed.load()<round;k++)usleep(10000);
+   if(allowed.load()<round){failed.store(true);close(client);return;}
+   for(size_t i=0;i<annexb.size();i+=193){
+    size_t n=annexb.size()-i;if(n>193)n=193;
+    if(!sendall(client,annexb.data()+i,n)){failed.store(true);break;}
+    usleep(120);
+   }
+   for(int k=0;k<800&&released.load()<round;k++)usleep(10000);
+   if(released.load()<round)failed.store(true);
+   shutdown(client,SHUT_RDWR);close(client);
+   closed.store(round);
   }
-  // Keep source connected while 111 decodes & renders card.
-  for(int k=0;k<240&&!finished.load();k++)usleep(10000);
-  shutdown(client,SHUT_RDWR);close(client);
  });
  r17::Sidecar card;
  assert(card.start(clock_us()));
  std::vector<unsigned char> original,frame;
  map_fill(original);
- frame=original;
- assert(!card.compose_111(frame.data(),W,H,clock_us()));
- assert(frame==original);
- int draws=0;
- for(int i=0;i<160&&!failed.load();i++){
-  frame=original;
-  if(card.compose_111(frame.data(),W,H,clock_us())){
+ for(int round=1;round<=2;round++){
+  int draws=0;
+  for(int i=0;i<250&&!failed.load();i++){
+   frame=original;
+   if(card.compose_111(frame.data(),W,H,clock_us())){
     assert(same_map_outside(frame,original));
-    draws++;
-    break;
+    draws++;break;
+   }
+   usleep(10000);
   }
-  usleep(10000);
+  assert(draws>0);
+  released.store(round);
+  for(int k=0;k<250&&closed.load()<round;k++)usleep(10000);
+  assert(closed.load()==round);
+  usleep(260000);
+  frame=original;
+  assert(!card.compose_111(frame.data(),W,H,clock_us()));
+  assert(frame==original);
+  allowed.store(round+1);
  }
- finished.store(true);
  server.join();
  assert(!failed.load());
- assert(draws>0); /* real FFmpeg decoder filled R12 Joiner */
- // Only after sidecar EOF do we know 112 is dropped; no stale overlay.
- usleep(260000);
- frame=original;
- assert(!card.compose_111(frame.data(),W,H,clock_us()));
- assert(frame==original);
  card.stop();
  frame=original;
  assert(!card.compose_111(frame.data(),W,H,clock_us()));
@@ -121,7 +132,7 @@ int main(int argc,char**argv){
  frame=original;
  assert(!off.compose_111(frame.data(),640,360,clock_us()));
  off.stop();
- std::cout<<"PASS R17 real H264 TCP sidecar->FFmpeg 112->R12 joiner->"
+ std::cout<<"PASS R18 reconnect twice: real H264 TCP sidecar->FFmpeg 112->R12 joiner->"
           <<"original 111 buffer exact-map 70% card, no 112/stale/wrong-size fail-close; "
           <<"generated fixture ONLY\n";
  close(fd);
