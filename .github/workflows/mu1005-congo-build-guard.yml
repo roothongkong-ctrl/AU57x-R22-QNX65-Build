@@ -1,0 +1,72 @@
+name: Congo MU1005 build guard localization (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-congo-bluetooth-only-runtime]
+    paths: ['.github/workflows/mu1005-congo-build-guard.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        lane: [guard, startup, acl]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Locate donor guard and startup references without running or patching code
+        env:
+          LANE: ${{ matrix.lane }}
+        run: |
+          set -euo pipefail
+          git init donor
+          git -C donor remote add origin https://github.com/congobg/MHI2Q_WiFi_CarPlay
+          git -C donor fetch --depth 1 origin 223b42f90bf7c15fbbbef23259da36caa9bd4994
+          git -C donor checkout --detach FETCH_HEAD
+          git fetch --depth 1 origin 235f971a53ce99e9e32db7c48062647dcb4fdb8d
+          git show FETCH_HEAD:integration/mu1005_si_native/BT_START_EIR_ORIGINAL_CN.md > stock-start.md
+          git show FETCH_HEAD:integration/mu1005_si_native/BT_TRACE_ORIGINAL_CN.md > stock-acl.md
+          mkdir evidence
+          python3 - <<'PY'
+          import os,struct,re,tarfile,pathlib,json,hashlib
+          lane=os.environ["LANE"]
+          with tarfile.open("donor/MHI2QC_3638/wcp.tar.gz","r:gz") as t:
+              m=[m for m in t if m.isfile() and pathlib.PurePosixPath(m.name).name=="libbthook.so"]
+              assert len(m)==1 and 0<m[0].size<10000000
+              b=t.extractfile(m[0]).read()
+          assert b[:6]==b"\x7fELF\x01\x01"
+          ph=struct.unpack_from("<I",b,28)[0];sz,n=struct.unpack_from("<HH",b,42)
+          seg=[]
+          for i in range(n):
+              k,o,v,_,f,_,flags,_=struct.unpack_from("<8I",b,ph+i*sz)
+              if k==1: seg.append((o,o+f,v,flags))
+          def location(o):
+              for a,z,v,flags in seg:
+                  if a<=o<z:return {"file_offset":hex(o),"virtual_address":hex(v+o-a),"flags":flags}
+              return {"file_offset":hex(o)}
+          def words(x):
+              return [location(m.start()) for m in re.finditer(re.escape(struct.pack("<I",x)),b)]
+          spec={
+            "guard":[("graft startup",0x11efdc,0x11ecd0,0x11ec60),("graft EIR",0x12c990,0x12a710,0x12a6a0)],
+            "startup":[("startup trace GOT",0x2c6134,0x2c112c,0x2c18fc)],
+            "acl":[("ACL trace GOT",0x2c6a94,0x2c1a88,None)]
+          }
+          start=pathlib.Path("stock-start.md").read_text()
+          acl=pathlib.Path("stock-acl.md").read_text()
+          assert "0x11ec60" in start and "0x12a6a0" in start and "0x13f6c4" in acl
+          rows=[]
+          for name,a,c,target in spec[lane]:
+              rows.append({"name":name,"donor3638":words(a),"donor5092":words(c),"mu1005_static_candidate":hex(target) if target is not None else None})
+          patterns={"guard":r"build|signature|unsupported|mismatch|btstack","startup":r"Primary DID|startBtStack|logCV|register","acl":r"ACL|already connected|starting service|iAP2"}
+          strings=[{"location":location(m.start()),"text":m.group().decode("ascii")} for m in re.finditer(rb"[ -~]{5,}",b) if re.search(patterns[lane],m.group().decode("ascii"),re.I)]
+          report={"lane":lane,"donor_sha256":hashlib.sha256(b).hexdigest(),"scope":"static references only; no runtime compatibility or patch authorization","installable":False,"rows":rows,"strings":strings[:150],"mu1005_acl_trace_calls_static":["0x13f6c4","0x13f1d8"] if lane=="acl" else []}
+          pathlib.Path("evidence/guard.json").write_text(json.dumps(report,indent=2))
+          print(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: congo-guard-${{ matrix.lane }}
+          path: evidence/
+          retention-days: 7
