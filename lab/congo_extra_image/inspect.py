@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Read previously excluded same-variant original MMX images, no OEM export."""
-import ctypes,ctypes.util,hashlib,json,subprocess,sys
+import sys
+# This entry point is named inspect.py; exclude its own directory before
+# any imports can resolve Python's standard-library inspect to this script.
+if sys.path:
+    sys.path.pop(0)
+import ctypes,ctypes.util,hashlib,json,subprocess
 from pathlib import Path,PurePosixPath
 archive,toolkit,out=map(Path,sys.argv[1:])
 sys.path.insert(0,str(toolkit.resolve()/"tools"))
