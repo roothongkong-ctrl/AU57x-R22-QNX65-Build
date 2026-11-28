@@ -1,0 +1,2 @@
+# R105.292 复用原厂蓝牙自动回连
+用户指定不做蓝牙自动配对/ACL连接程序，手机及原厂 BT 负责；CarPlay 只在原厂已配对 ACL 存在、原厂有线释放且原厂 iAP2 transport 已发布后推进。复用 R105.291 原厂记录和 R105.279 paired_start，同一 ACL 可在拔线后复用，原厂认证必须重新进行。新增在现有 notify/queue 原厂 owner dispatch 中的可选回调，保留原厂 notify。真实 native caller 仍需要绑定 mu_stock_reconnect_bind 及 R105.291 selected/certify/read_live；未证明车机运行。并发 host 新场景与已有 QNX 环境集成编译。固定余项2–8共7项；第2项 R105.291 run 46128988747 编译和 fixture成功，真实接口仍待接通；第3项本轮提交待验收；4 Wi-Fi双频，5原厂认证，6原厂输出，7 SD安装恢复，8 实车。NO INSTALL。

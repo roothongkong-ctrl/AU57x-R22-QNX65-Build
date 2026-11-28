@@ -28,6 +28,8 @@ static struct {
  MuNotifyGate gate;
  volatile unsigned active;
  int attempted,queue_only;
+ void (*reconnect)(void*,int);
+ void *reconnect_context;
 } n;
 static uint32_t tid(void){return (uint32_t)(uintptr_t)pthread_self();}
 static int on_owner(void*p){(void)p;return tid()==n.thread.tid;}
@@ -58,6 +60,8 @@ static void after(void*p){
  if(rc==-1&&n.b.worker&&n.b.handoff->state==AU98_EMPTY&&*n.b.prepared_fd>=0){
   (void)close(*n.b.prepared_fd);*n.b.prepared_fd=-1;
  }
+ if(n.reconnect&&safe(&n.b)&&mu_bt_osapi_identity_matches(&n.thread,tid(),n.b.owner.read_live,n.b.owner.opaque))
+  n.reconnect(n.reconnect_context,n.b.handoff->state==AU98_PUBLISHED);
 }
 static void notify(void*self,unsigned char value){
  MuNotifyOriginal original=(MuNotifyOriginal)(uintptr_t)ORIGINAL;
@@ -108,12 +112,18 @@ int mu_bt_notify_periodic_dispatch(void){
     !mu_bt_osapi_identity_matches(&n.thread,tid(),n.b.owner.read_live,n.b.owner.opaque))return -1;
  n.gate.inside=1;after(NULL);n.gate.inside=0;return 0;
 }
+int mu_bt_notify_set_reconnect(void (*dispatch)(void*,int),void*ctx){
+ if(!dispatch||!ctx||n.reconnect||!enabled(NULL)||!on_owner(NULL)||n.gate.inside||
+    !safe(&n.b)||!mu_bt_osapi_identity_matches(&n.thread,tid(),n.b.owner.read_live,n.b.owner.opaque))return -1;
+ n.reconnect_context=ctx;n.reconnect=dispatch;return 0;
+}
 int mu_bt_notify_unbind(void){
  if(!enabled(NULL)||!on_owner(NULL)||n.gate.inside||n.b.handoff->state!=AU98_EMPTY||
  !safe(&n.b)||!mu_bt_osapi_identity_matches(&n.thread,tid(),n.b.owner.read_live,n.b.owner.opaque)||
  !words(&n.b.owner,n.queue_only?ORIGINAL:(uint32_t)(uintptr_t)notify))return -1;
  if(!n.queue_only&&!__sync_bool_compare_and_swap((volatile uint32_t*)(uintptr_t)SLOT,(uint32_t)(uintptr_t)notify,ORIGINAL))return -1;
  __sync_lock_release(&n.active);
+ n.reconnect=NULL;n.reconnect_context=NULL;
  /* No freeing or unloading: a previously fetched callback may still run. */
  return 0;
 }
@@ -122,5 +132,6 @@ int mu_bt_notify_bind(const MuBtNotifyBinding*b){(void)b;return -1;}
 int mu_bt_notify_bind_queue_only(const MuBtNotifyBinding*b){(void)b;return -1;}
 int mu_bt_notify_discovery_allowed(void){return 0;}
 int mu_bt_notify_periodic_dispatch(void){return -1;}
+int mu_bt_notify_set_reconnect(void (*dispatch)(void*,int),void*ctx){(void)dispatch;(void)ctx;return -1;}
 int mu_bt_notify_unbind(void){return -1;}
 #endif

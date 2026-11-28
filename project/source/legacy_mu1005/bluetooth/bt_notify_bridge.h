@@ -34,5 +34,10 @@ int mu_bt_notify_bind(const MuBtNotifyBinding*);
 int mu_bt_notify_bind_queue_only(const MuBtNotifyBinding*);
 int mu_bt_notify_discovery_allowed(void);
 int mu_bt_notify_periodic_dispatch(void);
+/* Optional original-owner reconnect dispatch, installed after verified
+ * queue/notify bind. No Bluetooth ACL connection is requested here.
+ * Callback runs after existing handoff state update on the original AO.
+ * Caller storage must remain live until original process retirement. */
+int mu_bt_notify_set_reconnect(void (*dispatch)(void*,int),void*);
 int mu_bt_notify_unbind(void);
 #endif
