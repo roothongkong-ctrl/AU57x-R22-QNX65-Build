@@ -13,9 +13,14 @@ typedef struct {
 /* A/B are receiver launch alternatives. C is a Type-3 ingress + shared
  * original receiver candidate, not an independent foreign CarPlay binary.
  * ready_mask must come from the real respective provider, never CI results.
+ * Original SI is always first; DIRECT is second; TYPE3 is third.
+ * An unknown readiness blocks lower routes until positively ruled out.
+ * preferred is last successful route for observation, not a priority override.
  * Every new trial receives a fresh epoch after full original restoration. */
 void mu_route_init(MuRouteSelect*,unsigned enabled,unsigned preferred);
 unsigned mu_route_begin(MuRouteSelect*,uint64_t epoch,unsigned ready_mask,int wired_idle);
+/* Definitive compatibility rejection without prior side effects only. */
+int mu_route_unavailable(MuRouteSelect*,unsigned route,int definitive,int original_clean);
 int mu_route_result(MuRouteSelect*,unsigned route,uint64_t epoch,int result,int wireless_verified);
 int mu_route_usb(MuRouteSelect*);
 int mu_route_restored(MuRouteSelect*,unsigned route,uint64_t epoch,int original_restored,int wired_idle);

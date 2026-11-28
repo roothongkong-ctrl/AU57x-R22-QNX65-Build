@@ -10,14 +10,24 @@ void mu_route_init(MuRouteSelect*s,unsigned enabled,unsigned preferred){
 }
 unsigned mu_route_begin(MuRouteSelect*s,uint64_t epoch,unsigned ready,int idle){
  if(!s||s->state!=MU_ROUTE_IDLE||idle!=1||!epoch||epoch<=s->last_epoch)return 0;
- unsigned available=s->enabled&ready&~s->failed;
- unsigned r=(available&s->preferred)?s->preferred:
-  (available&MU_ROUTE_DIRECT)?MU_ROUTE_DIRECT:
-  (available&MU_ROUTE_SI)?MU_ROUTE_SI:
-  (available&MU_ROUTE_TYPE3)?MU_ROUTE_TYPE3:0;
- if(!r){if(!(s->enabled&~s->failed))s->state=MU_ROUTE_EXHAUSTED;return 0;}
+ unsigned remaining=s->enabled&~s->failed;
+ /* Fixed original-first order even when a previous fallback succeeded.
+  * Missing readiness is not a terminal failure: wait for a positive
+  * capability verdict instead of skipping original SI on slow startup. */
+ unsigned r=(remaining&MU_ROUTE_SI)?MU_ROUTE_SI:
+  (remaining&MU_ROUTE_DIRECT)?MU_ROUTE_DIRECT:
+  (remaining&MU_ROUTE_TYPE3)?MU_ROUTE_TYPE3:0;
+ if(!r){s->state=MU_ROUTE_EXHAUSTED;return 0;}
+ if(!(ready&r))return 0;
  s->active=r;s->epoch=s->last_epoch=epoch;s->state=MU_ROUTE_TRIAL;
  return r;
+}
+/* Only a certified no-side-effect incompatibility can skip an idle route. */
+int mu_route_unavailable(MuRouteSelect*s,unsigned r,int definitive,int clean){
+ if(!s||s->state!=MU_ROUTE_IDLE||s->active||!single(r)||!(s->enabled&r)||definitive!=1||clean!=1)return -1;
+ s->failed|=r;if(s->preferred==r)s->preferred=0;
+ if(!(s->enabled&~s->failed))s->state=MU_ROUTE_EXHAUSTED;
+ return 0;
 }
 int mu_route_result(MuRouteSelect*s,unsigned r,uint64_t e,int result,int verified){
  if(!s||!single(r)||s->active!=r||s->epoch!=e||
