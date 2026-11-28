@@ -1,0 +1,64 @@
+name: R105.270 cross-branch cached QNX link
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105270-cross-branch-link.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  qnx-link:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: f04e909b1aef41ce07877a2dccc8f7d9822cd5af
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Prepare output
+        run: mkdir -p output
+      - name: Link original CPRX receiver with integrated native job adapter
+        run: |
+          set -euxo pipefail
+          docker run --rm --platform linux/amd64 -v "$PWD":/src -w /src qnx65-armv7-toolchain:8.5 bash -c '
+            set -eux
+            C=arm-unknown-nto-qnx6.5.0eabi-gcc
+            R=arm-unknown-nto-qnx6.5.0eabi-readelf
+            a=project/source/legacy_mu1005/airplay
+            s=integration/mu1005_si_native
+            d=lab/mu1005_route4_5
+            p=integration/mu1005_congo_reuse
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$a" -I"$s" -I"$d" -I"$p" "$s"/{si_mu1005_layout,si_mu1005_registration,si_mu1005_activation,si_mu1005_snapshot,si_mu1005_owner,si_mu1005_cprx}.c "$a"/{cprx_service,native_exports,semantic,mu1005_r34_ap_server}.c "$d/dio_existing_receiver.c" "$p/receiver_integration.c" -lsocket -lc -o output/libmu1005_congo_receiver_review.so
+            "$R" -h -dW -sW output/libmu1005_congo_receiver_review.so > output/elf.txt
+            grep -F mu_congo_receiver_tick output/elf.txt
+          '
+          printf '%s\n' 'QNX link candidate only; requires real OEM owner, native path and same-session authentication provider. No installation.' > output/README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105270-qnx-receiver-NO-INSTALL
+          path: output/
+  bundle:
+    runs-on: ubuntu-latest
+    needs: qnx-link
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: R105270-qnx-receiver-NO-INSTALL
+          path: bundle/receiver
+      - name: Reuse existing SD preparation and previously built donor daemon
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir -p bundle/sd bundle/daemon
+          gh run download 46114095087 --repo "$GITHUB_REPOSITORY" --name R105264-SD-preparation-NO-INSTALL --dir bundle/sd
+          gh run download 46109600160 --repo "$GITHUB_REPOSITORY" --name R105248-full-donor-auto-ie-arm-NO-INSTALL --dir bundle/daemon
+          printf '%s\n' 'REVIEW ONLY: no live owner provider, no activation, no install. Existing donor daemon is a separate reference component.' > bundle/NO-INSTALL.txt
+          (cd bundle && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105270-consolidated-QNX-review-NO-INSTALL
+          path: bundle/
