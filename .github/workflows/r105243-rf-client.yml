@@ -1,0 +1,43 @@
+name: R105.243 CMGR and RFCOMM client ARM adapters (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['lab/mu1005_paired_start/rf_client.*','.github/workflows/r105243-rf-client.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -eux
+          b=project/source/legacy_mu1005/bluetooth
+          l=lab/mu1005_paired_start
+          cc -std=c99 -Wall -Wextra -Werror -I"$b" -I"$l" "$l"/cmgr_peer.c "$l"/test_cmgr_peer.c -o /tmp/cmgr-peer
+          /tmp/cmgr-peer
+  arm-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          b=project/source/legacy_mu1005/bluetooth
+          l=lab/mu1005_paired_start
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -I"$b" -I"$l" -c "$l"/cmgr_peer.c -o evidence/cmgr_peer.o
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -I"$b" -I"$l" -Iproject/source/src -c "$l"/rf_client.c -o evidence/rf_client.o
+          readelf -h -sW evidence/cmgr_peer.o evidence/rf_client.o | tee evidence/arm.txt
+          grep -F mu1005_rf_client_open evidence/arm.txt
+          grep -E 'Machine:.*ARM' evidence/arm.txt
+          grep -F mu1005_cmgr_remote evidence/arm.txt
+          grep -F mu38_stock_bond_present evidence/arm.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105243-ARM-RF-CLIENT-REVIEW-NO-INSTALL
+          path: evidence/

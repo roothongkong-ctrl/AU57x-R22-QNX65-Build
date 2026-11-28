@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #ifndef MU1005_CMGR_PEER_H
 #define MU1005_CMGR_PEER_H
+#include <sys/types.h>
 #include <stdint.h>
 #include <stddef.h>
 /* Borrowed original CMGR handler from the serialized OEM caller.

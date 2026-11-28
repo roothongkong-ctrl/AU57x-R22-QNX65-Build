@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.242",
+    "version": "R105.243",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 6
+      "dependent_not_yet_listed": 9
     },
     "runs": [],
     "verified_prior": [
@@ -405,10 +405,21 @@
           46107312229
         ],
         "evidence": "Original selected peer registry lookup fixture passed, no current native owner."
+      },
+      {
+        "version": "R105.242",
+        "passed": 6,
+        "failed": 1,
+        "runs": [
+          46107516829,
+          46107516664,
+          46107516710
+        ],
+        "evidence": "Host contract and SI/paired controller pass; ARM fails size_t missing, not runtime. R105.243 adds sys/types.h."
       }
     ],
-    "discovery": "R105.239 retained artifact 15247627806 confirms exact CMGR getter entry takes handler and locks/unlocks, obtains handler+0xc -> +0x2c remote. Actual QNX-only original getter invocation adapter plus same selected-phone bond and MAC check, with independent native handler/lifetime/lock-free owner proof; no actual caller supplied yet. No raw key reads.",
-    "expected_jobs": 6,
+    "discovery": "Fix QNX size_t header; implement QNX-only original RFCOMM open adapter using independently certified CMGR/SDP/client descriptor, original entry checks, native raw return. Exact firmware guard verification in parallel. No actual production caller/descriptor or link yet.",
+    "expected_jobs": 9,
     "pending_prior": [
       46106440500
     ]
@@ -448,9 +459,10 @@
         "lab/mu1005_paired_start/paired_start.c",
         "lab/mu1005_paired_start/client_contract.py",
         "lab/mu1005_paired_start/peer_snapshot.c",
-        "lab/mu1005_paired_start/cmgr_peer.c"
+        "lab/mu1005_paired_start/cmgr_peer.c",
+        "lab/mu1005_paired_start/rf_client.c"
       ],
-      "evidence": "R105.242 actual original QNX CMGR getter call adapter added, host/ARM review pending; still requires genuine handler and certified owner/caller. RFCOMM open remains."
+      "evidence": "R105.243 actual native client open call candidate added with R105.242 CMGR and original normalized return. Requires genuine original descriptor and SDP owner; ARM compilation and exact original guard verification pending."
     },
     {
       "priority": 2,
