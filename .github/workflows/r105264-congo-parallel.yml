@@ -1,0 +1,144 @@
+name: R105.264 parallel native receiver resolution and SD preparation
+on:
+  push:
+    branches: [mu1005-congo-direct-reuse]
+    paths: ['.github/workflows/r105264-congo-parallel.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        module: [receiver, bluetooth]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover exact original firmware
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir firmware original-tools evidence
+          gh run download 45923122041 --repo "$GITHUB_REPOSITORY" --name mu1005-nas-firmware-archive --dir firmware
+          archive="$PWD/firmware/MHI2_CN_AU57x_K1006_2_MU1005_4M0906961EJ.7z"
+          echo "6946216d1f87f073aefc873a4252b9b952d261e3b9fd2fedf403d26ea2f2db94  $archive" | sha256sum -c -
+          git fetch --depth 1 origin 713fddea9bb11acfdb1df7eff02ca645011ad6d6
+          git archive FETCH_HEAD tools/mu1005_extract_app70.py | tar -x -C original-tools
+          git init extractor
+          git -C extractor remote add origin https://github.com/harman-f/MHI2-MHI2Q-MH2P-Firmware-Toolkit.git
+          git -C extractor fetch --depth 1 origin 64a44fe23dbaa08771440d69642d2874d7028295
+          git -C extractor checkout --detach FETCH_HEAD
+          git init qnxmount
+          git -C qnxmount remote add origin https://github.com/NetherlandsForensicInstitute/qnxmount.git
+          git -C qnxmount fetch --depth 1 origin 0379c064975d5bbe3595ac7e3d149ea789406794
+          git -C qnxmount checkout --detach FETCH_HEAD
+          python3 -m venv /tmp/extract-venv
+          /tmp/extract-venv/bin/pip install kaitaistruct==0.11 crcmod==1.7
+          python3 original-tools/tools/mu1005_extract_app70.py "$archive" "$RUNNER_TEMP/app70/app.img"
+          /tmp/extract-venv/bin/python extractor/tools/extract_firmware.py --source "$RUNNER_TEMP/app70/app.img" --output "$RUNNER_TEMP/original" --variant 70 --qnxmount-root "$PWD/qnxmount" > /tmp/app-summary.json
+      - name: Resolve only remaining native interface fields
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODULE: ${{ matrix.module }}
+        run: |
+          set -euxo pipefail
+          mkdir prior donor-analysis
+          gh run download 46113522955 --repo "$GITHUB_REPOSITORY" --name R105262-native-profile-fields-NO-INSTALL --dir prior
+          case "$MODULE" in receiver) lib=libwcpstart.so;; bluetooth) lib=libbthook.so;; esac
+          gh run download 46112674227 --repo "$GITHUB_REPOSITORY" --name "R105260-$lib-decompilation" --dir donor-analysis
+          python3 -m venv /tmp/disasm
+          /tmp/disasm/bin/pip install capstone==5.0.6
+          /tmp/disasm/bin/python - <<'PY'
+          import pathlib,hashlib,struct,os,json,re
+          from capstone import Cs,CS_ARCH_ARM,CS_MODE_ARM
+          P=pathlib.Path
+          module=os.environ['MODULE']
+          root=P(os.environ['RUNNER_TEMP'])/'original'
+          previous=json.loads(P('prior/native-profile-fields.json').read_text())[module]
+          name,pin=('dio_manager','e40b5bf9df3f96221ac01bc0484e06493e6c58e60cca32d2547939ff1d56f63c') if module=='receiver' else ('btstack','51ecbd44c3581bd69f01ed5bdc053ba28ccc6fef3bf1bd4c3a8f010898ab0566')
+          found=[p for p in root.rglob(name) if p.is_file() and hashlib.sha256(p.read_bytes()).hexdigest()==pin]
+          if not found:raise SystemExit('exact original missing')
+          b=found[0].read_bytes()
+          def word(o):return struct.unpack_from('<I',b,o)[0]
+          ph=word(28); sz,n=struct.unpack_from('<HH',b,42)
+          segments=[(v,v+f,o,flags) for k,o,v,_,f,_,flags,_ in (struct.unpack_from('<8I',b,ph+i*sz) for i in range(n)) if k==1]
+          def read(va,n):
+              for l,h,o,flags in segments:
+                  if l<=va and va+n<=h:return b[o+va-l:o+va-l+n]
+              raise ValueError(hex(va))
+          md=Cs(CS_ARCH_ARM,CS_MODE_ARM)
+          def dis(va,n):
+              return [{'va':hex(i.address),'instruction':i.mnemonic+' '+i.op_str} for i in md.disasm(read(va,n),va)]
+          def target(w,a):
+              if w>>28==15 or w&0x0f000000!=0x0b000000:return None
+              d=w&0xffffff
+              return a+8+4*(d-0x1000000 if d&0x800000 else d)
+          def calls(va,n):
+              out=[]
+              for i in range(0,n,4):
+                  w=struct.unpack('<I',read(va+i,4))[0]
+                  dest=target(w,va+i)
+                  if dest is None:continue
+                  try: first=struct.unpack('<I',read(dest,4))[0]
+                  except ValueError:continue
+                  out.append({'site':hex(va+i),'target':hex(dest),'first_word':hex(first)})
+              return out
+          if module=='receiver':
+              start=0x15c854
+              chain=calls(start,0x180)
+              ctor=[x for x in chain if x['first_word']=='0xe92d4060']
+              nested=[]
+              for c in ctor:
+                  a=int(c['target'],16)
+                  nested.append({'candidate':c,'body':dis(a,0x60),'calls':calls(a,0x60)})
+              # Emit actual call relationships, not a guessed receiver profile.
+              result={'startup_candidate':hex(start),'startup_body':dis(start,0x180),
+                'direct_calls':chain,'constructor_candidates':nested,
+                'thread_vtable_words':[hex(v) for v in struct.unpack('<16I',read(0x1a5890,64))],
+                'timer_body':dis(0x155bc4,0x80),
+                'iap2_job_body':dis(0x17a55c,0x100)}
+          else:
+              result={'startup':dis(0x11ec60,0x48),'eir':dis(0x12a680,0x60),
+                'startup_completed_store':dis(0x11ec98,12),
+                'cmgr_client':dis(0x24352c,0x50),
+                'candidate_got_words':{hex(a):hex(struct.unpack('<I',read(a,4))[0]) for a in (0x2c18fc,0x2c2258)},
+                'matched_core_functions':sum(1 for x in previous['fields'].values() if x.get('same_prologue'))}
+          result.update({'stock_sha256':pin,'activation_ready':False,'installable':False})
+          P('evidence/native-'+module+'.json').write_text(json.dumps(result,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: R105264-${{ matrix.module }}-native-NO-INSTALL
+          path: evidence/
+  sd-preparation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble original backup and recovery entry points
+        run: |
+          set -euxo pipefail
+          mkdir -p SD-MU1005
+          for f in backup.sh backup-config.sh recover.sh config_transaction.sh stock_config_apply.sh; do
+            cp "integration/mu1005_vehicle_stage/$f" SD-MU1005/
+          done
+          cat > SD-MU1005/prepare.sh <<'SH'
+          #!/bin/sh
+          set -eu
+          here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+          [ "$#" -eq 2 ] || { echo 'usage: prepare.sh CORE_BACKUP CONFIG_BACKUP'; exit 2; }
+          sh "$here/backup.sh" vehicle "$1"
+          sh "$here/backup-config.sh" "$1" "$2"
+          echo 'Backup preparation finished; no installation performed.'
+          SH
+          printf '%s\n' 'NO INSTALL: preparation and recovery staging only; original receiver compatibility unresolved.' > SD-MU1005/README.txt
+          (cd SD-MU1005 && sha256sum *.sh README.txt > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105264-SD-preparation-NO-INSTALL
+          path: SD-MU1005/
