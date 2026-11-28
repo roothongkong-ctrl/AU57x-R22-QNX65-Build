@@ -1,0 +1,2 @@
+# R105.314 原版启动器退出码定位
+R105.313 run 46142223414 两 job success 表示观察成功，而不是无线接收成功。实际进程 wireless-receiver-exec 正常退出 status=11（不是 SIGSEGV），probe 退出0。暂未证明接收器被 exec。新增固定两个原版 launcher SHA 的只读静态退出值候选与公开路径审计，检查其实际前置条件；不伪造配置、身份、认证、许可，不修改原版或原厂校验，不重复 QEMU/SDK。先定位真实缺项，如需 OEM 文件则使用已归档 MU1005；如属于不能合法复用的限制则回退既有原厂/Congo 方案。NO INSTALL。
