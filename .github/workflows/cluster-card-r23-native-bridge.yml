@@ -12,7 +12,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - name: Apply bridge to pinned upstream source trees
@@ -26,11 +26,40 @@ jobs:
           python3 experiments/cluster-compact-card/r24/prepare_rgi_bridge.py upstream luka
           git -C upstream diff > evidence/player.patch
           git -C luka diff > evidence/rgd-hook.patch
-      - name: Build shared QNX ARM toolchain
+      - name: Identify reusable build dependencies
+        id: deps
         run: |
-          git clone --depth 1 https://github.com/luka-dev/qnx65-armv7-toolchain.git qnx-toolchain
-          cd qnx-toolchain
-          ./host-scripts/qnx-run.sh build 8.5
+          set -euo pipefail
+          git clone -q --depth 1 https://github.com/luka-dev/qnx65-armv7-toolchain.git qnx-toolchain
+          echo "toolchain=$(git -C qnx-toolchain rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "ffmpeg=$(sha256sum upstream/build_local.sh upstream/tools/qnx_cc.sh upstream/tools/ffmpeg_qnx_aligned.sh | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Restore QNX 6.5 GCC 8.5 Docker image
+        id: qnx-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: docker-images/qnx65-armv7-toolchain_8.5.tar.gz
+          key: qnx65-armv7-amd64-8.5-v1-${{ steps.deps.outputs.toolchain }}
+      - name: Load existing toolchain or build on cache miss
+        run: |
+          set -euo pipefail
+          if ! sh upstream/tools/docker_image.sh qnx65-armv7-toolchain:8.5; then
+            (cd qnx-toolchain && ./host-scripts/qnx-run.sh build 8.5)
+          fi
+          sh upstream/tools/docker_image.sh qnx65-armv7-toolchain:8.5
+          docker run --rm qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-g++ --version
+          test -s docker-images/qnx65-armv7-toolchain_8.5.tar.gz
+      - name: Save QNX image immediately for later builds
+        if: steps.qnx-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: docker-images/qnx65-armv7-toolchain_8.5.tar.gz
+          key: ${{ steps.qnx-cache.outputs.cache-primary-key }}
+      - name: Restore existing FFmpeg ARM static libraries
+        id: ffmpeg-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: upstream/build/ffmpeg-mini
+          key: qnx-ffmpeg-6.1.5-neon-v1-${{ steps.deps.outputs.toolchain }}-${{ steps.deps.outputs.ffmpeg }}
       - name: Build modified player only
         run: |
           set -euo pipefail
@@ -46,6 +75,12 @@ jobs:
           ./build_local.sh player 2>&1 | tee ../evidence/player-build.log
           cp build/stream-player ../evidence/stream-player.rgd70.review
           readelf -h -d ../evidence/stream-player.rgd70.review > ../evidence/player-elf.txt
+      - name: Save compiled FFmpeg once
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: upstream/build/ffmpeg-mini
+          key: ${{ steps.ffmpeg-cache.outputs.cache-primary-key }}
       - name: Build modified RGI hook separately (do not preload together)
         run: |
           set -euo pipefail
