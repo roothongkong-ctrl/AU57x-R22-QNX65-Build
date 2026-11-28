@@ -1,0 +1,41 @@
+name: R105.242 original CMGR getter ARM adapter (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['lab/mu1005_paired_start/cmgr_peer.*','lab/mu1005_paired_start/test_cmgr_peer.c','.github/workflows/r105242-cmgr-peer.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -eux
+          b=project/source/legacy_mu1005/bluetooth
+          l=lab/mu1005_paired_start
+          cc -std=c99 -Wall -Wextra -Werror -I"$b" -I"$l" "$l"/cmgr_peer.c "$l"/test_cmgr_peer.c -o /tmp/cmgr-peer
+          /tmp/cmgr-peer
+  arm-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          b=project/source/legacy_mu1005/bluetooth
+          l=lab/mu1005_paired_start
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -I"$b" -I"$l" -c "$l"/cmgr_peer.c -o evidence/cmgr_peer.o
+          readelf -h -sW evidence/cmgr_peer.o | tee evidence/arm.txt
+          grep -E 'Machine:.*ARM' evidence/arm.txt
+          grep -F mu1005_cmgr_remote evidence/arm.txt
+          grep -F mu38_stock_bond_present evidence/arm.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105242-ARM-CMGR-REVIEW-NO-INSTALL
+          path: evidence/

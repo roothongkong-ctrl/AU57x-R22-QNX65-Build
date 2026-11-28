@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.241",
+    "version": "R105.242",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -395,9 +395,19 @@
           46107105809
         ],
         "evidence": "Native library and original client pending contract, SI and unified review passed. No OEM runtime connection."
+      },
+      {
+        "version": "R105.241",
+        "passed": 6,
+        "runs": [
+          46107312279,
+          46107312246,
+          46107312229
+        ],
+        "evidence": "Original selected peer registry lookup fixture passed, no current native owner."
       }
     ],
-    "discovery": "Actual bounded selected peer association lookup in existing stock RFCOMM registry using existing native registry and bond metadata readers. Does not infer ACL from old bond, no credentials. Requires selected phone and native owner lifetime, no actual call yet.",
+    "discovery": "R105.239 retained artifact 15247627806 confirms exact CMGR getter entry takes handler and locks/unlocks, obtains handler+0xc -> +0x2c remote. Actual QNX-only original getter invocation adapter plus same selected-phone bond and MAC check, with independent native handler/lifetime/lock-free owner proof; no actual caller supplied yet. No raw key reads.",
     "expected_jobs": 6,
     "pending_prior": [
       46106440500
@@ -437,9 +447,10 @@
         "lab/mu1005_route4_5/supervised_startup.h",
         "lab/mu1005_paired_start/paired_start.c",
         "lab/mu1005_paired_start/client_contract.py",
-        "lab/mu1005_paired_start/peer_snapshot.c"
+        "lab/mu1005_paired_start/peer_snapshot.c",
+        "lab/mu1005_paired_start/cmgr_peer.c"
       ],
-      "evidence": "R105.241 original registry selected-peer association search added; no new pairing or auth. Caller still needs original selected-phone and lifetime/ACL provider; RFCOMM client call unresolved."
+      "evidence": "R105.242 actual original QNX CMGR getter call adapter added, host/ARM review pending; still requires genuine handler and certified owner/caller. RFCOMM open remains."
     },
     {
       "priority": 2,
