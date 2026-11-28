@@ -1,8 +1,5 @@
 name: R105.112 real OEM library runtime and process boundary (NO INSTALL)
 on:
-  push:
-    branches: [mu1005-si-cprx-real-review]
-    paths: [.github/workflows/r105112-oem-runtime.yml, lab/mu1005_oem_runtime/**]
   workflow_dispatch:
 permissions:
   contents: read
@@ -48,19 +45,9 @@ jobs:
           sudo apt-get install -y -qq qemu-system-arm
           qemu-system-arm --version | tee qnx-runtime-evidence/qemu-version.log
           sha256sum toolchain/tests/qemu/{startup-virt,libstartup.a,devc-serdebug,u-boot.bin} toolchain/tests/qemu-run.sh | tee qnx-runtime-evidence/boot-inputs.sha256
-      - uses: actions/cache/restore@v4
-        id: gnu-cache
+      - uses: ./.github/actions/mu1005-qnx-image
         with:
-          path: ~/.cache/au57x-gnu
-          key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
-      - name: Configure reusable compiler build cache
-        uses: docker/setup-buildx-action@v3
-      - name: Build verified toolchain
-        run: |
-          set -euxo pipefail
-          bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee qnx-runtime-evidence/gnu.log
-          docker buildx build --load --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 --cache-from type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1 --cache-to type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1,mode=min,ignore-error=true -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee qnx-runtime-evidence/compiler.log
-          docker run --rm --platform linux/amd64 qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc --version | tee qnx-runtime-evidence/compiler-version.log
+          require-cache: 'true'
       - name: Build isolated QNX test provider
         run: |
           set -euxo pipefail
@@ -185,19 +172,9 @@ jobs:
           sudo apt-get install -y -qq qemu-system-arm
           qemu-system-arm --version | tee qnx-runtime-evidence/qemu-version.log
           sha256sum toolchain/tests/qemu/{startup-virt,libstartup.a,devc-serdebug,u-boot.bin} toolchain/tests/qemu-run.sh | tee qnx-runtime-evidence/boot-inputs.sha256
-      - uses: actions/cache/restore@v4
-        id: gnu-cache
+      - uses: ./.github/actions/mu1005-qnx-image
         with:
-          path: ~/.cache/au57x-gnu
-          key: mu1005-gnu-gcc850-d308841a-binutils238-e316477a-v1
-      - name: Configure reusable compiler build cache
-        uses: docker/setup-buildx-action@v3
-      - name: Build verified toolchain
-        run: |
-          set -euxo pipefail
-          bash tools/ci/mu1005_gnu_mirrors.sh "$HOME/.cache/au57x-gnu" toolchain | tee qnx-runtime-evidence/gnu.log
-          docker buildx build --load --platform linux/amd64 --target base-env --build-arg BASE=base-8.5 --cache-from type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1 --cache-to type=gha,scope=mu1005-qnx65-baa45224-gcc85-v1,mode=min,ignore-error=true -t qnx65-armv7-toolchain:8.5 toolchain 2>&1 | tee qnx-runtime-evidence/compiler.log
-          docker run --rm --platform linux/amd64 qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc --version | tee qnx-runtime-evidence/compiler-version.log
+          require-cache: 'true'
       - name: Build actual OEM library loader adapter
         run: |
           set -euo pipefail
