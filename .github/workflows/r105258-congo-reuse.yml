@@ -1,0 +1,77 @@
+name: R105.258 Congo whole-donor staging (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-congo-direct-reuse]
+    paths: ['.github/workflows/r105258-congo-reuse.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  congo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stage exact upstream release without executing installer
+        run: |
+          set -euxo pipefail
+          git init donor
+          git -C donor remote add origin https://github.com/congobg/MHI2Q_WiFi_CarPlay.git
+          git -C donor fetch --depth 1 origin 223b42f90bf7c15fbbbef23259da36caa9bd4994
+          git -C donor checkout --detach FETCH_HEAD
+          mkdir -p review/congo
+          cp donor/MHI2QC_3638/AltScreen.sh donor/MHI2QC_3638/wcp.tar.gz review/congo/
+          cp donor/docs/LICENSE review/congo/LICENSE
+          git -C donor rev-parse HEAD > review/congo/UPSTREAM_COMMIT
+          (cd review/congo && sha256sum AltScreen.sh wcp.tar.gz > SHA256SUMS)
+          tar -tzf review/congo/wcp.tar.gz > review/congo/CONTENTS.txt
+          printf '%s\n' 'Donor release for MHI2Q QC only. Do not install on AU57x.' > review/congo/NO-INSTALL.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r105258-congo-reference
+          path: review/
+          retention-days: 7
+  mu1005:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reuse existing MU1005 review package and mapping without recompiling
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          mkdir -p review/mu1005
+          gh run download 46111809904 --repo "$GITHUB_REPOSITORY" --name R105257-consolidated-review-NO-INSTALL --dir review/mu1005
+          cp integration/mu1005_vehicle_stage/congo_port_table.json review/mu1005/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r105258-mu1005-reference
+          path: review/
+          retention-days: 7
+  assemble:
+    runs-on: ubuntu-latest
+    needs: [congo, mu1005]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: r105258-congo-reference
+          path: review/
+      - uses: actions/download-artifact@v4
+        with:
+          name: r105258-mu1005-reference
+          path: review/
+      - name: Assemble source materials for direct reuse
+        run: |
+          set -euxo pipefail
+          cat > review/NO-INSTALL.txt <<'EOF'
+          MU1005 Congo direct-reuse staging, NOT an installer.
+          Congo's complete original donor and existing MU1005 port review are separated.
+          Preserve OEM authentication and wired CarPlay.
+          No QC drivers, HMI classes or executables are installed or activated.
+          Native ABI, lifecycle and receiver adaptation are not completed.
+          EOF
+          (cd review && zip -qr ../MU1005-R105258-Congo-direct-reuse-NO-INSTALL.zip .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105258-Congo-direct-reuse-NO-INSTALL
+          path: MU1005-R105258-Congo-direct-reuse-NO-INSTALL.zip
+          retention-days: 7
