@@ -15,14 +15,15 @@ jobs:
       matrix:
         dependencies: [locked, refreshed]
     steps:
-      - name: Check Xcode and boot an actual iPhone simulator
+      - uses: actions/checkout@v4
+      - name: Check Xcode and boot an actual iPad simulator
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/r19"
           xcodebuild -version | tee "$RUNNER_TEMP/r19/xcode.txt"
           xcrun simctl list devices available -j > "$RUNNER_TEMP/r19/devices.json"
-          UDID=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))["devices"]; print(next(x["udid"] for k,v in d.items() if "iOS" in k for x in v if x.get("isAvailable") and x["name"].startswith("iPhone")))' "$RUNNER_TEMP/r19/devices.json")
+          UDID=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))["devices"]; print(next(x["udid"] for k,v in d.items() if "iOS" in k for x in v if x.get("isAvailable") and x["name"].startswith("iPad")))' "$RUNNER_TEMP/r19/devices.json")
           echo "R19_UDID=$UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
@@ -37,7 +38,9 @@ jobs:
           git grep -inE 'startEmulatorNavi|didConnectCarInterfaceController|CPTemplateApplicationInstrumentClusterScene|CPTemplateApplicationDashboardScene|CPMapTemplate|AMapNaviDriveView' -- '*.m' '*.h' '*.plist' > "$RUNNER_TEMP/r19/api-inventory.txt" || true
           cat "$RUNNER_TEMP/r19/api-inventory.txt"
           cp Podfile.lock "$RUNNER_TEMP/r19/original-pod-lock.txt"
-      - name: Compile real SDK sample for iPhone Simulator
+      - name: Patch native SDK lab viewport
+        run: python3 "$GITHUB_WORKSPACE/experiments/cluster-compact-card/r19/patch_amap_lab.py" "$RUNNER_TEMP/amap"
+      - name: Compile real SDK sample for iOS Simulator
         shell: bash
         env:
           DEPS: ${{ matrix.dependencies }}
@@ -51,7 +54,26 @@ jobs:
           APP=$(find "$RUNNER_TEMP/derived/Build/Products" -maxdepth 2 -name HelloCarPlay.app -print -quit)
           test -n "$APP"
           xcrun simctl install "$R19_UDID" "$APP"
+          BUNDLE=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Info.plist")
+          echo "R19_BUNDLE=$BUNDLE" >> "$GITHUB_ENV"
           echo 'SDK demo built and installed; NOT proof of live navigation, instrument cluster or type112.' | tee "$RUNNER_TEMP/r19/scope.txt"
+      - name: Launch native SDK and verify real emulator callbacks
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun simctl privacy "$R19_UDID" grant location "$R19_BUNDLE" || true
+          xcrun simctl launch "$R19_UDID" "$R19_BUNDLE" -R19Lab | tee "$RUNNER_TEMP/r19/launch.txt"
+          for t in 1 2 3 4 5 6; do
+            sleep 10
+            xcrun simctl io "$R19_UDID" screenshot "$RUNNER_TEMP/r19/sdk-frame-$t.png"
+            xcrun simctl spawn "$R19_UDID" log show --last 5m --style compact --predicate 'eventMessage CONTAINS "R19_"' > "$RUNNER_TEMP/r19/navigation.log"
+            if grep -q R19_ROUTE_SUCCESS "$RUNNER_TEMP/r19/navigation.log" && grep -q R19_NAV_SAMPLE "$RUNNER_TEMP/r19/navigation.log"; then break; fi
+          done
+          cat "$RUNNER_TEMP/r19/navigation.log"
+          grep -q 'R19_LAB_VIEWPORT 800x298' "$RUNNER_TEMP/r19/navigation.log"
+          grep -q R19_ROUTE_SUCCESS "$RUNNER_TEMP/r19/navigation.log"
+          grep -q R19_NAV_SAMPLE "$RUNNER_TEMP/r19/navigation.log"
+          echo 'Native SDK emulator callback observed, not a production AMap CarPlay type112 stream.'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
