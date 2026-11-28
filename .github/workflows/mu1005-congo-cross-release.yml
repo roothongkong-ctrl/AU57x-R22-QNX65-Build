@@ -1,4 +1,4 @@
-name: Congo cross-release Bluetooth ABI evidence (NO INSTALL)
+name: Congo pinned Bluetooth ABI evidence (NO INSTALL)
 on:
   push:
     branches: [mu1005-congo-bluetooth-only-runtime]
@@ -70,10 +70,10 @@ jobs:
               for b in good[i+1:]:
                   differences={k:{"only_a":sorted(set(a[k])-set(b[k])),"only_b":sorted(set(b[k])-set(a[k]))} for k in ("imports","exports","needed")}
                   comparisons.append({"a":a["variant"],"b":b["variant"],"identical_binary":a["sha256"]==b["sha256"],"differences":differences})
-          report={"component":name,"scope":"donor release comparison only; not OEM ABI or actual phone connection","installable":False,"variants":rows,"comparisons":comparisons}
+          report={"component":name,"scope":"pinned donor inventory and comparison where multiple archives exist; not OEM ABI or actual phone connection","installable":False,"variants":rows,"comparisons":comparisons,"cross_archive_comparison_available":len(good)>=2}
           pathlib.Path("evidence/report.json").write_text(json.dumps(report,indent=2))
           print("variants",len(rows),"comparisons",len(comparisons))
-          if name!="startup-config": assert len(good)>=2, "Need two donor variants for comparison"
+          if name!="startup-config": assert len(good)>=1, "Missing donor component"
           else: assert any(r["startup_references"] for r in rows), "No relevant startup references"
           PY
       - uses: actions/upload-artifact@v4
