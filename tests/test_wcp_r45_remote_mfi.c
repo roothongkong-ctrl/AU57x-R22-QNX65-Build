@@ -68,6 +68,19 @@ static int o_other(void *p,const uint8_t *v,size_t n){
 static void o_free(void *p,void *v){(void)p;free(v);}
 #ifdef MU_STOCK_COMBINED_TEST
 #include "cp_wcp_r45_cloud.h"
+#include "../lab/mu1005_si_dio_owner/si_dio_cloud.h"
+static int unified_launch_calls;
+static int unified_launch_admit(void*v,uint64_t e,const char*lib){
+ struct original*o=v;
+ assert(e==o->epoch&&!strcmp(lib,"/tmp/libmu1005_review.so"));
+ ++unified_launch_calls;return 1;
+}
+static int unified_launch_cleanup(void*v,uint64_t e){
+ return ((struct original*)v)->epoch==e;
+}
+static int unified_endpoint_owned(void*v,pid_t pid,uint32_t e,const MuCprxRemoteEndpoint*ep){
+ (void)v;(void)pid;(void)e;(void)ep;return 0;
+}
 static int unified_ap_calls;
 static int unified_caps(void*v,enum cp_radio_band band){
  (void)v;return band==CP_RADIO_5||band==CP_RADIO_24;
@@ -290,10 +303,18 @@ int main(void){
  r90_send_data(client,&w,iap_frame,iap_len,121);
  assert(cp_s4_authenticated(&s));
 #ifdef MU_STOCK_COMBINED_TEST
- assert(cp_wcp_r45_cloud_tick(&r,&w,&t,&ops,&ac,&cloud,&cloud_ops,NULL,NULL,123)==CP_CLOUD_RETRY);
+ char *launch_env[]={"PATH=/bin",NULL};
+ MuSiDioCloud dio={.original={&o,unified_launch_admit,unified_launch_cleanup},
+  .env=launch_env,.library="/tmp/libmu1005_review.so",.endpoint_owned=unified_endpoint_owned};
+ assert(mu_si_dio_cloud_tick(&dio,&r,&w,&t,&ops,&ac,&cloud,&cloud_ops,NULL,NULL,123)==CP_CLOUD_RETRY);
  assert(cloud.started&&cloud.prefer_stock_dual_band&&cloud.require_live_ap_refresh);
- assert(cp_wcp_r45_cloud_tick(&r,&w,&t,&ops,&ac,&cloud,&cloud_ops,NULL,NULL,124)==CP_CLOUD_RETRY);
- assert(cp_wcp_r45_cloud_tick(&r,&w,&t,&ops,&ac,&cloud,&cloud_ops,NULL,NULL,125)==CP_CLOUD_RETRY);
+ assert(mu_si_dio_cloud_tick(&dio,&r,&w,&t,&ops,&ac,&cloud,&cloud_ops,NULL,NULL,124)==CP_CLOUD_RETRY);
+ assert(mu_si_dio_cloud_tick(&dio,&r,&w,&t,&ops,&ac,&cloud,&cloud_ops,NULL,NULL,125)==CP_CLOUD_RETRY);
+ assert(!unified_launch_calls&&!dio.child.launch.attempted);
+ MuCprxRemoteEndpoint unrelated={0};
+ assert(mu_si_dio_cloud_tick(&dio,&r,&w,&t,&ops,&ac,&cloud,&cloud_ops,&unrelated,"uap0",126)==CP_CLOUD_PROOF);
+ assert(!unified_launch_calls&&!dio.child.launch.attempted);
+ puts("R105303_NO_DIO_BEFORE_ASSOCIATION_OR_UNVERIFIED_ENDPOINT_PASS");
  assert(unified_ap_calls==1&&cloud.band==CP_RADIO_5&&!cloud.live_ap_config);
  assert(!cloud.remote_phase&&!cp_cloud_first_session_seen(&cloud));
  puts("R105299_REAL_TCP_TO_STOCK_DUAL_BAND_OWNER_ROUTE_FIXTURE_PASS");

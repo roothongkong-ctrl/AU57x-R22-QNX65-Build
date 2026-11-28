@@ -1,8 +1,8 @@
-name: R105.299 unified stock wireless handoff integration (NO INSTALL)
+name: R105.303 unified stock wireless handoff and DIO startup integration (NO INSTALL)
 on:
   push:
     branches: [mu1005-si-cprx-real-review]
-    paths: ['.github/workflows/r105299-stock-unified.yml','project/source/src/cp_wcp_r45_cloud.*']
+    paths: ['.github/workflows/r105299-stock-unified.yml','project/source/src/cp_wcp_r45_cloud.*','lab/mu1005_si_dio_owner/si_dio_cloud.*']
   workflow_dispatch:
 permissions:
   contents: read
@@ -18,9 +18,10 @@ jobs:
           s=project/source/src
           a=project/source/legacy_mu1005/airplay
           b=project/source/legacy_mu1005/bluetooth
-          cc -std=gnu99 -O1 -g -Wall -Wextra -Werror -DMU_STOCK_COMBINED_TEST -rdynamic -I"$s" -I"$a" -I"$b" tests/test_wcp_r45_remote_mfi.c "$s"/{cp_wcp_r45_cloud,cp_wcp_r45_remote,cp_wcp_handoff,cp_cloud_pipeline,cp_wcp_autoconnect,cp_radio_policy,cp_session_handoff,cp_step04_socket_io,cp_step04_tcp_bridge,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_wireless,cp_oem_boundary,cp_csm,cp_event}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" -ldl -o output/stock-unified
+          cc -std=gnu99 -O1 -g -Wall -Wextra -Werror -DMU_STOCK_COMBINED_TEST -rdynamic -I"$s" -I"$a" -I"$b" tests/test_wcp_r45_remote_mfi.c "$s"/{cp_wcp_r45_cloud,cp_wcp_r45_remote,cp_wcp_handoff,cp_cloud_pipeline,cp_wcp_autoconnect,cp_radio_policy,cp_session_handoff,cp_step04_socket_io,cp_step04_tcp_bridge,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_wireless,cp_oem_boundary,cp_csm,cp_event}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" lab/mu1005_si_dio_owner/{si_dio_owner,si_dio_cloud}.c lab/mu1005_dio_launch/dio_launch.c -ldl -o output/stock-unified
           output/stock-unified | tee output/host.log
           grep -Fx R105299_REAL_TCP_TO_STOCK_DUAL_BAND_OWNER_ROUTE_FIXTURE_PASS output/host.log
+          grep -Fx R105303_NO_DIO_BEFORE_ASSOCIATION_OR_UNVERIFIED_ENDPOINT_PASS output/host.log
   native-integrated:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -38,11 +39,13 @@ jobs:
             s=project/source/src
             a=project/source/legacy_mu1005/airplay
             b=project/source/legacy_mu1005/bluetooth
-            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$s" -I"$a" -I"$b" "$s"/{cp_wcp_r45_cloud,cp_wcp_r45_remote,cp_wcp_handoff,cp_cloud_pipeline,cp_wcp_autoconnect,cp_radio_policy,cp_session_handoff,cp_step04_socket_io,cp_step04_tcp_bridge,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_wireless,cp_oem_boundary,cp_csm,cp_event}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" -lsocket -lc -o output/libmu1005_stock_unified_review.so
+            "$C" -std=gnu99 -D_QNX_SOURCE -O2 -Wall -Wextra -Werror -fPIC -shared -Wl,--no-undefined -I"$s" -I"$a" -I"$b" "$s"/{cp_wcp_r45_cloud,cp_wcp_r45_remote,cp_wcp_handoff,cp_cloud_pipeline,cp_wcp_autoconnect,cp_radio_policy,cp_session_handoff,cp_step04_socket_io,cp_step04_tcp_bridge,cp_step04_session,cp_step04_link,cp_step04_iap2_auth,cp_step04_stock_mfi,cp_wireless,cp_oem_boundary,cp_csm,cp_event}.c "$a"/{mu1005_r34_ap_server,native_exports,cprx_service,semantic}.c "$b/mu1005_rf_ingress.c" lab/mu1005_si_dio_owner/{si_dio_owner,si_dio_cloud}.c lab/mu1005_dio_launch/dio_launch.c -lsocket -lc -o output/libmu1005_stock_unified_review.so
             arm-unknown-nto-qnx6.5.0eabi-readelf -h -sW output/libmu1005_stock_unified_review.so > output/elf.txt
             grep -F cp_wcp_r45_cloud_tick output/elf.txt
+            grep -F mu_si_dio_cloud_tick output/elf.txt
+            grep -F mu_dio_launch_wireless output/elf.txt
           '
       - uses: actions/upload-artifact@v4
         with:
-          name: R105299-stock-unified-ARM-NO-INSTALL
+          name: R105303-stock-unified-DIO-ARM-NO-INSTALL
           path: output/
