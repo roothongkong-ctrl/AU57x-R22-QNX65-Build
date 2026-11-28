@@ -1,0 +1,62 @@
+name: MU1005 backup implementation host regression (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['integration/mu1005_vehicle_stage/**', '.github/workflows/mu1005-vehicle-stage-backup.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        scenario: [normal, wrong-firmware, missing-file, existing-backup, wrong-path, card-missing]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test actual backup script against isolated fixture
+        env:
+          CASE: ${{ matrix.scenario }}
+        run: |
+          set -euo pipefail
+          root=$(mktemp -d)
+          trap 'rm -rf "$root"' EXIT
+          touch "$root/LAB_ONLY"
+          mkdir -p "$root/eso/bin/apps"
+          for n in btstack bluetooth smartphone_integrator dio_manager; do
+            printf '%s\n' "original-$n" > "$root/eso/bin/apps/$n"
+          done
+          expected=$(sha256sum "$root/eso/bin/apps/btstack" | awk '{print $1}')
+          dest="$root/backup-test"
+          s=integration/mu1005_vehicle_stage/backup.sh
+          sh -n "$s"
+          case "$CASE" in
+            normal) ;;
+            wrong-firmware) expected=bad ;;
+            missing-file) rm "$root/eso/bin/apps/dio_manager" ;;
+            existing-backup) mkdir "$dest"; echo sentinel > "$dest/sentinel" ;;
+            wrong-path) dest="$root/other" ;;
+            card-missing) dest="$root/backup-absent/subdirectory" ;;
+          esac
+          (cd "$root/eso/bin/apps"; sha256sum *) > "$root/originals.before"
+          if [ "$CASE" = normal ]; then
+            sh "$s" host-fixture "$dest" "$root" "$expected"
+            test -f "$dest/COMPLETE"
+            test "$(wc -l < "$dest/SHA256.tsv")" = 4
+            for n in btstack bluetooth smartphone_integrator dio_manager; do
+              cmp "$root/eso/bin/apps/$n" "$dest/$n"
+            done
+          else
+            if sh "$s" host-fixture "$dest" "$root" "$expected"; then
+              echo "unexpected success"; exit 1
+            fi
+            test ! -f "$dest/COMPLETE"
+            if [ "$CASE" = existing-backup ]; then
+              test "$(cat "$dest/sentinel")" = sentinel
+            fi
+          fi
+          (cd "$root/eso/bin/apps"; sha256sum *) > "$root/originals.after"
+          cmp "$root/originals.before" "$root/originals.after"
+          echo "BACKUP_CASE_PASS $CASE; no vehicle execution"
