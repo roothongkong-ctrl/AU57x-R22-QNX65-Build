@@ -1,0 +1,17 @@
+name: MusicSkin R17 isolated loader review
+on:
+  push:
+    branches: [mediasskin-r17]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned upstream loader and verify fixture
+        run: |
+          curl -fLsS https://raw.githubusercontent.com/MacsInSpace/mib-cluster-map/v1.2.14/scripts/lsd_jar.sh -o /tmp/lsd_jar.sh
+          python3 media_skin_r17/test_loader.py /tmp/lsd_jar.sh
