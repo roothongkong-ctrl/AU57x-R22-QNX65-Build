@@ -1,0 +1,34 @@
+name: R105.221 original running Bluetooth service one-shot observation (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: [.github/workflows/r105221-bt-live-observe.yml, lab/mu1005_bt_live_observe/**]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  build-read-only-helper:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/mu1005-qnx-image
+        with:
+          require-cache: 'true'
+      - name: Build real original state observer using existing pinned native readers
+        run: |
+          set -euxo pipefail
+          mkdir -p package
+          b=project/source/legacy_mu1005/bluetooth
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src qnx65-armv7-toolchain:8.5 arm-unknown-nto-qnx6.5.0eabi-gcc -std=gnu99 -D_QNX_SOURCE -Wall -Wextra -Werror -O2 -I"$b" -Itools/review_txn lab/mu1005_bt_live_observe/observe.c "$b/bt_startup_snapshot.c" "$b/bt_owner_identity.c" tools/review_txn/sha256.c -o package/bt-live-observe
+          readelf -h package/bt-live-observe | grep -E 'Machine:.*ARM'
+          cp lab/mu1005_bt_live_observe/{probe.sh,README_CN.md} package/
+          sh -n package/probe.sh
+          chmod 0555 package/bt-live-observe package/probe.sh
+          (cd package && sha256sum bt-live-observe probe.sh README_CN.md > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: R105221-MU1005-BT-READ-ONLY-PROBE
+          path: package/
+          retention-days: 30

@@ -50,7 +50,7 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.220",
+    "version": "R105.221",
     "observed_jobs": {
       "success": 0,
       "running": 0,
@@ -203,23 +203,29 @@
           46092385370
         ],
         "evidence": "Full five-adapter default-feature QNX ARM Rust executable built and uploaded, artifact 15242186627. Inherited ACK and original SI requirement strings verified; no actual OEM/RF runtime."
-      }
-    ],
-    "discovery": "R105.220 reuses byte-identical full LuKa R105.218 executable (artifact 15242186627, SHA256 0d2134b3d72069164cb3e821d2c143af51544b3193c98eacc720a1ecc9a94515), executes actual main --check-config under QNX guest without hardware; required explicit AP refusal and process exit 1, not an installation or first link. No repeated Rust build.",
-    "expected_jobs": 5,
-    "pending_prior": [
+      },
       {
         "version": "R105.219",
+        "passed": 6,
         "runs": [
           46092706940,
           46092706968
         ],
-        "observed": {
-          "success": 5,
-          "running": 1
-        },
-        "note": "QNX child IFS explicit raw stage runtime pending."
+        "evidence": "Actual QNX process spawn, FD3 data exchange, EOF and reaping passed plus host and four SI regressions."
       },
+      {
+        "version": "R105.220",
+        "passed": 5,
+        "runs": [
+          46092922023,
+          46092922008
+        ],
+        "evidence": "Exact full donor ARM executable reached real config-check main, expected AP absence refusal; QNX loader verified. No live OEM AP or RF."
+      }
+    ],
+    "discovery": "R105.221 stops repeated static searches: one-shot actual parked-vehicle read-only original btstack lifecycle and OSAPI snapshot tool, reuses verified snapshot functions, verifies exact stock executable path/file hash and mapped anchors; emits booleans only. No debug stop or OEM call, no lifecycle lease, no install. Requires actual car report for real state, cannot infer from CI.",
+    "expected_jobs": 5,
+    "pending_prior": [
       {
         "version": "Congo",
         "runs": [
@@ -228,7 +234,7 @@
         "observed": {
           "running": 1
         },
-        "note": "metadata alias resolver fixture passed, cache/build pending."
+        "note": "original ImageFS alias resolution pending actual extraction, fixture passed"
       }
     ]
   },
@@ -265,7 +271,7 @@
         "lab/mu1005_route4_5/supervised_startup.c",
         "lab/mu1005_route4_5/supervised_startup.h"
       ],
-      "evidence": "R105.219 QNX child runtime pending; R105.220 exact full production donor loader/config boundary test. Congo alias fix pending. Real OEM provider remains missing."
+      "evidence": "Full LuKa ARM loads, QNX inherited FD works. Live stock startup/OSAPI/owner evidence absent. Use R105.221 one-shot read-only report if available; not lease. Continue Congo actual dependency results."
     },
     {
       "priority": 2,
