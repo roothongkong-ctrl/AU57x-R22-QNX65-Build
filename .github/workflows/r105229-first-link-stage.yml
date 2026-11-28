@@ -1,0 +1,107 @@
+name: R105.229 minimal first-link payload and config transaction (NO INSTALL)
+on:
+  push:
+    branches: [mu1005-si-cprx-real-review]
+    paths: ['.github/workflows/r105229-first-link-stage.yml', 'integration/mu1005_vehicle_stage/config_transaction.sh']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  config:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [normal, crlf, wrong-hash, duplicate, existing]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise QNX-compatible config staging and byte-exact reverse
+        env:
+          CASE: ${{ matrix.scenario }}
+        run: |
+          set -euo pipefail
+          root=$(mktemp -d)
+          trap 'rm -rf "$root"' EXIT
+          touch "$root/LAB_ONLY"
+          mkdir "$root/original"
+          src="$root/original/connectivity.json"
+          python3 - "$src" <<'PY'
+          import sys,os,pathlib
+          eol=b"\r\n" if os.environ["CASE"]=="crlf" else b"\n"
+          lines=[b"{"]+[b"# retained comment"]*214+[b' "enableIap": false,',b' "other": 12',b"}"]
+          if os.environ["CASE"]=="duplicate": lines.insert(216,b' "enableIap": false,')
+          pathlib.Path(sys.argv[1]).write_bytes(eol.join(lines)+eol)
+          PY
+          pin=$(sha256sum "$src" | awk '{print $1}')
+          dest="$root/stage-one"
+          case "$CASE" in
+            wrong-hash) pin=bad ;;
+            existing) mkdir "$dest"; echo sentinel > "$dest/sentinel" ;;
+          esac
+          before=$(sha256sum "$src")
+          s=integration/mu1005_vehicle_stage/config_transaction.sh
+          sh -n "$s"
+          case "$CASE" in
+            normal|crlf)
+              sh "$s" host-fixture "$src" "$dest" "$root" "$pin"
+              cmp "$src" "$dest/original.json"
+              python3 - "$src" "$dest/candidate.json" <<'PY'
+          import sys,pathlib
+          a,b=map(lambda p:pathlib.Path(p).read_bytes(),sys.argv[1:])
+          assert b==a.replace(b'"enableIap": false',b'"enableIap": true')
+          PY
+              test "$(cat "$dest/COMPLETE")" = CONFIG_STAGED_NO_ACTIVATION
+              ;;
+            *)
+              if sh "$s" host-fixture "$src" "$dest" "$root" "$pin"; then exit 1; fi
+              test ! -f "$dest/COMPLETE"
+              if [ "$CASE" = existing ]; then test "$(cat "$dest/sentinel")" = sentinel; fi
+              ;;
+          esac
+          test "$before" = "$(sha256sum "$src")"
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reuse latest successful native and last actual ARM donor build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p stage/components/native stage/components/luka-arm stage/tools stage/source
+          gh run download 46102648356 --repo "$GITHUB_REPOSITORY" --name mu1005-si-cprx-arm-NO-INSTALL --dir stage/components/native
+          gh run download 46094722505 --repo "$GITHUB_REPOSITORY" --name R105225-full-donor-exit-NO-INSTALL --dir /tmp/donor
+          cp /tmp/donor/donor-daemon-MU1005-INHERITED-ACK-NO-INSTALL.bin stage/components/luka-arm/
+          cp /tmp/donor/STATUS.txt /tmp/donor/daemon.sha256 stage/components/luka-arm/
+          for f in LICENSE LICENSE.md COPYING; do if [ -f "/tmp/donor/$f" ]; then cp "/tmp/donor/$f" stage/components/luka-arm/; fi; done
+          cp integration/mu1005_vehicle_stage/{backup.sh,recover.sh,config_transaction.sh,congo_port_table.json} stage/tools/
+          cp -R lab/mu1005_donor_ie stage/source/
+          readelf -h stage/components/luka-arm/*.bin | grep -E 'Machine:.*ARM'
+          python3 - <<'PY'
+          import hashlib,json,pathlib,zipfile
+          root=pathlib.Path("stage")
+          bin=next((root/"components/luka-arm").glob("*.bin"))
+          assert hashlib.sha256(bin.read_bytes()).hexdigest()==(bin.parent/"daemon.sha256").read_text().split()[0]
+          rows=[]
+          for p in sorted(root.rglob("*")):
+              if p.is_symlink():raise ValueError("unexpected link")
+              if p.is_file(): rows.append({"path":str(p.relative_to(root)),"sha256":hashlib.sha256(p.read_bytes()).hexdigest(),"bytes":p.stat().st_size})
+          manifest={"target":"MHI2_CN_AU57x_K1006_2 / MU1005","installable":False,"vehicle_verified":False,"native_run":46102648356,"luka_arm_run":46094722505,"luka_arm_version":"R105.225 (R105.228 IE fix source only, NOT in binary)","missing":["actual OEM Bluetooth registration","production SI/DIO and original MFi owner binding","latest ARM IE build","live installation and rollback integration"],"files":rows}
+          (root/"manifest.json").write_text(json.dumps(manifest,indent=2))
+          (root/"DO_NOT_INSTALL.txt").write_text("Review payload only. Do not execute or flash. ARM daemon predates IE ownership fix.\n")
+          out="MU1005-first-link-payload-NO-INSTALL.zip"
+          with zipfile.ZipFile(out,"w",zipfile.ZIP_DEFLATED) as z:
+              for p in sorted(root.rglob("*")):
+                  if p.is_file():z.write(p,p.relative_to(root))
+          with zipfile.ZipFile(out) as z:
+              assert z.testzip() is None
+              assert all(hashlib.sha256(z.read(row["path"])).hexdigest()==row["sha256"] for row in rows)
+          print("PACKAGED_COMPONENTS",len(rows),"NO_INSTALL")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MU1005-first-link-payload-NO-INSTALL
+          path: MU1005-first-link-payload-NO-INSTALL.zip
+          retention-days: 14

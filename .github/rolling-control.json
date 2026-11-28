@@ -50,12 +50,12 @@
   },
   "baseline": {
     "commit": null,
-    "version": "R105.228",
+    "version": "R105.229",
     "observed_jobs": {
       "success": 0,
       "running": 0,
       "failed": 0,
-      "dependent_not_yet_listed": 5
+      "dependent_not_yet_listed": 10
     },
     "runs": [],
     "verified_prior": [
@@ -277,10 +277,19 @@
           46102648408
         ],
         "evidence": "All 13 jobs passed including full QNX native library and host Bluetooth trace; no OEM owner or phone."
+      },
+      {
+        "version": "R105.228",
+        "passed": 5,
+        "runs": [
+          46103867205,
+          46103867117
+        ],
+        "evidence": "Full actual donor host ownership test and EOF/error regression, plus four SI host regressions passed. No ARM build of ninth adapter."
       }
     ],
-    "discovery": "Actual LuKa full donor ninth adapter distinguishes borrowed stock AP advertisement from newly owned slot; only explicitly empty slot can be written; no periodic rewrite, no unowned removal; uncertain write retains owner marker. Host regression submitted; ARM rebuild not yet authorized by cache evidence; real OEM owner still unbound.",
-    "expected_jobs": 5,
+    "discovery": "Added QNX shell-only exact pinned connectivity.json delta and byte-reversible SD staging, with CRLF and failure regressions. Assemble last proven full ARM donor and current native payload, explicitly distinguish R105.228 source fix from R105.225 ARM binary. No live activation. Actual OEM registration still missing.",
+    "expected_jobs": 10,
     "pending_prior": []
   },
   "read_strategy": {
@@ -355,7 +364,8 @@
       "steps": [
         35
       ],
-      "task": "Prepare reversible first-link candidate in parallel, not after first physical phone link. Keep installation disabled until actual modified components and recovery are integrated; defer nonessential optimizations."
+      "task": "Prepare reversible first-link candidate in parallel, not after first physical phone link. Keep installation disabled until actual modified components and recovery are integrated; defer nonessential optimizations.",
+      "evidence": "R105.229 config transaction stages original and candidate to SD, no live overwrite; first-link package includes actual ARM executable and native artifact. Tests pending."
     }
   ],
   "rules": [
